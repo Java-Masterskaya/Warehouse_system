@@ -1,0 +1,36 @@
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Build
+build/
+.gradle/
+out/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Secrets / keys
+*.pem
+*.key
+*.p12
+*.jks
+
+# Docker override (local only)
+docker-compose.override.yml
