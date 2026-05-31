@@ -1,0 +1,24 @@
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/warehouse_db}
+    username: ${SPRING_DATASOURCE_USERNAME:warehouse_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:warehouse_password}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:admin123}
+      lettuce:
+        shutdown-timeout: 100ms
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+server:
+  port: 8080

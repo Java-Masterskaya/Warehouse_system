@@ -1,0 +1,94 @@
+services:
+
+  # -- Базы данных --
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: warehouse_db
+      POSTGRES_USER: warehouse_user
+      POSTGRES_PASSWORD: warehouse_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_user -d warehouse_db -t 10"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --appendonly yes --requirepass admin123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "admin123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -- Kafka --
+  zookeeper:
+    image: zookeeper:3.8
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: server.1=zookeeper:2888:3888;2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CREATE_TOPICS: "low-stock-alerts:1:1"
+    depends_on:
+      - zookeeper
+
+  # -- Приложение --
+  warehouse-app:
+    build: .
+    container_name: warehouse-app
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/warehouse_db
+      SPRING_DATASOURCE_USERNAME: warehouse_user
+      SPRING_DATASOURCE_PASSWORD: warehouse_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: admin123
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    
+volumes:
+  postgres_data:
+  redis_data:
