@@ -4,17 +4,14 @@ services:
   postgres:
     image: postgres:16
     container_name: postgres
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_DB: warehouse_db
-      POSTGRES_USER: warehouse_user
-      POSTGRES_PASSWORD: warehouse_password
+    env_file:
+      - .env
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U warehouse_user -d warehouse_db -t 10"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -t 10 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,13 +19,15 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
-    command: redis-server --appendonly yes --requirepass admin123
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
+    env_file:
+      - .env
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "admin123", "ping"]
+      test: ["CMD", "sh", "-c", "redis-cli -a $$REDIS_PASSWORD ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -71,16 +70,9 @@ services:
     build: .
     container_name: warehouse-app
     ports:
-      - "8080:8080"
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/warehouse_db
-      SPRING_DATASOURCE_USERNAME: warehouse_user
-      SPRING_DATASOURCE_PASSWORD: warehouse_password
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: admin123
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      - "${SERVER_PORT}:8080"
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy

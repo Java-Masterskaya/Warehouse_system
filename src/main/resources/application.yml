@@ -1,15 +1,16 @@
+# yaml-language-server: $schema=https://json.schemastore.org/spring-configuration-properties.json
 spring:
   config:
     activate:
       on-profile: docker
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/warehouse_db}
-    username: ${SPRING_DATASOURCE_USERNAME:warehouse_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:warehouse_password}
+    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+    username: ${POSTGRES_USER:warehouse_user}
+    password: ${POSTGRES_PASSWORD:change_me}
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:admin123}
       lettuce:
@@ -21,4 +22,4 @@ management:
       show-details: always
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
