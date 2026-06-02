@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/warehouse
+    username: warehouse_user
+    password: warehouse_password
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: admin123
+  kafka:
+    bootstrap-servers: localhost:9092
+  jpa:
+    show-sql: true
