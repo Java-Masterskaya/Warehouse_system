@@ -33,37 +33,28 @@ services:
       retries: 5
 
   # -- Kafka --
-  zookeeper:
-    image: zookeeper:3.8
-    container_name: zookeeper
-    ports:
-      - "2181:2181"
-    environment:
-      ZOO_MY_ID: 1
-      ZOO_SERVERS: server.1=zookeeper:2888:3888;2181
-
   kafka:
-    image: confluentinc/cp-kafka:7.6.1
+    image: docker.redpanda.com/redpandadata/redpanda:v23.2.11
     container_name: kafka
     ports:
-      - "9092:9092"
+      - "9092:9092"  # Kafka API (для приложения и CLI)
+      - "8081:8081"  # Schema Registry (для управления схемами)
+    command:
+      - redpanda
+      - start
+      - --kafka-addr
+      - internal://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - localhost:9092
+      - --schema-registry-addr
+      - internal://0.0.0.0:8081
+      - --mode
+      - dev-container
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      test: ["CMD", "rpk", "cluster", "info"]
       interval: 15s
       timeout: 10s
       retries: 10
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_CREATE_TOPICS: "low-stock-alerts:1:1"
-    depends_on:
-      - zookeeper
 
   # -- Приложение --
   warehouse-app:
