@@ -35,8 +35,10 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.+'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'com.h2database:h2'
 }
 
 test {
     useJUnitPlatform()
+    environment 'SPRING_PROFILES_ACTIVE', 'test'
 }

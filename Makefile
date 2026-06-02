@@ -1,5 +1,5 @@
 # Makefile для управления стеком приложения Warehouse System
-.PHONY: up down app-up app-down infra-up infra-down health
+.PHONY: up down app-up app-down infra-up infra-down health test
 
 ## --- Управление всем стеком ---
 up: ## Запуск всего стека (инфраструктура, приложение)
@@ -26,6 +26,10 @@ app-down: ## Остановка приложения (SIGTERM)
 health: ## Проверка работоспособности через Actuator
 	@echo "Проверка статуса приложения..."
 	@curl -s -H "Accept: application/json" http://localhost:8080/actuator/health
+
+## --- Тестирование ---
+test: ## Запуск тестов
+	./gradlew clean test
 
 ## --- Вспомогательные команды ---
 clean: ## Остановка и удаление контейнеров и томов
