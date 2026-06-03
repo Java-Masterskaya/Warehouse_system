@@ -14,9 +14,13 @@ public interface ItemMapper {
     Item toEntity(CreateItemRequest request);
     ItemResponse toResponse(Item item);
 
-    @Mapping(target = "currentStock", ignore = true)
-        // игнорируем, если нет в Item
+    @Mapping(target = "currentStock", ignore = true) // игнорируем, если нет в Item
     ItemDetails toItemDetails(Item item);
 
-    Item updateItemFromRequest(ItemUpdateRequest request, @MappingTarget Item item);
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "sku", ignore = true)
+    @Mapping(target = "active", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    void updateItemFromRequest(ItemUpdateRequest request, @MappingTarget Item item);
 }

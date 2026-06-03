@@ -7,8 +7,10 @@ import com.warehouse.entity.Stock;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,11 +32,16 @@ class ItemServiceTest {
     @Mock
     private StockRepository stockRepository;
 
-    @Mock
-    private ItemMapper itemMapper;
-
     @InjectMocks
     private ItemService itemService;
+
+    @BeforeEach
+    void setUp() {
+        // Используем реальную реализацию MapStruct
+        ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
+        // Внедряем её в сервис вручную
+        itemService = new ItemService(itemRepository, stockRepository, itemMapper);
+    }
 
     // Успешное обновление активного товара
     @Test
@@ -63,7 +70,6 @@ class ItemServiceTest {
         // 2. Настройка моков
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(itemMapper.toItemDetails(existingItem)).thenReturn(expectedDetails);
         when(stockRepository.findByItemId(itemId)).thenReturn(Optional.of(stock));
 
         // 3. Выполнение
@@ -78,7 +84,6 @@ class ItemServiceTest {
 
         verify(itemRepository, times(1)).findById(itemId);
         verify(itemRepository, times(1)).save(existingItem);
-        verify(itemMapper, times(1)).toItemDetails(existingItem);
         verify(stockRepository, times(1)).findByItemId(itemId);
     }
 
@@ -160,7 +165,6 @@ class ItemServiceTest {
         // 2. Настройка моков (Stubbing)
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(itemMapper.toItemDetails(existingItem)).thenReturn(mockedDetails);
 
         // Имитируем отсутствие записи об остатках в БД
         when(stockRepository.findByItemId(itemId)).thenReturn(Optional.empty());
@@ -180,7 +184,6 @@ class ItemServiceTest {
         // Проверяем вызовы методов
         verify(itemRepository, times(1)).findById(itemId);
         verify(itemRepository, times(1)).save(existingItem);
-        verify(itemMapper, times(1)).toItemDetails(existingItem);
         verify(stockRepository, times(1)).findByItemId(itemId);
     }
 }
