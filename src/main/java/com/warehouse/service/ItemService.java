@@ -3,7 +3,6 @@ package com.warehouse.service;
 import com.warehouse.dto.ItemDetails;
 import com.warehouse.dto.ItemUpdateRequest;
 import com.warehouse.entity.Item;
-import com.warehouse.entity.Stock;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -35,7 +34,7 @@ public class ItemService {
             );
         }
 
-        item = itemMapper.updateItemFromRequest(request, item);
+        itemMapper.updateItemFromRequest(request, item);
 
         Item savedItem = itemRepository.save(item);
         ItemDetails details = itemMapper.toItemDetails(savedItem);
