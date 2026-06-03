@@ -35,19 +35,16 @@ public class ItemService {
             );
         }
 
-        item.setName(request.getName());
-        item.setCategory(request.getCategory());
-        item.setMinStock(request.getMinStock());
+        item = itemMapper.updateItemFromRequest(request, item);
 
         Item savedItem = itemRepository.save(item);
         ItemDetails details = itemMapper.toItemDetails(savedItem);
 
-        Stock stock = stockRepository.findByItemId(savedItem.getId()).orElse(null);
-        if (stock != null) {
-            details.setCurrentStock(stock.getQuantity());
-        } else {
-            details.setCurrentStock(0);
-        }
+        stockRepository.findByItemId(savedItem.getId())
+                .ifPresent(stock -> {
+                    details.setCurrentStock(stock.getQuantity());
+                });
+        if (details.getCurrentStock() == null) details.setCurrentStock(0);
         return details;
     }
 }
