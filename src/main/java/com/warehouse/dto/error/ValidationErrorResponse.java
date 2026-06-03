@@ -2,14 +2,13 @@ package com.warehouse.dto.error;
 
 import lombok.Getter;
 
-import java.util.Map;
+import java.time.Instant;
+import java.util.List;
 
 @Getter
-public class ValidationErrorResponse extends ErrorResponse {
-    private final Map<String, String> fields;
+public record ValidationErrorResponse(String error, String message, Instant timestamp, List<FieldError> fields) {
 
-    public ValidationErrorResponse(String error, String message, Map<String, String> fields) {
-        super(error, message);
-        this.fields = fields;
+    public ValidationErrorResponse(String error, String message, List<FieldError> fields) {
+        this(error, message, Instant.now(), fields);
     }
 }
