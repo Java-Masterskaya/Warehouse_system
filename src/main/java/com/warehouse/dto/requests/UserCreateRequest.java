@@ -14,8 +14,8 @@ public class UserCreateRequest {
     @Size(max = 100)
     private String username;
 
-    @Size(min = 8, max = 255, message = "Категория не может быть пустой")
-    @NotNull(message = "Пароль не должен быть пустой")
+    @Size(min = 8, max = 255, message = "Пароль не может быть пустой")
+    @NotBlank(message = "Пароль не должен быть пустой")
     private String password;
 
     @NotNull(message = "Права пользователя не могут быть null")
