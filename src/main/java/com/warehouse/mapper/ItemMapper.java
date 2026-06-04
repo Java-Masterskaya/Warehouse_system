@@ -1,9 +1,9 @@
 package com.warehouse.mapper;
 
 import com.warehouse.dto.request.CreateItemRequest;
-import com.warehouse.dto.responce.ItemResponse;
-import com.warehouse.dto.ItemDetails;
-import com.warehouse.dto.ItemUpdateRequest;
+import com.warehouse.dto.response.ItemResponse;
+import com.warehouse.dto.response.ItemDetails;
+import com.warehouse.dto.request.UpdateItemRequest;
 import com.warehouse.entity.Item;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -14,7 +14,7 @@ public interface ItemMapper {
     Item toEntity(CreateItemRequest request);
     ItemResponse toResponse(Item item);
 
-    @Mapping(target = "currentStock", ignore = true) // игнорируем, если нет в Item
+    @Mapping(target = "currentStock", ignore = true)
     ItemDetails toItemDetails(Item item);
 
     @Mapping(target = "id", ignore = true)
@@ -22,5 +22,5 @@ public interface ItemMapper {
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    void updateItemFromRequest(ItemUpdateRequest request, @MappingTarget Item item);
+    void updateItemFromRequest(UpdateItemRequest request, @MappingTarget Item item);
 }

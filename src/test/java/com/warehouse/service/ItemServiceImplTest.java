@@ -1,7 +1,7 @@
 package com.warehouse.service;
 
-import com.warehouse.dto.ItemDetails;
-import com.warehouse.dto.ItemUpdateRequest;
+import com.warehouse.dto.response.ItemDetails;
+import com.warehouse.dto.request.UpdateItemRequest;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.mapper.ItemMapper;
@@ -11,7 +11,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -21,10 +20,13 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ItemServiceTest {
+class ItemServiceImplTest {
 
     @Mock
     private ItemRepository itemRepository;
@@ -32,7 +34,6 @@ class ItemServiceTest {
     @Mock
     private StockRepository stockRepository;
 
-    @InjectMocks
     private ItemService itemService;
 
     @BeforeEach
@@ -40,7 +41,7 @@ class ItemServiceTest {
         // Используем реальную реализацию MapStruct
         ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
         // Внедряем её в сервис вручную
-        itemService = new ItemService(itemRepository, stockRepository, itemMapper);
+        itemService = new ItemServiceImpl(itemRepository, stockRepository, itemMapper);
     }
 
     // Успешное обновление активного товара
@@ -55,10 +56,8 @@ class ItemServiceTest {
         existingItem.setMinStock(5);
         existingItem.setActive(true); // Товар активен
 
-        ItemUpdateRequest request = new ItemUpdateRequest();
-        request.setName("Новое название");
-        request.setCategory("Новая категория");
-        request.setMinStock(10);
+        UpdateItemRequest request = new UpdateItemRequest("Новое название",
+                "Новая категория", 10);
 
         Stock stock = new Stock();
         stock.setItem(existingItem);
@@ -92,10 +91,9 @@ class ItemServiceTest {
     void updateItem_ItemNotFound_ThrowsException() {
         // 1. Подготовка данных
         Long itemId = 99L;
-        ItemUpdateRequest request = new ItemUpdateRequest();
-        request.setName("Тест");
-        request.setCategory("Тест Категория");
-        request.setMinStock(1);
+
+        UpdateItemRequest request = new UpdateItemRequest("Тест",
+                "Тест Категория", 1);
 
         // 2. Настройка моков
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
@@ -122,10 +120,8 @@ class ItemServiceTest {
         inactiveItem.setId(itemId);
         inactiveItem.setActive(false);
 
-        ItemUpdateRequest request = new ItemUpdateRequest();
-        request.setName("Тест");
-        request.setCategory("Тест Категория");
-        request.setMinStock(1);
+        UpdateItemRequest request = new UpdateItemRequest("Тест",
+                "Тест Категория", 1);
 
         // 2. Настройка моков
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
@@ -155,10 +151,8 @@ class ItemServiceTest {
         existingItem.setMinStock(5);
         existingItem.setActive(true);
 
-        ItemUpdateRequest request = new ItemUpdateRequest();
-        request.setName("Обновленное название");
-        request.setCategory("Обновленная категория");
-        request.setMinStock(15);
+        UpdateItemRequest request = new UpdateItemRequest("Обновленное название",
+                "Обновленная категория", 15);
 
         ItemDetails mockedDetails = new ItemDetails();
 

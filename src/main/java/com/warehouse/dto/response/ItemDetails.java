@@ -1,4 +1,4 @@
-package com.warehouse.dto;
+package com.warehouse.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ItemDetails {
+public class ItemDetails { // Есть изменяемые поля, оставил как класс
     private Long id;
     private String sku;
     private String name;

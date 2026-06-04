@@ -77,7 +77,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ItemUpdateRequest'
+              $ref: '#/components/schemas/UpdateItemRequest'
       responses:
         '200':
           description: Товар успешно обновлен
@@ -212,7 +212,7 @@ components:
           description: "Минимальный уровень остатка, при котором нужно отправить уведомление (Kafka)"
           example: 5
 
-    ItemUpdateRequest:
+    UpdateItemRequest:
       type: object
       description: "Данные для обновления товара. SKU изменить нельзя."
       required:
