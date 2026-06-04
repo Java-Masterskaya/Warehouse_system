@@ -51,10 +51,7 @@ public class GlobalExceptionHandler {
                 .map(fieldError -> new FieldError(fieldError.getField(), fieldError.getDefaultMessage()))
                 .toList();
 
-        return new ValidationErrorResponse(
-                "VALIDATION_ERROR",
-                "Validation failed for one or more fields",
-                fieldErrors);
+        return new ValidationErrorResponse("VALIDATION_ERROR", fieldErrors);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

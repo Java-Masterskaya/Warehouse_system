@@ -14,8 +14,6 @@ public class ValidationErrorResponseSerializer extends JsonSerializer<Validation
                           SerializerProvider serializers) throws IOException {
         gen.writeStartObject();
         gen.writeStringField("error", value.error());
-        gen.writeStringField("message", value.message());
-        gen.writeObjectField("timestamp", value.timestamp());
         gen.writeObjectFieldStart("fields");
         for (FieldError fieldError : value.fields()) {
             gen.writeStringField(fieldError.field(), fieldError.message());

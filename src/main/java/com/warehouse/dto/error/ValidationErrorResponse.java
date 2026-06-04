@@ -1,11 +1,14 @@
 package com.warehouse.dto.error;
 
-import java.time.Instant;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
 import java.util.List;
 
-public record ValidationErrorResponse(String error, String message, Instant timestamp, List<FieldError> fields) {
+@JsonSerialize(using = ValidationErrorResponseSerializer.class)
+public record ValidationErrorResponse(String error, List<FieldError> fields) {
 
-    public ValidationErrorResponse(String error, String message, List<FieldError> fields) {
-        this(error, message, Instant.now(), fields);
+    public ValidationErrorResponse(String error, List<FieldError> fields) {
+        this.error = error;
+        this.fields = fields;
     }
 }
