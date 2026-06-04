@@ -1,4 +1,4 @@
-package com.warehouse.dto;
+package com.warehouse.dto.responce;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
