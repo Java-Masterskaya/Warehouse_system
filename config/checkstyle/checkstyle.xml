@@ -104,7 +104,9 @@
         <!-- Пробелы после запятых, точек с запятыми -->
         <module name="WhitespaceAfter"/>
         <!-- Пробелы вокруг операторов -->
-        <module name="WhitespaceAround"/>
+        <module name="WhitespaceAround">
+            <property name="allowEmptyTypes" value="true"/>
+        </module>
 
         <!-- Модификаторы -->
         <!-- Правильный порядок модификаторов (public static final) -->
