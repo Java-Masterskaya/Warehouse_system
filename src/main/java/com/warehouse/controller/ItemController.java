@@ -1,7 +1,7 @@
 package com.warehouse.controller;
 
-import com.warehouse.dto.CreateItemRequest;
-import com.warehouse.dto.ItemResponse;
+import com.warehouse.dto.request.CreateItemRequest;
+import com.warehouse.dto.responce.ItemResponse;
 import com.warehouse.service.ItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -1,7 +1,7 @@
 package com.warehouse.service;
 
-import com.warehouse.dto.CreateItemRequest;
-import com.warehouse.dto.ItemResponse;
+import com.warehouse.dto.request.CreateItemRequest;
+import com.warehouse.dto.responce.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
