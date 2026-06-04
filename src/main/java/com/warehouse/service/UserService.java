@@ -23,7 +23,7 @@ public class UserService {
     @Transactional
     public UserResponse createUser(UserCreateRequest request) {
         log.debug("Create user with name '{}'", request.getUsername());
-        if (userRepository.existByUsername(request.getUsername())) {
+        if (userRepository.existsByUsername(request.getUsername())) {
             log.warn("User '{}' is already exist", request.getUsername());
             throw new UserAlreadyExistException(request.getUsername());
         }
