@@ -19,18 +19,23 @@ class WarehouseAppContextTest {
     // @ServiceConnection автоматически пробрасывает datasource URL/credentials в контекст Spring
     @Container
     @ServiceConnection
+    @SuppressWarnings("unused")
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @Container
+    @SuppressWarnings("unused")
     @ServiceConnection
     static RedpandaContainer redpanda = new RedpandaContainer(
             DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"));
 
     // GenericContainer вместо RedisContainer: @ServiceConnection для Redis не поддерживает пароль,
     // поэтому пробрасываем свойства вручную через @DynamicPropertySource
+    private static final int REDIS_PORT = 6379;
+
     @Container
+    @SuppressWarnings("resource")
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(6379);
+            .withExposedPorts(REDIS_PORT);
 
     @DynamicPropertySource
     static void redisProperties(DynamicPropertyRegistry registry) {
