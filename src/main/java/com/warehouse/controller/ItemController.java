@@ -2,7 +2,6 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.CreateItemRequest;
 import com.warehouse.dto.response.ItemResponse;
-import com.warehouse.dto.response.ItemDetails;
 import com.warehouse.dto.request.UpdateItemRequest;
 import com.warehouse.service.ItemService;
 import jakarta.validation.Valid;
@@ -34,7 +33,7 @@ public class ItemController {
     @PutMapping("/{itemId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public ItemDetails updateItem(
+    public ItemResponse updateItem(
             @PathVariable Long itemId,
             @Valid @RequestBody UpdateItemRequest request) {
         return itemService.updateItem(itemId, request);

@@ -1,6 +1,5 @@
 package com.warehouse.service;
 
-import com.warehouse.dto.response.ItemDetails;
 import com.warehouse.dto.request.UpdateItemRequest;
 import com.warehouse.dto.request.CreateItemRequest;
 import com.warehouse.dto.response.ItemResponse;
@@ -50,7 +49,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
-    public ItemDetails updateItem(Long itemId, UpdateItemRequest request) {
+    public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
@@ -68,14 +67,6 @@ public class ItemServiceImpl implements ItemService {
         item.setMinStock(request.minStock());
 
         Item savedItem = itemRepository.save(item);
-        ItemDetails details = itemMapper.toItemDetails(savedItem);
-
-        Stock stock = stockRepository.findByItemId(savedItem.getId()).orElse(null);
-        if (stock != null) {
-            details.setCurrentStock(stock.getQuantity());
-        } else {
-            details.setCurrentStock(0);
-        }
-        return details;
+        return itemMapper.toResponse(savedItem);
     }
 }

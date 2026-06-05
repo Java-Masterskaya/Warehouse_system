@@ -1,9 +1,8 @@
 package com.warehouse.mapper;
 
 import com.warehouse.dto.request.CreateItemRequest;
-import com.warehouse.dto.response.ItemResponse;
-import com.warehouse.dto.response.ItemDetails;
 import com.warehouse.dto.request.UpdateItemRequest;
+import com.warehouse.dto.response.ItemResponse;
 import com.warehouse.entity.Item;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -14,9 +13,6 @@ public interface ItemMapper {
     Item toEntity(CreateItemRequest request);
 
     ItemResponse toResponse(Item item);
-
-    @Mapping(target = "currentStock", ignore = true)
-    ItemDetails toItemDetails(Item item);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "sku", ignore = true)
