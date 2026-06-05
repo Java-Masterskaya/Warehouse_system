@@ -4,7 +4,6 @@ import com.warehouse.dto.requests.UserCreateRequest;
 import com.warehouse.dto.responses.UserResponse;
 import com.warehouse.entity.User;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface UserMapper {
