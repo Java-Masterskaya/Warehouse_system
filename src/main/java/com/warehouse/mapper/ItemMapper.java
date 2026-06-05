@@ -12,6 +12,7 @@ import org.mapstruct.MappingTarget;
 @Mapper(componentModel = "spring")
 public interface ItemMapper {
     Item toEntity(CreateItemRequest request);
+
     ItemResponse toResponse(Item item);
 
     @Mapping(target = "currentStock", ignore = true)
