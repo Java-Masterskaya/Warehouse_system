@@ -11,8 +11,16 @@
     - Lombok генерирует геттеры, сеттеры и другие методы во время компиляции
     - Правила включают проверку скрытых полей (ignoreConstructorParameter, ignoreSetter)
     - Это позволяет избежать ложных срабатываний на Lombok-генерируемый код
+    
+    Подавления:
+    - Магические числа разрешены в тестовых файлах (через SuppressionFilter)
 -->
 <module name="Checker">
+    <!-- Подавления для тестов -->
+    <module name="SuppressionFilter">
+        <property name="file" value="${config_loc}/suppressions.xml"/>
+    </module>
+
     <!-- Проверка кодировки файлов -->
     <property name="charset" value="UTF-8"/>
 

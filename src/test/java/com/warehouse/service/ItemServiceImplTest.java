@@ -38,10 +38,6 @@ class ItemServiceImplTest {
 
     private ItemService itemService;
 
-    private static final long ITEM_ID = 3L;
-    private static final int INITIAL_MIN_STOCK = 5;
-    private static final int UPDATED_MIN_STOCK = 10;
-
     @BeforeEach
     void setUp() {
         // Используем реальную реализацию MapStruct
@@ -54,16 +50,16 @@ class ItemServiceImplTest {
     @Test
     void updateItemSuccess() {
         // 1. Подготовка данных
-        Long itemId = ITEM_ID;
+        Long itemId = 3L;
         Item existingItem = new Item();
         existingItem.setId(itemId);
         existingItem.setName("Старое название");
         existingItem.setCategory("Старая категория");
-        existingItem.setMinStock(INITIAL_MIN_STOCK);
+        existingItem.setMinStock(5);
         existingItem.setActive(true); // Товар активен
 
         UpdateItemRequest request = new UpdateItemRequest("Новое название",
-                "Новая категория", UPDATED_MIN_STOCK);
+                "Новая категория", 10);
 
         // 2. Настройка моков
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
@@ -76,7 +72,7 @@ class ItemServiceImplTest {
         assertNotNull(result);
         assertEquals("Новое название", existingItem.getName());
         assertEquals("Новая категория", existingItem.getCategory());
-        assertEquals(UPDATED_MIN_STOCK, existingItem.getMinStock());
+        assertEquals(10, existingItem.getMinStock());
 
         verify(itemRepository, times(1)).findById(itemId);
         verify(itemRepository, times(1)).save(existingItem);
@@ -86,10 +82,10 @@ class ItemServiceImplTest {
     @Test
     void updateItemItemNotFoundThrowsException() {
         // 1. Подготовка данных
-        Long itemId = ITEM_ID;
+        Long itemId = 3L;
 
         UpdateItemRequest request = new UpdateItemRequest("Тест",
-                "Тест Категория", UPDATED_MIN_STOCK);
+                "Тест Категория", 10);
 
         // 2. Настройка моков
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
@@ -111,13 +107,13 @@ class ItemServiceImplTest {
     @Test
     void updateItemItemInactiveThrowsException() {
         // 1. Подготовка данных
-        Long itemId = ITEM_ID;
+        Long itemId = 3L;
         Item inactiveItem = new Item();
         inactiveItem.setId(itemId);
         inactiveItem.setActive(false);
 
         UpdateItemRequest request = new UpdateItemRequest("Тест",
-                "Тест Категория", UPDATED_MIN_STOCK);
+                "Тест Категория", 10);
 
         // 2. Настройка моков
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));

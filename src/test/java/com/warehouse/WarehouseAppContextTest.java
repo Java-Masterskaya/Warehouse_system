@@ -28,14 +28,10 @@ class WarehouseAppContextTest {
     static RedpandaContainer redpanda = new RedpandaContainer(
             DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"));
 
-    // GenericContainer вместо RedisContainer: @ServiceConnection для Redis не поддерживает пароль,
-    // поэтому пробрасываем свойства вручную через @DynamicPropertySource
-    private static final int REDIS_PORT = 6379;
-
     @Container
     @SuppressWarnings("resource")
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(REDIS_PORT);
+            .withExposedPorts(6379);
 
     @DynamicPropertySource
     static void redisProperties(DynamicPropertyRegistry registry) {
