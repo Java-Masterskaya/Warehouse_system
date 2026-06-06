@@ -12,13 +12,15 @@ import org.springframework.stereotype.Repository;
 public interface StockMovementRepository extends JpaRepository<StockMovement, Long> {
 
     /**
-     * Получить все движения товара (для внутреннего использования, без пагинации)
+     * Получить все движения товара (для внутреннего использования, без пагинации).
+     * @param itemId ID товара
+     * @return Список отсортированный по убыванию.
      */
     List<StockMovement> findByItemIdOrderByCreatedAtDesc(Long itemId);
 
     /**
-     * Получить историю движений товара с пагинацией (для эндпоинта GET /api/v1/items/{itemId}/movements)
-     * Сортировку передаем через Pageable
+     * Получить историю движений товара с пагинацией (для эндпоинта GET /api/v1/items/{itemId}/movements).
+     * Сортировку передаем через Pageable.
      * @param itemId ID товара
      * @param pageable параметры пагинации (page, size, sort)
      * @return страница с записями движений
@@ -26,8 +28,8 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     Page<StockMovement> findByItemId(Long itemId, Pageable pageable);
 
     /**
-     * Получить историю движений товара с фильтрацией по типу (с пагинацией)
-     * Сортировку передаем через Pageable
+     * Получить историю движений товара с фильтрацией по типу (с пагинацией).
+     * Сортировку передаем через Pageable.
      * @param itemId ID товара
      * @param type тип движения (RECEIVE или WRITE_OFF)
      * @param pageable параметры пагинации
