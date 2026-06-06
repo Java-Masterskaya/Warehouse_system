@@ -50,8 +50,9 @@ class ItemServiceImplTest {
     @Test
     void updateItemSuccess() {
         // 1. Подготовка данных
+        Long itemId = 3L;
         Item existingItem = new Item();
-        existingItem.setId(3L);
+        existingItem.setId(itemId);
         existingItem.setName("Старое название");
         existingItem.setCategory("Старая категория");
         existingItem.setMinStock(5);
@@ -61,11 +62,11 @@ class ItemServiceImplTest {
                 "Новая категория", 10);
 
         // 2. Настройка моков
-        when(itemRepository.findById(3L)).thenReturn(Optional.of(existingItem));
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // 3. Выполнение
-        ItemResponse result = itemService.updateItem(3L, request);
+        ItemResponse result = itemService.updateItem(itemId, request);
 
         // 4. Проверки
         assertNotNull(result);
@@ -73,7 +74,7 @@ class ItemServiceImplTest {
         assertEquals("Новая категория", existingItem.getCategory());
         assertEquals(10, existingItem.getMinStock());
 
-        verify(itemRepository, times(1)).findById(3L);
+        verify(itemRepository, times(1)).findById(itemId);
         verify(itemRepository, times(1)).save(existingItem);
     }
 
@@ -81,16 +82,17 @@ class ItemServiceImplTest {
     @Test
     void updateItemItemNotFoundThrowsException() {
         // 1. Подготовка данных
+        Long itemId = 3L;
 
         UpdateItemRequest request = new UpdateItemRequest("Тест",
                 "Тест Категория", 10);
 
         // 2. Настройка моков
-        when(itemRepository.findById(3L)).thenReturn(Optional.empty());
+        when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
         // 3. Выполнение и проверка исключения
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
-            itemService.updateItem(3L, request);
+            itemService.updateItem(itemId, request);
         });
 
         // 4. Проверка деталей исключения
@@ -105,19 +107,20 @@ class ItemServiceImplTest {
     @Test
     void updateItemItemInactiveThrowsException() {
         // 1. Подготовка данных
+        Long itemId = 3L;
         Item inactiveItem = new Item();
-        inactiveItem.setId(3L);
+        inactiveItem.setId(itemId);
         inactiveItem.setActive(false);
 
         UpdateItemRequest request = new UpdateItemRequest("Тест",
                 "Тест Категория", 10);
 
         // 2. Настройка моков
-        when(itemRepository.findById(3L)).thenReturn(Optional.of(inactiveItem));
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
         // 3. Выполнение и проверка исключения
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
-            itemService.updateItem(3L, request);
+            itemService.updateItem(itemId, request);
         });
 
         // 4. Проверка деталей исключения
