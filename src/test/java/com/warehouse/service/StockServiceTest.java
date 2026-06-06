@@ -85,11 +85,11 @@ class StockServiceTest {
         assertEquals(EXPECTED_STOCK_AFTER_WRITE_OFF, stock.getQuantity());
 
         verify(movementRepository).save(argThat(movement ->
-                movement.getItem().equals(item) &&
-                        movement.getUser().equals(user) &&
-                        movement.getType() == MovementType.WRITE_OFF &&
-                        movement.getQuantity() == WRITE_OFF_AMOUNT &&
-                        COMMENT_WRITE_OFF.equals(movement.getComment())
+                movement.getItem().equals(item)
+                        && movement.getUser().equals(user)
+                        && movement.getType() == MovementType.WRITE_OFF
+                        && movement.getQuantity() == WRITE_OFF_AMOUNT
+                        && COMMENT_WRITE_OFF.equals(movement.getComment())
         ));
     }
 
@@ -156,7 +156,7 @@ class StockServiceTest {
     // ==========================================
 
     @Test
-    void receive_Success() {
+    void receiveSuccess() {
         User user = new User();
 
         Item item = createActiveItem(ITEM_ID);
@@ -174,8 +174,8 @@ class StockServiceTest {
         assertEquals(EXPECTED_STOCK_AFTER_RECEIVE, stock.getQuantity());
 
         verify(movementRepository).save(argThat(movement ->
-                movement.getType() == MovementType.RECEIVE &&
-                        movement.getQuantity() == RECEIVE_AMOUNT
+                movement.getType() == MovementType.RECEIVE
+                        && movement.getQuantity() == RECEIVE_AMOUNT
         ));
     }
 
