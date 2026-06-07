@@ -9,7 +9,6 @@ import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.StockMovementMapper;
-import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import jakarta.transaction.Transactional;
@@ -30,7 +29,6 @@ import org.springframework.stereotype.Service;
 public class StockMovementServiceImpl implements StockMovementService {
 
     StockMovementMapper mapper;
-    ItemRepository itemRepository;
     StockRepository stockRepository;
     StockMovementRepository stockMovementRepository;
 
@@ -48,22 +46,18 @@ public class StockMovementServiceImpl implements StockMovementService {
         int quantity = request.quantity();
         Long itemId = request.itemId();
 
-        Item item = itemRepository.findById(itemId)
+        Stock stock = stockRepository.findWithItemById(itemId)
             .orElseThrow(() -> {
-                log.warn("Item not found: itemId={}, userId={}", itemId, user.getId());
-                return EntityNotFoundException.forId("Item", itemId);
+                log.warn("Stock not found for item: itemId={}, userId={}", itemId, user.getId());
+                return EntityNotFoundException.forId("Stock", itemId);
             });
+
+        Item item = stock.getItem();
 
         if (!item.isActive()) {
             log.warn("Attempt to replenish inactive item: itemId={}, userId={}", itemId, user.getId());
             throw EntityNotFoundException.forId("Item", itemId);
         }
-
-        Stock stock = stockRepository.findByItemId(itemId)
-            .orElseThrow(() -> {
-                log.warn("Stock not found for item: itemId={}, userId={}", itemId, user.getId());
-                return EntityNotFoundException.forId("Stock", itemId);
-            });
 
         StockMovement stockMovement = StockMovement.builder()
             .item(item)
@@ -74,8 +68,8 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         stock.setQuantity(stock.getQuantity() + quantity);
 
-        stockMovementRepository.save(stockMovement);
         stockRepository.save(stock);
+        stockMovementRepository.save(stockMovement);
 
         log.info("Stock replenishment: itemId={}, quantity={}, newTotal={}, userId={}",
             itemId, quantity, stock.getQuantity(), user.getId());

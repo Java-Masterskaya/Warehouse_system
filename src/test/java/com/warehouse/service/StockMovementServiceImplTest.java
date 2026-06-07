@@ -10,7 +10,6 @@ import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.StockMovementMapper;
-import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,9 +38,6 @@ import static org.mockito.Mockito.when;
 class StockMovementServiceImplTest {
 
     @Mock
-    private ItemRepository itemRepository;
-
-    @Mock
     private StockRepository stockRepository;
 
     @Mock
@@ -54,7 +50,6 @@ class StockMovementServiceImplTest {
         StockMovementMapper mapper = Mappers.getMapper(StockMovementMapper.class);
         stockMovementService = new StockMovementServiceImpl(
             mapper,
-            itemRepository,
             stockRepository,
             stockMovementRepository
         );
@@ -87,8 +82,7 @@ class StockMovementServiceImplTest {
             .quantity(50)
             .build();
 
-        when(itemRepository.findById(itemId)).thenReturn(Optional.of(item));
-        when(stockRepository.findByItemId(itemId)).thenReturn(Optional.of(stock));
+        when(stockRepository.findWithItemById(itemId)).thenReturn(Optional.of(stock));
         when(stockMovementRepository.save(any(StockMovement.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
         when(stockRepository.save(any(Stock.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -101,17 +95,16 @@ class StockMovementServiceImplTest {
         assertEquals(MovementType.RECEIVE, result.type());
         assertEquals(60, result.stockAfter());
 
-        verify(itemRepository, times(1)).findById(itemId);
-        verify(stockRepository, times(1)).findByItemId(itemId);
+        verify(stockRepository, times(1)).findWithItemById(itemId);
         verify(stockMovementRepository, times(1)).save(any(StockMovement.class));
         verify(stockRepository, times(1)).save(any(Stock.class));
     }
 
     /**
-     * Тест: Исключение при отсутствии товара.
+     * Тест: Исключение при отсутствии остатка на складе.
      */
     @Test
-    void receiveStockItemNotFoundThrowsException() {
+    void receiveStockStockNotFoundThrowsException() {
         Long itemId = 1L;
         User user = User.builder()
             .id(1L)
@@ -119,13 +112,13 @@ class StockMovementServiceImplTest {
 
         CreateStockMovementRequest request = new CreateStockMovementRequest(itemId, 10);
 
-        when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
+        when(stockRepository.findWithItemById(itemId)).thenReturn(Optional.empty());
 
         EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
             stockMovementService.receiveStock(user, request);
         });
 
-        assertTrue(exception.getMessage().contains("not found"));
+        assertTrue(exception.getMessage().contains("Stock"));
     }
 
     /**
@@ -145,39 +138,17 @@ class StockMovementServiceImplTest {
             .active(false)
             .build();
 
-        when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
+        Stock stock = Stock.builder()
+            .item(inactiveItem)
+            .quantity(50)
+            .build();
+
+        when(stockRepository.findWithItemById(itemId)).thenReturn(Optional.of(stock));
 
         EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
             stockMovementService.receiveStock(user, request);
         });
 
-        assertTrue(exception.getMessage().contains("not found"));
-    }
-
-    /**
-     * Тест: Исключение при отсутствии остатка на складе.
-     */
-    @Test
-    void receiveStockStockNotFoundThrowsException() {
-        Long itemId = 1L;
-        User user = User.builder()
-            .id(1L)
-            .build();
-
-        CreateStockMovementRequest request = new CreateStockMovementRequest(itemId, 10);
-
-        Item item = Item.builder()
-            .id(itemId)
-            .active(true)
-            .build();
-
-        when(itemRepository.findById(itemId)).thenReturn(Optional.of(item));
-        when(stockRepository.findByItemId(itemId)).thenReturn(Optional.empty());
-
-        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.receiveStock(user, request);
-        });
-
-        assertTrue(exception.getMessage().contains("not found"));
+        assertTrue(exception.getMessage().contains("Item"));
     }
 }
