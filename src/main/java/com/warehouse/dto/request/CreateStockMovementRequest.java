@@ -11,5 +11,5 @@ import jakarta.validation.constraints.NotNull;
  */
 public record CreateStockMovementRequest(
     @NotNull Long itemId,
-    @NotNull @Min(1) int quantity
+    @Min(1) int quantity
 ) {}
