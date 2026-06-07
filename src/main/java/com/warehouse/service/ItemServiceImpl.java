@@ -77,9 +77,20 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<ItemResponse> getItems(String sort, String order, String category, String search, int page, int size) {
-        Sort.Direction direction = "desc".equalsIgnoreCase(order) ? Sort.Direction.DESC : Sort.Direction.ASC;
-        String sortField = "sku".equalsIgnoreCase(sort) ? "sku" : "name";
+    public PageResponse<ItemResponse> getItems(
+            String sort, String order, String category, String search, int page, int size) {
+        Sort.Direction direction;
+        if ("desc".equalsIgnoreCase(order)) {
+            direction = Sort.Direction.DESC;
+        } else {
+            direction = Sort.Direction.ASC;
+        }
+        String sortField;
+        if ("sku".equalsIgnoreCase(sort)) {
+            sortField = "sku";
+        } else {
+            sortField = "name";
+        }
 
         Specification<Item> spec = Specification.where(ItemSpecification.isActive());
         if (category != null && !category.isBlank()) {
