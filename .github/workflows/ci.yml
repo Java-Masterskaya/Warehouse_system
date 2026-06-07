@@ -12,6 +12,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    services:
+      docker:
+        image: docker:dind
+        privileged: true
+        options: >-
+          --name=docker-daemon
+          --storage-driver=overlay2
+        ports:
+          - 2375:2375
+        environment:
+          DOCKER_TLS_CERTDIR: ""
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,4 +37,4 @@ jobs:
       - name: Build and test
         run: |
           chmod +x gradlew
-          ./gradlew clean build --no-daemon
+          DOCKER_HOST=tcp://localhost:2375 ./gradlew clean build --no-daemon
