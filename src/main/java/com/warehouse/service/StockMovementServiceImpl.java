@@ -49,14 +49,21 @@ public class StockMovementServiceImpl implements StockMovementService {
         Long itemId = request.itemId();
 
         Item item = itemRepository.findById(itemId)
-            .orElseThrow(() -> EntityNotFoundException.forId("Item", itemId));
+            .orElseThrow(() -> {
+                log.warn("Item not found: itemId={}, userId={}", itemId, user.getId());
+                return EntityNotFoundException.forId("Item", itemId);
+            });
 
         if (!item.isActive()) {
+            log.warn("Attempt to replenish inactive item: itemId={}, userId={}", itemId, user.getId());
             throw EntityNotFoundException.forId("Item", itemId);
         }
 
         Stock stock = stockRepository.findByItemId(itemId)
-            .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
+            .orElseThrow(() -> {
+                log.warn("Stock not found for item: itemId={}, userId={}", itemId, user.getId());
+                return EntityNotFoundException.forId("Stock", itemId);
+            });
 
         StockMovement stockMovement = StockMovement.builder()
             .item(item)
