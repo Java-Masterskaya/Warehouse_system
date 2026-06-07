@@ -1,4 +1,4 @@
-package com.warehouse.dto.requests;
+package com.warehouse.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.warehouse.entity.Role;

@@ -1,4 +1,4 @@
-package com.warehouse.dto.responses;
+package com.warehouse.dto.response;
 
 import lombok.Getter;
 import lombok.Setter;

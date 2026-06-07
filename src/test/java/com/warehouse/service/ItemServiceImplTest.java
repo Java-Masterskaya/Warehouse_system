@@ -3,6 +3,7 @@ package com.warehouse.service;
 import com.warehouse.dto.request.UpdateItemRequest;
 import com.warehouse.dto.response.ItemResponse;
 import com.warehouse.entity.Item;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -12,8 +13,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -91,13 +90,12 @@ class ItemServiceImplTest {
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
         // 3. Выполнение и проверка исключения
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
             itemService.updateItem(itemId, request);
         });
 
         // 4. Проверка деталей исключения
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-        assertTrue(exception.getReason().contains("не найден"));
+        assertTrue(exception.getMessage().contains("not found"));
 
         // Проверяем, что сохранение не вызывалось
         verify(itemRepository, never()).save(any(Item.class));
@@ -119,13 +117,12 @@ class ItemServiceImplTest {
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
         // 3. Выполнение и проверка исключения
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
             itemService.updateItem(itemId, request);
         });
 
         // 4. Проверка деталей исключения
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-        assertTrue(exception.getReason().contains("неактивен"));
+        assertTrue(exception.getMessage().contains("not found"));
 
         // Проверяем, что сохранение не вызывалось
         verify(itemRepository, never()).save(any(Item.class));

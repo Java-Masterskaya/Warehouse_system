@@ -12,11 +12,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
 
+/**
+ * Контекстный тест для проверки загрузки Spring Boot приложения.
+ * Загружает полный контекст приложения с интеграцией PostgreSQL, Redpanda и Redis.
+ */
 @SpringBootTest
 @Testcontainers
 class WarehouseAppContextTest {
 
-    // @ServiceConnection автоматически пробрасывает datasource URL/credentials в контекст Spring
     @Container
     @ServiceConnection
     @SuppressWarnings("unused")
@@ -41,6 +44,9 @@ class WarehouseAppContextTest {
         registry.add("spring.data.redis.password", () -> "");
     }
 
+    /**
+     * Тест: Проверка успешной загрузки Spring Boot приложения.
+     */
     @Test
     void contextLoads() {
     }

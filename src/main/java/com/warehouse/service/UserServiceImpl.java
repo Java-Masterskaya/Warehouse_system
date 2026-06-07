@@ -1,7 +1,7 @@
 package com.warehouse.service;
 
-import com.warehouse.dto.requests.UserCreateRequest;
-import com.warehouse.dto.responses.UserResponse;
+import com.warehouse.dto.request.UserCreateRequest;
+import com.warehouse.dto.response.UserResponse;
 import com.warehouse.entity.User;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.mapper.UserMapper;

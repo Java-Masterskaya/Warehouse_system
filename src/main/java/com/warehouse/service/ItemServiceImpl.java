@@ -6,15 +6,14 @@ import com.warehouse.dto.response.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -51,15 +50,9 @@ public class ItemServiceImpl implements ItemService {
     @Override
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
         Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Товар с itemId " + itemId + " не найден"
-                ));
+                .orElseThrow(() -> EntityNotFoundException.forId("Item", itemId));
         if (!item.isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Товар неактивен и не подлежит редактированию"
-            );
+            throw EntityNotFoundException.forId("Item", itemId);
         }
 
         item.setName(request.name());

@@ -16,13 +16,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+/** Эндпоинты для управления товарами. */
 @RestController
-@RequestMapping("/api/v1/items")
+@RequestMapping("/api/items")
 @RequiredArgsConstructor
 public class ItemController {
 
     private final ItemService itemService;
 
+    /** Создаёт новый товар.
+     *
+     * @param request запрос на создание товара
+     * @return созданный товар
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
@@ -30,6 +36,12 @@ public class ItemController {
         return itemService.createItem(request);
     }
 
+    /** Редактирует товар.
+     *
+     * @param itemId  id товара
+     * @param request запрос на обновление товара
+     * @return обновлённый товар
+     */
     @PutMapping("/{itemId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
