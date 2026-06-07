@@ -2,7 +2,6 @@ package com.warehouse.mapper;
 
 import com.warehouse.dto.request.CreateItemRequest;
 import com.warehouse.dto.request.UpdateItemRequest;
-import com.warehouse.dto.response.ItemDetailsResponse;
 import com.warehouse.dto.response.ItemResponse;
 import com.warehouse.entity.Item;
 import org.mapstruct.Mapper;
