@@ -7,6 +7,7 @@ import com.warehouse.dto.response.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -75,16 +76,10 @@ public class ItemServiceImpl implements ItemService {
     @Transactional(readOnly = true)
     public ItemDetailsResponse getItem(Long itemId) {
         ItemDetailsResponse item = itemRepository.findWithStock(itemId)
-                        .orElseThrow(() -> new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "Товар не найден"
-                        ));
+                        .orElseThrow(() -> new EntityNotFoundException("Товар не найден"));
 
         if (!item.active()) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Товар неактивен"
-            );
+            throw new EntityNotFoundException("Товар неактивен");
         }
         return item;
     }
