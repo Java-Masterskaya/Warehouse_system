@@ -2,6 +2,7 @@ package com.warehouse.service;
 
 import com.warehouse.dto.request.UpdateItemRequest;
 import com.warehouse.dto.request.CreateItemRequest;
+import com.warehouse.dto.response.ItemDetailsResponse;
 import com.warehouse.dto.response.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -68,5 +69,23 @@ public class ItemServiceImpl implements ItemService {
 
         Item savedItem = itemRepository.save(item);
         return itemMapper.toResponse(savedItem);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ItemDetailsResponse getItem(Long itemId) {
+        ItemDetailsResponse item = itemRepository.findWithStock(itemId)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Товар не найден"
+                        ));
+
+        if (!item.active()) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Товар неактивен"
+            );
+        }
+        return item;
     }
 }
