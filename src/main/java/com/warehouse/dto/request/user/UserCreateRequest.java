@@ -1,4 +1,4 @@
-package com.warehouse.dto.requests;
+package com.warehouse.dto.request.user;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.warehouse.entity.Role;
@@ -19,6 +19,5 @@ public class UserCreateRequest {
     private String password;
 
     @NotNull(message = "Права пользователя не могут быть null")
-    @Size(max = 20)
     private Role role;
 }

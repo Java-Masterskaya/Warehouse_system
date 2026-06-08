@@ -12,3 +12,15 @@ spring:
     bootstrap-servers: localhost:9092
   jpa:
     show-sql: true
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+logging:
+  level:
+    root: WARN
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    com.warehouse: DEBUG

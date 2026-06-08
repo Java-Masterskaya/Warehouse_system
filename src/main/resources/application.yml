@@ -9,6 +9,11 @@ spring:
   flyway:
     enabled: true
 
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
 management:
   endpoints:
     web:
@@ -17,3 +22,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+logging:
+  level:
+    root: WARN
+    com.warehouse: INFO

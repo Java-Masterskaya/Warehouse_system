@@ -1,8 +1,8 @@
 package com.warehouse.controller;
 
-import com.warehouse.dto.requests.UserCreateRequest;
-import com.warehouse.dto.responses.UserResponse;
-import com.warehouse.service.UserService;
+import com.warehouse.dto.request.user.UserCreateRequest;
+import com.warehouse.dto.response.user.UserResponse;
+import com.warehouse.service.user.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

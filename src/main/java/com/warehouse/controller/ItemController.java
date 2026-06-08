@@ -1,9 +1,9 @@
 package com.warehouse.controller;
 
-import com.warehouse.dto.request.CreateItemRequest;
-import com.warehouse.dto.response.ItemResponse;
-import com.warehouse.dto.request.UpdateItemRequest;
-import com.warehouse.service.ItemService;
+import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.service.item.ItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
