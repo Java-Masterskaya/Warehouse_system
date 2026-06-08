@@ -1,0 +1,109 @@
+package com.warehouse.kafka;
+
+import com.warehouse.dto.event.LowStockAlert;
+import com.warehouse.kafka.producer.KafkaStockAlertProducer;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
+
+import java.util.concurrent.CompletableFuture;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class KafkaStockAlertProducerTest {
+
+    @Mock
+    private KafkaTemplate<String, Object> kafkaTemplate;
+
+    private KafkaStockAlertProducer producer;
+
+    private static final String TOPIC_NAME = "low-stock-alerts";
+    private static final Long ITEM_ID = 1L;
+    private static final String ITEM_NAME = "Тестовый товар";
+    private static final Integer CURRENT_STOCK = 2;
+    private static final Integer MIN_STOCK = 5;
+
+    @BeforeEach
+    void setUp() {
+        producer = new KafkaStockAlertProducer(kafkaTemplate);
+    }
+
+    @Test
+    void sendLowStockAlertShouldSendMessageWithoutException() {
+        // Arrange
+        LowStockAlert alert = new LowStockAlert(ITEM_ID, ITEM_NAME, CURRENT_STOCK, MIN_STOCK);
+
+        // Создаем мок результата отправки
+        TopicPartition topicPartition = new TopicPartition(TOPIC_NAME, 0);
+        RecordMetadata recordMetadata = new RecordMetadata(topicPartition, 0, 0, 0,
+                0, 0);
+        SendResult<String, Object> sendResult = new SendResult<>(null, recordMetadata);
+
+        CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(sendResult);
+
+        when(kafkaTemplate.send(eq(TOPIC_NAME), eq(String.valueOf(ITEM_ID)), eq(alert))).thenReturn(future);
+
+        // Act & Assert
+        assertDoesNotThrow(() -> producer.sendLowStockAlert(alert));
+
+        // Verify (что send вызван с правильными параметрами)
+        verify(kafkaTemplate, times(1)).send(TOPIC_NAME, String.valueOf(ITEM_ID), alert);
+    }
+
+    @Test
+    void sendLowStockAlertShouldUseItemIdAsKey() {
+        // Arrange
+        Long specificItemId = 42L;
+        LowStockAlert alert = new LowStockAlert(specificItemId, ITEM_NAME, CURRENT_STOCK, MIN_STOCK);
+
+        TopicPartition topicPartition = new TopicPartition(TOPIC_NAME, 1);
+        RecordMetadata recordMetadata = new RecordMetadata(topicPartition, 0,
+                0, 0, 0, 0);
+        SendResult<String, Object> sendResult = new SendResult<>(null, recordMetadata);
+
+        CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(sendResult);
+
+        when(kafkaTemplate.send(eq(TOPIC_NAME), eq(String.valueOf(specificItemId)), eq(alert)))
+                .thenReturn(future);
+
+        // Act
+        producer.sendLowStockAlert(alert);
+
+        // Assert – проверяем, что send был вызван ровно один раз с ключом "42"
+        verify(kafkaTemplate).send(TOPIC_NAME, "42", alert);
+    }
+
+    @Test
+    void sendLowStockAlertShouldThrowRuntimeExceptionWhenSendFails() {
+        // Arrange
+        LowStockAlert alert = new LowStockAlert(ITEM_ID, ITEM_NAME, CURRENT_STOCK, MIN_STOCK);
+
+        CompletableFuture<SendResult<String, Object>> failedFuture = new CompletableFuture<>();
+        failedFuture.completeExceptionally(new RuntimeException("Kafka broker unavailable"));
+
+        when(kafkaTemplate.send(eq(TOPIC_NAME), anyString(), any(LowStockAlert.class)))
+                .thenReturn(failedFuture);
+
+        // Act & Assert
+        assertThrows(RuntimeException.class,
+                () -> producer.sendLowStockAlert(alert));
+
+        // Проверяем, что send был вызван один раз
+        // Ретраи не тестируем тут, нет Spring-контекста и  @Retryable не активен
+        verify(kafkaTemplate, times(1)).send(TOPIC_NAME, String.valueOf(ITEM_ID), alert);
+    }
+}
