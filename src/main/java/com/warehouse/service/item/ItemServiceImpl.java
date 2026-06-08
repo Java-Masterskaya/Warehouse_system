@@ -3,14 +3,19 @@ package com.warehouse.service.item;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.PageResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,5 +73,35 @@ public class ItemServiceImpl implements ItemService {
 
         Item savedItem = itemRepository.save(item);
         return itemMapper.toResponse(savedItem);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public PageResponse<ItemResponse> getItems(
+            String sort, String order, String category, String search, int page, int size) {
+        Sort.Direction direction;
+        if ("desc".equalsIgnoreCase(order)) {
+            direction = Sort.Direction.DESC;
+        } else {
+            direction = Sort.Direction.ASC;
+        }
+        String sortField;
+        if ("sku".equalsIgnoreCase(sort)) {
+            sortField = "sku";
+        } else {
+            sortField = "name";
+        }
+
+        Specification<Item> spec = Specification.where(ItemSpecification.isActive());
+        if (category != null && !category.isBlank()) {
+            spec = spec.and(ItemSpecification.hasCategory(category));
+        }
+        if (search != null && !search.isBlank()) {
+            spec = spec.and(ItemSpecification.nameContains(search));
+        }
+
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        return PageResponse.from(itemRepository.findAll(spec, pageable).map(itemMapper::toResponse));
     }
 }
