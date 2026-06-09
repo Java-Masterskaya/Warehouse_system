@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.5'
     id 'io.spring.dependency-management' version '1.1.5'
+    id 'checkstyle'
 }
 
 group = 'com.warehouse'
@@ -15,7 +16,12 @@ repositories {
     mavenCentral()
 }
 
+ext {
+    testcontainersVersion = '1.21.4'
+}
+
 dependencies {
+    // Spring Boot starters
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -23,32 +29,58 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.kafka:spring-kafka'
-    implementation("org.flywaydb:flyway-database-postgresql")
-//    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.+'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    // implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.+'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.+'
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
     implementation 'org.mapstruct:mapstruct:1.5.+'
 
+    // Lombok
     compileOnly 'org.projectlombok:lombok'
     testCompileOnly 'org.projectlombok:lombok'
 
+    // Annotation processors
     annotationProcessor 'org.projectlombok:lombok'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.+'
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
     testAnnotationProcessor 'org.projectlombok:lombok'
 
+    // Database
     runtimeOnly 'org.postgresql:postgresql'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.+'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.+'
 
+    // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testRuntimeOnly 'com.h2database:h2'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
-    testImplementation 'org.testcontainers:junit-jupiter'
-    testImplementation 'org.testcontainers:postgresql'
-    testImplementation 'org.testcontainers:redpanda'
+    testImplementation "org.testcontainers:testcontainers:${testcontainersVersion}"
+    testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
+    testImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
+    testImplementation "org.testcontainers:redpanda:${testcontainersVersion}"
+
+    testRuntimeOnly 'com.h2database:h2'
 }
 
 test {
     useJUnitPlatform()
     environment 'SPRING_PROFILES_ACTIVE', 'test'
+}
+
+checkstyle {
+    toolVersion = '10.21.0'
+    configFile = file('config/checkstyle/checkstyle.xml')
+}
+
+bootRun {
+    def envFile = file('.env')
+    if (envFile.exists()) {
+        envFile.readLines().each { line ->
+            if (!line.trim().isEmpty() && !line.startsWith('#')) {
+                def parts = line.split('=', 2)
+                if (parts.length == 2) {
+                    environment parts[0], parts[1]
+                }
+            }
+        }
+    }
 }

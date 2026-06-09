@@ -1,0 +1,187 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!-- 
+    Конфигурация Checkstyle для проекта Warehouse System.
+    Стандартные правила Java с акцентом на читаемость и консистентность.
+    
+    Поддержка Lombok:
+    - Lombok генерирует геттеры, сеттеры и другие методы во время компиляции
+    - Правила включают проверку скрытых полей (ignoreConstructorParameter, ignoreSetter)
+    - Это позволяет избежать ложных срабатываний на Lombok-генерируемый код
+    
+    Подавления:
+    - Магические числа разрешены в тестовых файлах (через SuppressionFilter)
+-->
+<module name="Checker">
+    <!-- Подавления для тестов -->
+    <module name="SuppressionFilter">
+        <property name="file" value="${config_loc}/suppressions.xml"/>
+    </module>
+
+    <!-- Проверка кодировки файлов -->
+    <property name="charset" value="UTF-8"/>
+
+    <!-- Уровень ошибок для всех проверок -->
+    <property name="severity" value="error"/>
+
+    <!-- Проверяемые расширения файлов -->
+    <property name="fileExtensions" value="java"/>
+
+    <!-- Проверка на использование символов табуляции (запрещено) -->
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="true"/>
+    </module>
+
+    <!-- Максимальная длина строки (120 символов), игнорирует package/import и URL -->
+    <module name="LineLength">
+        <property name="max" value="120"/>
+        <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- Проверка размера отступов -->
+        <module name="Indentation">
+            <!-- Отступ внутри case блоков должен быть 4 пробела -->
+            <property name="caseIndent" value="4"/>
+            <!-- Отступ при переносе исключений должен быть 4 пробела -->
+            <property name="throwsIndent" value="4"/>
+            <!-- Отступ при инициализации массивов должен быть 4 пробела -->
+            <property name="arrayInitIndent" value="4"/>
+        </module>
+
+        <!-- Проверка пустых строк между операторами -->
+        <module name="EmptyLineSeparator">
+            <!-- Между полями класса пустая строка не обязательна -->
+            <property name="allowNoEmptyLineBetweenFields" value="true"/>
+            <!-- Запрещены несколько пустых строк подряд -->
+            <property name="allowMultipleEmptyLines" value="false"/>
+            <!-- Запрещены несколько пустых строк внутри методов -->
+            <property name="allowMultipleEmptyLinesInsideClassMembers" value="false"/>
+        </module>
+
+        <!-- Конвенции именования -->
+        <!-- Имена локальных финальных переменных (CONSTANT_CASE) -->
+        <module name="LocalFinalVariableName"/>
+        <!-- Имена локальных переменных (camelCase) -->
+        <module name="LocalVariableName"/>
+        <!-- Имена полей класса (camelCase) -->
+        <module name="MemberName"/>
+        <!-- Имена методов (camelCase) -->
+        <module name="MethodName"/>
+        <!-- Имена пакетов (lowercase) -->
+        <module name="PackageName"/>
+        <!-- Имена параметров методов (camelCase) -->
+        <module name="ParameterName"/>
+        <!-- Имена статических переменных (camelCase) -->
+        <module name="StaticVariableName"/>
+        <!-- Имена классов и интерфейсов (PascalCase) -->
+        <module name="TypeName"/>
+
+        <!-- Проверка импортов -->
+        <!-- Запрещает import package.* -->
+        <module name="AvoidStarImport"/>
+        <!-- Запрещает импорт определенных пакетов (например, java.awt) -->
+        <module name="IllegalImport"/>
+        <!-- Удаляет дублирующиеся импорты -->
+        <module name="RedundantImport"/>
+        <!-- Удаляет неиспользуемые импорты -->
+        <module name="UnusedImports">
+            <property name="processJavadoc" value="false"/>
+        </module>
+
+        <!-- Пробелы -->
+        <!-- Пробелы в пустых циклах for -->
+        <module name="EmptyForIteratorPad"/>
+        <!-- Пробелы в generic-выражениях -->
+        <module name="GenericWhitespace"/>
+        <!-- Пробелы после имени метода -->
+        <module name="MethodParamPad"/>
+        <!-- Нет пробелов после определенных токенов -->
+        <module name="NoWhitespaceAfter"/>
+        <!-- Нет пробелов перед определенными токенами -->
+        <module name="NoWhitespaceBefore"/>
+        <!-- Перенос операторов -->
+        <module name="OperatorWrap"/>
+        <!-- Пробелы в скобках -->
+        <module name="ParenPad"/>
+        <!-- Пробелы в приведении типов -->
+        <module name="TypecastParenPad"/>
+        <!-- Пробелы после запятых, точек с запятыми -->
+        <module name="WhitespaceAfter"/>
+        <!-- Пробелы вокруг операторов -->
+        <module name="WhitespaceAround">
+            <property name="allowEmptyTypes" value="true"/>
+        </module>
+
+        <!-- Модификаторы -->
+        <!-- Правильный порядок модификаторов (public static final) -->
+        <module name="ModifierOrder"/>
+        <!-- Удаляет лишние модификаторы -->
+        <module name="RedundantModifier"/>
+
+        <!-- Блоки кода -->
+        <!-- Запрещает вложенные блоки -->
+        <module name="AvoidNestedBlocks"/>
+        <!-- Блоки должны содержать комментарий -->
+        <module name="EmptyBlock"/>
+        <!-- Открывающие скобки на той же строке -->
+        <module name="LeftCurly"/>
+        <!-- Всегда нужны скобки для if/for/while -->
+        <module name="NeedBraces"/>
+        <!-- Закрывающие скобки на отдельной строке -->
+        <module name="RightCurly"/>
+
+        <!-- Типичные проблемы -->
+        <!-- Запрещает инлайновые условия (a ? b : c) -->
+        <module name="AvoidInlineConditionals"/>
+        <!-- Запрещает пустые операторы (например, ; после if) -->
+        <module name="EmptyStatement"/>
+        <!-- При переопределении equals() нужно и hashCode() -->
+        <module name="EqualsHashCode"/>
+        <!-- Требует аннотацию @Override для переопределенных методов -->
+        <module name="MissingOverride"/>
+        <!-- Поля не должны скрывать параметры методов (разрешено для конструктора и сеттера) -->
+        <module name="HiddenField">
+            <property name="ignoreConstructorParameter" value="true"/>
+            <property name="ignoreSetter" value="true"/>
+        </module>
+        <!-- Запрещает создание экземпляров определенных классов (например, ArrayList) -->
+        <module name="IllegalInstantiation"/>
+        <!-- Запрещает присваивания внутри выражений (a = b == c) -->
+        <module name="InnerAssignment"/>
+        <!-- Запрещает магические числа (кроме -1, 0, 1)
+             Исключает аннотации JPA (Column, Table и т.д.), где числа - это метаданные БД -->
+        <module name="MagicNumber">
+            <property name="ignoreAnnotation" value="true"/>
+            <property name="ignoreHashCodeMethod" value="true"/>
+            <property name="ignoreAnnotationElementDefaults" value="true"/>
+        </module>
+        <!-- В switch должен быть default -->
+        <module name="MissingSwitchDefault"/>
+        <!-- Одна переменная на строку -->
+        <module name="MultipleVariableDeclarations"/>
+        <!-- Упрощение булевых выражений -->
+        <module name="SimplifyBooleanExpression"/>
+        <!-- Упрощение return true/false -->
+        <module name="SimplifyBooleanReturn"/>
+
+        <!-- Javadoc документация -->
+        <!-- Документация для методов -->
+        <module name="JavadocMethod"/>
+        <!-- Документация для классов -->
+        <module name="JavadocType"/>
+        <!-- Стиль документации (отсутствие HTML, точка в конце) -->
+        <module name="JavadocStyle"/>
+
+        <!-- Метрики кода -->
+        <!-- Цикломатическая сложность (ограничение 10) -->
+        <module name="CyclomaticComplexity"/>
+        <!-- NPath-сложность (ограничение 200) -->
+        <module name="NPathComplexity"/>
+        <!-- Строк кода, комментариев, суммарная сложность -->
+        <module name="JavaNCSS"/>
+    </module>
+</module>

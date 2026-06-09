@@ -31,6 +31,10 @@ health: ## Проверка работоспособности через Actuat
 test: ## Запуск тестов
 	./gradlew clean test
 
+## --- Проверка стиля ---
+checkstyle: ## Проверка стиля кода
+	./gradlew checkstyleMain checkstyleTest
+
 ## --- Вспомогательные команды ---
 clean: ## Остановка и удаление контейнеров и томов
 	docker-compose down -v --remove-orphans

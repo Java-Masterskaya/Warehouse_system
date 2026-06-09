@@ -48,6 +48,7 @@ paths:
           required: true
           schema:
             type: integer
+            format: int64
       responses:
         '200':
           description: Успешный ответ
@@ -57,6 +58,41 @@ paths:
                 $ref: '#/components/schemas/ItemDetails'
         '404':
           description: Товар не найден
+
+    put:
+      summary: Обновить информацию о товаре
+      description: Доступно только Admin. SKU изменить нельзя. Требуется полная замена (все поля обязательны).
+      operationId: updateItem
+      tags:
+        - items
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemRequest'
+      responses:
+        '200':
+          description: Товар успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemResponse'
+        '400':
+          description: Неверный запрос (отрицательный minStock, пустая строка или отсутствует обязательное поле)
+        '401':
+          description: Не авторизован (отсутствует или недействительный токен)
+        '403':
+          description: Доступ запрещен (необходима роль Admin)
+        '404':
+          description: Товар не найден или неактивен (is_active = false)
 
   /api/v1/items/{itemId}/movements:
     post:
@@ -68,6 +104,7 @@ paths:
           required: true
           schema:
             type: integer
+            format: int64
       requestBody:
         required: true
         content:
@@ -75,7 +112,7 @@ paths:
             schema:
               $ref: '#/components/schemas/MovementRequest'
       responses:
-        '200':
+        '201':
           description: Операция успешно выполнена
         '400':
           description: Ошибка валидации (например, попытка списать больше, чем есть на складе)
@@ -90,6 +127,7 @@ paths:
           required: true
           schema:
             type: integer
+            format: int64
       responses:
         '200':
           description: Успешный ответ
@@ -104,37 +142,136 @@ components:
   schemas:
     Item:
       type: object
+      description: "Базовая информация о товаре"
       properties:
         id:
           type: integer
+          format: int64
+          description: "Уникальный идентификатор товара"
           example: 101
         sku:
           type: string
-          example: "KEYB-001"
+          maxLength: 100
+          description: "Уникальный артикул товара"
+          example: "KEY-001"
         name:
           type: string
+          maxLength: 255
+          description: "Название товара"
           example: "Механическая клавиатура"
         category:
           type: string
+          maxLength: 100
+          description: "Категория товара"
           example: "Электроника"
+        minStock:
+          type: integer
+          description: "Минимальный уровень остатка для уведомлений"
+          example: 5
+        active:
+          type: boolean
+          description: "Флаг активности товара (true - активен, false - снят с учета/архив)"
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: "Дата и время создания записи"
+          example: "2023-10-25T10:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "Дата и время последнего обновления записи"
+          example: "2023-10-26T12:30:00Z"
 
     ItemCreateRequest:
       type: object
       required:
         - sku
         - name
-        - minStockLevel
+        - category
+        - minStock
       properties:
         sku:
           type: string
+          maxLength: 100
+          description: "Уникальный артикул товара"
+          example: "KEY-256"
         name:
           type: string
+          maxLength: 255
+          description: "Название товара"
+          example: "Механическая клавиатура"
         category:
           type: string
-        minStockLevel:
+          maxLength: 100
+          description: "Категория товара"
+          example: "Электроника"
+        minStock:
           type: integer
-          description: Уровень остатка, при котором нужно отправить уведомление (Kafka)
+          minimum: 0
+          description: "Минимальный уровень остатка, при котором нужно отправить уведомление (Kafka)"
           example: 5
+
+    UpdateItemRequest:
+      type: object
+      description: "Данные для обновления товара. SKU изменить нельзя."
+      required:
+        - name
+        - category
+        - minStock
+      properties:
+        name:
+          type: string
+          description: "Название товара"
+          example: "Ноутбук Dell"
+        category:
+          type: string
+          description: "Категория товара"
+          example: "Электроника"
+        minStock:
+          type: integer
+          minimum: 0
+          description: "Минимальный уровень остатка"
+          example: 10
+
+    ItemResponse:
+      type: object
+      description: "Ответ с информацией о товаре"
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: "Уникальный идентификатор товара"
+          example: 101
+        sku:
+          type: string
+          maxLength: 100
+          description: "Уникальный артикул товара"
+          example: "KEY-001"
+        name:
+          type: string
+          maxLength: 255
+          description: "Название товара"
+          example: "Механическая клавиатура"
+        category:
+          type: string
+          maxLength: 100
+          description: "Категория товара"
+          example: "Электроника"
+        minStock:
+          type: integer
+          minimum: 0
+          description: "Минимальный уровень остатка для уведомлений"
+          example: 5
+        isActive: # Имя поля соответствует @JsonProperty("isActive")
+          type: boolean
+          description: "Флаг активности товара"
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: "Дата и время создания записи"
+          example: "2023-10-25T10:00:00Z"
 
     ItemDetails:
       allOf:
@@ -143,6 +280,8 @@ components:
           properties:
             currentStock:
               type: integer
+              format: int32
+              description: "Текущее количество товара на складе"
               example: 42
 
     MovementRequest:
@@ -153,8 +292,10 @@ components:
       properties:
         type:
           type: string
-          enum: [RECEIPT, WRITEOFF]
-          description: "RECEIPT - приход, WRITEOFF - списание"
+          enum:
+            - RECEIVE
+            - WRITE_OFF
+          description: "RECEIVE - приход, WRITE_OFF - списание"
         quantity:
           type: integer
           minimum: 1
@@ -168,9 +309,12 @@ components:
       properties:
         id:
           type: integer
+          format: int64
         type:
           type: string
-          enum: [RECEIPT, WRITEOFF]
+          enum:
+            - RECEIVE
+            - WRITE_OFF
         quantity:
           type: integer
         createdAt:
