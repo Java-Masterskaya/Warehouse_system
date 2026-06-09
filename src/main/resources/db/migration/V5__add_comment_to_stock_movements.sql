@@ -1,1 +1,0 @@
-ALTER TABLE stock_movements ADD COLUMN comment VARCHAR(500);

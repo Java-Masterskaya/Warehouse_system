@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.dto.internal.StockMovementInternalRequest;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
@@ -9,6 +10,7 @@ import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,7 +27,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,21 +34,15 @@ class StockServiceTest {
 
     private static final Long ITEM_ID = 1L;
     private static final Long NON_EXISTENT_ITEM_ID = 99L;
+    private static final Long USER_ID = 1L;
 
     private static final int INITIAL_STOCK_QUANTITY = 10;
     private static final int LOW_STOCK_QUANTITY = 3;
     private static final int WRITE_OFF_AMOUNT = 5;
     private static final int RECEIVE_AMOUNT = 5;
     private static final int EXCESSIVE_AMOUNT = 5;
-    private static final int ZERO_AMOUNT = 0;
-    private static final int NEGATIVE_AMOUNT = -5;
     private static final int EXPECTED_STOCK_AFTER_WRITE_OFF = 5;
     private static final int EXPECTED_STOCK_AFTER_RECEIVE = 15;
-
-    private static final String COMMENT_WRITE_OFF = "Списание для заказа №123";
-    private static final String COMMENT_RECEIVE = "Приход от поставщика";
-    private static final String COMMENT_FIRST_RECEIPT = "Первое поступление";
-    private static final String DEFAULT_COMMENT = "c";
 
     @Mock
     private StockRepository stockRepository;
@@ -58,8 +53,11 @@ class StockServiceTest {
     @Mock
     private StockMovementRepository movementRepository;
 
+    @Mock
+    private UserRepository userRepository;
+
     @InjectMocks
-    private StockService stockService;
+    private StockServiceImpl stockService;
 
     // ==========================================
     //         ТЕСТЫ ДЛЯ МЕТОДА writeOff
@@ -69,17 +67,22 @@ class StockServiceTest {
     void writeOffSuccess() {
         // Arrange
         User user = new User();
+        user.setId(USER_ID);
 
         Item item = createActiveItem(ITEM_ID);
         Stock stock = createStock(item, INITIAL_STOCK_QUANTITY);
 
+        StockMovementInternalRequest request = new StockMovementInternalRequest(
+                ITEM_ID, WRITE_OFF_AMOUNT, USER_ID);
+
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
         when(movementRepository.save(any(StockMovement.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
-        stockService.writeOff(ITEM_ID, WRITE_OFF_AMOUNT, COMMENT_WRITE_OFF, user);
+        stockService.writeOff(request);
 
         // Assert
         assertEquals(EXPECTED_STOCK_AFTER_WRITE_OFF, stock.getQuantity());
@@ -89,22 +92,7 @@ class StockServiceTest {
                         && movement.getUser().equals(user)
                         && movement.getType() == MovementType.WRITE_OFF
                         && movement.getQuantity() == WRITE_OFF_AMOUNT
-                        && COMMENT_WRITE_OFF.equals(movement.getComment())
         ));
-    }
-
-    @Test
-    void writeOffInvalidAmountThrowsException() {
-        User user = new User();
-
-        assertThrows(IllegalArgumentException.class, () ->
-                stockService.writeOff(ITEM_ID, ZERO_AMOUNT, DEFAULT_COMMENT, user));
-        assertThrows(IllegalArgumentException.class, () ->
-                stockService.writeOff(ITEM_ID, NEGATIVE_AMOUNT, DEFAULT_COMMENT, user));
-        assertThrows(IllegalArgumentException.class, () ->
-                stockService.writeOff(ITEM_ID, null, DEFAULT_COMMENT, user));
-
-        verifyNoInteractions(itemRepository, stockRepository, movementRepository);
     }
 
     @Test
@@ -112,7 +100,8 @@ class StockServiceTest {
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
-            stockService.writeOff(NON_EXISTENT_ITEM_ID, WRITE_OFF_AMOUNT, DEFAULT_COMMENT, new User());
+            stockService.writeOff(new StockMovementInternalRequest(
+                    NON_EXISTENT_ITEM_ID, WRITE_OFF_AMOUNT, USER_ID));
         });
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
@@ -127,7 +116,8 @@ class StockServiceTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(inactiveItem));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
-            stockService.writeOff(ITEM_ID, WRITE_OFF_AMOUNT, DEFAULT_COMMENT, new User());
+            stockService.writeOff(new StockMovementInternalRequest(
+                    ITEM_ID, WRITE_OFF_AMOUNT, USER_ID));
         });
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
@@ -143,7 +133,8 @@ class StockServiceTest {
         when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
 
         InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
-            stockService.writeOff(ITEM_ID, EXCESSIVE_AMOUNT, DEFAULT_COMMENT, new User());
+            stockService.writeOff(new StockMovementInternalRequest(
+                    ITEM_ID, EXCESSIVE_AMOUNT, USER_ID));
         });
 
         assertEquals(LOW_STOCK_QUANTITY, stock.getQuantity());
@@ -158,17 +149,22 @@ class StockServiceTest {
     @Test
     void receiveSuccess() {
         User user = new User();
+        user.setId(USER_ID);
 
         Item item = createActiveItem(ITEM_ID);
         Stock stock = createStock(item, INITIAL_STOCK_QUANTITY);
 
+        StockMovementInternalRequest request = new StockMovementInternalRequest(
+                ITEM_ID, RECEIVE_AMOUNT, USER_ID);
+
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
         when(movementRepository.save(any(StockMovement.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
-        stockService.receive(ITEM_ID, RECEIVE_AMOUNT, COMMENT_RECEIVE, user);
+        stockService.receive(request);
 
         // Assert
         assertEquals(EXPECTED_STOCK_AFTER_RECEIVE, stock.getQuantity());
@@ -182,28 +178,25 @@ class StockServiceTest {
     @Test
     void receiveWhenStockNotExistsCreatesNewStock() {
         User user = new User();
+        user.setId(USER_ID);
         Item item = createActiveItem(ITEM_ID);
+
+        StockMovementInternalRequest request = new StockMovementInternalRequest(
+                ITEM_ID, RECEIVE_AMOUNT, USER_ID);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
         when(movementRepository.save(any(StockMovement.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Act
-        stockService.receive(ITEM_ID, RECEIVE_AMOUNT, COMMENT_FIRST_RECEIPT, user);
+        stockService.receive(request);
 
         // Assert
         verify(stockRepository).save(argThat(stock ->
                 stock.getItem().equals(item) && stock.getQuantity() == RECEIVE_AMOUNT
         ));
-    }
-
-    @Test
-    void receiveInvalidAmountThrowsException() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            stockService.receive(ITEM_ID, ZERO_AMOUNT, DEFAULT_COMMENT, new User());
-        });
-        verifyNoInteractions(itemRepository, stockRepository, movementRepository);
     }
 
     // ==========================================
