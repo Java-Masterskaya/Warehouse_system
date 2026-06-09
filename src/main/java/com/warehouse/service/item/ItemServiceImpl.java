@@ -1,12 +1,13 @@
 package com.warehouse.service.item;
 
-import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.item.CreateItemRequest;
-import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -104,4 +105,18 @@ public class ItemServiceImpl implements ItemService {
 
         return PageResponse.from(itemRepository.findAll(spec, pageable).map(itemMapper::toResponse));
     }
+
+    @Transactional
+    @Override
+    public void deleteItem(Long itemId) {
+        itemRepository.findById(itemId).orElseThrow(() -> {
+            log.warn("Item с id={} не найден", itemId);
+            return new EntityNotFoundException("Item с таким id = " + itemId + " не найден");
+        });
+
+        stockRepository.deleteByItemId(itemId);
+        itemRepository.deleteById(itemId);
+        log.info("Item c id={} успешно удален", itemId);
+    }
+
 }

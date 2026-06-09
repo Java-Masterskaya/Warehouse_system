@@ -11,4 +11,6 @@ public interface ItemService {
     ItemResponse updateItem(Long itemId, UpdateItemRequest request);
 
     PageResponse<ItemResponse> getItems(String sort, String order, String category, String search, int page, int size);
+
+    void deleteItem(Long itemId);
 }

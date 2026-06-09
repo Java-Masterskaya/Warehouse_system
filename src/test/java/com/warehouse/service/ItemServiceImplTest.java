@@ -3,6 +3,7 @@ package com.warehouse.service;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.Item;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -19,15 +20,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ItemServiceImplTest {
@@ -131,5 +127,42 @@ class ItemServiceImplTest {
 
         // Проверяем, что сохранение не вызывалось
         verify(itemRepository, never()).save(any(Item.class));
+    }
+
+    // Удаление существующего товара
+    @Test
+    void successDeleteItem() {
+        Long itemId = 1L;
+        Item item = new Item();
+        item.setId(itemId);
+
+        when(itemRepository.findById(itemId))
+                .thenReturn(Optional.of(item));
+        itemService.deleteItem(itemId);
+
+        verify(itemRepository).findById(itemId);
+        verify(stockRepository).deleteByItemId(itemId);
+        verify(itemRepository).deleteById(itemId);
+
+    }
+
+    // Удаление несуществующего товара
+    @Test
+    void deleteNotExistentItem() {
+        Long itemId = 999L;
+        when(itemRepository.findById(itemId))
+                .thenReturn(Optional.empty());
+
+        EntityNotFoundException exception =
+                assertThrows(EntityNotFoundException.class,
+                        () -> itemService.deleteItem(itemId));
+        assertEquals(
+                "Item с таким id = 999 не найден",
+                exception.getMessage()
+        );
+        verify(itemRepository).findById(itemId);
+        verify(stockRepository, never()).deleteByItemId(anyLong());
+        verify(itemRepository, never()).deleteById(anyLong());
+
     }
 }
