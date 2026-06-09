@@ -1,8 +1,8 @@
-package com.warehouse.service;
+package com.warehouse.service.item;
 
-import com.warehouse.dto.request.UpdateItemRequest;
-import com.warehouse.dto.request.CreateItemRequest;
-import com.warehouse.dto.response.ItemResponse;
+import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -37,7 +37,7 @@ public class ItemServiceImpl implements ItemService {
 
         if (itemRepository.existsBySku(request.sku())) {
             log.warn("Duplicate SKU '{}' — item already exists", request.sku());
-            throw new DuplicateSkuException(request.sku());
+            throw DuplicateSkuException.forSku(request.sku());
         }
 
         Item item = itemMapper.toEntity(request);
