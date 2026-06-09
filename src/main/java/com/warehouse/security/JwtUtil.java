@@ -44,26 +44,26 @@ public class JwtUtil {
                 .signWith(key)
                 .compact();
 
-        log.debug("JWT generated successfully, expires in {} ms", expirationMs);
+        log.debug("JWT generated successfully for user: {}, expires in {} ms", username, expirationMs);
         return token;
     }
 
-    public String getUsernameFromToken(String token) {
-        return parseClaims(token).getSubject();
-    }
-
-    public List<String> getRolesFromToken(String token) {
-        return extractRoles(token)
-                .orElseThrow(() -> new JwtException("Invalid or missing 'roles' claim"));
-    }
-
-    public boolean validateToken(String token) {
+    public Optional<JwtPayload> parseToken(String token) {
         try {
-            return extractRoles(token).isPresent();
+            Claims claims = parseClaims(token);
+            String username = claims.getSubject();
+            Object rolesObj = claims.get("roles");
+            if (rolesObj instanceof List<?> list && list.stream().allMatch(String.class::isInstance)) {
+                List<String> roles = list.stream()
+                        .map(Object::toString)
+                        .toList();
+                return Optional.of(new JwtPayload(username, roles));
+            }
+            log.warn("Invalid or missing 'roles' claim in token");
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("JWT validation failed: {}", e.getMessage());
-            return false;
         }
+        return Optional.empty();
     }
 
     private Claims parseClaims(String token) {
@@ -74,12 +74,6 @@ public class JwtUtil {
                 .getPayload();
     }
 
-    private Optional<List<String>> extractRoles(String token) {
-        Claims claims = parseClaims(token);
-        Object rolesObj = claims.get("roles");
-        if (rolesObj instanceof List<?> list && list.stream().allMatch(String.class::isInstance)) {
-            return Optional.of(list.stream().map(String.class::cast).toList());
-        }
-        return Optional.empty();
+    public record JwtPayload(String username, List<String> roles) {
     }
 }

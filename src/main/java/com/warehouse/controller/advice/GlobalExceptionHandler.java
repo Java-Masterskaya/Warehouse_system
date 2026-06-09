@@ -59,13 +59,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleAccessDenied(AccessDeniedException ex) {
-        return new ErrorResponse("ACCESS_DENIED", ex.getMessage());
+        return new ErrorResponse("ACCESS_DENIED", "Access denied");
     }
 
     @ExceptionHandler(AuthenticationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleAuthentication(AuthenticationException ex) {
-        return new ErrorResponse("UNAUTHORIZED", ex.getMessage());
+        return new ErrorResponse("UNAUTHORIZED", "Authentication failed");
     }
 
     @ExceptionHandler(Exception.class)

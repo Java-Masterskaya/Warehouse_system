@@ -35,25 +35,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(@NonNull HttpServletRequest request,
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
-        extractToken(request).ifPresent(token -> {
-            if (jwtUtil.validateToken(token)) {
-                String username = jwtUtil.getUsernameFromToken(token);
-                log.debug("Authenticated user '{}' from JWT", username);
+        extractToken(request).flatMap(jwtUtil::parseToken).ifPresent(payload -> {
+            List<GrantedAuthority> authorities = payload.roles().stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .collect(Collectors.toList());
 
-                List<String> roleNames = jwtUtil.getRolesFromToken(token);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(payload.username(), null, authorities);
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                List<GrantedAuthority> authorities = roleNames.stream()
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
-
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(username, null, authorities);
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } else {
-                log.debug("Invalid JWT token received");
-            }
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            log.debug("Authenticated user '{}' from JWT", payload.username());
         });
 
         filterChain.doFilter(request, response);

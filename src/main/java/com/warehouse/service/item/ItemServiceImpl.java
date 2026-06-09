@@ -37,7 +37,7 @@ public class ItemServiceImpl implements ItemService {
 
         if (itemRepository.existsBySku(request.sku())) {
             log.warn("Duplicate SKU '{}' — item already exists", request.sku());
-            throw new DuplicateSkuException(request.sku());
+            throw DuplicateSkuException.forSku(request.sku());
         }
 
         Item item = itemMapper.toEntity(request);

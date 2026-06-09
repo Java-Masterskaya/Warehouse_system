@@ -22,7 +22,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import java.time.Instant;
+import java.io.IOException;
 
 @Configuration
 @EnableWebSecurity
@@ -65,27 +65,22 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
-        return (request, response, authException) -> {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            ErrorResponse error = new ErrorResponse(
-                    "UNAUTHORIZED",
-                    authException.getMessage(),
-                    Instant.now());
-            objectMapper.writeValue(response.getOutputStream(), error);
-        };
+        return (request, response, authException) ->
+                sendError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        "UNAUTHORIZED", "Authentication failed");
     }
 
     @Bean
     public AccessDeniedHandler accessDeniedHandler() {
-        return (request, response, accessDeniedException) -> {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            ErrorResponse error = new ErrorResponse(
-                    "ACCESS_DENIED",
-                    accessDeniedException.getMessage(),
-                    Instant.now());
-            objectMapper.writeValue(response.getOutputStream(), error);
-        };
+        return (request, response, accessDeniedException) ->
+                sendError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "ACCESS_DENIED", "Access denied");
+    }
+
+    private void sendError(HttpServletResponse response,
+                           int status, String error, String message) throws IOException {
+        response.setStatus(status);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(error, message));
     }
 }

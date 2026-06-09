@@ -9,7 +9,7 @@ import com.warehouse.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
-    private final BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     @Override
@@ -26,11 +26,11 @@ public class UserServiceImpl implements UserService {
         log.debug("Create user with name '{}'", request.getUsername());
         if (userRepository.existsByUsername(request.getUsername())) {
             log.warn("User '{}' is already exist", request.getUsername());
-            throw new DuplicateUsernameException(request.getUsername());
+            throw DuplicateUsernameException.forUsername(request.getUsername());
         }
 
         User user = userMapper.toEntity(request);
-        user.setPassword(bCryptPasswordEncoder.encode(user.getPassword()));
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
 
         log.info("User created: name={}", user.getUsername());
