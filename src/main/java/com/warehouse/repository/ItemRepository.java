@@ -15,7 +15,7 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
     boolean existsBySku(String sku);
 
     @Query("""
-        SELECT new com.warehouse.dto.response.ItemDetailsResponse(
+        SELECT new com.warehouse.dto.response.item.ItemDetailsResponse(
             i.id,
             i.sku,
             i.name,
