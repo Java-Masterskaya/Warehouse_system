@@ -3,7 +3,7 @@ package com.warehouse.service.item;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.response.item.ItemResponse;
-import com.warehouse.dto.response.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;

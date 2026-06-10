@@ -1,6 +1,6 @@
 package com.warehouse.repository;
 
-import com.warehouse.dto.response.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
