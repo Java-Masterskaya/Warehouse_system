@@ -22,9 +22,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 
-/**
- * Эндпоинты для управления товарами.
- */
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
@@ -45,12 +44,6 @@ public class ItemController {
         return itemService.getItems(sort, order, category, search, page, size);
     }
 
-    /**
-     * Создаёт новый товар.
-     *
-     * @param request запрос на создание товара
-     * @return созданный товар
-     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
@@ -58,13 +51,6 @@ public class ItemController {
         return itemService.createItem(request);
     }
 
-    /**
-     * Редактирует товар.
-     *
-     * @param itemId  id товара
-     * @param request запрос на обновление товара
-     * @return обновлённый товар
-     */
     @PutMapping("/{itemId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
@@ -81,18 +67,17 @@ public class ItemController {
         return itemService.getItem(itemId);
     }
 
-    /**
-     * Скрывает товар из выдачи по его идентификатору.
-     * <p>
-     * Доступен только пользователям с ролью ADMIN.
-     *
-     * @param itemId идентификатор скрываемого товара
-     * @throws EntityNotFoundException если товар не найден
-     */
     @DeleteMapping("/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
     public void softDeleteItem(@PathVariable Long itemId) {
         itemService.softDeleteItem(itemId);
+    }
+
+    @GetMapping("/categories")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public List<String> getCategories() {
+        return itemService.getCategories();
     }
 }
