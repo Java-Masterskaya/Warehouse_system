@@ -1,4 +1,4 @@
-package com.warehouse.dto.error;
+package com.warehouse.dto.response.error;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 

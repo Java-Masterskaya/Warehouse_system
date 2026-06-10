@@ -1,13 +1,15 @@
 package com.warehouse.service;
 
-import com.warehouse.dto.request.UpdateItemRequest;
+import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.ItemDetailsResponse;
-import com.warehouse.dto.response.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.service.item.ItemService;
+import com.warehouse.service.item.ItemServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

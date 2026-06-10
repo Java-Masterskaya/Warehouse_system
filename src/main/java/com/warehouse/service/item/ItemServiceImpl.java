@@ -1,9 +1,10 @@
-package com.warehouse.service;
+package com.warehouse.service.item;
 
-import com.warehouse.dto.request.UpdateItemRequest;
-import com.warehouse.dto.request.CreateItemRequest;
+import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.ItemDetailsResponse;
-import com.warehouse.dto.response.ItemResponse;
+import com.warehouse.dto.response.PageResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
@@ -11,8 +12,12 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +39,7 @@ public class ItemServiceImpl implements ItemService {
 
         if (itemRepository.existsBySku(request.sku())) {
             log.warn("Duplicate SKU '{}' — item already exists", request.sku());
-            throw new DuplicateSkuException(request.sku());
+            throw DuplicateSkuException.forSku(request.sku());
         }
 
         Item item = itemMapper.toEntity(request);
@@ -70,6 +75,36 @@ public class ItemServiceImpl implements ItemService {
 
         Item savedItem = itemRepository.save(item);
         return itemMapper.toResponse(savedItem);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public PageResponse<ItemResponse> getItems(
+            String sort, String order, String category, String search, int page, int size) {
+        Sort.Direction direction;
+        if ("desc".equalsIgnoreCase(order)) {
+            direction = Sort.Direction.DESC;
+        } else {
+            direction = Sort.Direction.ASC;
+        }
+        String sortField;
+        if ("sku".equalsIgnoreCase(sort)) {
+            sortField = "sku";
+        } else {
+            sortField = "name";
+        }
+
+        Specification<Item> spec = Specification.where(ItemSpecification.isActive());
+        if (category != null && !category.isBlank()) {
+            spec = spec.and(ItemSpecification.hasCategory(category));
+        }
+        if (search != null && !search.isBlank()) {
+            spec = spec.and(ItemSpecification.nameContains(search));
+        }
+
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+
+        return PageResponse.from(itemRepository.findAll(spec, pageable).map(itemMapper::toResponse));
     }
 
     @Override
