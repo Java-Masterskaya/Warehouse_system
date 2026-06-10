@@ -2,8 +2,8 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
-import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.service.item.ItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +47,14 @@ public class ItemController {
         return itemService.updateItem(itemId, request);
     }
 
+    /**
+     * Удаляет товар по его идентификатору.
+     * <p>
+     * Доступен только пользователям с ролью ADMIN.
+     *
+     * @param itemId идентификатор удаляемого товара
+     * @throws EntityNotFoundException если товар не найден
+     */
     @DeleteMapping("/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
