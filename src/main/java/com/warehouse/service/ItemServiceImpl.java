@@ -75,12 +75,18 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional(readOnly = true)
     public ItemDetailsResponse getItem(Long itemId) {
+        log.debug("Getting item with id '{}'", itemId);
         ItemDetailsResponse item = itemRepository.findWithStock(itemId)
-                        .orElseThrow(() -> new EntityNotFoundException("Товар не найден"));
+                        .orElseThrow(() -> {
+                            log.warn("Item not found: id={}", itemId);
+                            return new EntityNotFoundException("Товар не найден");
+                        });
 
         if (!item.active()) {
+            log.warn("Item inactive: id={}", itemId);
             throw new EntityNotFoundException("Товар неактивен");
         }
+
         return item;
     }
 }
