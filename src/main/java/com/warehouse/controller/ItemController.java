@@ -4,6 +4,7 @@ import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.service.item.ItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
