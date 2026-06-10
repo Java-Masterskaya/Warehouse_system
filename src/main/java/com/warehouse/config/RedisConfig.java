@@ -38,6 +38,9 @@ import java.util.Map;
 @EnableCaching
 public class RedisConfig {
 
+    private static final int CATEGORIES_TTL_MINUTES = 10;
+    private static final int ITEM_TTL_MINUTES = 5;
+
     /**
      * Создаёт и настраивает {@link RedisCacheManager}.
      * <p>
@@ -71,12 +74,12 @@ public class RedisConfig {
 
         configs.put(
                 "categories",
-                defaultConfig.entryTtl(Duration.ofMinutes(10))
+                defaultConfig.entryTtl(Duration.ofMinutes(CATEGORIES_TTL_MINUTES))
         );
 
         configs.put(
                 "item",
-                defaultConfig.entryTtl(Duration.ofMinutes(5))
+                defaultConfig.entryTtl(Duration.ofMinutes(ITEM_TTL_MINUTES))
         );
 
         return RedisCacheManager.builder(connectionFactory)
