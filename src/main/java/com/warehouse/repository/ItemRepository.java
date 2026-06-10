@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 /**
  * Репозиторий для управления товарами.
@@ -25,6 +26,18 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
      * @return true, если товар существует, иначе false
      */
     boolean existsBySku(String sku);
+
+    /**
+     * Возвращает список уникальных категорий активных товаров.
+     * <p>
+     * Используется для заполнения фильтра категорий и кэшируется
+     * в Redis через {@code @Cacheable(value = "categories")} на уровне сервиса.
+     *
+     * @return список уникальных названий категорий, отсортированных в порядке, возвращаемом БД
+     */
+    @Query("SELECT DISTINCT i.category FROM Item i WHERE i.active = true")
+    List<String> findDistinctCategories();
+}
 
     @Query("""
             SELECT new com.warehouse.dto.response.item.ItemDetailsResponse(

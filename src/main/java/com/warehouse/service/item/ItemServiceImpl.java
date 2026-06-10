@@ -15,11 +15,14 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -148,4 +151,11 @@ public class ItemServiceImpl implements ItemService {
         log.info("Item c id={} успешно деактивирован", itemId);
     }
 
+    @Cacheable(value = "categories")
+    @Transactional(readOnly = true)
+    @Override
+    public List<String> getCategories() {
+        log.debug("Fetching categories from database");
+        return itemRepository.findDistinctCategories();
+    }
 }
