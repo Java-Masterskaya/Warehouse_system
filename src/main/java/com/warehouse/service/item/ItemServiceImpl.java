@@ -3,10 +3,12 @@ package com.warehouse.service.item;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -103,5 +105,23 @@ public class ItemServiceImpl implements ItemService {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
 
         return PageResponse.from(itemRepository.findAll(spec, pageable).map(itemMapper::toResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ItemDetailsResponse getItem(Long itemId) {
+        log.debug("Getting item with id '{}'", itemId);
+        ItemDetailsResponse item = itemRepository.findWithStock(itemId)
+                        .orElseThrow(() -> {
+                            log.warn("Item not found: id={}", itemId);
+                            return new EntityNotFoundException("Товар не найден");
+                        });
+
+        if (!item.active()) {
+            log.warn("Item inactive: id={}", itemId);
+            throw new EntityNotFoundException("Товар неактивен");
+        }
+
+        return item;
     }
 }

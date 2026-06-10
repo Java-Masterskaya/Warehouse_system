@@ -2,6 +2,7 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.service.item.ItemService;
@@ -53,5 +54,12 @@ public class ItemController {
             @PathVariable Long itemId,
             @Valid @RequestBody UpdateItemRequest request) {
         return itemService.updateItem(itemId, request);
+    }
+
+    @GetMapping("/{itemId}")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public ItemDetailsResponse getItem(@PathVariable Long itemId) {
+        return itemService.getItem(itemId);
     }
 }
