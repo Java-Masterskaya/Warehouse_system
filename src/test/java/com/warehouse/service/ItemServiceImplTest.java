@@ -18,6 +18,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -269,6 +272,33 @@ class ItemServiceImplTest {
         verifyNoInteractions(stockRepository);
     }
 
+    @Test
+    void getCategoriesShouldReturnDistinctList() {
+        when(itemRepository.findDistinctCategories())
+                .thenReturn(List.of("Электроника", "Мебель", "Инструменты"));
+
+        List<String> categories = itemService.getCategories();
+
+        assertNotNull(categories);
+        assertEquals(3, categories.size());
+        assertTrue(categories.contains("Электроника"));
+        assertTrue(categories.contains("Мебель"));
+        assertTrue(categories.contains("Инструменты"));
+        assertEquals(3, new HashSet<>(categories).size());
+
+        verify(itemRepository, times(1)).findDistinctCategories();
+    }
+
+    @Test
+    void getCategoriesShouldReturnEmptyListWhenNoActiveItems() {
+        when(itemRepository.findDistinctCategories())
+                .thenReturn(Collections.emptyList());
+
+        List<String> categories = itemService.getCategories();
+
+        assertNotNull(categories);
+        assertTrue(categories.isEmpty());
+
+        verify(itemRepository, times(1)).findDistinctCategories();
+    }
 }
-
-
