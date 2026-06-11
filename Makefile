@@ -1,5 +1,5 @@
 # Makefile для управления стеком приложения Warehouse System
-.PHONY: up down app-up app-down infra-up infra-down health test
+.PHONY: up down app-up app-down infra-up infra-down health test build checkstyle help
 
 ## --- Управление всем стеком ---
 up: ## Запуск всего стека (инфраструктура, приложение)
@@ -30,6 +30,10 @@ health: ## Проверка работоспособности через Actuat
 ## --- Тестирование ---
 test: ## Запуск тестов
 	./gradlew clean test
+
+## --- Сборка проекта ---
+build: ## Сборка проекта с тестами и проверкой стиля
+	./gradlew clean build
 
 ## --- Проверка стиля ---
 checkstyle: ## Проверка стиля кода

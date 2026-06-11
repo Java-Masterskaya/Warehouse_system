@@ -6,6 +6,10 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 
+/**
+ * Сервис для управления товарами.
+ * Предоставляет операции создания, обновления и фильтрации товаров.
+ */
 public interface ItemService {
 
     /**
@@ -27,6 +31,12 @@ public interface ItemService {
      */
     ItemResponse updateItem(Long itemId, UpdateItemRequest request);
 
+    /**
+     * Получает детальную информацию о товаре.
+     *
+     * @param itemId идентификатор товара
+     * @return детальная информация о товаре в виде DTO
+     */
     ItemDetailsResponse getItem(Long itemId);
 
     /**

@@ -18,10 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -57,22 +55,17 @@ public class ItemServiceImpl implements ItemService {
     @Transactional
     @Override
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
-        log.debug("Updating item id={}", itemId);
+        log.debug("Updating item with id={}", itemId);
 
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> {
-                    log.warn("Item id={} not found", itemId);
-                    return new ResponseStatusException(
-                            HttpStatus.NOT_FOUND,
-                            "Товар с itemId " + itemId + " не найден"
-                    );
+                    log.warn("Item with id={} not found", itemId);
+                    return EntityNotFoundException.forId("Item", itemId);
                 });
+
         if (!item.isActive()) {
-            log.warn("Item id={} is inactive, cannot update", itemId);
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Товар неактивен и не подлежит редактированию"
-            );
+            log.warn("Attempt to update inactive item with id={}", itemId);
+            throw EntityNotFoundException.forId("Item", itemId);
         }
 
         item.setName(request.name());
@@ -88,6 +81,9 @@ public class ItemServiceImpl implements ItemService {
     @Override
     public PageResponse<ItemResponse> getItems(
             String sort, String order, String category, String search, int page, int size) {
+        log.debug("Getting items: sort={}, order={}, category={}, search={}, page={}, size={}",
+                sort, order, category, search, page, size);
+
         Sort.Direction direction;
         if ("desc".equalsIgnoreCase(order)) {
             direction = Sort.Direction.DESC;
@@ -111,7 +107,10 @@ public class ItemServiceImpl implements ItemService {
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
 
-        return PageResponse.from(itemRepository.findAll(spec, pageable).map(itemMapper::toResponse));
+        var itemsPage = itemRepository.findAll(spec, pageable);
+        log.info("Found {} items for request (category={}, search={})", itemsPage.getTotalElements(), category, search);
+
+        return PageResponse.from(itemsPage.map(itemMapper::toResponse));
     }
 
     @Override
