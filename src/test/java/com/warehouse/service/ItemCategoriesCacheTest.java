@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Testcontainers
 @ActiveProfiles("test")
-class ItemServiceCacheTest {
+class ItemCategoriesCacheTest {
 
     @Container
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
