@@ -35,8 +35,12 @@ public class RedisConfig {
                 new Jackson2JsonRedisSerializer<>(objectMapper, ItemDetailsResponse.class);
 
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(genericSerializer))
+                .serializeKeysWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer())
+                )
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(genericSerializer)
+                )
                 .disableCachingNullValues();
 
         Map<String, RedisCacheConfiguration> configs = new HashMap<>();
