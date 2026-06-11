@@ -62,7 +62,7 @@ public class ItemServiceImpl implements ItemService {
                     log.warn("Item with id={} not found", itemId);
                     return EntityNotFoundException.forId("Item", itemId);
                 });
-        
+
         if (!item.isActive()) {
             log.warn("Attempt to update inactive item with id={}", itemId);
             throw EntityNotFoundException.forId("Item", itemId);

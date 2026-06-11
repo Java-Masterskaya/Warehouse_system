@@ -13,19 +13,21 @@ import com.warehouse.dto.response.PageResponse;
 public interface ItemService {
 
     /**
-     * Создаёт новый товар.
+     * Создаёт новый товар и инициализирует его остаток нулём.
      *
-     * @param request данные для создания товара
-     * @return DTO с информацией о созданном товаре
+     * @param request данные нового товара
+     * @return созданный товар
+     * @throws com.warehouse.exception.DuplicateSkuException если товар с таким SKU уже существует
      */
     ItemResponse createItem(CreateItemRequest request);
 
     /**
-     * Обновляет данные товара.
+     * Обновляет название, категорию и минимальный остаток активного товара.
      *
      * @param itemId  идентификатор товара
-     * @param request новые данные товара
-     * @return DTO с обновлённой информацией о товаре
+     * @param request новые значения полей
+     * @return обновлённый товар
+     * @throws org.springframework.web.server.ResponseStatusException 404 если товар не найден или неактивен
      */
     ItemResponse updateItem(Long itemId, UpdateItemRequest request);
 
@@ -38,15 +40,15 @@ public interface ItemService {
     ItemDetailsResponse getItem(Long itemId);
 
     /**
-     * Получает страницу товаров с фильтрацией и сортировкой.
+     * Возвращает постраничный список активных товаров с поддержкой фильтрации и сортировки.
      *
-     * @param sort    поле сортировки (sku или name)
-     * @param order   порядок сортировки (asc или desc)
-     * @param category фильтр по категории
-     * @param search  поиск по названию
-     * @param page    номер страницы
-     * @param size    размер страницы
-     * @return страница товаров в виде DTO
+     * @param sort     поле сортировки: {@code name} (по умолчанию) или {@code sku}
+     * @param order    направление: {@code asc} или {@code desc}
+     * @param category фильтр по категории (опционально)
+     * @param search   поиск по подстроке в названии (опционально)
+     * @param page     номер страницы (с 0)
+     * @param size     размер страницы
+     * @return страница товаров
      */
     PageResponse<ItemResponse> getItems(String sort, String order, String category, String search, int page, int size);
 }

@@ -1,52 +1,14 @@
 package com.warehouse;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.redpanda.RedpandaContainer;
-import org.testcontainers.utility.DockerImageName;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 
-/**
- * Контекстный тест для проверки загрузки Spring Boot приложения.
- * Загружает полный контекст приложения с интеграцией PostgreSQL, Redpanda и Redis.
- */
-@SpringBootTest
-@Testcontainers
-class WarehouseAppContextTest {
+// @AutoConfigureMockMvc нужен, чтобы этот класс использовал тот же Spring-контекст,
+// что ItemControllerTest и AuthControllerTest. Без него создаётся отдельный контекст,
+// JUnit 5 останавливает контейнеры между классами, и кэшированный контекст теряет соединение с БД.
+@AutoConfigureMockMvc
+class WarehouseAppContextTest extends AbstractIntegrationTest {
 
-    @Container
-    @ServiceConnection
-    @SuppressWarnings("unused")
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
-    @Container
-    @SuppressWarnings("unused")
-    @ServiceConnection
-    static RedpandaContainer redpanda = new RedpandaContainer(
-            DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"));
-
-    @Container
-    @SuppressWarnings("resource")
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(6379);
-
-    @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
-        // В тестах пароль не нужен — Redis поднимается без аутентификации
-        registry.add("spring.data.redis.password", () -> "");
-    }
-
-    /**
-     * Тест: Проверка успешной загрузки Spring Boot приложения.
-     */
     @Test
     void contextLoads() {
     }
