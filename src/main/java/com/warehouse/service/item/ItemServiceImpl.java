@@ -57,12 +57,18 @@ public class ItemServiceImpl implements ItemService {
     @Transactional
     @Override
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
+        log.debug("Updating item id={}", itemId);
+
         Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Товар с itemId " + itemId + " не найден"
-                ));
+                .orElseThrow(() -> {
+                    log.warn("Item id={} not found", itemId);
+                    return new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Товар с itemId " + itemId + " не найден"
+                    );
+                });
         if (!item.isActive()) {
+            log.warn("Item id={} is inactive, cannot update", itemId);
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
                     "Товар неактивен и не подлежит редактированию"
@@ -74,6 +80,7 @@ public class ItemServiceImpl implements ItemService {
         item.setMinStock(request.minStock());
 
         Item savedItem = itemRepository.save(item);
+        log.info("Item updated: id={}, SKU='{}'", savedItem.getId(), savedItem.getSku());
         return itemMapper.toResponse(savedItem);
     }
 
