@@ -118,7 +118,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = "item", key = "#id")
+    @Cacheable(value = "item", key = "#itemId")
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
         ItemDetailsResponse item = itemRepository.findWithStock(itemId)
