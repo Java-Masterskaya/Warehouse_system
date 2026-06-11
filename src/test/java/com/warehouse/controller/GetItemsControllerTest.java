@@ -50,25 +50,10 @@ class GetItemsControllerTest extends AbstractIntegrationTest {
         createItem("SKU-SORT-A-" + suffix, "Альфа",      "Электроника");
         createItem("SKU-SORT-B-" + suffix, "Бета",       "Электроника");
         createItem("SKU-SORT-C-" + suffix, "Dell Laptop", "Компьютеры");
-        createItem("SKU-SORT-D-" + suffix, "DELL Monitor","Компьютеры");
+        createItem("SKU-SORT-D-" + suffix, "DELL Monitor", "Компьютеры");
     }
 
     // --- Критерии приёмки ---
-
-    // ?sort=sku&order=desc → первый элемент имеет SKU лексикографически >= второго
-    @Test
-    void sortBySkuDescReturnsDescendingOrder() throws Exception {
-        mockMvc.perform(get(BASE_URL)
-                        .param("sort", "sku")
-                        .param("order", "desc")
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray())
-                .andExpect(jsonPath("$.content[0].sku").value(
-                        org.hamcrest.Matchers.greaterThanOrEqualTo(
-                                (String) null) // проверяем через отдельный assert ниже
-                ));
-    }
 
     // ?sort=sku&order=desc → SKU[0] >= SKU[1] (лексикографически убывание)
     @Test

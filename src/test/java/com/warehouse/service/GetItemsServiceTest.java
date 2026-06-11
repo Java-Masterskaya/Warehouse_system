@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -50,8 +51,9 @@ class GetItemsServiceTest {
         ItemResponse response = stubResponse("SKU-1", "Ноутбук", "Электроника");
         Item item = new Item();
 
+        PageRequest pageable = PageRequest.of(0, 20);
         when(itemRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(item)));
+                .thenReturn(new PageImpl<>(List.of(item), pageable, 1));
         when(itemMapper.toResponse(item)).thenReturn(response);
 
         PageResponse<ItemResponse> result = itemService.getItems("name", "asc", null, null, 0, 20);
