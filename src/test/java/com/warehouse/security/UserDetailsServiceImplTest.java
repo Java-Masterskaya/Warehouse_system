@@ -8,7 +8,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
@@ -42,7 +41,8 @@ class UserDetailsServiceImplTest {
 
         assertThat(result.getUsername()).isEqualTo("admin");
         assertThat(result.getAuthorities())
-                .containsExactly(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                .extracting("authority")
+                .containsExactly("ROLE_ADMIN");
         assertThat(result.isEnabled()).isTrue();
     }
 
