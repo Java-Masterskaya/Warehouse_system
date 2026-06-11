@@ -1,8 +1,9 @@
-package com.warehouse.service;
+package com.warehouse.service.item;
 
-import com.warehouse.dto.request.UpdateItemRequest;
-import com.warehouse.dto.request.CreateItemRequest;
-import com.warehouse.dto.response.ItemResponse;
+import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 
 /**
@@ -10,6 +11,7 @@ import com.warehouse.dto.response.PageResponse;
  * Предоставляет операции создания, обновления и фильтрации товаров.
  */
 public interface ItemService {
+
     /**
      * Создаёт новый товар.
      *
@@ -26,6 +28,14 @@ public interface ItemService {
      * @return DTO с обновлённой информацией о товаре
      */
     ItemResponse updateItem(Long itemId, UpdateItemRequest request);
+
+    /**
+     * Получает детальную информацию о товаре.
+     *
+     * @param itemId идентификатор товара
+     * @return детальная информация о товаре в виде DTO
+     */
+    ItemDetailsResponse getItem(Long itemId);
 
     /**
      * Получает страницу товаров с фильтрацией и сортировкой.

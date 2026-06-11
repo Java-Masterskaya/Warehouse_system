@@ -1,12 +1,15 @@
 package com.warehouse.service;
 
-import com.warehouse.dto.request.UpdateItemRequest;
-import com.warehouse.dto.response.ItemResponse;
+import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.service.item.ItemService;
+import com.warehouse.service.item.ItemServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +17,7 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -126,5 +130,67 @@ class ItemServiceImplTest {
 
         // Проверяем, что сохранение не вызывалось
         verify(itemRepository, never()).save(any(Item.class));
+    }
+
+    @Test
+    void shouldReturnItemWhenItemExistsAndActive() {
+        // 1. Подготовка данных
+        ItemDetailsResponse response = new ItemDetailsResponse(
+                1L,
+                "WH-001",
+                "Ноутбук Dell XPS 15",
+                "Электроника",
+                5,
+                23,
+                true,
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+
+        // 2. Настройка моков
+        when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(response));
+
+        // 3. Выполнение
+        ItemDetailsResponse result = itemService.getItem(1L);
+
+        // 4. Проверка
+        assertEquals(response, result);
+        verify(itemRepository).findWithStock(1L);
+    }
+
+    @Test
+    void shouldThrowEntityNotFoundExceptionWhenItemNotFound() {
+        // 2. Настройка моков
+        when(itemRepository.findWithStock(1L)).thenReturn(Optional.empty());
+
+        // 3. Выполнение
+        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> itemService.getItem(1L));
+
+        // 4. Проверка
+        assertEquals("Товар не найден", exception.getMessage());
+    }
+
+    @Test
+    void shouldThrowEntityNotFoundExceptionWhenItemNotActive() {
+        ItemDetailsResponse response = new ItemDetailsResponse(
+                1L,
+                "WH-001",
+                "Ноутбук Dell XPS 15",
+                "Электроника",
+                5,
+                23,
+                false,
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+
+        // 2. Настройка моков
+        when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(response));
+
+        // 3. Выполнение
+        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> itemService.getItem(1L));
+
+        // 4. Проверка
+        assertEquals("Товар неактивен", exception.getMessage());
     }
 }

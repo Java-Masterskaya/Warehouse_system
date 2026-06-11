@@ -1,7 +1,7 @@
 package com.warehouse.mapper;
 
-import com.warehouse.dto.request.UserCreateRequest;
-import com.warehouse.dto.response.UserResponse;
+import com.warehouse.dto.request.user.UserCreateRequest;
+import com.warehouse.dto.response.user.UserResponse;
 import com.warehouse.entity.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

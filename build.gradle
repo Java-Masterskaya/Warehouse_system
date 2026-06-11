@@ -16,6 +16,10 @@ repositories {
     mavenCentral()
 }
 
+ext {
+    testcontainersVersion = '1.21.4'
+}
+
 dependencies {
     // Spring Boot starters
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -28,6 +32,7 @@ dependencies {
     implementation 'org.flywaydb:flyway-database-postgresql'
     // implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.+'
     implementation 'io.jsonwebtoken:jjwt-api:0.12.+'
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
     implementation 'org.mapstruct:mapstruct:1.5.+'
 
     // Lombok
@@ -49,9 +54,10 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
-    testImplementation 'org.testcontainers:junit-jupiter'
-    testImplementation 'org.testcontainers:postgresql'
-    testImplementation 'org.testcontainers:redpanda'
+    testImplementation "org.testcontainers:testcontainers:${testcontainersVersion}"
+    testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
+    testImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
+    testImplementation "org.testcontainers:redpanda:${testcontainersVersion}"
 
     testRuntimeOnly 'com.h2database:h2'
 }
@@ -64,4 +70,18 @@ test {
 checkstyle {
     toolVersion = '10.21.0'
     configFile = file('config/checkstyle/checkstyle.xml')
+}
+
+bootRun {
+    def envFile = file('.env')
+    if (envFile.exists()) {
+        envFile.readLines().each { line ->
+            if (!line.trim().isEmpty() && !line.startsWith('#')) {
+                def parts = line.split('=', 2)
+                if (parts.length == 2) {
+                    environment parts[0], parts[1]
+                }
+            }
+        }
+    }
 }

@@ -1,4 +1,4 @@
-package com.warehouse.dto.request;
+package com.warehouse.dto.request.item;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.Min;

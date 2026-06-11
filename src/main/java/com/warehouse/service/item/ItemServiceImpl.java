@@ -1,8 +1,9 @@
-package com.warehouse.service;
+package com.warehouse.service.item;
 
-import com.warehouse.dto.request.UpdateItemRequest;
-import com.warehouse.dto.request.CreateItemRequest;
-import com.warehouse.dto.response.ItemResponse;
+import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -36,7 +37,7 @@ public class ItemServiceImpl implements ItemService {
 
         if (itemRepository.existsBySku(request.sku())) {
             log.warn("Duplicate SKU '{}' — item already exists", request.sku());
-            throw new DuplicateSkuException(request.sku());
+            throw DuplicateSkuException.forSku(request.sku());
         }
 
         Item item = itemMapper.toEntity(request);
@@ -110,5 +111,23 @@ public class ItemServiceImpl implements ItemService {
         log.info("Found {} items for request (category={}, search={})", itemsPage.getTotalElements(), category, search);
 
         return PageResponse.from(itemsPage.map(itemMapper::toResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ItemDetailsResponse getItem(Long itemId) {
+        log.debug("Getting item with id '{}'", itemId);
+        ItemDetailsResponse item = itemRepository.findWithStock(itemId)
+                        .orElseThrow(() -> {
+                            log.warn("Item not found: id={}", itemId);
+                            return new EntityNotFoundException("Товар не найден");
+                        });
+
+        if (!item.active()) {
+            log.warn("Item inactive: id={}", itemId);
+            throw new EntityNotFoundException("Товар неактивен");
+        }
+
+        return item;
     }
 }

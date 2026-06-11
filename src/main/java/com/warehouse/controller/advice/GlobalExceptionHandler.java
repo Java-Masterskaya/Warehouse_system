@@ -1,12 +1,13 @@
 package com.warehouse.controller.advice;
 
-import com.warehouse.dto.error.ErrorResponse;
-import com.warehouse.dto.error.FieldError;
-import com.warehouse.dto.error.ValidationErrorResponse;
+import com.warehouse.dto.response.error.ErrorResponse;
+import com.warehouse.dto.response.error.FieldError;
+import com.warehouse.dto.response.error.ValidationErrorResponse;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -57,18 +59,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleAccessDenied(AccessDeniedException ex) {
-        return new ErrorResponse("ACCESS_DENIED", ex.getMessage());
+        return new ErrorResponse("ACCESS_DENIED", "Access denied");
     }
 
     @ExceptionHandler(AuthenticationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleAuthentication(AuthenticationException ex) {
-        return new ErrorResponse("UNAUTHORIZED", ex.getMessage());
+        return new ErrorResponse("UNAUTHORIZED", "Authentication failed");
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleGeneral(Exception ex) {
+        log.error("Unhandled exception: {}", ex.getMessage(), ex);
         return new ErrorResponse("INTERNAL_ERROR", "Internal server error");
     }
 }
