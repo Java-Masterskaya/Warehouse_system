@@ -1,4 +1,4 @@
-package com.warehouse.dto.request;
+package com.warehouse.dto.request.movement;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

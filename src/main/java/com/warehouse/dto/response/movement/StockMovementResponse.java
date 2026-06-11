@@ -1,4 +1,4 @@
-package com.warehouse.dto.response;
+package com.warehouse.dto.response.movement;
 
 import com.warehouse.entity.MovementType;
 

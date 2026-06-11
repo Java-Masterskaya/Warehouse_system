@@ -50,7 +50,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     void createItemAdminTokenReturns201WithBody() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell", "Электроника", 5);
 
-        mockMvc.perform(post("/api/v1/items")
+        mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -65,14 +65,14 @@ class ItemControllerTest extends AbstractIntegrationTest {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар", "Категория", 0);
 
         // Создаём первый раз — успешно
-        mockMvc.perform(post("/api/v1/items")
+        mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
         // Тот же SKU — должен вернуть 409
-        mockMvc.perform(post("/api/v1/items")
+        mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -84,7 +84,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     void createItemNoTokenReturns401() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар", "Категория", 0);
 
-        mockMvc.perform(post("/api/v1/items")
+        mockMvc.perform(post("/api/items")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
@@ -95,7 +95,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     void createItemUserTokenReturns403() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар", "Категория", 0);
 
-        mockMvc.perform(post("/api/v1/items")
+        mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -111,7 +111,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 {"sku": "", "name": "Товар", "category": "Категория", "minStock": 0}
                 """;
 
-        mockMvc.perform(post("/api/v1/items")
+        mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -125,7 +125,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 {"sku": "SKU-CTRL-004", "name": "Товар", "category": "Категория", "minStock": -1}
                 """;
 
-        mockMvc.perform(post("/api/v1/items")
+        mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
