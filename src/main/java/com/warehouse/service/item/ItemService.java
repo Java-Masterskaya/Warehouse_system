@@ -2,6 +2,7 @@ package com.warehouse.service.item;
 
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 
@@ -25,6 +26,8 @@ public interface ItemService {
      * @throws org.springframework.web.server.ResponseStatusException 404 если товар не найден или неактивен
      */
     ItemResponse updateItem(Long itemId, UpdateItemRequest request);
+
+    ItemDetailsResponse getItem(Long itemId);
 
     /**
      * Возвращает постраничный список активных товаров с поддержкой фильтрации и сортировки.
