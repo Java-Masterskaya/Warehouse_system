@@ -2,8 +2,8 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
-import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.PageResponse;
 import com.warehouse.service.item.ItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +20,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 
+/** Эндпоинты для управления товарами. */
 @RestController
-@RequestMapping("/api/v1/items")
+@RequestMapping("/api/items")
 @RequiredArgsConstructor
 public class ItemController {
 
@@ -40,6 +41,11 @@ public class ItemController {
         return itemService.getItems(sort, order, category, search, page, size);
     }
 
+    /** Создаёт новый товар.
+     *
+     * @param request запрос на создание товара
+     * @return созданный товар
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
@@ -47,6 +53,12 @@ public class ItemController {
         return itemService.createItem(request);
     }
 
+    /** Редактирует товар.
+     *
+     * @param itemId  id товара
+     * @param request запрос на обновление товара
+     * @return обновлённый товар
+     */
     @PutMapping("/{itemId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")

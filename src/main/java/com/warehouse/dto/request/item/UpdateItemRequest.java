@@ -16,5 +16,4 @@ public record UpdateItemRequest(
         @Min(value = 0, message = "Минимальный остаток не может быть отрицательным")
         @NotNull(message = "Минимальный остаток не может быть null")
         Integer minStock
-) {
-}
+) {}
