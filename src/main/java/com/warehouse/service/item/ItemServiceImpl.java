@@ -1,10 +1,9 @@
 package com.warehouse.service.item;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
-import com.warehouse.dto.response.item.ItemResponse;
-import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -19,10 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -121,10 +118,10 @@ public class ItemServiceImpl implements ItemService {
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
         ItemDetailsResponse item = itemRepository.findWithStock(itemId)
-                        .orElseThrow(() -> {
-                            log.warn("Item not found: id={}", itemId);
-                            return new EntityNotFoundException("Товар не найден");
-                        });
+                .orElseThrow(() -> {
+                    log.warn("Item not found: id={}", itemId);
+                    return new EntityNotFoundException("Товар не найден");
+                });
 
         if (!item.active()) {
             log.warn("Item inactive: id={}", itemId);

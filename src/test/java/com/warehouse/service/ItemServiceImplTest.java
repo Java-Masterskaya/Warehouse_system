@@ -241,7 +241,6 @@ class ItemServiceImplTest {
         // 4. Проверка
         assertEquals("Товар неактивен", exception.getMessage());
     }
-}
 
     // Скрытие(деактивация) уже деактивированного товара
     @Test
