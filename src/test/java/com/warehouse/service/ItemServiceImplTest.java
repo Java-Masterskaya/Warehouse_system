@@ -20,10 +20,19 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ItemServiceImplTest {
@@ -129,40 +138,77 @@ class ItemServiceImplTest {
         verify(itemRepository, never()).save(any(Item.class));
     }
 
-    // Удаление существующего товара
+    // Скрытие(деактивация) существующего товара
     @Test
-    void successDeleteItem() {
+    void successSoftDeleteItem() {
         Long itemId = 1L;
+
         Item item = new Item();
         item.setId(itemId);
+        item.setActive(true);
 
         when(itemRepository.findById(itemId))
                 .thenReturn(Optional.of(item));
-        itemService.deleteItem(itemId);
+
+        itemService.softDeleteItem(itemId);
 
         verify(itemRepository).findById(itemId);
-        verify(stockRepository).deleteByItemId(itemId);
-        verify(itemRepository).deleteById(itemId);
 
+        assertFalse(item.isActive());
+
+        verifyNoMoreInteractions(stockRepository);
     }
 
-    // Удаление несуществующего товара
+    // Скрытие(деактивация) несуществующего товара
     @Test
-    void deleteNotExistentItem() {
+    void softDeleteNotExistentItem() {
         Long itemId = 999L;
+
         when(itemRepository.findById(itemId))
                 .thenReturn(Optional.empty());
 
         EntityNotFoundException exception =
-                assertThrows(EntityNotFoundException.class,
-                        () -> itemService.deleteItem(itemId));
+                assertThrows(
+                        EntityNotFoundException.class,
+                        () -> itemService.softDeleteItem(itemId)
+                );
+
         assertEquals(
-                "Item с таким id = 999 не найден",
+                "Item with id 999 not found",
                 exception.getMessage()
         );
-        verify(itemRepository).findById(itemId);
-        verify(stockRepository, never()).deleteByItemId(anyLong());
-        verify(itemRepository, never()).deleteById(anyLong());
 
+        verify(itemRepository).findById(itemId);
+        verifyNoInteractions(stockRepository);
     }
+
+    // Скрытие(деактивация) уже деактивированного товара
+    @Test
+    void softDeleteAlreadyInactiveItem() {
+        Long itemId = 1L;
+
+        Item item = new Item();
+        item.setId(itemId);
+        item.setActive(false);
+
+        when(itemRepository.findById(itemId))
+                .thenReturn(Optional.of(item));
+
+        EntityNotFoundException exception =
+                assertThrows(
+                        EntityNotFoundException.class,
+                        () -> itemService.softDeleteItem(itemId)
+                );
+
+        assertEquals(
+                "Item with id=1 is already deactivated",
+                exception.getMessage()
+        );
+
+        verify(itemRepository).findById(itemId);
+        verifyNoInteractions(stockRepository);
+    }
+
 }
+
+

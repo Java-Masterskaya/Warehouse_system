@@ -108,15 +108,19 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
-    public void deleteItem(Long itemId) {
-        itemRepository.findById(itemId).orElseThrow(() -> {
+    public void softDeleteItem(Long itemId) {
+        Item item = itemRepository.findById(itemId).orElseThrow(() -> {
             log.warn("Item с id={} не найден", itemId);
-            return new EntityNotFoundException("Item с таким id = " + itemId + " не найден");
+            return EntityNotFoundException.forId("Item", itemId);
         });
 
-        stockRepository.deleteByItemId(itemId);
-        itemRepository.deleteById(itemId);
-        log.info("Item c id={} успешно удален", itemId);
+        if (!item.isActive()) {
+            log.warn("Item с id={} уже неактивный", itemId);
+            throw new EntityNotFoundException("Item with id=" + itemId + " is already deactivated");
+        }
+
+        item.setActive(false);
+        log.info("Item c id={} успешно деактивирован", itemId);
     }
 
 }
