@@ -2,9 +2,11 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.service.item.ItemService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,7 +22,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 
-/** Эндпоинты для управления товарами. */
+/**
+ * Эндпоинты для управления товарами.
+ */
 @RestController
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
@@ -41,7 +45,8 @@ public class ItemController {
         return itemService.getItems(sort, order, category, search, page, size);
     }
 
-    /** Создаёт новый товар.
+    /**
+     * Создаёт новый товар.
      *
      * @param request запрос на создание товара
      * @return созданный товар
@@ -53,7 +58,8 @@ public class ItemController {
         return itemService.createItem(request);
     }
 
-    /** Редактирует товар.
+    /**
+     * Редактирует товар.
      *
      * @param itemId  id товара
      * @param request запрос на обновление товара
@@ -66,6 +72,13 @@ public class ItemController {
             @PathVariable Long itemId,
             @Valid @RequestBody UpdateItemRequest request) {
         return itemService.updateItem(itemId, request);
+    }
+
+    @GetMapping("/{itemId}")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public ItemDetailsResponse getItem(@PathVariable Long itemId) {
+        return itemService.getItem(itemId);
     }
 
     /**
