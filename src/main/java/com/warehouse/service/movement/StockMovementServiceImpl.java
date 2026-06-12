@@ -10,11 +10,14 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,35 +35,54 @@ public class StockMovementServiceImpl implements StockMovementService {
     StockService stockService;
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
+    UserRepository userRepository;
 
     /**
      * Регистрирует приход товара на склад.
      * Выполняет валидацию товара, обновляет остаток и сохраняет запись о движении.
      *
-     * @param user      пользователь, выполняющий операцию
-     * @param request   данные запроса на приход товара
+     * @param request данные запроса на приход товара
      * @return ответ с информацией о движении товара
      * @throws EntityNotFoundException если товар не найден или неактивен
      */
     @Override
     @Transactional
-    public StockMovementResponse registerReceipt(User user, CreateStockMovementRequest request) {
+    public StockMovementResponse registerReceipt(CreateStockMovementRequest request) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
 
-        log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}",
-            itemId, quantity, user.getId());
+        if (quantity <= 0) {
+            log.warn("Invalid quantity for stock receipt: itemId={}, quantity={}", itemId, quantity);
+            throw new IllegalArgumentException("Quantity must be greater than 0");
+        }
 
+        // Сначала проверяем товар
         Item item = itemRepository.findById(itemId)
             .orElseThrow(() -> {
-                log.warn("Item not found: itemId={}, userId={}", itemId, user.getId());
+                log.warn("Item not found: itemId={}", itemId);
                 return EntityNotFoundException.forId("Item", itemId);
             });
 
         if (!item.isActive()) {
-            log.warn("Item not found: itemId={}, userId={}", itemId, user.getId());
+            log.warn("Attempt to receive inactive item: itemId={}", itemId);
             throw EntityNotFoundException.forId("Item", itemId);
         }
+
+        // Получаем Authentication и пользователя
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            log.error("Authentication is null when processing stock receipt");
+            throw new IllegalStateException("Authentication required");
+        }
+
+        User user = userRepository.findByUsername(authentication.getName())
+            .orElseThrow(() -> {
+                log.warn("User not found: username={}", authentication.getName());
+                return new IllegalStateException("User not found: " + authentication.getName());
+            });
+
+        log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}",
+            itemId, quantity, user.getId());
 
         int stockAfter = stockService.receiveStock(itemId, quantity);
 
