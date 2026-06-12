@@ -2,6 +2,7 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.movement.CreateStockMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.User;
 import com.warehouse.service.movement.StockMovementService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -10,6 +11,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,14 +35,17 @@ public class StockMovementController {
      * Регистрирует приход товара на склад.
      * Доступно только пользователям с ролью ADMIN.
      *
-     * @param request запрос на создание движения товара
+     * @param request  запрос на создание движения товара
+     * @param currentUser текущий аутентифицированный пользователь (из @AuthenticationPrincipal)
      * @return ответ с информацией о движении товара
      */
     @PostMapping("/receive")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public StockMovementResponse registerReceipt(@Valid @RequestBody CreateStockMovementRequest request) {
+    public StockMovementResponse registerReceipt(
+        @Valid @RequestBody CreateStockMovementRequest request,
+        @AuthenticationPrincipal User currentUser) {
         log.debug("Received stock movement request: itemId={}, quantity={}", request.itemId(), request.quantity());
-        return stockMovementService.registerReceipt(request);
+        return stockMovementService.registerReceipt(request, currentUser);
     }
 }

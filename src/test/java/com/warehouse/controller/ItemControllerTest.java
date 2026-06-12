@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.entity.User;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.security.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -32,6 +35,12 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private String adminToken;
     private String userToken;
 
@@ -39,6 +48,17 @@ class ItemControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         // Получаем реальный токен через /api/auth/login — admin создаётся миграцией V5
         adminToken = obtainToken("admin", "secret");
+        
+        // Создаём пользователя testuser, если его нет
+        userRepository.findByUsername("testuser").orElseGet(() -> {
+            User user = new User();
+            user.setUsername("testuser");
+            user.setPassword(passwordEncoder.encode("password"));
+            user.setRole(com.warehouse.entity.Role.ROLE_USER);
+            user.setActive(true);
+            return userRepository.save(user);
+        });
+        
         // USER нет в миграциях — генерируем токен напрямую.
         // JwtAuthFilter читает роли из claims, не обращаясь к БД, поэтому это корректно.
         userToken = jwtUtil.generateToken("testuser", List.of("ROLE_USER"));

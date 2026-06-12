@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.entity.User;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.security.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -37,12 +40,29 @@ class GetItemsControllerTest extends AbstractIntegrationTest {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private String adminToken;
     private String userToken;
 
     @BeforeEach
     void setUp() throws Exception {
         adminToken = obtainToken("admin", "secret");
+        
+        // Создаём пользователя testuser_get, если его нет
+        userRepository.findByUsername("testuser_get").orElseGet(() -> {
+            User user = new User();
+            user.setUsername("testuser_get");
+            user.setPassword(passwordEncoder.encode("password"));
+            user.setRole(com.warehouse.entity.Role.ROLE_USER);
+            user.setActive(true);
+            return userRepository.save(user);
+        });
+        
         userToken = jwtUtil.generateToken("testuser_get", List.of("ROLE_USER"));
 
         // Уникальный суффикс чтобы SKU не конфликтовали между запусками тестов
