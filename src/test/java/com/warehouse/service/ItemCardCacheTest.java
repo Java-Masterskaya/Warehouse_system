@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -9,32 +10,12 @@ import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@Testcontainers
 @ActiveProfiles("test")
-class ItemCardCacheTest {
-
-    @Container
-    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
-            .withExposedPorts(6379)
-            .withCommand("redis-server --requirepass testpass");
-
-    @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
-        registry.add("spring.data.redis.password", () -> "testpass");
-    }
+class ItemCardCacheTest extends AbstractIntegrationTest {
 
     @Autowired
     private ItemRepository itemRepository;
