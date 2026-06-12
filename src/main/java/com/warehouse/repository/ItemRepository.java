@@ -37,7 +37,6 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
      */
     @Query("SELECT DISTINCT i.category FROM Item i WHERE i.active = true")
     List<String> findDistinctCategories();
-}
 
     @Query("""
             SELECT new com.warehouse.dto.response.item.ItemDetailsResponse(
