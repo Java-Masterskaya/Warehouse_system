@@ -72,11 +72,11 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     }
 
     /**
-     * ADMIN токен может зарегистрировать приход товара,
+     * ADMIN может зарегистрировать приход товара,
      * остаток на складе увеличивается на указанное количество.
      */
     @Test
-    void adminToken_canRegisterStockReceipt_and_stockQuantityIncreases() throws Exception {
+    void adminTokenCanRegisterStockReceiptAndStockQuantityIncreases() throws Exception {
         CreateStockMovementRequest request = new CreateStockMovementRequest(testItemId, 5);
 
         mockMvc.perform(post("/api/movements/receive")
@@ -98,7 +98,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      * возвращает статус 403 Forbidden.
      */
     @Test
-    void userToken_cannotRegisterStockReceipt_returns403() throws Exception {
+    void userTokenCannotRegisterStockReceiptReturns403() throws Exception {
         CreateStockMovementRequest request = new CreateStockMovementRequest(testItemId, 5);
 
         mockMvc.perform(post("/api/movements/receive")
@@ -114,7 +114,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      * возвращает статус 401 Unauthorized.
      */
     @Test
-    void noToken_cannotRegisterStockReceipt_returns401() throws Exception {
+    void noTokenCannotRegisterStockReceiptReturns401() throws Exception {
         CreateStockMovementRequest request = new CreateStockMovementRequest(testItemId, 5);
 
         mockMvc.perform(post("/api/movements/receive")
@@ -128,7 +128,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      * Приход товара для несуществующего item_id возвращает статус 404 Not Found.
      */
     @Test
-    void nonExistentItem_returns404() throws Exception {
+    void nonExistentItemReturns404() throws Exception {
         CreateStockMovementRequest request = new CreateStockMovementRequest(999L, 5);
 
         mockMvc.perform(post("/api/movements/receive")
@@ -143,7 +143,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      * Приход товара для неактивного товара возвращает статус 404 Not Found.
      */
     @Test
-    void inactiveItem_returns404() throws Exception {
+    void inactiveItemReturns404() throws Exception {
         testItem.setActive(false);
         itemRepository.save(testItem);
 
@@ -161,7 +161,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      * Валидация: количество = 0 возвращает статус 400 Bad Request.
      */
     @Test
-    void zeroQuantity_validationError_returns400() throws Exception {
+    void zeroQuantityValidationErrorReturns400() throws Exception {
         CreateStockMovementRequest request = new CreateStockMovementRequest(testItemId, 0);
 
         mockMvc.perform(post("/api/movements/receive")
@@ -176,7 +176,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      * Валидация: отрицательное количество возвращает статус 400 Bad Request.
      */
     @Test
-    void negativeQuantity_validationError_returns400() throws Exception {
+    void negativeQuantityValidationErrorReturns400() throws Exception {
         CreateStockMovementRequest request = new CreateStockMovementRequest(testItemId, -1);
 
         mockMvc.perform(post("/api/movements/receive")
