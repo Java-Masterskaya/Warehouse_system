@@ -8,13 +8,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Configuration
@@ -29,30 +29,42 @@ public class RedisConfig {
             RedisConnectionFactory connectionFactory,
             ObjectMapper objectMapper
     ) {
-        GenericJackson2JsonRedisSerializer genericSerializer = new GenericJackson2JsonRedisSerializer(objectMapper);
-
-        Jackson2JsonRedisSerializer<ItemDetailsResponse> itemSerializer =
-                new Jackson2JsonRedisSerializer<>(objectMapper, ItemDetailsResponse.class);
-
-        RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
+        RedisCacheConfiguration baseConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .serializeKeysWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer())
-                )
-                .serializeValuesWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(genericSerializer)
+                        RedisSerializationContext.SerializationPair.fromSerializer(
+                                new StringRedisSerializer()
+                        )
                 )
                 .disableCachingNullValues();
 
-        Map<String, RedisCacheConfiguration> configs = new HashMap<>();
+        RedisCacheConfiguration categoriesConfig = baseConfig
+                .entryTtl(Duration.ofMinutes(CATEGORIES_TTL_MINUTES))
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(
+                                new Jackson2JsonRedisSerializer<>(
+                                        objectMapper,
+                                        List.class
+                                )
+                        )
+                );
 
-        configs.put("categories", defaultConfig.entryTtl(Duration.ofMinutes(CATEGORIES_TTL_MINUTES)));
-
-        configs.put("item", defaultConfig
+        RedisCacheConfiguration itemConfig = baseConfig
                 .entryTtl(Duration.ofMinutes(ITEM_TTL_MINUTES))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(itemSerializer)));
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(
+                                new Jackson2JsonRedisSerializer<>(
+                                        objectMapper,
+                                        ItemDetailsResponse.class
+                                )
+                        )
+                );
+
+        Map<String, RedisCacheConfiguration> configs = new HashMap<>();
+        configs.put("categories", categoriesConfig);
+        configs.put("item", itemConfig);
 
         return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(defaultConfig)
+                .cacheDefaults(baseConfig)
                 .withInitialCacheConfigurations(configs)
                 .build();
     }
