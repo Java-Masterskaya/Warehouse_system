@@ -6,14 +6,17 @@ import com.warehouse.dto.request.movement.CreateStockMovementRequest;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.security.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -45,6 +48,12 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     @Autowired
     private StockRepository stockRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private String adminToken;
     private String userToken;
     private Item testItem;
@@ -67,6 +76,26 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         stockRepository.save(stock);
 
         testItemId = testItem.getId();
+        
+        // Создаём пользователей только если их нет
+        userRepository.findByUsername("admin").orElseGet(() -> {
+            User admin = new User();
+            admin.setUsername("admin");
+            admin.setPassword(passwordEncoder.encode("secret"));
+            admin.setRole(com.warehouse.entity.Role.ROLE_ADMIN);
+            admin.setActive(true);
+            return userRepository.save(admin);
+        });
+        
+        userRepository.findByUsername("testuser").orElseGet(() -> {
+            User user = new User();
+            user.setUsername("testuser");
+            user.setPassword(passwordEncoder.encode("password"));
+            user.setRole(com.warehouse.entity.Role.ROLE_USER);
+            user.setActive(true);
+            return userRepository.save(user);
+        });
+        
         adminToken = obtainToken("admin", "secret");
         userToken = jwtUtil.generateToken("testuser", List.of("ROLE_USER"));
     }
