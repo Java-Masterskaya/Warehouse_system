@@ -101,7 +101,7 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .build();
 
         stockMovementRepository.save(stockMovement);
-        log.info("Stock receipt deleted: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
+        log.info("Stock receipt writeOffed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
                 itemId, quantity, stockAfter, user.getId(), stockMovement.getId());
 
         return mapper.toResponse(stockMovement, stockAfter);
