@@ -18,4 +18,6 @@ public interface StockService {
      * @return новый остаток после списания
      */
     int writeOffStock(Long itemId, int quantity);
+
+
 }

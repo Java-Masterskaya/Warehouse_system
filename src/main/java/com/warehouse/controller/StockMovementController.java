@@ -1,6 +1,7 @@
 package com.warehouse.controller;
 
 import com.warehouse.dto.request.movement.CreateStockMovementRequest;
+import com.warehouse.dto.request.movement.WriteOffStockMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.User;
 import com.warehouse.service.movement.StockMovementService;
@@ -45,7 +46,16 @@ public class StockMovementController {
     public StockMovementResponse registerReceipt(
         @Valid @RequestBody CreateStockMovementRequest request,
         @AuthenticationPrincipal User currentUser) {
-        log.debug("Received stock movement request: itemId={}, quantity={}", request.itemId(), request.quantity());
+        log.debug("Received stock movement register request: itemId={}, quantity={}", request.itemId(), request.quantity());
         return stockMovementService.registerReceipt(request, currentUser);
+    }
+
+    @PostMapping("/write-off")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public StockMovementResponse wrireOffReceipt(@Valid @RequestBody WriteOffStockMovementRequest request,
+                                                 @AuthenticationPrincipal User currentUser) {
+        log.debug("Received stock movement writeOff request: itemId={}, quantity={}", request.itemId(), request.quantity());
+        return stockMovementService.writeOffReceipt(request, currentUser);
     }
 }

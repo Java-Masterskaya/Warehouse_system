@@ -1,6 +1,7 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.request.movement.CreateStockMovementRequest;
+import com.warehouse.dto.request.movement.WriteOffStockMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.User;
 
@@ -18,4 +19,6 @@ public interface StockMovementService {
      * @return ответ с информацией о движении товара
      */
     StockMovementResponse registerReceipt(CreateStockMovementRequest request, User user);
+
+    StockMovementResponse writeOffReceipt(WriteOffStockMovementRequest request, User user);
 }
