@@ -3,6 +3,7 @@ package com.warehouse.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.movement.CreateStockMovementRequest;
+import com.warehouse.dto.request.movement.WriteOffStockMovementRequest;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -226,5 +227,140 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(response).get("token").asText();
+    }
+
+    // ==========================================
+//    ТЕСТЫ ДЛЯ WRITE-OFF ENDPOINT
+// ==========================================
+
+    /**
+     * ADMIN может списать товар со склада,
+     * остаток на складе уменьшается на указанное количество.
+     */
+    @Test
+    void adminTokenCanWriteOffStockAndStockQuantityDecreases() throws Exception {
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(testItemId, 5);
+
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itemId").value(testItemId))
+                .andExpect(jsonPath("$.quantity").value(5))
+                .andExpect(jsonPath("$.type").value("WRITE_OFF"))
+                .andExpect(jsonPath("$.stockAfter").value(5));
+
+        Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+        assertThat(updatedStock.getQuantity()).isEqualTo(5);
+    }
+
+    /**
+     * USER токен не может списать товар,
+     * возвращает статус 403 Forbidden.
+     */
+    @Test
+    void userTokenCannotWriteOffStockReturns403() throws Exception {
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(testItemId, 5);
+
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+    }
+
+    /**
+     * Запрос без токена не может списать товар,
+     * возвращает статус 401 Unauthorized.
+     */
+    @Test
+    void noTokenCannotWriteOffStockReturns401() throws Exception {
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(testItemId, 5);
+
+        mockMvc.perform(post("/api/movements/write-off")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
+
+    /**
+     * Списание товара для несуществующего item_id возвращает статус 404 Not Found.
+     */
+    @Test
+    void writeOffNonExistentItemReturns404() throws Exception {
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(999L, 5);
+
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+    }
+
+    /**
+     * Списание товара для неактивного товара возвращает статус 404 Not Found.
+     */
+    @Test
+    void writeOffInactiveItemReturns404() throws Exception {
+        testItem.setActive(false);
+        itemRepository.save(testItem);
+
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(testItemId, 5);
+
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+    }
+
+    /**
+     * Списание товара при недостаточном остатке возвращает статус 422 Unprocessable Entity.
+     */
+    @Test
+    void writeOffInsufficientStockReturns422() throws Exception {
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(testItemId, 15);
+
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("INSUFFICIENT_STOCK"));
+    }
+
+    /**
+     * Валидация: количество = 0 возвращает статус 400 Bad Request.
+     */
+    @Test
+    void writeOffZeroQuantityValidationErrorReturns400() throws Exception {
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(testItemId, 0);
+
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    /**
+     * Валидация: отрицательное количество возвращает статус 400 Bad Request.
+     */
+    @Test
+    void writeOffNegativeQuantityValidationErrorReturns400() throws Exception {
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(testItemId, -1);
+
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
     }
 }

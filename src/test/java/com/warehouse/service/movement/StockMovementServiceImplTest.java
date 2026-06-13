@@ -1,12 +1,14 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.request.movement.CreateStockMovementRequest;
+import com.warehouse.dto.request.movement.WriteOffStockMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -178,6 +180,133 @@ class StockMovementServiceImplTest {
 
         // Act
         stockMovementService.registerReceipt(request, user);
+
+        // Assert
+        verify(stockMovementRepository).save(stockMovementCaptor.capture());
+        StockMovement savedMovement = stockMovementCaptor.getValue();
+        assertNotNull(savedMovement.getUser());
+        assertEquals(USER_ID, savedMovement.getUser().getId());
+        assertEquals("admin", savedMovement.getUser().getUsername());
+    }
+
+    // ==========================================
+//    ТЕСТЫ ДЛЯ WRITE-OFF
+// ==========================================
+
+    @Test
+    void writeOffReceiptSuccess() {
+        // Arrange
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(ITEM_ID, QUANTITY);
+        User user = createUser(USER_ID, "admin");
+        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        int stockAfterWriteOff = 5;
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff)))
+                .thenAnswer(invocation -> {
+                    StockMovement movement = invocation.getArgument(0);
+                    int stockAfter = invocation.getArgument(1);
+                    return new StockMovementResponse(
+                            movement.getItem().getId(),
+                            movement.getId(),
+                            movement.getType(),
+                            movement.getQuantity(),
+                            stockAfter,
+                            movement.getCreatedAt()
+                    );
+                });
+
+        // Act
+        StockMovementResponse response = stockMovementService.writeOffReceipt(request, user);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(ITEM_ID, response.itemId());
+        assertEquals(QUANTITY, response.quantity());
+        assertEquals(stockAfterWriteOff, response.stockAfter());
+        assertEquals(MovementType.WRITE_OFF, response.type());
+
+        verify(stockMovementRepository).save(stockMovementCaptor.capture());
+        StockMovement savedMovement = stockMovementCaptor.getValue();
+        assertEquals(ITEM_ID, savedMovement.getItem().getId());
+        assertEquals(USER_ID, savedMovement.getUser().getId());
+        assertEquals(MovementType.WRITE_OFF, savedMovement.getType());
+        assertEquals(QUANTITY, savedMovement.getQuantity());
+    }
+
+    @Test
+    void writeOffReceiptItemNotFoundThrowsException() {
+        // Arrange
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
+        User user = createUser(USER_ID, "admin");
+
+        when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
+            stockMovementService.writeOffReceipt(request, user);
+        });
+
+        assertTrue(ex.getMessage().contains("Item"));
+        assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
+    }
+
+    @Test
+    void writeOffReceiptInactiveItemThrowsException() {
+        // Arrange
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(ITEM_ID, QUANTITY);
+        User user = createUser(USER_ID, "admin");
+        Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(inactiveItem));
+
+        // Act & Assert
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
+            stockMovementService.writeOffReceipt(request, user);
+        });
+
+        assertTrue(ex.getMessage().contains("Item"));
+        assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
+    }
+
+    @Test
+    void writeOffReceiptInsufficientStockThrowsException() {
+        // Arrange
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(ITEM_ID, 20);
+        User user = createUser(USER_ID, "admin");
+        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockService.writeOffStock(ITEM_ID, 20))
+                .thenThrow(new InsufficientStockException("Insufficient stock"));
+
+        // Act & Assert
+        InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
+            stockMovementService.writeOffReceipt(request, user);
+        });
+
+        assertEquals("Insufficient stock", ex.getMessage());
+    }
+
+    @Test
+    void writeOffReceiptUserNotNull() {
+        // Arrange
+        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(ITEM_ID, QUANTITY);
+        User user = createUser(USER_ID, "admin");
+        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        int stockAfterWriteOff = 5;
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        stockMovementService.writeOffReceipt(request, user);
 
         // Assert
         verify(stockMovementRepository).save(stockMovementCaptor.capture());
