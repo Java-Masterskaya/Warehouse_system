@@ -1,10 +1,10 @@
 package com.warehouse.service.item;
 
-import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.item.CreateItemRequest;
-import com.warehouse.dto.response.item.ItemResponse;
-import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
@@ -118,10 +118,10 @@ public class ItemServiceImpl implements ItemService {
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
         ItemDetailsResponse item = itemRepository.findWithStock(itemId)
-                        .orElseThrow(() -> {
-                            log.warn("Item not found: id={}", itemId);
-                            return new EntityNotFoundException("Товар не найден");
-                        });
+                .orElseThrow(() -> {
+                    log.warn("Item not found: id={}", itemId);
+                    return new EntityNotFoundException("Товар не найден");
+                });
 
         if (!item.active()) {
             log.warn("Item inactive: id={}", itemId);
@@ -130,4 +130,22 @@ public class ItemServiceImpl implements ItemService {
 
         return item;
     }
+
+    @Transactional
+    @Override
+    public void softDeleteItem(Long itemId) {
+        Item item = itemRepository.findById(itemId).orElseThrow(() -> {
+            log.warn("Item с id={} не найден", itemId);
+            return EntityNotFoundException.forId("Item", itemId);
+        });
+
+        if (!item.isActive()) {
+            log.warn("Item с id={} уже неактивный", itemId);
+            throw new EntityNotFoundException("Item with id=" + itemId + " is already deactivated");
+        }
+
+        item.setActive(false);
+        log.info("Item c id={} успешно деактивирован", itemId);
+    }
+
 }

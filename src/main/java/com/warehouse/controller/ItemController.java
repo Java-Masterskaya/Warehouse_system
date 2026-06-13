@@ -6,21 +6,25 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.service.item.ItemService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
-/** Эндпоинты для управления товарами. */
+/**
+ * Эндпоинты для управления товарами.
+ */
 @RestController
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
@@ -41,7 +45,8 @@ public class ItemController {
         return itemService.getItems(sort, order, category, search, page, size);
     }
 
-    /** Создаёт новый товар.
+    /**
+     * Создаёт новый товар.
      *
      * @param request запрос на создание товара
      * @return созданный товар
@@ -53,7 +58,8 @@ public class ItemController {
         return itemService.createItem(request);
     }
 
-    /** Редактирует товар.
+    /**
+     * Редактирует товар.
      *
      * @param itemId  id товара
      * @param request запрос на обновление товара
@@ -73,5 +79,20 @@ public class ItemController {
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ItemDetailsResponse getItem(@PathVariable Long itemId) {
         return itemService.getItem(itemId);
+    }
+
+    /**
+     * Скрывает товар из выдачи по его идентификатору.
+     * <p>
+     * Доступен только пользователям с ролью ADMIN.
+     *
+     * @param itemId идентификатор скрываемого товара
+     * @throws EntityNotFoundException если товар не найден
+     */
+    @DeleteMapping("/{itemId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('ADMIN')")
+    public void softDeleteItem(@PathVariable Long itemId) {
+        itemService.softDeleteItem(itemId);
     }
 }
