@@ -8,11 +8,15 @@ import org.springframework.kafka.config.TopicBuilder;
 @Configuration
 public class KafkaTopicConfig {
 
+    private static final String TOPIC_NAME = "low-stock-alerts";
+    private static final int PARTITIONS = 3;
+    private static final short REPLICAS = 1;
+
     @Bean
     public NewTopic lowStockAlertsTopic() {
-        return TopicBuilder.name("low-stock-alerts")
-                .partitions(3)
-                .replicas(1)
+        return TopicBuilder.name(TOPIC_NAME)
+                .partitions(PARTITIONS)
+                .replicas(REPLICAS)
                 .build();
     }
 }
