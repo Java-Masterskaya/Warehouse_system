@@ -1,8 +1,10 @@
 package com.warehouse.service.report;
 
-import com.warehouse.dto.response.report.LowStockReportResponse;
+import com.warehouse.dto.response.report.LowStockItem;
+
+import java.util.List;
 
 public interface ReportService {
 
-    LowStockReportResponse getLowStockReport();
+    List<LowStockItem> getLowStockItems();
 }

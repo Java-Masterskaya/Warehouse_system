@@ -6,5 +6,5 @@ import java.util.List;
 public record LowStockReportResponse(
         LocalDateTime generatedAt,
         int count,
-        List<LowStockItemResponse> items
+        List<LowStockItem> items
 ) {}

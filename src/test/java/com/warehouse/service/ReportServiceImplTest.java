@@ -1,7 +1,6 @@
 package com.warehouse.service;
 
-import com.warehouse.dto.response.report.LowStockItemResponse;
-import com.warehouse.dto.response.report.LowStockReportResponse;
+import com.warehouse.dto.response.report.LowStockItem;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.projection.LowStockProjection;
 import com.warehouse.service.report.ReportServiceImpl;
@@ -42,11 +41,11 @@ public class ReportServiceImplTest {
         when(projection.getMinStock()).thenReturn(5);
         when(itemRepository.findLowStockItems()).thenReturn(List.of(projection));
 
-        LowStockReportResponse response = reportService.getLowStockReport();
+        List<LowStockItem> items = reportService.getLowStockItems();
 
-        assertEquals(1, response.count());
+        assertEquals(1, items.size());
 
-        LowStockItemResponse item = response.items().getFirst();
+        LowStockItem item = items.getFirst();
 
         assertEquals(2, item.currentStock());
         assertEquals(5, item.minStock());
@@ -64,8 +63,8 @@ public class ReportServiceImplTest {
         when(projection.getMinStock()).thenReturn(5);
         when(itemRepository.findLowStockItems()).thenReturn(List.of(projection));
 
-        LowStockReportResponse response = reportService.getLowStockReport();
+        List<LowStockItem> items = reportService.getLowStockItems();
 
-        assertEquals(3, response.items().getFirst().deficit());
+        assertEquals(3, items.getFirst().deficit());
     }
 }

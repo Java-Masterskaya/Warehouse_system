@@ -1,6 +1,6 @@
 package com.warehouse.dto.response.report;
 
-public record LowStockItemResponse(
+public record LowStockItem(
         Long id,
         String sku,
         String name,
