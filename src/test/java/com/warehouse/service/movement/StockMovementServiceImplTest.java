@@ -1,7 +1,6 @@
 package com.warehouse.service.movement;
 
-import com.warehouse.dto.request.movement.CreateStockMovementRequest;
-import com.warehouse.dto.request.movement.WriteOffStockMovementRequest;
+import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
@@ -62,7 +61,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptSuccess() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
 
@@ -106,7 +105,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptWithZeroQuantityThrowsException() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, 0);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 0);
         User user = createUser(USER_ID, "admin");
 
         // Act & Assert
@@ -120,7 +119,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptWithNegativeQuantityThrowsException() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, -1);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, -1);
         User user = createUser(USER_ID, "admin");
 
         // Act & Assert
@@ -134,7 +133,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptItemNotFoundThrowsException() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
@@ -151,7 +150,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptInactiveItemThrowsException() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
 
@@ -169,7 +168,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptUserNotNull() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
 
@@ -196,7 +195,7 @@ class StockMovementServiceImplTest {
     @Test
     void writeOffReceiptSuccess() {
         // Arrange
-        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
         int stockAfterWriteOff = 5;
@@ -241,7 +240,7 @@ class StockMovementServiceImplTest {
     @Test
     void writeOffReceiptItemNotFoundThrowsException() {
         // Arrange
-        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
@@ -258,7 +257,7 @@ class StockMovementServiceImplTest {
     @Test
     void writeOffReceiptInactiveItemThrowsException() {
         // Arrange
-        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
 
@@ -276,7 +275,7 @@ class StockMovementServiceImplTest {
     @Test
     void writeOffReceiptInsufficientStockThrowsException() {
         // Arrange
-        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(ITEM_ID, 20);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 20);
         User user = createUser(USER_ID, "admin");
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
 
@@ -295,7 +294,7 @@ class StockMovementServiceImplTest {
     @Test
     void writeOffReceiptUserNotNull() {
         // Arrange
-        WriteOffStockMovementRequest request = new WriteOffStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
         int stockAfterWriteOff = 5;

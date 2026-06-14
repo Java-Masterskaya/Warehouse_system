@@ -1,7 +1,6 @@
 package com.warehouse.service.movement;
 
-import com.warehouse.dto.request.movement.CreateStockMovementRequest;
-import com.warehouse.dto.request.movement.WriteOffStockMovementRequest;
+import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
@@ -45,7 +44,7 @@ public class StockMovementServiceImpl implements StockMovementService {
      */
     @Override
     @Transactional
-    public StockMovementResponse registerReceipt(CreateStockMovementRequest request, User user) {
+    public StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, User user) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
 
@@ -81,7 +80,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Override
     @Transactional
-    public StockMovementResponse writeOffReceipt(WriteOffStockMovementRequest request, User user) {
+    public StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, User user) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
 
