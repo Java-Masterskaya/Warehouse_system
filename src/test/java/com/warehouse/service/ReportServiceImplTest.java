@@ -32,10 +32,8 @@ public class ReportServiceImplTest {
 
     @Test
     public void shouldBuildLowStockItems() {
-        // 1. Подготовка данных
         LowStockProjection projection = mock(LowStockProjection.class);
 
-        // 2. Настройка моков
         when(projection.getId()).thenReturn(1L);
         when(projection.getSku()).thenReturn("WH-001");
         when(projection.getName()).thenReturn("Ноутбук Dell XPS 15");
@@ -44,10 +42,8 @@ public class ReportServiceImplTest {
         when(projection.getMinStock()).thenReturn(5);
         when(itemRepository.findLowStockItems()).thenReturn(List.of(projection));
 
-        // 3. Выполнение
         LowStockReportResponse response = reportService.getLowStockReport();
 
-        // 4. Проверки
         assertEquals(1, response.count());
 
         LowStockItemResponse item = response.items().getFirst();
@@ -58,10 +54,8 @@ public class ReportServiceImplTest {
 
     @Test
     public void shouldCalculateDeficit() {
-        // 1. Подготовка данных
         LowStockProjection projection = mock(LowStockProjection.class);
 
-        // 2. Настройка моков
         when(projection.getId()).thenReturn(1L);
         when(projection.getSku()).thenReturn("WH-001");
         when(projection.getName()).thenReturn("Ноутбук Dell XPS 15");
@@ -70,10 +64,8 @@ public class ReportServiceImplTest {
         when(projection.getMinStock()).thenReturn(5);
         when(itemRepository.findLowStockItems()).thenReturn(List.of(projection));
 
-        // 3. Выполнение
         LowStockReportResponse response = reportService.getLowStockReport();
 
-        // 4. Проверки
         assertEquals(3, response.items().getFirst().deficit());
     }
 }

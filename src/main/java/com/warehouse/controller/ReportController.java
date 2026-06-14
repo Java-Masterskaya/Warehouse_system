@@ -17,10 +17,6 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    /**
-     * Отчёт по товарам с остатком ниже минимального.
-     * @return отчёт со списком дефицитных товаров
-     */
     @GetMapping("/low-stock")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
