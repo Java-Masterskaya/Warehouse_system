@@ -1,12 +1,13 @@
 package com.warehouse.service.movement;
 
-import com.warehouse.dto.request.movement.CreateStockMovementRequest;
+import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -60,7 +61,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptSuccess() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
 
@@ -104,7 +105,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptWithZeroQuantityThrowsException() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, 0);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 0);
         User user = createUser(USER_ID, "admin");
 
         // Act & Assert
@@ -118,7 +119,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptWithNegativeQuantityThrowsException() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, -1);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, -1);
         User user = createUser(USER_ID, "admin");
 
         // Act & Assert
@@ -132,7 +133,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptItemNotFoundThrowsException() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
@@ -149,7 +150,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptInactiveItemThrowsException() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
 
@@ -167,7 +168,7 @@ class StockMovementServiceImplTest {
     @Test
     void registerReceiptUserNotNull() {
         // Arrange
-        CreateStockMovementRequest request = new CreateStockMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         User user = createUser(USER_ID, "admin");
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
 
@@ -178,6 +179,133 @@ class StockMovementServiceImplTest {
 
         // Act
         stockMovementService.registerReceipt(request, user);
+
+        // Assert
+        verify(stockMovementRepository).save(stockMovementCaptor.capture());
+        StockMovement savedMovement = stockMovementCaptor.getValue();
+        assertNotNull(savedMovement.getUser());
+        assertEquals(USER_ID, savedMovement.getUser().getId());
+        assertEquals("admin", savedMovement.getUser().getUsername());
+    }
+
+    // ==========================================
+//    ТЕСТЫ ДЛЯ WRITE-OFF
+// ==========================================
+
+    @Test
+    void writeOffReceiptSuccess() {
+        // Arrange
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        User user = createUser(USER_ID, "admin");
+        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        int stockAfterWriteOff = 5;
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff)))
+                .thenAnswer(invocation -> {
+                    StockMovement movement = invocation.getArgument(0);
+                    int stockAfter = invocation.getArgument(1);
+                    return new StockMovementResponse(
+                            movement.getItem().getId(),
+                            movement.getId(),
+                            movement.getType(),
+                            movement.getQuantity(),
+                            stockAfter,
+                            movement.getCreatedAt()
+                    );
+                });
+
+        // Act
+        StockMovementResponse response = stockMovementService.writeOffReceipt(request, user);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(ITEM_ID, response.itemId());
+        assertEquals(QUANTITY, response.quantity());
+        assertEquals(stockAfterWriteOff, response.stockAfter());
+        assertEquals(MovementType.WRITE_OFF, response.type());
+
+        verify(stockMovementRepository).save(stockMovementCaptor.capture());
+        StockMovement savedMovement = stockMovementCaptor.getValue();
+        assertEquals(ITEM_ID, savedMovement.getItem().getId());
+        assertEquals(USER_ID, savedMovement.getUser().getId());
+        assertEquals(MovementType.WRITE_OFF, savedMovement.getType());
+        assertEquals(QUANTITY, savedMovement.getQuantity());
+    }
+
+    @Test
+    void writeOffReceiptItemNotFoundThrowsException() {
+        // Arrange
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
+        User user = createUser(USER_ID, "admin");
+
+        when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
+            stockMovementService.writeOffReceipt(request, user);
+        });
+
+        assertTrue(ex.getMessage().contains("Item"));
+        assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
+    }
+
+    @Test
+    void writeOffReceiptInactiveItemThrowsException() {
+        // Arrange
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        User user = createUser(USER_ID, "admin");
+        Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(inactiveItem));
+
+        // Act & Assert
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
+            stockMovementService.writeOffReceipt(request, user);
+        });
+
+        assertTrue(ex.getMessage().contains("Item"));
+        assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
+    }
+
+    @Test
+    void writeOffReceiptInsufficientStockThrowsException() {
+        // Arrange
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 20);
+        User user = createUser(USER_ID, "admin");
+        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockService.writeOffStock(ITEM_ID, 20))
+                .thenThrow(new InsufficientStockException("Insufficient stock"));
+
+        // Act & Assert
+        InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
+            stockMovementService.writeOffReceipt(request, user);
+        });
+
+        assertEquals("Insufficient stock", ex.getMessage());
+    }
+
+    @Test
+    void writeOffReceiptUserNotNull() {
+        // Arrange
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        User user = createUser(USER_ID, "admin");
+        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        int stockAfterWriteOff = 5;
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        stockMovementService.writeOffReceipt(request, user);
 
         // Assert
         verify(stockMovementRepository).save(stockMovementCaptor.capture());
