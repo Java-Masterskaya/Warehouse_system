@@ -19,6 +19,7 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     public LowStockReportResponse getLowStockReport() {
+        log.debug("Get low stock report");
         List<LowStockItemResponse> items = itemRepository.findLowStockItems().stream()
                 .map(item -> new LowStockItemResponse(
                         item.getId(),
