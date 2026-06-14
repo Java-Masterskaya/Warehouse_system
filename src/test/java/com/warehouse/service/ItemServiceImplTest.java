@@ -16,8 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -26,11 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ItemServiceImplTest {
@@ -96,13 +98,12 @@ class ItemServiceImplTest {
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
         // 3. Выполнение и проверка исключения
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
             itemService.updateItem(itemId, request);
         });
 
         // 4. Проверка деталей исключения
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-        assertTrue(exception.getReason().contains("не найден"));
+        assertTrue(exception.getMessage().contains("not found"));
 
         // Проверяем, что сохранение не вызывалось
         verify(itemRepository, never()).save(any(Item.class));
@@ -124,16 +125,59 @@ class ItemServiceImplTest {
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
         // 3. Выполнение и проверка исключения
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
             itemService.updateItem(itemId, request);
         });
 
         // 4. Проверка деталей исключения
-        assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
-        assertTrue(exception.getReason().contains("неактивен"));
+        assertTrue(exception.getMessage().contains("not found"));
 
         // Проверяем, что сохранение не вызывалось
         verify(itemRepository, never()).save(any(Item.class));
+    }
+
+    // Скрытие(деактивация) существующего товара
+    @Test
+    void successSoftDeleteItem() {
+        Long itemId = 1L;
+
+        Item item = new Item();
+        item.setId(itemId);
+        item.setActive(true);
+
+        when(itemRepository.findById(itemId))
+                .thenReturn(Optional.of(item));
+
+        itemService.softDeleteItem(itemId);
+
+        verify(itemRepository).findById(itemId);
+
+        assertFalse(item.isActive());
+
+        verifyNoMoreInteractions(stockRepository);
+    }
+
+    // Скрытие(деактивация) несуществующего товара
+    @Test
+    void softDeleteNotExistentItem() {
+        Long itemId = 999L;
+
+        when(itemRepository.findById(itemId))
+                .thenReturn(Optional.empty());
+
+        EntityNotFoundException exception =
+                assertThrows(
+                        EntityNotFoundException.class,
+                        () -> itemService.softDeleteItem(itemId)
+                );
+
+        assertEquals(
+                "Item with id 999 not found",
+                exception.getMessage()
+        );
+
+        verify(itemRepository).findById(itemId);
+        verifyNoInteractions(stockRepository);
     }
 
     @Test
@@ -197,4 +241,34 @@ class ItemServiceImplTest {
         // 4. Проверка
         assertEquals("Товар неактивен", exception.getMessage());
     }
+
+    // Скрытие(деактивация) уже деактивированного товара
+    @Test
+    void softDeleteAlreadyInactiveItem() {
+        Long itemId = 1L;
+
+        Item item = new Item();
+        item.setId(itemId);
+        item.setActive(false);
+
+        when(itemRepository.findById(itemId))
+                .thenReturn(Optional.of(item));
+
+        EntityNotFoundException exception =
+                assertThrows(
+                        EntityNotFoundException.class,
+                        () -> itemService.softDeleteItem(itemId)
+                );
+
+        assertEquals(
+                "Item with id=1 is already deactivated",
+                exception.getMessage()
+        );
+
+        verify(itemRepository).findById(itemId);
+        verifyNoInteractions(stockRepository);
+    }
+
 }
+
+

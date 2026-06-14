@@ -1,10 +1,10 @@
 package com.warehouse.service.item;
 
-import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.item.CreateItemRequest;
-import com.warehouse.dto.response.item.ItemResponse;
-import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
@@ -18,10 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
@@ -57,16 +55,17 @@ public class ItemServiceImpl implements ItemService {
     @Transactional
     @Override
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
+        log.debug("Updating item with id={}", itemId);
+
         Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Товар с itemId " + itemId + " не найден"
-                ));
+                .orElseThrow(() -> {
+                    log.warn("Item with id={} not found", itemId);
+                    return EntityNotFoundException.forId("Item", itemId);
+                });
+
         if (!item.isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Товар неактивен и не подлежит редактированию"
-            );
+            log.warn("Attempt to update inactive item with id={}", itemId);
+            throw EntityNotFoundException.forId("Item", itemId);
         }
 
         item.setName(request.name());
@@ -74,6 +73,7 @@ public class ItemServiceImpl implements ItemService {
         item.setMinStock(request.minStock());
 
         Item savedItem = itemRepository.save(item);
+        log.info("Item updated: id={}, SKU='{}'", savedItem.getId(), savedItem.getSku());
         return itemMapper.toResponse(savedItem);
     }
 
@@ -81,6 +81,9 @@ public class ItemServiceImpl implements ItemService {
     @Override
     public PageResponse<ItemResponse> getItems(
             String sort, String order, String category, String search, int page, int size) {
+        log.debug("Getting items: sort={}, order={}, category={}, search={}, page={}, size={}",
+                sort, order, category, search, page, size);
+
         Sort.Direction direction;
         if ("desc".equalsIgnoreCase(order)) {
             direction = Sort.Direction.DESC;
@@ -104,7 +107,10 @@ public class ItemServiceImpl implements ItemService {
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
 
-        return PageResponse.from(itemRepository.findAll(spec, pageable).map(itemMapper::toResponse));
+        var itemsPage = itemRepository.findAll(spec, pageable);
+        log.info("Found {} items for request (category={}, search={})", itemsPage.getTotalElements(), category, search);
+
+        return PageResponse.from(itemsPage.map(itemMapper::toResponse));
     }
 
     @Override
@@ -112,10 +118,10 @@ public class ItemServiceImpl implements ItemService {
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
         ItemDetailsResponse item = itemRepository.findWithStock(itemId)
-                        .orElseThrow(() -> {
-                            log.warn("Item not found: id={}", itemId);
-                            return new EntityNotFoundException("Товар не найден");
-                        });
+                .orElseThrow(() -> {
+                    log.warn("Item not found: id={}", itemId);
+                    return new EntityNotFoundException("Товар не найден");
+                });
 
         if (!item.active()) {
             log.warn("Item inactive: id={}", itemId);
@@ -124,4 +130,22 @@ public class ItemServiceImpl implements ItemService {
 
         return item;
     }
+
+    @Transactional
+    @Override
+    public void softDeleteItem(Long itemId) {
+        Item item = itemRepository.findById(itemId).orElseThrow(() -> {
+            log.warn("Item с id={} не найден", itemId);
+            return EntityNotFoundException.forId("Item", itemId);
+        });
+
+        if (!item.isActive()) {
+            log.warn("Item с id={} уже неактивный", itemId);
+            throw new EntityNotFoundException("Item with id=" + itemId + " is already deactivated");
+        }
+
+        item.setActive(false);
+        log.info("Item c id={} успешно деактивирован", itemId);
+    }
+
 }
