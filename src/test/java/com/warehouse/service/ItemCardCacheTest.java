@@ -5,6 +5,7 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,14 +25,18 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
+    private StockMovementRepository stockMovementRepository;
+
+    @Autowired
     private ItemService itemService;
 
     private Long itemId;
 
     @BeforeEach
     void setUp() {
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
+        stockMovementRepository.deleteAllInBatch();
+        stockRepository.deleteAllInBatch();
+        itemRepository.deleteAllInBatch();
 
         Item item = new Item();
         item.setSku("SKU-001");
