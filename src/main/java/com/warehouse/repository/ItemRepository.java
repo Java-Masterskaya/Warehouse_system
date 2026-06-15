@@ -9,22 +9,19 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
-
-/**
- * Репозиторий для управления товарами.
- * Расширяет JpaRepository с поддержкой JPA Specification.
- */
+import java.util.List;
 
 @Repository
 public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificationExecutor<Item> {
 
-    /**
-     * Проверяет наличие товара с указанным SKU.
-     *
-     * @param sku артикул товара
-     * @return true, если товар существует, иначе false
-     */
     boolean existsBySku(String sku);
+
+    @Query("""
+            SELECT DISTINCT i.category
+            FROM Item i
+            WHERE i.active = true
+            """)
+    List<String> findDistinctCategories();
 
     @Query("""
             SELECT new com.warehouse.dto.response.item.ItemDetailsResponse(
