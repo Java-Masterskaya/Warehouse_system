@@ -52,9 +52,9 @@ class GetItemsControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         adminToken = obtainToken("admin", "secret");
-        
+
         // Создаём пользователя testuser_get, если его нет
-        userRepository.findByUsername("testuser_get").orElseGet(() -> {
+        User testUser = userRepository.findByUsername("testuser_get").orElseGet(() -> {
             User user = new User();
             user.setUsername("testuser_get");
             user.setPassword(passwordEncoder.encode("password"));
@@ -62,13 +62,13 @@ class GetItemsControllerTest extends AbstractIntegrationTest {
             user.setActive(true);
             return userRepository.save(user);
         });
-        
-        userToken = jwtUtil.generateToken("testuser_get", List.of("ROLE_USER"));
+
+        userToken = jwtUtil.generateToken(testUser.getUsername(), testUser.getId(), List.of("ROLE_USER"));
 
         // Уникальный суффикс чтобы SKU не конфликтовали между запусками тестов
         String suffix = String.valueOf(System.currentTimeMillis());
-        createItem("SKU-SORT-A-" + suffix, "Альфа",      "Электроника");
-        createItem("SKU-SORT-B-" + suffix, "Бета",       "Электроника");
+        createItem("SKU-SORT-A-" + suffix, "Альфа", "Электроника");
+        createItem("SKU-SORT-B-" + suffix, "Бета", "Электроника");
         createItem("SKU-SORT-C-" + suffix, "Dell Laptop", "Компьютеры");
         createItem("SKU-SORT-D-" + suffix, "DELL Monitor", "Компьютеры");
     }

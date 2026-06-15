@@ -76,7 +76,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         stockRepository.save(stock);
 
         testItemId = testItem.getId();
-        
+
         // Создаём пользователей только если их нет
         userRepository.findByUsername("admin").orElseGet(() -> {
             User admin = new User();
@@ -86,8 +86,8 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             admin.setActive(true);
             return userRepository.save(admin);
         });
-        
-        userRepository.findByUsername("testuser").orElseGet(() -> {
+
+        User testUser = userRepository.findByUsername("testuser").orElseGet(() -> {
             User user = new User();
             user.setUsername("testuser");
             user.setPassword(passwordEncoder.encode("password"));
@@ -95,9 +95,9 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             user.setActive(true);
             return userRepository.save(user);
         });
-        
+
         adminToken = obtainToken("admin", "secret");
-        userToken = jwtUtil.generateToken("testuser", List.of("ROLE_USER"));
+        userToken = jwtUtil.generateToken(testUser.getUsername(), testUser.getId(), List.of("ROLE_USER"));
     }
 
     /**
