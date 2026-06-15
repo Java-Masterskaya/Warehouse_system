@@ -13,7 +13,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Эндпоинты для управления движениями товаров на складе.
@@ -43,7 +47,8 @@ public class StockMovementController {
             @Valid @RequestBody ChangeQuantityMovementRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Received stock movement request: itemId={}, quantity={}", request.itemId(), request.quantity());
-        return stockMovementService.registerReceipt(request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+        return stockMovementService.registerReceipt(
+                request, new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 
     @PostMapping("/write-off")
@@ -53,6 +58,7 @@ public class StockMovementController {
                                                  @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Received stock movement writeOff request: itemId={}, quantity={}", request.itemId(),
                 request.quantity());
-        return stockMovementService.writeOffReceipt(request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+        return stockMovementService.writeOffReceipt(
+                request, new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 }
