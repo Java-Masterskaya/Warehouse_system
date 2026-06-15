@@ -3,6 +3,7 @@ package com.warehouse.service;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.entity.Item;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,12 +25,16 @@ class ItemCategoriesCacheTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
+    private StockMovementRepository stockMovementRepository;
+
+    @Autowired
     private ItemService itemService;
 
     @BeforeEach
     void setUp() {
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
+        stockMovementRepository.deleteAllInBatch();
+        stockRepository.deleteAllInBatch();
+        itemRepository.deleteAllInBatch();
 
         Item item1 = createItem("SKU-001", "Ноутбук", "Электроника", true);
         Item item2 = createItem("SKU-002", "Стол", "Мебель", true);
