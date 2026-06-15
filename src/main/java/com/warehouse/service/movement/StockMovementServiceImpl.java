@@ -59,16 +59,16 @@ public class StockMovementServiceImpl implements StockMovementService {
         itemCheckForActive(item);
 
         log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}",
-            itemId, quantity, user.getId());
+                itemId, quantity, user.getId());
 
         int stockAfter = stockService.receiveStock(itemId, quantity);
 
         StockMovement stockMovement = StockMovement.builder()
-            .item(item)
-            .user(user)
-            .type(MovementType.RECEIVE)
-            .quantity(quantity)
-            .build();
+                .item(item)
+                .user(user)
+                .type(MovementType.RECEIVE)
+                .quantity(quantity)
+                .build();
 
         stockMovementRepository.save(stockMovement);
 
@@ -105,6 +105,12 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         return mapper.toResponse(stockMovement, stockAfter);
     }
+
+    @Override
+    public StockMovementResponse itemMovementHistory(Long itemId) {
+        return null;
+    }
+
 
     private void itemCheckForActive(Item item) {
         if (!item.isActive()) {

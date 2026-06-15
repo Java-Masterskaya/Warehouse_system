@@ -20,4 +20,6 @@ public interface StockMovementService {
     StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, User user);
 
     StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, User user);
+
+    StockMovementResponse itemMovementHistory(Long itemId);
 }
