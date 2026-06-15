@@ -31,20 +31,21 @@ public class JwtUtil {
         this.expirationMs = expirationMs;
     }
 
-    public String generateToken(String username, List<String> roles) {
+    public String generateToken(String username, Long userId, List<String> roles) {
         log.debug("Generating JWT for user: {}", username);
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(expirationMs);
 
         String token = Jwts.builder()
                 .subject(username)
+                .claim("userId", userId)
                 .claim("roles", roles)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(key)
                 .compact();
 
-        log.debug("JWT generated successfully for user: {}, expires in {} ms", username, expirationMs);
+        log.debug("JWT generated successfully for user: {} expires in {} ms", username, expirationMs);
         return token;
     }
 
@@ -52,14 +53,17 @@ public class JwtUtil {
         try {
             Claims claims = parseClaims(token);
             String username = claims.getSubject();
+            Long userId = claims.get("userId", Long.class);
             Object rolesObj = claims.get("roles");
-            if (rolesObj instanceof List<?> list && list.stream().allMatch(String.class::isInstance)) {
+
+            if (userId != null && rolesObj instanceof List<?> list
+                    && list.stream().allMatch(String.class::isInstance)) {
                 List<String> roles = list.stream()
                         .map(Object::toString)
                         .toList();
-                return Optional.of(new JwtPayload(username, roles));
+                return Optional.of(new JwtPayload(userId, username, roles));
             }
-            log.warn("Invalid or missing 'roles' claim in token");
+            log.warn("Invalid or missing claims in token: userId={}, roles={}", userId, rolesObj);
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("JWT validation failed: {}", e.getMessage());
         }
@@ -74,6 +78,6 @@ public class JwtUtil {
                 .getPayload();
     }
 
-    public record JwtPayload(String username, List<String> roles) {
+    public record JwtPayload(Long userId, String username, List<String> roles) {
     }
 }

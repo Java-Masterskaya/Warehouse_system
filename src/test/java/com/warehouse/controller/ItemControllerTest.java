@@ -48,9 +48,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         // Получаем реальный токен через /api/auth/login — admin создаётся миграцией V5
         adminToken = obtainToken("admin", "secret");
-        
+
         // Создаём пользователя testuser, если его нет
-        userRepository.findByUsername("testuser").orElseGet(() -> {
+        User testUser = userRepository.findByUsername("testuser").orElseGet(() -> {
             User user = new User();
             user.setUsername("testuser");
             user.setPassword(passwordEncoder.encode("password"));
@@ -58,10 +58,10 @@ class ItemControllerTest extends AbstractIntegrationTest {
             user.setActive(true);
             return userRepository.save(user);
         });
-        
+
         // USER нет в миграциях — генерируем токен напрямую.
         // JwtAuthFilter читает роли из claims, не обращаясь к БД, поэтому это корректно.
-        userToken = jwtUtil.generateToken("testuser", List.of("ROLE_USER"));
+        userToken = jwtUtil.generateToken(testUser.getUsername(), testUser.getId(), List.of("ROLE_USER"));
     }
 
     // --- Acceptance criteria задачи #1 ---
