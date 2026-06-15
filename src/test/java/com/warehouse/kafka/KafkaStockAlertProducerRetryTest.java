@@ -1,14 +1,15 @@
 package com.warehouse.kafka;
 
-import com.warehouse.dto.event.LowStockAlert;
+import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,6 +22,13 @@ import static org.mockito.Mockito.when;
 @SpringBootTest
 class KafkaStockAlertProducerRetryTest {
 
+    private static final Long ITEM_ID = 1L;
+    private static final String ITEM_SKU = "KEY-001";
+    private static final String ITEM_NAME = "Тестовый товар";
+    private static final int CURRENT_STOCK = 2;
+    private static final int MIN_STOCK = 5;
+    private static final String TRIGGERED_BY = "admin";
+
     @Autowired
     private KafkaStockAlertProducer producer;
 
@@ -30,7 +38,14 @@ class KafkaStockAlertProducerRetryTest {
     @Test
     void sendLowStockAlertShouldRetryThreeTimesOnFailure() {
         // Arrange
-        LowStockAlert alert = new LowStockAlert(1L, "Test", 2, 5);
+        LowStockAlertEvent alert = new LowStockAlertEvent(
+                ITEM_ID,
+                ITEM_SKU,
+                ITEM_NAME,
+                CURRENT_STOCK,
+                MIN_STOCK,
+                TRIGGERED_BY,
+                LocalDateTime.now());
 
         CompletableFuture<SendResult<String, Object>> failedFuture = new CompletableFuture<>();
         failedFuture.completeExceptionally(new RuntimeException("Kafka broker unavailable"));
