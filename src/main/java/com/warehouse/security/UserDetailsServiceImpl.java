@@ -30,7 +30,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                     return new UsernameNotFoundException("User not found: " + username);
                 });
 
-        return new AppUserDetails(
+        log.debug("User found: {}, role: {}, active: {}", user.getUsername(), user.getRole(), user.isActive());
+        return new UserPrincipal(
                 user.getId(),
                 user.getUsername(),
                 user.getPassword(),

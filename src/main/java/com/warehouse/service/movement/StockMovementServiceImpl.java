@@ -1,6 +1,7 @@
 package com.warehouse.service.movement;
 
-import com.warehouse.dto.request.movement.CreateStockMovementRequest;
+import com.warehouse.dto.UserContext;
+import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
@@ -39,15 +40,14 @@ public class StockMovementServiceImpl implements StockMovementService {
      * Регистрирует приход товара на склад.
      * Выполняет валидацию товара, обновляет остаток и сохраняет запись о движении.
      *
-     * @param request  данные запроса на приход товара
-     * @param userId   ID пользователя, выполняющего операцию
-     * @param username username пользователя, выполняющего операцию
+     * @param request данные запроса на приход товара
+     * @param ctx     record UserContext, содержит ID и username пользователя, выполняющего операцию
      * @return ответ с информацией о движении товара
      * @throws EntityNotFoundException если товар не найден или неактивен
      */
     @Override
     @Transactional
-    public StockMovementResponse registerReceipt(CreateStockMovementRequest request, Long userId, String username) {
+    public StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
 
@@ -57,23 +57,16 @@ public class StockMovementServiceImpl implements StockMovementService {
         }
 
         // Сначала проверяем товар
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> {
-                    log.warn("Item not found: itemId={}", itemId);
-                    return EntityNotFoundException.forId("Item", itemId);
-                });
+        Item item = itemCheckForExist(itemId);
 
-        if (!item.isActive()) {
-            log.warn("Attempt to receive inactive item: itemId={}", itemId);
-            throw EntityNotFoundException.forId("Item", itemId);
-        }
+        itemCheckForActive(item);
 
         log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}",
-                itemId, quantity, userId);
+                itemId, quantity, ctx.userId());
 
         int stockAfter = stockService.receiveStock(itemId, quantity);
 
-        User userRef = userRepository.getReferenceById(userId);
+        User userRef = userRepository.getReferenceById(ctx.userId());
 
         StockMovement stockMovement = StockMovement.builder()
                 .item(item)
@@ -85,8 +78,53 @@ public class StockMovementServiceImpl implements StockMovementService {
         stockMovementRepository.save(stockMovement);
 
         log.info("Stock receipt registered: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
-                itemId, quantity, stockAfter, userId, stockMovement.getId());
+                itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
         return mapper.toResponse(stockMovement, stockAfter);
+    }
+
+    @Override
+    @Transactional
+    public StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
+        int quantity = request.quantity();
+        Long itemId = request.itemId();
+
+        Item item = itemCheckForExist(itemId);
+
+        itemCheckForActive(item);
+
+        log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}",
+                itemId, quantity, ctx.userId());
+        int stockAfter = stockService.writeOffStock(itemId, quantity);
+
+        User userRef = userRepository.getReferenceById(ctx.userId());
+
+        StockMovement stockMovement = StockMovement.builder()
+                .item(item)
+                .user(userRef)
+                .type(MovementType.WRITE_OFF)
+                .quantity(quantity)
+                .build();
+
+        stockMovementRepository.save(stockMovement);
+        log.info("Stock receipt writeOffed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
+                itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
+
+        return mapper.toResponse(stockMovement, stockAfter);
+    }
+
+    private void itemCheckForActive(Item item) {
+        if (!item.isActive()) {
+            log.warn("Attempt to receive inactive item: itemId={}", item.getId());
+            throw EntityNotFoundException.forId("Item", item.getId());
+        }
+    }
+
+    private Item itemCheckForExist(Long itemId) {
+        return itemRepository.findById(itemId)
+                .orElseThrow(() -> {
+                    log.warn("Item not found: itemId={}", itemId);
+                    return EntityNotFoundException.forId("Item", itemId);
+                });
     }
 }

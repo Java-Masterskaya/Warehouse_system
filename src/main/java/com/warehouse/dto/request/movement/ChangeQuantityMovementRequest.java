@@ -9,7 +9,7 @@ import jakarta.validation.constraints.NotNull;
  * @param itemId ID товара
  * @param quantity Количество единиц (должно быть >= 1)
  */
-public record CreateStockMovementRequest(
+public record ChangeQuantityMovementRequest(
     @NotNull Long itemId,
     @Min(1) int quantity
 ) {}

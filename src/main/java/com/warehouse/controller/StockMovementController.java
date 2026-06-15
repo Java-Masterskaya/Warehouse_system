@@ -1,8 +1,9 @@
 package com.warehouse.controller;
 
-import com.warehouse.dto.request.movement.CreateStockMovementRequest;
+import com.warehouse.dto.UserContext;
+import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.security.AppUserDetails;
+import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.movement.StockMovementService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -39,9 +40,19 @@ public class StockMovementController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
     public StockMovementResponse registerReceipt(
-            @Valid @RequestBody CreateStockMovementRequest request,
-            @AuthenticationPrincipal AppUserDetails currentUser) {
+            @Valid @RequestBody ChangeQuantityMovementRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Received stock movement request: itemId={}, quantity={}", request.itemId(), request.quantity());
-        return stockMovementService.registerReceipt(request, currentUser.getId(), currentUser.getUsername());
+        return stockMovementService.registerReceipt(request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+    }
+
+    @PostMapping("/write-off")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public StockMovementResponse writeOffReceipt(@Valid @RequestBody ChangeQuantityMovementRequest request,
+                                                 @AuthenticationPrincipal UserPrincipal currentUser) {
+        log.debug("Received stock movement writeOff request: itemId={}, quantity={}", request.itemId(),
+                request.quantity());
+        return stockMovementService.writeOffReceipt(request, new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 }

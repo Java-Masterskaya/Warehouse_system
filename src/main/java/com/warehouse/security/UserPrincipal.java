@@ -13,7 +13,7 @@ import java.util.List;
 
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class AppUserDetails implements UserDetails {
+public class UserPrincipal implements UserDetails {
 
     @Getter
     final Long id;
