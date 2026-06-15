@@ -1,6 +1,6 @@
 package com.warehouse.kafka.producer;
 
-import com.warehouse.dto.event.LowStockAlert;
+import com.warehouse.dto.event.LowStockAlertEvent;
 
 public interface KafkaProducerService {
 
@@ -9,5 +9,5 @@ public interface KafkaProducerService {
      *
      * @param alert DTO с данными об остатке товара
      */
-    void sendLowStockAlert(LowStockAlert alert);
+    void sendLowStockAlert(LowStockAlertEvent alert);
 }
