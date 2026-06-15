@@ -6,15 +6,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Конфигурация Jackson ObjectMapper.
- * <p>
- * Определяет единый ObjectMapper для всего приложения:
- * <ul>
- *   <li>поддержка Java 8 дат ({@code LocalDateTime} как ISO-строка)</li>
- *   <li>отключён timestamp-формат дат</li>
- * </ul>
- */
 @Configuration
 public class JacksonConfig {
 
