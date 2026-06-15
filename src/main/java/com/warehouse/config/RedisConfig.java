@@ -17,24 +17,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Конфигурация кэширования на основе Redis.
- * <p>
- * Настраивает {@link RedisCacheManager} с раздельными конфигурациями для каждого кэша:
- * <ul>
- *   <li><b>categories</b> — {@code List<String>}, TTL 10 минут</li>
- *   <li><b>item</b> — {@link ItemDetailsResponse}, TTL 5 минут</li>
- * </ul>
- * <p>
- * Для сериализации значений используется {@link Jackson2JsonRedisSerializer} с явно заданным типом.
- * Ключи сериализуются как строки, null-значения не кэшируются.
- * <p>
- * ObjectMapper поставляется бином из {@link JacksonConfig}.
- *
- * @see EnableCaching
- * @see RedisCacheManager
- * @see JacksonConfig
- */
 @Configuration
 @EnableCaching
 public class RedisConfig {
@@ -42,21 +24,6 @@ public class RedisConfig {
     private static final int CATEGORIES_TTL_MINUTES = 10;
     private static final int ITEM_TTL_MINUTES = 5;
 
-    /**
-     * Создаёт и настраивает {@link RedisCacheManager} с двумя именованными кэшами.
-     * <p>
-     * Базовая конфигурация задаёт строковые ключи и отключает кэширование null.
-     * Каждый кэш переопределяет TTL и сериализатор значений:
-     * <ul>
-     *   <li>{@code categories} — {@link Jackson2JsonRedisSerializer} для {@code List}, TTL 10 минут</li>
-     *   <li>{@code item} — {@link Jackson2JsonRedisSerializer} для {@link ItemDetailsResponse}, TTL 5 минут</li>
-     * </ul>
-     *
-     * @param connectionFactory фабрика соединений с Redis,
-     *                          автоматически создаётся Spring Boot из {@code spring.data.redis.*}
-     * @param objectMapper      кастомный ObjectMapper из {@link JacksonConfig}
-     * @return настроенный менеджер кэша
-     */
     @Bean
     public RedisCacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
