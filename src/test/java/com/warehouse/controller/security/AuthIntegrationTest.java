@@ -26,6 +26,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Интеграционные тесты для аутентификации: токены, доступ к эндпоинтам, валидация.
+ * Тестируют: успешный логин, доступ без токена, невалидные/просроченные токены.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 class AuthIntegrationTest {
@@ -47,7 +51,9 @@ class AuthIntegrationTest {
         adminToken = obtainToken("admin", "secret");
     }
 
-    // Получаем токен
+    /**
+     * Получение JWT токена по корректным данным логина/пароля.
+     */
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
         String response = mockMvc.perform(post("/api/auth/login")
@@ -60,7 +66,9 @@ class AuthIntegrationTest {
         return objectMapper.readTree(response).get("token").asText();
     }
 
-    // Проверяем, что логин с верными данными возвращает токен и время жизни
+    /**
+     * Логин с верными данными возвращает токен и время жизни.
+     */
     @Test
     void loginSuccess() throws Exception {
         LoginRequest request = new LoginRequest("admin", "secret");
@@ -72,7 +80,9 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.expiresIn").value(86400000));
     }
 
-    // Проверяем, что запрос без токена к защищённому эндпоинту возвращает 401
+    /**
+     * Запрос без токена к защищённому эндпоинту возвращает 401.
+     */
     @Test
     void accessProtectedWithoutToken() throws Exception {
         mockMvc.perform(get("/api/v1/items/1"))
@@ -80,7 +90,9 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
-    // Проверяем, что запрос с невалидным токеном возвращает 401
+    /**
+     * Запрос с невалидным токеном возвращает 401.
+     */
     @Test
     void accessProtectedWithInvalidToken() throws Exception {
         mockMvc.perform(get("/api/v1/items/1")
@@ -89,7 +101,9 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
-    // Проверяем, что просроченный токен отклоняется с 401
+    /**
+     * Просроченный токен отклоняется с 401.
+     */
     @Test
     void accessProtectedWithExpiredToken() throws Exception {
         String expiredToken = createExpiredToken("admin", List.of("ROLE_ADMIN"));
@@ -99,14 +113,18 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
-    // Проверяем, что health-эндпоинт доступен без аутентификации (статус не 401)
+    /**
+     * Health-эндпоинт доступен без аутентификации (не 401).
+     */
     @Test
     void healthAccessibleWithoutToken() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().is(not(401)));
     }
 
-    // Проверяем, что с валидным токеном запрос не возвращает 401
+    /**
+     * Валидный токен позволяет доступ к защищённому эндпоинту (не 401).
+     */
     @Test
     void accessProtectedWithValidToken() throws Exception {
         mockMvc.perform(get("/api/v1/items/1")
@@ -114,7 +132,9 @@ class AuthIntegrationTest {
                 .andExpect(status().is(not(401)));
     }
 
-    // Проверяем, что пользователь с ролью USER не может выполнить действие, требующее ADMIN (получаем 403)
+    /**
+     * Пользователь с ролью USER не может выполнить действие, требующее ADMIN (403).
+     */
     @Test
     void accessAdminEndpointWithUserRoleShouldFail() throws Exception {
         UserCreateRequest userRequest = new UserCreateRequest();
@@ -143,6 +163,9 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
     }
 
+    /**
+     * Вспомогательный метод для создания просроченного JWT токена.
+     */
     private String createExpiredToken(String username, List<String> roles) {
         Instant past = Instant.now().minusSeconds(3600);
         return Jwts.builder()

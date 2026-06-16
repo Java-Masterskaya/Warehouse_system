@@ -19,6 +19,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Интеграционный тест с Spring контекстом: проверка ретраев при отправке в Kafka.
+ * Проверяет: ретраи 3 раза при неудачной отправке.
+ */
 @SpringBootTest
 class KafkaStockAlertProducerRetryTest {
 
@@ -35,6 +39,9 @@ class KafkaStockAlertProducerRetryTest {
     @MockitoBean
     private KafkaTemplate<String, Object> kafkaTemplate;
 
+    /**
+     * Отправка уведомления при неудаче Kafka повторяется 3 раза (1 попытка + 2 retry).
+     */
     @Test
     void sendLowStockAlertShouldRetryThreeTimesOnFailure() {
         // Arrange

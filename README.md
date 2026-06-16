@@ -71,8 +71,6 @@ http://localhost:8080
 | `POST`   | `/api/movements/write-off`        | Списать товар                  |
 | `GET`    | `/api/movements/{itemId}/history` | История движения               |
 
-Полная спецификация: `docs/warehouse_openapi.yaml`
-
 ## Архитектура
 
 ```

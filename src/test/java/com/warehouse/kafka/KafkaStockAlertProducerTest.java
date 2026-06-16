@@ -24,6 +24,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Юнит-тесты для KafkaStockAlertProducer: отправка уведомлений о низком остатке.
+ * Проверяют: успешная отправка, корректный ключ, обработка ошибок Kafka.
+ */
 @ExtendWith(MockitoExtension.class)
 class KafkaStockAlertProducerTest {
     private static final String TOPIC_NAME = "low-stock-alerts";
@@ -45,6 +49,9 @@ class KafkaStockAlertProducerTest {
         producer = new KafkaStockAlertProducer(kafkaTemplate);
     }
 
+    /**
+     * Отправка уведомления о низком остатке проходит без исключений.
+     */
     @Test
     void sendLowStockAlertShouldSendMessageWithoutException() {
         // Arrange
@@ -67,6 +74,9 @@ class KafkaStockAlertProducerTest {
         verify(kafkaTemplate, times(1)).send(TOPIC_NAME, String.valueOf(ITEM_ID), alert);
     }
 
+    /**
+     * Уведомление отправляется с itemId в качестве ключа.
+     */
     @Test
     void sendLowStockAlertShouldUseItemIdAsKey() {
         // Arrange
@@ -97,6 +107,9 @@ class KafkaStockAlertProducerTest {
         verify(kafkaTemplate).send(TOPIC_NAME, "42", alert);
     }
 
+    /**
+     * Ошибка отправки в Kafka приводит к RuntimeException.
+     */
     @Test
     void sendLowStockAlertShouldThrowRuntimeExceptionWhenSendFails() {
         // Arrange
@@ -117,6 +130,9 @@ class KafkaStockAlertProducerTest {
         verify(kafkaTemplate, times(1)).send(TOPIC_NAME, String.valueOf(ITEM_ID), alert);
     }
 
+    /**
+     * Вспомогательный метод для создания LowStockAlertEvent.
+     */
     private LowStockAlertEvent createAlert() {
         return new LowStockAlertEvent(
                 ITEM_ID,

@@ -27,6 +27,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
+/**
+ * Интеграционный тест: проверка создания топика Kafka при старте и отправки сообщений.
+ * Использует Redpanda через Testcontainers.
+ */
 @Tag("integration")
 @Testcontainers
 @DirtiesContext
@@ -60,6 +64,9 @@ class KafkaTopicIntegrationTest {
                 () -> "org.springframework.kafka.support.serializer.JsonSerializer");
     }
 
+    /**
+     * Топик создаётся при старте с 3 партициями и репликами.
+     */
     @Test
     void topicShouldBeCreatedWithThreePartitionsOnStartup() throws Exception {
         final String topicName = topicProperties.getName();
@@ -91,6 +98,9 @@ class KafkaTopicIntegrationTest {
         }
     }
 
+    /**
+     * Отправка сообщения через KafkaTemplate не выбрасывает исключений.
+     */
     @Test
     void kafkaTemplateSendShouldNotThrowException() {
         // Arrange

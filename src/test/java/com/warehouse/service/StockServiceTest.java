@@ -23,6 +23,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Юнит-тесты для StockServiceImpl: списание и приход товара.
+ * Проверяют: успешное списание, недостаточный остаток, ошибки сущности.
+ */
 @ExtendWith(MockitoExtension.class)
 class StockServiceImplTest {
 
@@ -41,10 +45,9 @@ class StockServiceImplTest {
     @InjectMocks
     private StockServiceImpl stockService;
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ МЕТОДА writeOffStock
-    // ==========================================
-
+    /**
+     * Списание товара с достаточным остатком успешно обновляет количество.
+     */
     @Test
     void writeOffStockSuccess() {
         // Arrange
@@ -66,6 +69,9 @@ class StockServiceImplTest {
         ));
     }
 
+    /**
+     * Списание точного количества остатка приводит к нулевому остатку.
+     */
     @Test
     void exactQuantityReturnsZero() {
         // Arrange - списываем ровно столько, сколько есть
@@ -83,6 +89,9 @@ class StockServiceImplTest {
         assertEquals(0, stock.getQuantity());
     }
 
+    /**
+     * Списание для несуществующего остатка выбрасывает EntityNotFoundException.
+     */
     @Test
     void stockNotFoundThrowsEntityNotFoundException() {
         // Arrange
@@ -105,6 +114,9 @@ class StockServiceImplTest {
         verify(stockRepository, never()).save(any());
     }
 
+    /**
+     * Списание при недостаточном остатке выбрасывает InsufficientStockException.
+     */
     @Test
     void insufficientStockThrowsInsufficientStockException() {
         // Arrange
@@ -134,16 +146,18 @@ class StockServiceImplTest {
         verify(stockRepository, never()).save(any());
     }
 
-    // ==========================================
-    //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
-    // ==========================================
-
+    /**
+     * Вспомогательный метод для создания Item.
+     */
     private Item createItem(Long itemId) {
         Item item = new Item();
         item.setId(itemId);
         return item;
     }
 
+    /**
+     * Вспомогательный метод для создания Stock.
+     */
     private Stock createStock(Item item, int quantity) {
         Stock stock = new Stock();
         stock.setItem(item);

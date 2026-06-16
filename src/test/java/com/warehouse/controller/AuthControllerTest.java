@@ -13,8 +13,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Интеграционный тест: реальная БД через Testcontainers (из AbstractIntegrationTest),
-// пользователь admin создаётся миграцией V5
+/**
+ * Интеграционный тест для проверки эндпоинта аутентификации.
+ * Тестирует логин с использованием реальной БД через Testcontainers.
+ */
 @AutoConfigureMockMvc
 class AuthControllerTest extends AbstractIntegrationTest {
 
@@ -24,6 +26,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /**
+     * Успешный логин администратора возвращает JWT токен.
+     */
     @Test
     void loginSuccessReturnsToken() throws Exception {
         LoginRequest request = new LoginRequest("admin", "secret");
@@ -36,6 +41,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.expiresIn").isNumber());
     }
 
+    /**
+     * Логин с неверным паролем возвращает 401 Unauthorized.
+     */
     @Test
     void loginWrongPasswordReturns401() throws Exception {
         LoginRequest request = new LoginRequest("admin", "wrongpassword");
@@ -47,6 +55,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
+    /**
+     * Логин с неизвестным пользователем возвращает 401 Unauthorized.
+     */
     @Test
     void loginUnknownUserReturns401() throws Exception {
         LoginRequest request = new LoginRequest("nobody", "secret");

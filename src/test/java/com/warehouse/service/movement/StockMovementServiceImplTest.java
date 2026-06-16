@@ -33,6 +33,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Юнит-тесты для StockMovementServiceImpl: регистрация прихода и списания.
+ * Проверяют: успешные операции, валидация количества, обработка несуществующих/неактивных товаров.
+ */
 @ExtendWith(MockitoExtension.class)
 class StockMovementServiceImplTest {
 
@@ -58,6 +62,9 @@ class StockMovementServiceImplTest {
     @Captor
     private ArgumentCaptor<StockMovement> stockMovementCaptor;
 
+    /**
+     * Успешная регистрация прихода товара: данные сохраняются корректно.
+     */
     @Test
     void registerReceiptSuccess() {
         // Arrange
@@ -104,6 +111,9 @@ class StockMovementServiceImplTest {
         assertEquals(QUANTITY, savedMovement.getQuantity());
     }
 
+    /**
+     * Регистрация прихода с количеством = 0 выбрасывает IllegalArgumentException.
+     */
     @Test
     void registerReceiptWithZeroQuantityThrowsException() {
         // Arrange
@@ -118,6 +128,9 @@ class StockMovementServiceImplTest {
         assertEquals("Quantity must be greater than 0", ex.getMessage());
     }
 
+    /**
+     * Регистрация прихода с отрицательным количеством выбрасывает IllegalArgumentException.
+     */
     @Test
     void registerReceiptWithNegativeQuantityThrowsException() {
         // Arrange
@@ -132,6 +145,9 @@ class StockMovementServiceImplTest {
         assertEquals("Quantity must be greater than 0", ex.getMessage());
     }
 
+    /**
+     * Регистрация прихода для несуществующего товара выбрасывает EntityNotFoundException.
+     */
     @Test
     void registerReceiptItemNotFoundThrowsException() {
         // Arrange
@@ -149,6 +165,9 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
     }
 
+    /**
+     * Регистрация прихода для неактивного товара выбрасывает EntityNotFoundException.
+     */
     @Test
     void registerReceiptInactiveItemThrowsException() {
         // Arrange
@@ -167,6 +186,9 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
     }
 
+    /**
+     * Регистрация прихода сохраняет ссылку на пользователя (не null).
+     */
     @Test
     void registerReceiptUserNotNull() {
         // Arrange
@@ -192,10 +214,9 @@ class StockMovementServiceImplTest {
         assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
-    // ==========================================
-//    ТЕСТЫ ДЛЯ WRITE-OFF
-// ==========================================
-
+    /**
+     * Успешное списание товара: данные сохраняются корректно.
+     */
     @Test
     void writeOffReceiptSuccess() {
         // Arrange
@@ -243,6 +264,9 @@ class StockMovementServiceImplTest {
         assertEquals(QUANTITY, savedMovement.getQuantity());
     }
 
+    /**
+     * Списание товара для несуществующего товара выбрасывает EntityNotFoundException.
+     */
     @Test
     void writeOffReceiptItemNotFoundThrowsException() {
         // Arrange
@@ -260,6 +284,9 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
     }
 
+    /**
+     * Списание товара для неактивного товара выбрасывает EntityNotFoundException.
+     */
     @Test
     void writeOffReceiptInactiveItemThrowsException() {
         // Arrange
@@ -278,6 +305,9 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
     }
 
+    /**
+     * Списание при недостаточном остатке выбрасывает InsufficientStockException.
+     */
     @Test
     void writeOffReceiptInsufficientStockThrowsException() {
         // Arrange
@@ -297,6 +327,9 @@ class StockMovementServiceImplTest {
         assertEquals("Insufficient stock", ex.getMessage());
     }
 
+    /**
+     * Списание сохраняет ссылку на пользователя (не null).
+     */
     @Test
     void writeOffReceiptUserNotNull() {
         // Arrange
@@ -323,10 +356,9 @@ class StockMovementServiceImplTest {
         assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
-    // ==========================================
-    //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
-    // ==========================================
-
+    /**
+     * Вспомогательный метод для создания ссылки на пользователя.
+     */
     private User createUserReference(Long userId, String username) {
         User user = new User();
         user.setId(userId);
@@ -337,6 +369,9 @@ class StockMovementServiceImplTest {
         return user;
     }
 
+    /**
+     * Вспомогательный метод для создания товара.
+     */
     private Item createItem(Long itemId, String name, boolean active) {
         Item item = new Item();
         item.setId(itemId);

@@ -17,6 +17,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+/**
+ * Юнит-тесты для UserDetailsServiceImpl: загрузка пользователя по username.
+ * Проверяют: успешная загрузка, неактивный пользователь, несуществующий пользователь.
+ */
 @ExtendWith(MockitoExtension.class)
 class UserDetailsServiceImplTest {
 
@@ -26,6 +30,9 @@ class UserDetailsServiceImplTest {
     @InjectMocks
     private UserDetailsServiceImpl userDetailsService;
 
+    /**
+     * Загрузка пользователя по username возвращает корректные UserDetails.
+     */
     @Test
     void loadUserByUsernameReturnsUserDetails() {
         User user = User.builder()
@@ -46,6 +53,9 @@ class UserDetailsServiceImplTest {
         assertThat(result.isEnabled()).isTrue();
     }
 
+    /**
+     * Загрузка неактивного пользователя отключает его (isEnabled = false).
+     */
     @Test
     void loadUserByUsernameActiveIsFalseDisablesUser() {
         User user = User.builder()
@@ -62,6 +72,9 @@ class UserDetailsServiceImplTest {
         assertThat(result.isEnabled()).isFalse();
     }
 
+    /**
+     * Загрузка несуществующего пользователя выбрасывает UsernameNotFoundException.
+     */
     @Test
     void loadUserByUsernameNotFoundThrowsException() {
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
