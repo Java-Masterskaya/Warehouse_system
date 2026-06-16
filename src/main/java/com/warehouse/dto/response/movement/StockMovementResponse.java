@@ -20,5 +20,6 @@ public record StockMovementResponse(
     MovementType type,
     int quantity,
     int stockAfter,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    boolean lowStockAlert
 ) {}

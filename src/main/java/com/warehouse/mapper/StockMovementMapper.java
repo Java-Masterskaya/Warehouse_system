@@ -23,9 +23,10 @@ public interface StockMovementMapper {
      */
     @Mappings({
         @Mapping(target = "itemId", source = "entity", qualifiedByName = "getItemId"),
-        @Mapping(target = "movementId", source = "entity.id")
+        @Mapping(target = "movementId", source = "entity.id"),
+        @Mapping(target = "lowStockAlert", source = "lowStockAlert")
     })
-    StockMovementResponse toResponse(StockMovement entity, int stockAfter);
+    StockMovementResponse toResponse(StockMovement entity, int stockAfter, boolean lowStockAlert);
 
     /**
      * Извлекает ID товара из сущности движения.

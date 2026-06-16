@@ -1,6 +1,7 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
+import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
@@ -8,6 +9,7 @@ import com.warehouse.entity.MovementType;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -19,6 +21,10 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.time.LocalDateTime;
 
 /**
  * Реализация сервиса для управления движениями товаров на складе.
@@ -35,6 +41,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
+    KafkaStockAlertProducer kafkaProducer;
 
     /**
      * Регистрирует приход товара на склад.
@@ -80,7 +87,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         log.info("Stock receipt registered: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
                 itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
-        return mapper.toResponse(stockMovement, stockAfter);
+        return mapper.toResponse(stockMovement, stockAfter, false);
     }
 
     @Override
@@ -107,10 +114,36 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .build();
 
         stockMovementRepository.save(stockMovement);
-        log.info("Stock receipt writeOffed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
+
+        boolean lowStock = stockAfter < item.getMinStock();
+        if (lowStock) {
+            LowStockAlertEvent event = new LowStockAlertEvent(
+                    item.getId(),
+                    item.getSku(),
+                    item.getName(),
+                    stockAfter,
+                    item.getMinStock(),
+                    ctx.username(),
+                    LocalDateTime.now()
+            );
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        kafkaProducer.sendLowStockAlert(event);
+                        log.info("LowStockAlert sent: itemId={}, stockAfter={}, minStock={}",
+                                item.getId(), stockAfter, item.getMinStock());
+                    } catch (Exception e) {
+                        log.error("Failed to send LowStockAlert for itemId={}: {}", item.getId(), e.getMessage());
+                    }
+                }
+            });
+        }
+
+        log.info("Write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
                 itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
-        return mapper.toResponse(stockMovement, stockAfter);
+        return mapper.toResponse(stockMovement, stockAfter, lowStock);
     }
 
     private void itemCheckForActive(Item item) {
