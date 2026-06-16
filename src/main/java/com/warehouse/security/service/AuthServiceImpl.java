@@ -1,5 +1,6 @@
 package com.warehouse.security.service;
 
+import com.warehouse.annotation.MetricCounter;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.dto.response.security.LoginResponse;
 import com.warehouse.security.JwtUtil;
@@ -23,6 +24,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtil jwtUtil;
 
     @Override
+    @MetricCounter("warehouse.auth.login.success.total")
     public LoginResponse login(LoginRequest request) {
         log.debug("Attempting login for user: {}", request.username());
         Authentication authentication = authenticationManager.authenticate(

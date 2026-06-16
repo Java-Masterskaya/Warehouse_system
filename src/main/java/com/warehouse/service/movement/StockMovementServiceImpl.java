@@ -1,6 +1,7 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
+import com.warehouse.annotation.MetricCounter;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
@@ -47,6 +48,7 @@ public class StockMovementServiceImpl implements StockMovementService {
      */
     @Override
     @Transactional
+    @MetricCounter("warehouse.movements.receive.total")
     public StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -56,9 +58,7 @@ public class StockMovementServiceImpl implements StockMovementService {
             throw new IllegalArgumentException("Quantity must be greater than 0");
         }
 
-        // Сначала проверяем товар
         Item item = itemCheckForExist(itemId);
-
         itemCheckForActive(item);
 
         log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}",
@@ -74,7 +74,6 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .type(MovementType.RECEIVE)
                 .quantity(quantity)
                 .build();
-
         stockMovementRepository.save(stockMovement);
 
         log.info("Stock receipt registered: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
@@ -85,16 +84,17 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Override
     @Transactional
+    @MetricCounter("warehouse.movements.writeoff.total")
     public StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
 
         Item item = itemCheckForExist(itemId);
-
         itemCheckForActive(item);
 
         log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}",
                 itemId, quantity, ctx.userId());
+
         int stockAfter = stockService.writeOffStock(itemId, quantity);
 
         User userRef = userRepository.getReferenceById(ctx.userId());
@@ -105,9 +105,9 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .type(MovementType.WRITE_OFF)
                 .quantity(quantity)
                 .build();
-
         stockMovementRepository.save(stockMovement);
-        log.info("Stock receipt writeOffed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
+
+        log.info("Stock write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
                 itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
         return mapper.toResponse(stockMovement, stockAfter);

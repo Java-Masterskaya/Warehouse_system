@@ -43,4 +43,11 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
             WHERE i.id = :itemId
             """)
     Optional<ItemDetailsResponse> findWithStock(@Param("itemId") Long itemId);
+
+    /**
+     * Подсчитывает количество активных товаров.
+     *
+     * @return количество товаров с is_active = true
+     */
+    long countByActiveTrue();
 }

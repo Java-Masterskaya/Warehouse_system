@@ -17,7 +17,7 @@ infra-down: ## Остановка инфраструктуры
 
 ## --- Управление приложением ---
 app-up: ## Запуск приложения в терминале (инфраструктура должна быть запущена через docker-compose)
-	./gradlew bootRun --args='--spring.profiles.active=dev'
+	./gradlew bootRun
 
 app-down: ## Остановка приложения (SIGTERM)
 	@echo "Приложение запущено в терминале, остановите его вручную через Ctrl+C"
