@@ -1,7 +1,4 @@
 spring:
-  datasource:
-    url: jdbc:tc:postgresql:16:///warehouse_test
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
   flyway:
     enabled: true
   jpa:
