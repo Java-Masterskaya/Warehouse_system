@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
  * Проверяют: успешное списание, недостаточный остаток, ошибки сущности.
  */
 @ExtendWith(MockitoExtension.class)
-class StockServiceImplTest {
+class StockServiceTest {
 
     private static final Long ITEM_ID = 1L;
     private static final Long NON_EXISTENT_ITEM_ID = 99L;
