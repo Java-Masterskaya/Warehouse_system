@@ -9,6 +9,7 @@ import com.warehouse.service.item.ItemService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
+@Slf4j
 public class ItemController {
 
     private final ItemService itemService;
@@ -41,6 +43,8 @@ public class ItemController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        log.debug("Received get items request: sort={}, order={}, category={}, search={}, page={}, size={}",
+                sort, order, category, search, page, size);
         return itemService.getItems(sort, order, category, search, page, size);
     }
 
@@ -48,6 +52,7 @@ public class ItemController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
     public ItemResponse createItem(@Valid @RequestBody CreateItemRequest request) {
+        log.debug("Received create item request: sku={}, name={}", request.sku(), request.name());
         return itemService.createItem(request);
     }
 
@@ -57,6 +62,8 @@ public class ItemController {
     public ItemResponse updateItem(
             @PathVariable Long itemId,
             @Valid @RequestBody UpdateItemRequest request) {
+        log.debug("Received update item request: itemId={}, name={}, category={}", itemId, request.name(),
+                request.category());
         return itemService.updateItem(itemId, request);
     }
 
@@ -64,6 +71,7 @@ public class ItemController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ItemDetailsResponse getItem(@PathVariable Long itemId) {
+        log.debug("Received get item request: itemId={}", itemId);
         return itemService.getItem(itemId);
     }
 
@@ -71,6 +79,7 @@ public class ItemController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
     public void softDeleteItem(@PathVariable Long itemId) {
+        log.debug("Received soft delete item request: itemId={}", itemId);
         itemService.softDeleteItem(itemId);
     }
 
@@ -78,6 +87,7 @@ public class ItemController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public List<String> getCategories() {
+        log.debug("Received get categories request");
         return itemService.getCategories();
     }
 }
