@@ -31,11 +31,17 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 // Интеграционный тест HTTP-слоя: реальный Spring-контекст + Testcontainers (из AbstractIntegrationTest).
 // Проверяет: статусы ответов, тело JSON, Security (401/403).
@@ -84,7 +90,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     @Test
     void createItemAdminTokenReturns201WithBody() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell", "Электроника", 5);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell",
+                "Электроника", 5);
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -98,7 +105,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     @Test
     void createItemDuplicateSkuReturns409() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар",
+                "Категория", 0);
 
         // Создаём первый раз — успешно
         mockMvc.perform(post("/api/items")
@@ -118,7 +126,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     @Test
     void createItemNoTokenReturns401() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар",
+                "Категория", 0);
 
         mockMvc.perform(post("/api/items")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -129,7 +138,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     @Test
     void createItemUserTokenReturns403() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар",
+                "Категория", 0);
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + userToken)
@@ -214,8 +224,10 @@ class ItemControllerTest extends AbstractIntegrationTest {
             @WithMockUser(roles = "ADMIN")
             @DisplayName("ADMIN может создать товар - 201")
             void adminCanCreateItem() throws Exception {
-                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-001", "Test", "Category", 10);
-                ItemResponse response = new ItemResponse(1L, "SKU-UNIT-001", "Test", "Category", 10, true, LocalDateTime.now());
+                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-001", "Test",
+                        "Category", 10);
+                ItemResponse response = new ItemResponse(1L, "SKU-UNIT-001", "Test",
+                        "Category", 10, true, LocalDateTime.now());
 
                 when(itemService.createItem(any(CreateItemRequest.class))).thenReturn(response);
 
@@ -230,7 +242,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
             @WithMockUser(roles = "USER")
             @DisplayName("USER не может создать товар - 403")
             void userCannotCreateItem() throws Exception {
-                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-002", "Test", "Category", 10);
+                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-002", "Test",
+                        "Category", 10);
 
                 mockMvc.perform(post("/api/items")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -241,7 +254,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
             @Test
             @DisplayName("Без токена - 401")
             void noTokenReturns401() throws Exception {
-                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-003", "Test", "Category", 10);
+                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-003", "Test",
+                        "Category", 10);
 
                 mockMvc.perform(post("/api/items")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -259,7 +273,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
             @DisplayName("ADMIN может обновить товар - 200")
             void adminCanUpdateItem() throws Exception {
                 UpdateItemRequest request = new UpdateItemRequest("Updated", "Category", 20);
-                ItemResponse response = new ItemResponse(1L, "SKU-001", "Updated", "Category", 20, true, LocalDateTime.now());
+                ItemResponse response = new ItemResponse(1L, "SKU-001", "Updated", "Category",
+                        20, true, LocalDateTime.now());
 
                 when(itemService.updateItem(eq(1L), any(UpdateItemRequest.class))).thenReturn(response);
 
@@ -342,7 +357,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
             @DisplayName("ADMIN может получить товар - 200")
             void adminCanGetItem() throws Exception {
                 ItemDetailsResponse response = new ItemDetailsResponse(
-                        1L, "SKU-001", "Test", "Category", 10, 50, true, LocalDateTime.now(), LocalDateTime.now()
+                        1L, "SKU-001", "Test", "Category", 10, 50,
+                        true, LocalDateTime.now(), LocalDateTime.now()
                 );
                 when(itemService.getItem(1L)).thenReturn(response);
 
@@ -356,7 +372,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
             @DisplayName("USER может получить товар - 200")
             void userCanGetItem() throws Exception {
                 ItemDetailsResponse response = new ItemDetailsResponse(
-                        1L, "SKU-001", "Test", "Category", 10, 50, true, LocalDateTime.now(), LocalDateTime.now()
+                        1L, "SKU-001", "Test", "Category", 10, 50,
+                        true, LocalDateTime.now(), LocalDateTime.now()
                 );
                 when(itemService.getItem(1L)).thenReturn(response);
 
