@@ -156,7 +156,9 @@ public class ItemServiceImpl implements ItemService {
     @Transactional(readOnly = true)
     @Override
     public List<String> getCategories() {
-        log.debug("Fetching categories from database");
-        return itemRepository.findDistinctCategories();
+        log.debug("Getting all active categories");
+        List<String> categories = itemRepository.findDistinctCategories();
+        log.info("Found {} categories: {}", categories.size(), categories);
+        return categories;
     }
 }
