@@ -17,8 +17,9 @@ public interface StockMovementMapper {
     /**
      * Преобразует сущность движения товара в ответ с информацией о движении.
      *
-     * @param entity   сущность движения товара
-     * @param stockAfter остаток после операции
+     * @param entity       сущность движения товара
+     * @param stockAfter   остаток после операции
+     * @param lowStockAlert true, если остаток опустился ниже минимального
      * @return ответ с информацией о движении товара
      */
     @Mappings({
