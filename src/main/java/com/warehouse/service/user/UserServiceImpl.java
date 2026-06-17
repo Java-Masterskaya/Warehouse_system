@@ -50,6 +50,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void deactivateUser(Long userId, Long currentUserId) {
         log.debug("Deactivate user with id '{}' by user with id '{}'", userId, currentUserId);
         if (userId.equals(currentUserId)) {
