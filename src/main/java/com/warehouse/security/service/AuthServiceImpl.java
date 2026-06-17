@@ -3,6 +3,7 @@ package com.warehouse.security.service;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.dto.response.security.LoginResponse;
 import com.warehouse.security.JwtUtil;
+import com.warehouse.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,15 +28,17 @@ public class AuthServiceImpl implements AuthService {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );
-        log.info("User '{}' successfully authenticated", request.username());
+
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
         List<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .toList();
 
-        String token = jwtUtil.generateToken(request.username(), roles);
+        String token = jwtUtil.generateToken(principal.getUsername(), principal.getId(), roles);
         long expiresIn = jwtUtil.getExpirationMs();
 
+        log.info("User '{}' successfully authenticated", request.username());
         return new LoginResponse(token, expiresIn);
     }
 }

@@ -34,6 +34,8 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.12.+'
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
     implementation 'org.mapstruct:mapstruct:1.5.+'
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
@@ -54,6 +56,9 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation 'org.testcontainers:kafka:1.21.4'
+    testImplementation 'org.awaitility:awaitility:4.3.0'
     testImplementation "org.testcontainers:testcontainers:${testcontainersVersion}"
     testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
     testImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
