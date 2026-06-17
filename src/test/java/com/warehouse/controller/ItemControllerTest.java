@@ -3,21 +3,37 @@ package com.warehouse.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.JwtUtil;
+import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -164,5 +180,189 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(response).get("token").asText();
+    }
+// ==========================================
+// UNIT ТЕСТЫ С @TestConfiguration
+// ==========================================
+
+    @WebMvcTest(ItemController.class)
+    class ItemControllerSecurityUnitTest {
+
+        @TestConfiguration
+        static class TestConfig {
+            @Bean
+            @Primary
+            public ItemService itemService() {
+                return Mockito.mock(ItemService.class);
+            }
+        }
+
+        @Autowired
+        private MockMvc mockMvc;
+
+        @Autowired
+        private ObjectMapper objectMapper;
+
+        @Autowired
+        private ItemService itemService;
+
+        @Nested
+        @DisplayName("POST /api/items - Security Tests")
+        class CreateItemSecurityTests {
+
+            @Test
+            @WithMockUser(roles = "ADMIN")
+            @DisplayName("ADMIN может создать товар - 201")
+            void adminCanCreateItem() throws Exception {
+                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-001", "Test", "Category", 10);
+                ItemResponse response = new ItemResponse(1L, "SKU-UNIT-001", "Test", "Category", 10, true, LocalDateTime.now());
+
+                when(itemService.createItem(any(CreateItemRequest.class))).thenReturn(response);
+
+                mockMvc.perform(post("/api/items")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.sku").value("SKU-UNIT-001"));
+            }
+
+            @Test
+            @WithMockUser(roles = "USER")
+            @DisplayName("USER не может создать товар - 403")
+            void userCannotCreateItem() throws Exception {
+                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-002", "Test", "Category", 10);
+
+                mockMvc.perform(post("/api/items")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isForbidden());
+            }
+
+            @Test
+            @DisplayName("Без токена - 401")
+            void noTokenReturns401() throws Exception {
+                CreateItemRequest request = new CreateItemRequest("SKU-UNIT-003", "Test", "Category", 10);
+
+                mockMvc.perform(post("/api/items")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isUnauthorized());
+            }
+        }
+
+        @Nested
+        @DisplayName("PUT /api/items/{id} - Security Tests")
+        class UpdateItemSecurityTests {
+
+            @Test
+            @WithMockUser(roles = "ADMIN")
+            @DisplayName("ADMIN может обновить товар - 200")
+            void adminCanUpdateItem() throws Exception {
+                UpdateItemRequest request = new UpdateItemRequest("Updated", "Category", 20);
+                ItemResponse response = new ItemResponse(1L, "SKU-001", "Updated", "Category", 20, true, LocalDateTime.now());
+
+                when(itemService.updateItem(eq(1L), any(UpdateItemRequest.class))).thenReturn(response);
+
+                mockMvc.perform(put("/api/items/1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.name").value("Updated"));
+            }
+
+            @Test
+            @WithMockUser(roles = "USER")
+            @DisplayName("USER не может обновить товар - 403")
+            void userCannotUpdateItem() throws Exception {
+                UpdateItemRequest request = new UpdateItemRequest("Updated", "Category", 20);
+
+                mockMvc.perform(put("/api/items/1")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isForbidden());
+            }
+        }
+
+        @Nested
+        @DisplayName("DELETE /api/items/{id} - Security Tests")
+        class DeleteItemSecurityTests {
+
+            @Test
+            @WithMockUser(roles = "ADMIN")
+            @DisplayName("ADMIN может удалить товар - 204")
+            void adminCanDeleteItem() throws Exception {
+                mockMvc.perform(delete("/api/items/1"))
+                        .andExpect(status().isNoContent());
+            }
+
+            @Test
+            @WithMockUser(roles = "USER")
+            @DisplayName("USER не может удалить товар - 403")
+            void userCannotDeleteItem() throws Exception {
+                mockMvc.perform(delete("/api/items/1"))
+                        .andExpect(status().isForbidden());
+            }
+        }
+
+        @Nested
+        @DisplayName("GET /api/items - Security Tests")
+        class GetItemsSecurityTests {
+
+            @Test
+            @WithMockUser(roles = "ADMIN")
+            @DisplayName("ADMIN может получить список товаров - 200")
+            void adminCanGetItems() throws Exception {
+                PageResponse<ItemResponse> response = new PageResponse<>(List.of(), 0L, 0, 0, 20);
+                when(itemService.getItems(anyString(), anyString(), any(), any(), anyInt(), anyInt()))
+                        .thenReturn(response);
+
+                mockMvc.perform(get("/api/items"))
+                        .andExpect(status().isOk());
+            }
+
+            @Test
+            @WithMockUser(roles = "USER")
+            @DisplayName("USER может получить список товаров - 200")
+            void userCanGetItems() throws Exception {
+                PageResponse<ItemResponse> response = new PageResponse<>(List.of(), 0L, 0, 0, 20);
+                when(itemService.getItems(anyString(), anyString(), any(), any(), anyInt(), anyInt()))
+                        .thenReturn(response);
+
+                mockMvc.perform(get("/api/items"))
+                        .andExpect(status().isOk());
+            }
+        }
+
+        @Nested
+        @DisplayName("GET /api/items/{id} - Security Tests")
+        class GetItemSecurityTests {
+
+            @Test
+            @WithMockUser(roles = "ADMIN")
+            @DisplayName("ADMIN может получить товар - 200")
+            void adminCanGetItem() throws Exception {
+                ItemDetailsResponse response = new ItemDetailsResponse(
+                        1L, "SKU-001", "Test", "Category", 10, 50, true, LocalDateTime.now(), LocalDateTime.now()
+                );
+                when(itemService.getItem(1L)).thenReturn(response);
+
+                mockMvc.perform(get("/api/items/1"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.id").value(1));
+            }
+
+            @Test
+            @WithMockUser(roles = "USER")
+            @DisplayName("USER может получить товар - 200")
+            void userCanGetItem() throws Exception {
+                ItemDetailsResponse response = new ItemDetailsResponse(
+                        1L, "SKU-001", "Test", "Category", 10, 50, true, LocalDateTime.now(), LocalDateTime.now()
+                );
+                when(itemService.getItem(1L)).thenReturn(response);
+
+                mockMvc.perform(get("/api/items/1"))
+                        .andExpect(status().isOk());
+            }
+        }
     }
 }

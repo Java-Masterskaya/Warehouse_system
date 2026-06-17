@@ -2,26 +2,42 @@ package com.warehouse.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.JwtUtil;
+import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -361,5 +377,151 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    // ==========================================
+// UNIT ТЕСТЫ С @TestConfiguration
+// ==========================================
+
+    @WebMvcTest(StockMovementController.class)
+    class StockMovementSecurityUnitTest {
+
+        @TestConfiguration
+        static class TestConfig {
+            @Bean
+            @Primary
+            public StockMovementService stockMovementService() {
+                return Mockito.mock(StockMovementService.class);
+            }
+        }
+
+        @Autowired
+        private MockMvc mockMvc;
+
+        @Autowired
+        private ObjectMapper objectMapper;
+
+        @Autowired
+        private StockMovementService stockMovementService;
+
+        @Nested
+        @DisplayName("POST /api/movements/receive - Security Tests")
+        class ReceiveSecurityTests {
+
+            @Test
+            @WithMockUser(username = "admin", roles = "ADMIN")
+            @DisplayName("ADMIN может зарегистрировать приход - 200")
+            void adminCanRegisterReceipt() throws Exception {
+                ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(1L, 10);
+                StockMovementResponse response = new StockMovementResponse(
+                        1L, 100L, MovementType.RECEIVE, 10, 20, LocalDateTime.now()
+                );
+
+                when(stockMovementService.registerReceipt(any(), any(UserContext.class))).thenReturn(response);
+
+                mockMvc.perform(post("/api/movements/receive")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.type").value("RECEIVE"));
+            }
+
+            @Test
+            @WithMockUser(username = "user", roles = "USER")
+            @DisplayName("USER не может зарегистрировать приход - 403")
+            void userCannotRegisterReceipt() throws Exception {
+                ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(1L, 10);
+
+                mockMvc.perform(post("/api/movements/receive")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isForbidden());
+            }
+
+            @Test
+            @DisplayName("Без аутентификации - 401")
+            void noAuthReturns401() throws Exception {
+                ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(1L, 10);
+
+                mockMvc.perform(post("/api/movements/receive")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isUnauthorized());
+            }
+        }
+
+        @Nested
+        @DisplayName("POST /api/movements/write-off - Security Tests")
+        class WriteOffSecurityTests {
+
+            @Test
+            @WithMockUser(username = "admin", roles = "ADMIN")
+            @DisplayName("ADMIN может списать товар - 200")
+            void adminCanWriteOff() throws Exception {
+                ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(1L, 5);
+                StockMovementResponse response = new StockMovementResponse(
+                        1L, 101L, MovementType.WRITE_OFF, 5, 15, LocalDateTime.now()
+                );
+
+                when(stockMovementService.writeOffReceipt(any(), any(UserContext.class))).thenReturn(response);
+
+                mockMvc.perform(post("/api/movements/write-off")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.type").value("WRITE_OFF"));
+            }
+
+            @Test
+            @WithMockUser(username = "user", roles = "USER")
+            @DisplayName("USER не может списать товар - 403")
+            void userCannotWriteOff() throws Exception {
+                ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(1L, 5);
+
+                mockMvc.perform(post("/api/movements/write-off")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isForbidden());
+            }
+
+            @Test
+            @DisplayName("Без аутентификации - 401")
+            void noAuthReturns401() throws Exception {
+                ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(1L, 5);
+
+                mockMvc.perform(post("/api/movements/write-off")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                        .andExpect(status().isUnauthorized());
+            }
+        }
+
+        @Nested
+        @DisplayName("GET /api/movements/{itemId}/history - Security Tests")
+        class HistorySecurityTests {
+
+            @Test
+            @WithMockUser(roles = "ADMIN")
+            @DisplayName("ADMIN может получить историю - 200")
+            void adminCanGetHistory() throws Exception {
+                mockMvc.perform(get("/api/movements/1/history"))
+                        .andExpect(status().isOk());
+            }
+
+            @Test
+            @WithMockUser(roles = "USER")
+            @DisplayName("USER может получить историю - 200")
+            void userCanGetHistory() throws Exception {
+                mockMvc.perform(get("/api/movements/1/history"))
+                        .andExpect(status().isOk());
+            }
+
+            @Test
+            @DisplayName("Без аутентификации - 401")
+            void noAuthReturns401() throws Exception {
+                mockMvc.perform(get("/api/movements/1/history"))
+                        .andExpect(status().isUnauthorized());
+            }
+        }
     }
 }

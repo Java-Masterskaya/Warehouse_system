@@ -13,11 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/movements")
@@ -48,5 +44,10 @@ public class StockMovementController {
                 request.quantity());
         return stockMovementService.writeOffReceipt(
                 request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+    }
+
+    @GetMapping("/{itemId}/history")
+    @PreAuthorize("hasAnyRole('ADMIN','USER')")
+    public void getItemHistory() {
     }
 }
