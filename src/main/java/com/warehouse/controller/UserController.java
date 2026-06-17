@@ -2,7 +2,7 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.user.UserCreateRequest;
 import com.warehouse.dto.response.user.UserResponse;
-import com.warehouse.entity.User;
+import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.user.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +43,10 @@ public class UserController {
 
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deactivateUser(@PathVariable Long userId, @AuthenticationPrincipal User currentUser) {
+    public ResponseEntity<Void> deactivateUser(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
         userService.deactivateUser(userId, currentUser.getId());
         return ResponseEntity.noContent().build();
     }
