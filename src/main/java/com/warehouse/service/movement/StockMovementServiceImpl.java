@@ -1,6 +1,8 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
@@ -15,6 +17,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -107,10 +112,26 @@ public class StockMovementServiceImpl implements StockMovementService {
     }
 
     @Override
-    public StockMovementResponse itemMovementHistory(Long itemId) {
-        return null;
-    }
+    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId,
+                                                                             MovementType type,
+                                                                             int page,
+                                                                             int size) {
+        itemRepository.findById(itemId)
+                .orElseThrow(() -> {
+                    log.warn("Item с id={} не найден", itemId);
+                    return EntityNotFoundException.forId("Item", itemId);
+                });
+        Pageable pageable = PageRequest.of(page, size);
 
+        Page<StockMovementHistoryResponse> history =
+                stockMovementRepository.findHistoryByItemId(
+                        itemId,
+                        type,
+                        pageable
+                );
+
+        return PageResponse.from(history);
+    }
 
     private void itemCheckForActive(Item item) {
         if (!item.isActive()) {
@@ -126,4 +147,5 @@ public class StockMovementServiceImpl implements StockMovementService {
                     return EntityNotFoundException.forId("Item", itemId);
                 });
     }
+
 }

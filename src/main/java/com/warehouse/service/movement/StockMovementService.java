@@ -1,7 +1,10 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.MovementType;
 import com.warehouse.entity.User;
 
 /**
@@ -21,5 +24,20 @@ public interface StockMovementService {
 
     StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, User user);
 
-    StockMovementResponse itemMovementHistory(Long itemId);
+    /**
+     * Возвращает историю движений товара с возможностью фильтрации по типу движения
+     * и постраничного вывода результатов.
+     *
+     * @param itemId идентификатор товара
+     * @param type   необязательный фильтр по типу движения
+     * @param page   номер страницы
+     * @param size   количество записей на странице
+     * @return страница с историей движений товара
+     * @throws EntityNotFoundException если товар не найден
+     */
+    PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId,
+                                                                      MovementType type,
+                                                                      int page,
+                                                                      int size);
+
 }
