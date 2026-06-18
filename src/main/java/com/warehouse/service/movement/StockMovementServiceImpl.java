@@ -1,7 +1,6 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.annotation.MetricCounter;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
@@ -9,6 +8,8 @@ import com.warehouse.entity.MovementType;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.metric.MetricService;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -36,6 +37,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
+    MetricService metricService;
 
     /**
      * Регистрирует приход товара на склад.
@@ -48,7 +50,6 @@ public class StockMovementServiceImpl implements StockMovementService {
      */
     @Override
     @Transactional
-    @MetricCounter("warehouse.movements.receive.total")
     public StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -79,12 +80,13 @@ public class StockMovementServiceImpl implements StockMovementService {
         log.info("Stock receipt registered: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
                 itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
+        metricService.increment("warehouse.movements.receive.total");
+
         return mapper.toResponse(stockMovement, stockAfter);
     }
 
     @Override
     @Transactional
-    @MetricCounter("warehouse.movements.writeoff.total")
     public StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -95,22 +97,29 @@ public class StockMovementServiceImpl implements StockMovementService {
         log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}",
                 itemId, quantity, ctx.userId());
 
-        int stockAfter = stockService.writeOffStock(itemId, quantity);
+        try {
+            int stockAfter = stockService.writeOffStock(itemId, quantity);
 
-        User userRef = userRepository.getReferenceById(ctx.userId());
+            User userRef = userRepository.getReferenceById(ctx.userId());
 
-        StockMovement stockMovement = StockMovement.builder()
-                .item(item)
-                .user(userRef)
-                .type(MovementType.WRITE_OFF)
-                .quantity(quantity)
-                .build();
-        stockMovementRepository.save(stockMovement);
+            StockMovement stockMovement = StockMovement.builder()
+                    .item(item)
+                    .user(userRef)
+                    .type(MovementType.WRITE_OFF)
+                    .quantity(quantity)
+                    .build();
+            stockMovementRepository.save(stockMovement);
 
-        log.info("Stock write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
-                itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
+            log.info("Stock write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
+                    itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
-        return mapper.toResponse(stockMovement, stockAfter);
+            metricService.increment("warehouse.movements.writeoff.total");
+
+            return mapper.toResponse(stockMovement, stockAfter);
+        } catch (InsufficientStockException e) {
+            metricService.increment("warehouse.movements.writeoff.rejected.total");
+            throw e;
+        }
     }
 
     private void itemCheckForActive(Item item) {

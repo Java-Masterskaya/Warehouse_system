@@ -43,11 +43,11 @@ services:
       - redpanda
       - start
       - --kafka-addr
-      - internal://0.0.0.0:9092
+      - 0.0.0.0:9092
       - --advertise-kafka-addr
       - localhost:9092
       - --schema-registry-addr
-      - internal://0.0.0.0:8081
+      - 0.0.0.0:8081
       - --mode
       - dev-container
     healthcheck:
