@@ -6,7 +6,6 @@ import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.MovementType;
-import com.warehouse.entity.User;
 
 /**
  * Сервис для управления движениями товаров на складе.
@@ -31,7 +30,6 @@ public interface StockMovementService {
      * @return ответ с информацией о движении товара
      */
     StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
-    StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, User user);
 
     /**
      * Возвращает историю движений товара с возможностью фильтрации по типу движения
