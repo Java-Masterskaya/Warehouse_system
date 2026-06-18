@@ -56,4 +56,11 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
         ORDER BY (i.minStock - s.quantity) DESC
         """)
     List<LowStockProjection> findLowStockItems();
+
+    /**
+     * Подсчитывает количество активных товаров.
+     *
+     * @return количество товаров с is_active = true
+     */
+    long countByActiveTrue();
 }

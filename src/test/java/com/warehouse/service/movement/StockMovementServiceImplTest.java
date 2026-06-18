@@ -10,6 +10,7 @@ import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.mapper.StockMovementMapper;
+import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.UserRepository;
@@ -53,6 +54,8 @@ class StockMovementServiceImplTest {
     private StockMovementRepository stockMovementRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private MetricService metricService;
     @InjectMocks
     private StockMovementServiceImpl stockMovementService;
     @Captor
