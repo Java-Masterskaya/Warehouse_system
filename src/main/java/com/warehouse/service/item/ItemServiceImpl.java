@@ -61,8 +61,8 @@ public class ItemServiceImpl implements ItemService {
     @Transactional
     @Override
     @Caching(evict = {
-            @CacheEvict(value = "item", key = "#itemId"),
-            @CacheEvict(value = "categories", allEntries = true)
+        @CacheEvict(value = "item", key = "#itemId"),
+        @CacheEvict(value = "categories", allEntries = true)
     })
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
         log.debug("Updating item with id={}", itemId);
