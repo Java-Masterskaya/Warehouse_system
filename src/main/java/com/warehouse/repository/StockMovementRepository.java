@@ -10,10 +10,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Репозиторий для работы с движениями товаров на складе.
- * Предоставляет методы доступа к сущности {@link StockMovement}.
- */
 @Repository
 public interface StockMovementRepository extends JpaRepository<StockMovement, Long> {
 

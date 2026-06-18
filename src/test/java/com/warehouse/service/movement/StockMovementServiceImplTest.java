@@ -1,5 +1,6 @@
 package com.warehouse.service.movement;
 
+import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
@@ -11,8 +12,10 @@ import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.mapper.StockMovementMapper;
+import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.service.stock.StockService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,38 +47,40 @@ import static org.mockito.Mockito.never;
 @ExtendWith(MockitoExtension.class)
 class StockMovementServiceImplTest {
 
-    @Mock
-    private StockMovementMapper mapper;
-
-    @Mock
-    private StockService stockService;
-
-    @Mock
-    private ItemRepository itemRepository;
-
-    @Mock
-    private StockMovementRepository stockMovementRepository;
-
-    @InjectMocks
-    private StockMovementServiceImpl stockMovementService;
-
-    @Captor
-    private ArgumentCaptor<StockMovement> stockMovementCaptor;
-
     private static final Long ITEM_ID = 1L;
     private static final Long NON_EXISTENT_ITEM_ID = 999L;
     private static final int QUANTITY = 5;
     private static final int STOCK_AFTER_RECEIPT = 15;
     private static final Long USER_ID = 10L;
+    private static final String USERNAME = "admin";
+    private static final String PASSWORD = "password";
+    @Mock
+    private StockMovementMapper mapper;
+    @Mock
+    private StockService stockService;
+    @Mock
+    private ItemRepository itemRepository;
+    @Mock
+    private StockMovementRepository stockMovementRepository;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private MetricService metricService;
+    @InjectMocks
+    private StockMovementServiceImpl stockMovementService;
+    @Captor
+    private ArgumentCaptor<StockMovement> stockMovementCaptor;
 
     @Test
     void registerReceiptSuccess() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.receiveStock(ITEM_ID, QUANTITY)).thenReturn(STOCK_AFTER_RECEIPT);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -95,7 +100,7 @@ class StockMovementServiceImplTest {
                 });
 
         // Act
-        StockMovementResponse response = stockMovementService.registerReceipt(request, user);
+        StockMovementResponse response = stockMovementService.registerReceipt(request, userContext);
 
         // Assert
         assertNotNull(response);
@@ -116,11 +121,11 @@ class StockMovementServiceImplTest {
     void registerReceiptWithZeroQuantityThrowsException() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 0);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         // Act & Assert
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
-            stockMovementService.registerReceipt(request, user);
+            stockMovementService.registerReceipt(request, userContext);
         });
 
         assertEquals("Quantity must be greater than 0", ex.getMessage());
@@ -130,11 +135,11 @@ class StockMovementServiceImplTest {
     void registerReceiptWithNegativeQuantityThrowsException() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, -1);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         // Act & Assert
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
-            stockMovementService.registerReceipt(request, user);
+            stockMovementService.registerReceipt(request, userContext);
         });
 
         assertEquals("Quantity must be greater than 0", ex.getMessage());
@@ -144,13 +149,13 @@ class StockMovementServiceImplTest {
     void registerReceiptItemNotFoundThrowsException() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
 
         // Act & Assert
         EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.registerReceipt(request, user);
+            stockMovementService.registerReceipt(request, userContext);
         });
 
         assertTrue(ex.getMessage().contains("Item"));
@@ -161,14 +166,14 @@ class StockMovementServiceImplTest {
     void registerReceiptInactiveItemThrowsException() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(inactiveItem));
 
         // Act & Assert
         EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.registerReceipt(request, user);
+            stockMovementService.registerReceipt(request, userContext);
         });
 
         assertTrue(ex.getMessage().contains("Item"));
@@ -179,23 +184,25 @@ class StockMovementServiceImplTest {
     void registerReceiptUserNotNull() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.receiveStock(ITEM_ID, QUANTITY)).thenReturn(STOCK_AFTER_RECEIPT);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        stockMovementService.registerReceipt(request, user);
+        stockMovementService.registerReceipt(request, userContext);
 
         // Assert
         verify(stockMovementRepository).save(stockMovementCaptor.capture());
         StockMovement savedMovement = stockMovementCaptor.getValue();
         assertNotNull(savedMovement.getUser());
         assertEquals(USER_ID, savedMovement.getUser().getId());
-        assertEquals("admin", savedMovement.getUser().getUsername());
+        assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
     // ==========================================
@@ -206,11 +213,13 @@ class StockMovementServiceImplTest {
     void writeOffReceiptSuccess() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        User userRef = createUserReference(USER_ID, USERNAME);
         int stockAfterWriteOff = 5;
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -230,7 +239,7 @@ class StockMovementServiceImplTest {
                 });
 
         // Act
-        StockMovementResponse response = stockMovementService.writeOffReceipt(request, user);
+        StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
         // Assert
         assertNotNull(response);
@@ -251,13 +260,13 @@ class StockMovementServiceImplTest {
     void writeOffReceiptItemNotFoundThrowsException() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
 
         // Act & Assert
         EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.writeOffReceipt(request, user);
+            stockMovementService.writeOffReceipt(request, userContext);
         });
 
         assertTrue(ex.getMessage().contains("Item"));
@@ -268,14 +277,14 @@ class StockMovementServiceImplTest {
     void writeOffReceiptInactiveItemThrowsException() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(inactiveItem));
 
         // Act & Assert
         EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.writeOffReceipt(request, user);
+            stockMovementService.writeOffReceipt(request, userContext);
         });
 
         assertTrue(ex.getMessage().contains("Item"));
@@ -286,7 +295,7 @@ class StockMovementServiceImplTest {
     void writeOffReceiptInsufficientStockThrowsException() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 20);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -295,7 +304,7 @@ class StockMovementServiceImplTest {
 
         // Act & Assert
         InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
-            stockMovementService.writeOffReceipt(request, user);
+            stockMovementService.writeOffReceipt(request, userContext);
         });
 
         assertEquals("Insufficient stock", ex.getMessage());
@@ -305,24 +314,26 @@ class StockMovementServiceImplTest {
     void writeOffReceiptUserNotNull() {
         // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
-        User user = createUser(USER_ID, "admin");
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        User userRef = createUserReference(USER_ID, USERNAME);
         int stockAfterWriteOff = 5;
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        stockMovementService.writeOffReceipt(request, user);
+        stockMovementService.writeOffReceipt(request, userContext);
 
         // Assert
         verify(stockMovementRepository).save(stockMovementCaptor.capture());
         StockMovement savedMovement = stockMovementCaptor.getValue();
         assertNotNull(savedMovement.getUser());
         assertEquals(USER_ID, savedMovement.getUser().getId());
-        assertEquals("admin", savedMovement.getUser().getUsername());
+        assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
     @Test
@@ -427,11 +438,11 @@ class StockMovementServiceImplTest {
     //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
     // ==========================================
 
-    private User createUser(Long userId, String username) {
+    private User createUserReference(Long userId, String username) {
         User user = new User();
         user.setId(userId);
         user.setUsername(username);
-        user.setPassword("password");
+        user.setPassword(PASSWORD);
         user.setRole(com.warehouse.entity.Role.ROLE_ADMIN);
         user.setActive(true);
         return user;

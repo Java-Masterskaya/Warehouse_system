@@ -1,5 +1,6 @@
 package com.warehouse.service.movement;
 
+import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
@@ -17,11 +18,19 @@ public interface StockMovementService {
      * Регистрирует приход товара на склад.
      *
      * @param request данные запроса на приход товара
-     * @param user    пользователь, выполняющий операцию
+     * @param ctx пользователь, выполняющий операцию
      * @return ответ с информацией о движении товара
      */
-    StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, User user);
+    StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
 
+    /**
+     * Регистрирует списание товара со склада.
+     *
+     * @param request данные запроса на списание товара
+     * @param ctx пользователь, выполняющий операцию
+     * @return ответ с информацией о движении товара
+     */
+    StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
     StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, User user);
 
     /**
