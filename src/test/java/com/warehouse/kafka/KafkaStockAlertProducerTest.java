@@ -2,6 +2,7 @@ package com.warehouse.kafka;
 
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
+import com.warehouse.metric.MetricService;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,9 @@ class KafkaStockAlertProducerTest {
     @Mock
     private KafkaTemplate<String, Object> kafkaTemplate;
 
+    @Mock
+    private MetricService metricService;
+
     private KafkaStockAlertProducer producer;
 
     private static final Long ITEM_ID = 1L;
@@ -46,7 +50,7 @@ class KafkaStockAlertProducerTest {
 
     @BeforeEach
     void setUp() {
-        producer = new KafkaStockAlertProducer(kafkaTemplate);
+        producer = new KafkaStockAlertProducer(kafkaTemplate, metricService);
     }
 
     /**

@@ -14,10 +14,17 @@ public interface StockMovementService {
      * Регистрирует приход товара на склад.
      *
      * @param request данные запроса на приход товара
-     * @param ctx     record UserContext, содержит ID и username пользователя, выполняющего операцию
+     * @param ctx пользователь, выполняющий операцию
      * @return ответ с информацией о движении товара
      */
     StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
 
+    /**
+     * Регистрирует списание товара со склада.
+     *
+     * @param request данные запроса на списание товара
+     * @param ctx пользователь, выполняющий операцию
+     * @return ответ с информацией о движении товара
+     */
     StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
 }

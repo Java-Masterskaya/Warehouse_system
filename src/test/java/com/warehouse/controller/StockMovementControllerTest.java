@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Интеграционный тест для проверки эндпоинта управления движениями товаров.
- * Тестирует API для регистрации прихода товара на склад.
+ * Тестирует API для регистрации прихода и списания товара на склад.
  */
 @AutoConfigureMockMvc
 class StockMovementControllerTest extends AbstractIntegrationTest {

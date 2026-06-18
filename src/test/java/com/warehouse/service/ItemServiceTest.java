@@ -38,6 +38,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Юнит-тесты для ItemServiceImpl: CRUD операции с товарами.
+ * Проверяют: создание, чтение, обновление, удаление, фильтрацию, сортировку.
+ */
 @ExtendWith(MockitoExtension.class)
 class ItemServiceTest {
 

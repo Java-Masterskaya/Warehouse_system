@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Юнит-тесты для StockServiceImpl: списание и приход товара.
- * Проверяют: успешное списание, недостаточный остаток, ошибки сущности.
+ * Проверяют: успешное списание, приход, недостаточный остаток, ошибки сущности.
  */
 @ExtendWith(MockitoExtension.class)
 class StockServiceTest {
@@ -38,6 +38,8 @@ class StockServiceTest {
     private static final int WRITE_OFF_AMOUNT = 5;
     private static final int EXCESSIVE_AMOUNT = 15;
     private static final int EXPECTED_STOCK_AFTER_WRITE_OFF = 5;
+    private static final int RECEIVE_AMOUNT = 7;
+    private static final int EXPECTED_STOCK_AFTER_RECEIVE = 17;
 
     @Mock
     private StockRepository stockRepository;
@@ -144,6 +146,135 @@ class StockServiceTest {
         // Остаток не должен измениться
         assertEquals(LOW_STOCK_QUANTITY, stock.getQuantity());
         verify(stockRepository, never()).save(any());
+    }
+
+    /**
+     * Приход товара успешно увеличивает остаток.
+     */
+    @Test
+    void receiveStockSuccess() {
+        // Arrange
+        Item item = createItem(ITEM_ID);
+        Stock stock = createStock(item, INITIAL_STOCK_QUANTITY);
+
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        int result = stockService.receiveStock(ITEM_ID, RECEIVE_AMOUNT);
+
+        // Assert
+        assertEquals(EXPECTED_STOCK_AFTER_RECEIVE, result);
+        assertEquals(EXPECTED_STOCK_AFTER_RECEIVE, stock.getQuantity());
+
+        verify(stockRepository).save(argThat(savedStock ->
+                savedStock.getQuantity() == EXPECTED_STOCK_AFTER_RECEIVE
+        ));
+    }
+
+    /**
+     * Приход нуля не меняет остаток.
+     */
+    @Test
+    void receiveStockZeroQuantityReturnsSameStock() {
+        // Arrange
+        Item item = createItem(ITEM_ID);
+        Stock stock = createStock(item, INITIAL_STOCK_QUANTITY);
+
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        int result = stockService.receiveStock(ITEM_ID, 0);
+
+        // Assert
+        assertEquals(INITIAL_STOCK_QUANTITY, result);
+        assertEquals(INITIAL_STOCK_QUANTITY, stock.getQuantity());
+    }
+
+    /**
+     * Приход для несуществующего остатка выбрасывает EntityNotFoundException.
+     */
+    @Test
+    void receiveStockNotFoundThrowsEntityNotFoundException() {
+        // Arrange
+        when(stockRepository.findByItemId(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
+            stockService.receiveStock(NON_EXISTENT_ITEM_ID, RECEIVE_AMOUNT);
+        });
+
+        // Проверяем сообщение исключения
+        String message = ex.getMessage();
+        assertTrue(message.contains("Stock"), "Сообщение должно содержать название сущности");
+        assertTrue(message.contains(String.valueOf(NON_EXISTENT_ITEM_ID)),
+                "Сообщение должно содержать ID товара");
+        assertTrue(message.contains("not found"),
+                "Сообщение должно содержать 'not found'");
+
+        verify(stockRepository, never()).save(any());
+    }
+
+    /**
+     * Приход отрицательного количества уменьшает остаток (интерпретируется как списание).
+     */
+    @Test
+    void receiveStockNegativeQuantityDecreasesStock() {
+        // Arrange
+        Item item = createItem(ITEM_ID);
+        Stock stock = createStock(item, INITIAL_STOCK_QUANTITY);
+
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        int result = stockService.receiveStock(ITEM_ID, -3);
+
+        // Assert
+        assertEquals(7, result); // 10 - 3 = 7
+        assertEquals(7, stock.getQuantity());
+    }
+
+    /**
+     * Приход очень большого количества корректно обрабатывается.
+     */
+    @Test
+    void receiveStockLargeQuantity() {
+        // Arrange
+        Item item = createItem(ITEM_ID);
+        Stock stock = createStock(item, INITIAL_STOCK_QUANTITY);
+
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        int largeAmount = Integer.MAX_VALUE - INITIAL_STOCK_QUANTITY;
+        int result = stockService.receiveStock(ITEM_ID, largeAmount);
+
+        // Assert
+        assertEquals(Integer.MAX_VALUE, result);
+        assertEquals(Integer.MAX_VALUE, stock.getQuantity());
+    }
+
+    /**
+     * Приход максимального целого значения вызывает переполнение (edge case).
+     */
+    @Test
+    void receiveStockMaxIntegerCausesOverflow() {
+        // Arrange
+        Item item = createItem(ITEM_ID);
+        Stock stock = createStock(item, INITIAL_STOCK_QUANTITY);
+
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Act
+        int result = stockService.receiveStock(ITEM_ID, Integer.MAX_VALUE);
+
+        // Assert
+        // Ожидаем переполнение: 10 + Integer.MAX_VALUE = Integer.MIN_VALUE + 9
+        assertEquals(Integer.MIN_VALUE + 9, result);
     }
 
     /**

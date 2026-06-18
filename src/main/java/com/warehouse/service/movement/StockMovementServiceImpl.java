@@ -8,6 +8,8 @@ import com.warehouse.entity.MovementType;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.metric.MetricService;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -35,6 +37,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
+    MetricService metricService;
 
     /**
      * Регистрирует приход товара на склад.
@@ -56,9 +59,7 @@ public class StockMovementServiceImpl implements StockMovementService {
             throw new IllegalArgumentException("Quantity must be greater than 0");
         }
 
-        // Сначала проверяем товар
         Item item = itemCheckForExist(itemId);
-
         itemCheckForActive(item);
 
         log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}",
@@ -74,11 +75,12 @@ public class StockMovementServiceImpl implements StockMovementService {
                 .type(MovementType.RECEIVE)
                 .quantity(quantity)
                 .build();
-
         stockMovementRepository.save(stockMovement);
 
         log.info("Stock receipt registered: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
                 itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
+
+        metricService.increment("warehouse.movements.receive.total");
 
         return mapper.toResponse(stockMovement, stockAfter);
     }
@@ -90,27 +92,34 @@ public class StockMovementServiceImpl implements StockMovementService {
         Long itemId = request.itemId();
 
         Item item = itemCheckForExist(itemId);
-
         itemCheckForActive(item);
 
         log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}",
                 itemId, quantity, ctx.userId());
-        int stockAfter = stockService.writeOffStock(itemId, quantity);
 
-        User userRef = userRepository.getReferenceById(ctx.userId());
+        try {
+            int stockAfter = stockService.writeOffStock(itemId, quantity);
 
-        StockMovement stockMovement = StockMovement.builder()
-                .item(item)
-                .user(userRef)
-                .type(MovementType.WRITE_OFF)
-                .quantity(quantity)
-                .build();
+            User userRef = userRepository.getReferenceById(ctx.userId());
 
-        stockMovementRepository.save(stockMovement);
-        log.info("Stock receipt writeOffed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
-                itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
+            StockMovement stockMovement = StockMovement.builder()
+                    .item(item)
+                    .user(userRef)
+                    .type(MovementType.WRITE_OFF)
+                    .quantity(quantity)
+                    .build();
+            stockMovementRepository.save(stockMovement);
 
-        return mapper.toResponse(stockMovement, stockAfter);
+            log.info("Stock write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
+                    itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
+
+            metricService.increment("warehouse.movements.writeoff.total");
+
+            return mapper.toResponse(stockMovement, stockAfter);
+        } catch (InsufficientStockException e) {
+            metricService.increment("warehouse.movements.writeoff.rejected.total");
+            throw e;
+        }
     }
 
     private void itemCheckForActive(Item item) {
