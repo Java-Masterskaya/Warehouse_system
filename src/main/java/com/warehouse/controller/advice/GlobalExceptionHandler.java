@@ -7,6 +7,7 @@ import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.SelfDeactivationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -54,6 +55,12 @@ public class GlobalExceptionHandler {
                 .toList();
 
         return new ValidationErrorResponse("VALIDATION_ERROR", fieldErrors);
+    }
+
+    @ExceptionHandler(SelfDeactivationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleSelfDeactivation(SelfDeactivationException ex) {
+        return new  ErrorResponse("SELF_DEACTIVATION", ex.getMessage());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
