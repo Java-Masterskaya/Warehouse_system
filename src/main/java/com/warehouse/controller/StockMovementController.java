@@ -76,6 +76,7 @@ public class StockMovementController {
      */
     @GetMapping("/{itemId}/history")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(@PathVariable Long itemId,
                                                       @RequestParam(required = false) MovementType type,
                                                       @RequestParam(defaultValue = "0") int page,
