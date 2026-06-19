@@ -1,4 +1,4 @@
-package com.warehouse.service;
+package com.warehouse.service.cashe;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
