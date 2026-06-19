@@ -5,6 +5,9 @@ import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.movement.StockMovementService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +27,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Tag(name = "Движения товара", description = "Поступление и списание (только ADMIN)")
+@SecurityRequirement(name = "bearerAuth")
 public class StockMovementController {
 
     StockMovementService stockMovementService;
 
+    @Operation(summary = "Зарегистрировать поступление")
     @PostMapping("/receive")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
@@ -39,6 +45,7 @@ public class StockMovementController {
                 request, new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 
+    @Operation(summary = "Списать товар")
     @PostMapping("/write-off")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
