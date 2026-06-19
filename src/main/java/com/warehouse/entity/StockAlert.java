@@ -1,6 +1,5 @@
 package com.warehouse.entity;
 
-import com.warehouse.dto.event.LowStockAlertEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,7 +8,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -39,24 +37,34 @@ public class StockAlert {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
-    /** Товар, по которому сработал алерт. */
+    /**
+     * Товар, по которому сработал алерт.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id", nullable = false)
     Item item;
 
-    /** Остаток на момент алерта. */
+    /**
+     * Остаток на момент алерта.
+     */
     @Column(name = "current_stock", nullable = false)
     int currentStock;
 
-    /** Минимально допустимый остаток. */
+    /**
+     * Минимально допустимый остаток.
+     */
     @Column(name = "min_stock", nullable = false)
     int minStock;
 
-    /** Пользователь, чьё действие вызвало алерт. */
+    /**
+     * Пользователь, чьё действие вызвало алерт.
+     */
     @Column(name = "triggered_by", nullable = false, length = 100)
     String triggeredBy;
 
-    /** Дата и время срабатывания алерта (из события). */
+    /**
+     * Дата и время срабатывания алерта (из события).
+     */
     @Column(name = "created_at", nullable = false, updatable = false)
     LocalDateTime createdAt;
 }
