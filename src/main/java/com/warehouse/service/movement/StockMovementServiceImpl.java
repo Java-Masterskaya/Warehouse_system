@@ -2,6 +2,8 @@ package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
@@ -19,6 +21,10 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +56,7 @@ public class StockMovementServiceImpl implements StockMovementService {
      */
     @Override
     @Transactional
+    @CacheEvict(value = "item", key = "#request.itemId")
     public StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -87,11 +94,13 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "item", key = "#request.itemId")
     public StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
 
         Item item = itemCheckForExist(itemId);
+
         itemCheckForActive(item);
 
         log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}",
@@ -122,6 +131,29 @@ public class StockMovementServiceImpl implements StockMovementService {
         }
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId,
+                                                                             MovementType type,
+                                                                             int page,
+                                                                             int size) {
+        if (!itemRepository.existsById(itemId)) {
+            log.warn("Item с id={} не найден", itemId);
+            throw  EntityNotFoundException.forId("Item", itemId);
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<StockMovementHistoryResponse> history =
+                stockMovementRepository.findHistoryByItemId(
+                        itemId,
+                        type,
+                        pageable
+                );
+
+        return PageResponse.from(history);
+    }
+
     private void itemCheckForActive(Item item) {
         if (!item.isActive()) {
             log.warn("Attempt to receive inactive item: itemId={}", item.getId());
@@ -136,4 +168,5 @@ public class StockMovementServiceImpl implements StockMovementService {
                     return EntityNotFoundException.forId("Item", itemId);
                 });
     }
+
 }

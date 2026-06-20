@@ -2,6 +2,8 @@ package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
@@ -22,7 +24,13 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,14 +38,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
-/**
- * Юнит-тесты для StockMovementServiceImpl: регистрация прихода и списания.
- * Проверяют: успешные операции, валидация количества, обработка несуществующих/неактивных товаров.
- */
 @ExtendWith(MockitoExtension.class)
 class StockMovementServiceImplTest {
 
@@ -65,9 +71,6 @@ class StockMovementServiceImplTest {
     @Captor
     private ArgumentCaptor<StockMovement> stockMovementCaptor;
 
-    /**
-     * Успешная регистрация прихода товара: данные сохраняются корректно.
-     */
     @Test
     void registerReceiptSuccess() {
         // Arrange
@@ -114,9 +117,6 @@ class StockMovementServiceImplTest {
         assertEquals(QUANTITY, savedMovement.getQuantity());
     }
 
-    /**
-     * Регистрация прихода с количеством = 0 выбрасывает IllegalArgumentException.
-     */
     @Test
     void registerReceiptWithZeroQuantityThrowsException() {
         // Arrange
@@ -131,9 +131,6 @@ class StockMovementServiceImplTest {
         assertEquals("Quantity must be greater than 0", ex.getMessage());
     }
 
-    /**
-     * Регистрация прихода с отрицательным количеством выбрасывает IllegalArgumentException.
-     */
     @Test
     void registerReceiptWithNegativeQuantityThrowsException() {
         // Arrange
@@ -148,9 +145,6 @@ class StockMovementServiceImplTest {
         assertEquals("Quantity must be greater than 0", ex.getMessage());
     }
 
-    /**
-     * Регистрация прихода для несуществующего товара выбрасывает EntityNotFoundException.
-     */
     @Test
     void registerReceiptItemNotFoundThrowsException() {
         // Arrange
@@ -168,9 +162,6 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
     }
 
-    /**
-     * Регистрация прихода для неактивного товара выбрасывает EntityNotFoundException.
-     */
     @Test
     void registerReceiptInactiveItemThrowsException() {
         // Arrange
@@ -189,9 +180,6 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
     }
 
-    /**
-     * Регистрация прихода сохраняет ссылку на пользователя (не null).
-     */
     @Test
     void registerReceiptUserNotNull() {
         // Arrange
@@ -217,9 +205,10 @@ class StockMovementServiceImplTest {
         assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
-    /**
-     * Успешное списание товара: данные сохраняются корректно.
-     */
+    // ==========================================
+//    ТЕСТЫ ДЛЯ WRITE-OFF
+// ==========================================
+
     @Test
     void writeOffReceiptSuccess() {
         // Arrange
@@ -267,9 +256,6 @@ class StockMovementServiceImplTest {
         assertEquals(QUANTITY, savedMovement.getQuantity());
     }
 
-    /**
-     * Списание товара для несуществующего товара выбрасывает EntityNotFoundException.
-     */
     @Test
     void writeOffReceiptItemNotFoundThrowsException() {
         // Arrange
@@ -287,9 +273,6 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
     }
 
-    /**
-     * Списание товара для неактивного товара выбрасывает EntityNotFoundException.
-     */
     @Test
     void writeOffReceiptInactiveItemThrowsException() {
         // Arrange
@@ -308,9 +291,6 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
     }
 
-    /**
-     * Списание при недостаточном остатке выбрасывает InsufficientStockException.
-     */
     @Test
     void writeOffReceiptInsufficientStockThrowsException() {
         // Arrange
@@ -330,9 +310,6 @@ class StockMovementServiceImplTest {
         assertEquals("Insufficient stock", ex.getMessage());
     }
 
-    /**
-     * Списание сохраняет ссылку на пользователя (не null).
-     */
     @Test
     void writeOffReceiptUserNotNull() {
         // Arrange
@@ -359,9 +336,106 @@ class StockMovementServiceImplTest {
         assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
-    /**
-     * Вспомогательный метод для создания ссылки на пользователя.
-     */
+    @Test
+    void getItemMovementHistorySuccess() {
+        Long itemId = 1L;
+        MovementType type = MovementType.WRITE_OFF;
+        int page = 0;
+        int size = 20;
+
+        StockMovementHistoryResponse movement =
+                new StockMovementHistoryResponse(
+                        102L,
+                        MovementType.WRITE_OFF,
+                        10,
+                        "admin",
+                        LocalDateTime.of(2026, 5, 28, 11, 30)
+                );
+
+        Page<StockMovementHistoryResponse> historyPage =
+                new PageImpl<>(
+                        List.of(movement),
+                        PageRequest.of(page, size),
+                        1
+                );
+
+        when(itemRepository.existsById(itemId))
+                .thenReturn(true);
+
+        when(stockMovementRepository.findHistoryByItemId(
+                eq(itemId),
+                eq(type),
+                any(Pageable.class)
+        )).thenReturn(historyPage);
+
+        PageResponse<StockMovementHistoryResponse> result =
+                stockMovementService.getItemMovementHistory(
+                        itemId,
+                        type,
+                        page,
+                        size
+                );
+
+        assertEquals(1, result.content().size());
+        assertEquals(1, result.totalElements());
+        assertEquals(1, result.totalPages());
+        assertEquals(0, result.page());
+        assertEquals(20, result.size());
+
+        StockMovementHistoryResponse response = result.content().get(0);
+
+        assertEquals(102L, response.id());
+        assertEquals(MovementType.WRITE_OFF, response.type());
+        assertEquals(10, response.quantity());
+        assertEquals("admin", response.performedBy());
+
+        verify(itemRepository).existsById(itemId);
+        verify(stockMovementRepository).findHistoryByItemId(
+                eq(itemId),
+                eq(type),
+                any(Pageable.class)
+        );
+    }
+
+    @Test
+    void getItemMovementHistoryItemNotFound() {
+        Long itemId = 999L;
+        MovementType type = MovementType.RECEIVE;
+        int page = 0;
+        int size = 20;
+
+        when(itemRepository.existsById(itemId))
+                .thenReturn(false);
+
+        EntityNotFoundException exception =
+                assertThrows(
+                        EntityNotFoundException.class,
+                        () -> stockMovementService.getItemMovementHistory(
+                                itemId,
+                                type,
+                                page,
+                                size
+                        )
+                );
+
+        assertEquals(
+                "Item with id 999 not found",
+                exception.getMessage()
+        );
+
+        verify(itemRepository).existsById(itemId);
+
+        verify(stockMovementRepository, never()).findHistoryByItemId(
+                anyLong(),
+                any(),
+                any(Pageable.class)
+        );
+    }
+
+    // ==========================================
+    //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    // ==========================================
+
     private User createUserReference(Long userId, String username) {
         User user = new User();
         user.setId(userId);
@@ -372,9 +446,6 @@ class StockMovementServiceImplTest {
         return user;
     }
 
-    /**
-     * Вспомогательный метод для создания товара.
-     */
     private Item createItem(Long itemId, String name, boolean active) {
         Item item = new Item();
         item.setId(itemId);
@@ -382,4 +453,5 @@ class StockMovementServiceImplTest {
         item.setActive(active);
         return item;
     }
+
 }

@@ -6,6 +6,9 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.service.item.ItemService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +32,13 @@ import java.util.List;
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Товары", description = "Управление каталогом товаров")
+@SecurityRequirement(name = "bearerAuth")
 public class ItemController {
 
     private final ItemService itemService;
 
+    @Operation(summary = "Список товаров", description = "Постраничный список с фильтрацией и сортировкой")
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
@@ -48,6 +54,7 @@ public class ItemController {
         return itemService.getItems(sort, order, category, search, page, size);
     }
 
+    @Operation(summary = "Создать товар")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
@@ -56,6 +63,7 @@ public class ItemController {
         return itemService.createItem(request);
     }
 
+    @Operation(summary = "Редактировать товар")
     @PutMapping("/{itemId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
@@ -67,6 +75,7 @@ public class ItemController {
         return itemService.updateItem(itemId, request);
     }
 
+    @Operation(summary = "Карточка товара")
     @GetMapping("/{itemId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
@@ -75,6 +84,7 @@ public class ItemController {
         return itemService.getItem(itemId);
     }
 
+    @Operation(summary = "Удалить товар (soft delete)")
     @DeleteMapping("/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
@@ -83,6 +93,7 @@ public class ItemController {
         itemService.softDeleteItem(itemId);
     }
 
+    @Operation(summary = "Список категорий")
     @GetMapping("/categories")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")

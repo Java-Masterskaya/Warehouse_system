@@ -15,7 +15,9 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -35,6 +37,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
+    @CacheEvict(value = "categories", allEntries = true)
     public ItemResponse createItem(CreateItemRequest request) {
         log.debug("Creating item with SKU '{}'", request.sku());
 
@@ -57,6 +60,10 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
+    @Caching(evict = {
+        @CacheEvict(value = "item", key = "#itemId"),
+        @CacheEvict(value = "categories", allEntries = true)
+    })
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
         log.debug("Updating item with id={}", itemId);
 
@@ -137,6 +144,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
+    @CacheEvict(value = "item", key = "#itemId")
     public void softDeleteItem(Long itemId) {
         Item item = itemRepository.findById(itemId).orElseThrow(() -> {
             log.warn("Item с id={} не найден", itemId);
