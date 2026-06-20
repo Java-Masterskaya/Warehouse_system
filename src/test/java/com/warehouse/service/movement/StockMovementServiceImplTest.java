@@ -343,9 +343,6 @@ class StockMovementServiceImplTest {
         int page = 0;
         int size = 20;
 
-        Item item = new Item();
-        item.setId(itemId);
-
         StockMovementHistoryResponse movement =
                 new StockMovementHistoryResponse(
                         102L,
@@ -362,8 +359,8 @@ class StockMovementServiceImplTest {
                         1
                 );
 
-        when(itemRepository.findById(itemId))
-                .thenReturn(Optional.of(item));
+        when(itemRepository.existsById(itemId))
+                .thenReturn(true);
 
         when(stockMovementRepository.findHistoryByItemId(
                 eq(itemId),
@@ -392,7 +389,7 @@ class StockMovementServiceImplTest {
         assertEquals(10, response.quantity());
         assertEquals("admin", response.performedBy());
 
-        verify(itemRepository).findById(itemId);
+        verify(itemRepository).existsById(itemId);
         verify(stockMovementRepository).findHistoryByItemId(
                 eq(itemId),
                 eq(type),
@@ -407,8 +404,8 @@ class StockMovementServiceImplTest {
         int page = 0;
         int size = 20;
 
-        when(itemRepository.findById(itemId))
-                .thenReturn(Optional.empty());
+        when(itemRepository.existsById(itemId))
+                .thenReturn(false);
 
         EntityNotFoundException exception =
                 assertThrows(
@@ -426,7 +423,8 @@ class StockMovementServiceImplTest {
                 exception.getMessage()
         );
 
-        verify(itemRepository).findById(itemId);
+        verify(itemRepository).existsById(itemId);
+
         verify(stockMovementRepository, never()).findHistoryByItemId(
                 anyLong(),
                 any(),
