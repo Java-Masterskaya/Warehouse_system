@@ -21,6 +21,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -55,6 +56,7 @@ public class StockMovementServiceImpl implements StockMovementService {
      */
     @Override
     @Transactional
+    @CacheEvict(value = "item", key = "#request.itemId")
     public StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -92,6 +94,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "item", key = "#request.itemId")
     public StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
