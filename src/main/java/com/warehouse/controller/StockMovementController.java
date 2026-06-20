@@ -24,12 +24,16 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/api/movements")
 @RequiredArgsConstructor
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Validated
 public class StockMovementController {
 
     StockMovementService stockMovementService;
@@ -77,10 +81,17 @@ public class StockMovementController {
     @GetMapping("/{itemId}/history")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(@PathVariable Long itemId,
-                                                      @RequestParam(required = false) MovementType type,
-                                                      @RequestParam(defaultValue = "0") int page,
-                                                      @RequestParam(defaultValue = "20") int size) {
+    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(
+            @PathVariable Long itemId,
+            @RequestParam(required = false) MovementType type,
+            @RequestParam(defaultValue = "0")
+            @Min(0)
+            int page,
+
+            @RequestParam(defaultValue = "20")
+            @Min(1)
+            @Max(100)
+            int size) {
         return stockMovementService.getItemMovementHistory(itemId, type, page, size);
     }
 

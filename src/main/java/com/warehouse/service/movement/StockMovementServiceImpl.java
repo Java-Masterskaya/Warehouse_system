@@ -128,16 +128,17 @@ public class StockMovementServiceImpl implements StockMovementService {
         }
     }
 
+    @Transactional(readOnly = true)
     @Override
     public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId,
                                                                              MovementType type,
                                                                              int page,
                                                                              int size) {
-        itemRepository.findById(itemId)
-                .orElseThrow(() -> {
-                    log.warn("Item с id={} не найден", itemId);
-                    return EntityNotFoundException.forId("Item", itemId);
-                });
+        if (!itemRepository.existsById(itemId)) {
+            log.warn("Item с id={} не найден", itemId);
+            throw  EntityNotFoundException.forId("Item", itemId);
+        }
+
         Pageable pageable = PageRequest.of(page, size);
 
         Page<StockMovementHistoryResponse> history =
