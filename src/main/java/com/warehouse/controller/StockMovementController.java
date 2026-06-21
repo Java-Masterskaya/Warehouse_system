@@ -93,5 +93,4 @@ public class StockMovementController {
             int size) {
         return stockMovementService.getItemMovementHistory(itemId, type, page, size);
     }
-
 }
