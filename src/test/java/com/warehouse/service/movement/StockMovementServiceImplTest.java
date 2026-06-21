@@ -71,6 +71,9 @@ class StockMovementServiceImplTest {
     @Captor
     private ArgumentCaptor<StockMovement> stockMovementCaptor;
 
+    /**
+     * Успешная регистрация прихода товара.
+     */
     @Test
     void registerReceiptSuccess() {
         // Arrange

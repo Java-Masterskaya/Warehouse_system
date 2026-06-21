@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
  * Проверяют: успешное списание, приход, недостаточный остаток, ошибки сущности.
  */
 @ExtendWith(MockitoExtension.class)
-class StockServiceTest {
+class StockServiceImplTest {
 
     private static final Long ITEM_ID = 1L;
     private static final Long NON_EXISTENT_ITEM_ID = 99L;
@@ -279,6 +279,9 @@ class StockServiceTest {
 
     /**
      * Вспомогательный метод для создания Item.
+     *
+     * @param itemId ID товара
+     * @return созданный объект Item
      */
     private Item createItem(Long itemId) {
         Item item = new Item();
@@ -288,6 +291,10 @@ class StockServiceTest {
 
     /**
      * Вспомогательный метод для создания Stock.
+     *
+     * @param item     товар
+     * @param quantity количество
+     * @return созданный объект Stock
      */
     private Stock createStock(Item item, int quantity) {
         Stock stock = new Stock();

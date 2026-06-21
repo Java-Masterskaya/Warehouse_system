@@ -43,7 +43,7 @@ import static org.mockito.Mockito.when;
  * Проверяют: создание, чтение, обновление, удаление, фильтрацию, сортировку.
  */
 @ExtendWith(MockitoExtension.class)
-class ItemServiceTest {
+class ItemServiceImplTest {
 
     @Mock
     private ItemRepository itemRepository;

@@ -216,6 +216,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
     }
 
+    /**
+     * Вспомогательный метод для получения JWT токена через API.
+     *
+     * @param username имя пользователя
+     * @param password пароль
+     * @return JWT токен
+     */
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
         String response = mockMvc.perform(post("/api/auth/login")

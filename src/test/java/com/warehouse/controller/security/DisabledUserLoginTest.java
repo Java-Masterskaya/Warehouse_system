@@ -81,6 +81,8 @@ class DisabledUserLoginTest extends AbstractIntegrationTest {
 
     /**
      * Вспомогательный метод для получения токена администратора.
+     *
+     * @return JWT токен администратора
      */
     private String obtainAdminToken() throws Exception {
         LoginRequest request = new LoginRequest("admin", "secret");

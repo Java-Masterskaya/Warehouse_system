@@ -53,6 +53,10 @@ class AuthIntegrationTest {
 
     /**
      * Получение JWT токена по корректным данным логина/пароля.
+     *
+     * @param username имя пользователя
+     * @param password пароль
+     * @return JWT токен
      */
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
@@ -165,6 +169,10 @@ class AuthIntegrationTest {
 
     /**
      * Вспомогательный метод для создания просроченного JWT токена.
+     *
+     * @param username имя пользователя
+     * @param roles список ролей
+     * @return просроченный JWT токен
      */
     private String createExpiredToken(String username, List<String> roles) {
         Instant past = Instant.now().minusSeconds(3600);

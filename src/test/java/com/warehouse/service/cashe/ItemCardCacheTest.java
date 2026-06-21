@@ -15,6 +15,10 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Интеграционный тест кэширования карточки товара.
+ * Тестирует: получение данных о товаре, кэширование, устойчивость к изменениям в БД.
+ */
 @ActiveProfiles("test")
 class ItemCardCacheTest extends AbstractIntegrationTest {
 
@@ -34,10 +38,12 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Arrange: очищаем тестовые данные
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
 
+        // Arrange: создаем тестовый товар
         Item item = new Item();
         item.setSku("SKU-001");
         item.setName("Ноутбук");
@@ -54,23 +60,34 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         itemId = item.getId();
     }
 
+    /**
+     * Получение карточки товара должно возвращать корректные данные.
+     */
     @Test
     void getItemShouldReturnItemDetails() {
+        // Act: получаем карточку товара
         ItemDetailsResponse response = itemService.getItem(itemId);
 
+        // Assert: проверяем, что данные корректны
         assertThat(response).isNotNull();
         assertThat(response.id()).isEqualTo(itemId);
         assertThat(response.name()).isEqualTo("Ноутбук");
         assertThat(response.currentStock()).isEqualTo(10);
     }
 
+    /**
+     * Получение карточки товара должно использовать кэш (данные не меняются после очистки БД).
+     */
     @Test
     void getItemShouldBeCached() {
+        // Arrange: получаем карточку товара и кэшируем
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
 
+        // Act: очищаем БД (данные удалились)
         stockRepository.deleteAll();
         itemRepository.deleteAll();
 
+        // Assert: при повторном запросе возвращаются закэшированные данные
         ItemDetailsResponse secondCall = itemService.getItem(itemId);
 
         assertThat(secondCall).isEqualTo(firstCall);

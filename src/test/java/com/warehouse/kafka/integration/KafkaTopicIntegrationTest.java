@@ -79,7 +79,7 @@ class KafkaTopicIntegrationTest {
 
         try (AdminClient adminClient = AdminClient.create(props)) {
             // Act & Assert
-            // Ждем пока топик будет создан (максимум 10 секунд)
+            // Arrange: ждем пока топик будет создан (максимум 10 секунд)
             await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
                 Set<String> topics = adminClient.listTopics().names().get(5, TimeUnit.SECONDS);
                 assertThat(topics).contains(topicName);
@@ -99,7 +99,7 @@ class KafkaTopicIntegrationTest {
     }
 
     /**
-     * Отправка сообщения через KafkaTemplate не выбрасывает исключений.
+     * Отправка сообщения через KafkaStockAlertProducer не выбрасывает исключений.
      */
     @Test
     void kafkaTemplateSendShouldNotThrowException() {

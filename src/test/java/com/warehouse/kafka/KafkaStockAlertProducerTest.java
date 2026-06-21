@@ -129,13 +129,15 @@ class KafkaStockAlertProducerTest {
         assertThrows(RuntimeException.class,
                 () -> producer.sendLowStockAlert(alert));
 
-        // Проверяем, что send был вызван один раз
-        // Ретраи не тестируем тут, нет Spring-контекста и  @Retryable не активен
+        // Verify: проверяем, что send был вызван один раз
+        // Ретраи не тестируем тут, нет Spring-контекста и @Retryable не активен
         verify(kafkaTemplate, times(1)).send(TOPIC_NAME, String.valueOf(ITEM_ID), alert);
     }
 
     /**
      * Вспомогательный метод для создания LowStockAlertEvent.
+     *
+     * @return созданный объект LowStockAlertEvent
      */
     private LowStockAlertEvent createAlert() {
         return new LowStockAlertEvent(

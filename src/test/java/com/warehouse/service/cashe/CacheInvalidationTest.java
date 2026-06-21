@@ -20,6 +20,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Интеграционный тест проверки инвалидации кэша при изменении данных.
+ * Тестирует: инвалидацию кэша карточки товара и кэша категорий.
+ */
 @ActiveProfiles("test")
 class CacheInvalidationTest extends AbstractIntegrationTest {
 
@@ -42,10 +46,12 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Arrange: очищаем тестовые данные
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
 
+        // Arrange: создаем тестовый товар
         Item item = new Item();
         item.setSku("SKU-001");
         item.setName("Ноутбук");
@@ -62,83 +68,121 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         itemId = item.getId();
     }
 
+    /**
+     * Обновление товара должно привести к инвалидации кэша карточки товара.
+     */
     @Test
     void updateItemShouldEvictItemCache() {
+        // Arrange: получаем товар и кэшируем
         itemService.getItem(itemId);
 
+        // Act: обновляем товар
         UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук Pro", "Электроника", 10);
         itemService.updateItem(itemId, updateRequest);
 
+        // Assert: при повторном запросе возвращаются обновленные данные
         ItemDetailsResponse response = itemService.getItem(itemId);
         assertThat(response.name()).isEqualTo("Ноутбук Pro");
         assertThat(response.minStock()).isEqualTo(10);
     }
 
+    /**
+     * Мягкое удаление товара должно привести к инвалидации кэша карточки товара.
+     */
     @Test
     void softDeleteItemShouldEvictItemCache() {
+        // Arrange: получаем товар и кэшируем
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.active()).isTrue();
 
+        // Act: удаляем товар
         itemService.softDeleteItem(itemId);
 
+        // Assert: при повторном запросе выбрасывается исключение
         try {
             itemService.getItem(itemId);
         } catch (Exception e) {
+            // Assert: проверяем сообщение исключения
             assertThat(e.getMessage()).contains("неактивен");
         }
     }
 
+    /**
+     * Регистрация прихода должна привести к инвалидации кэша карточки товара.
+     */
     @Test
     void receiveMovementShouldEvictItemCache() {
+        // Arrange: получаем товар и кэшируем
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.currentStock()).isEqualTo(10);
 
+        // Act: регистрируем приход
         ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5);
         stockMovementService.registerReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
+        // Assert: при повторном запросе возвращаются обновленные данные
         ItemDetailsResponse response = itemService.getItem(itemId);
         assertThat(response.currentStock()).isEqualTo(15);
     }
 
+    /**
+     * Регистрация списания должна привести к инвалидации кэша карточки товара.
+     */
     @Test
     void writeOffMovementShouldEvictItemCache() {
+        // Arrange: получаем товар и кэшируем
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.currentStock()).isEqualTo(10);
 
+        // Act: регистрируем списание
         ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 3);
         stockMovementService.writeOffReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
+        // Assert: при повторном запросе возвращаются обновленные данные
         ItemDetailsResponse response = itemService.getItem(itemId);
         assertThat(response.currentStock()).isEqualTo(7);
     }
 
+    /**
+     * Создание товара с новой категорией должно привести к инвалидации кэша категорий.
+     */
     @Test
     void createItemWithNewCategoryShouldEvictCategoriesCache() {
+        // Arrange: получаем категории и кэшируем
         List<String> firstCall = itemService.getCategories();
         assertThat(firstCall).contains("Электроника");
 
+        // Act: создаем товар с новой категорией
         com.warehouse.dto.request.item.CreateItemRequest createRequest =
                 new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель", 3);
         itemService.createItem(createRequest);
 
+        // Assert: при повторном запросе возвращаются обновленные категории
         List<String> secondCall = itemService.getCategories();
         assertThat(secondCall).contains("Электроника", "Мебель");
     }
 
+    /**
+     * Изменение категории товара должно привести к инвалидации кэша категорий.
+     */
     @Test
     void updateItemWithCategoryChangeShouldEvictCategoriesCache() {
+        // Arrange: создаем товар с категорией "Мебель"
         com.warehouse.dto.request.item.CreateItemRequest createRequest =
                 new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель", 3);
         itemService.createItem(createRequest);
 
+        // Arrange: получаем категории и кэшируем
         List<String> firstCall = itemService.getCategories();
         assertThat(firstCall).contains("Электроника", "Мебель");
 
+        // Act: обновляем категорию товара
         UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук", "Мебель", 5);
         itemService.updateItem(itemId, updateRequest);
 
+        // Assert: при повторном запросе возвращаются обновленные категории (без дубликатов)
         List<String> secondCall = itemService.getCategories();
         assertThat(secondCall).doesNotHaveDuplicates();
     }

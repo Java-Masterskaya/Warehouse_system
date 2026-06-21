@@ -63,7 +63,7 @@ class KafkaStockAlertProducerRetryTest {
         // Act & Assert
         assertThrows(RuntimeException.class, () -> producer.sendLowStockAlert(alert));
 
-        // Проверяем, что send был вызван 3 раза (1 попытка + 2 retry)
+        // Verify: проверяем, что send был вызван 3 раза (1 попытка + 2 retry)
         verify(kafkaTemplate, times(3)).send(anyString(), anyString(), any());
     }
 }

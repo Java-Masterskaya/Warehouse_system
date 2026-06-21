@@ -485,6 +485,10 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     /**
      * Вспомогательный метод для создания товара в базе.
+     *
+     * @param sku      SKU товара
+     * @param name     название товара
+     * @param category категория товара
      */
     private void createItem(String sku, String name, String category) throws Exception {
         CreateItemRequest request = new CreateItemRequest(sku, name, category, 0);
@@ -495,6 +499,13 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated());
     }
 
+    /**
+     * Вспомогательный метод для получения JWT токена через API.
+     *
+     * @param username имя пользователя
+     * @param password пароль
+     * @return JWT токен
+     */
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
         String response = mockMvc.perform(post("/api/auth/login")
