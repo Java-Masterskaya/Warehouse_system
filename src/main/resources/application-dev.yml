@@ -1,22 +1,28 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/warehouse
-    username: warehouse_user
-    password: warehouse_password
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT}/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
   data:
     redis:
       host: localhost
-      port: 6379
-      password: admin123
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
   kafka:
     bootstrap-servers: localhost:9092
   jpa:
     show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        generate_statistics: false
 
 app:
   jwt:
     secret: ${JWT_SECRET}
-    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    expiration-ms: ${JWT_EXPIRATION_MS}
 
 logging:
   level:

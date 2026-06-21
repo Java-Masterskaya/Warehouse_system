@@ -5,6 +5,7 @@ import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.security.JwtAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -24,6 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import java.io.IOException;
 
+@Slf4j
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -65,16 +67,20 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
-        return (request, response, authException) ->
-                sendError(response, HttpServletResponse.SC_UNAUTHORIZED,
-                        "UNAUTHORIZED", "Authentication failed");
+        return (request, response, authException) -> {
+            log.warn("Authentication failed: {}", authException.getMessage());
+            sendError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                    "UNAUTHORIZED", "Authentication failed");
+        };
     }
 
     @Bean
     public AccessDeniedHandler accessDeniedHandler() {
-        return (request, response, accessDeniedException) ->
-                sendError(response, HttpServletResponse.SC_FORBIDDEN,
-                        "ACCESS_DENIED", "Access denied");
+        return (request, response, accessDeniedException) -> {
+            log.warn("Access denied: {}", accessDeniedException.getMessage());
+            sendError(response, HttpServletResponse.SC_FORBIDDEN,
+                    "ACCESS_DENIED", "Access denied");
+        };
     }
 
     private void sendError(HttpServletResponse response,
