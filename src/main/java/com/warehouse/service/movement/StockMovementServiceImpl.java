@@ -1,6 +1,7 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
+import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
@@ -11,6 +12,7 @@ import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.metric.MetricService;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
@@ -27,6 +29,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.time.LocalDateTime;
 
 /**
  * Реализация сервиса для управления движениями товаров на складе.
@@ -43,6 +49,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
+    KafkaStockAlertProducer kafkaProducer;
     MetricService metricService;
 
     /**
@@ -89,7 +96,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         metricService.increment("warehouse.movements.receive.total");
 
-        return mapper.toResponse(stockMovement, stockAfter);
+        return mapper.toResponse(stockMovement, stockAfter, false);
     }
 
     @Override
@@ -119,12 +126,37 @@ public class StockMovementServiceImpl implements StockMovementService {
                     .build();
             stockMovementRepository.save(stockMovement);
 
-            log.info("Stock write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
+            boolean lowStock = stockAfter < item.getMinStock();
+            if (lowStock) {
+                LowStockAlertEvent event = new LowStockAlertEvent(
+                        item.getId(),
+                        item.getSku(),
+                        item.getName(),
+                        stockAfter,
+                        item.getMinStock(),
+                        ctx.username(),
+                        LocalDateTime.now()
+                );
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            kafkaProducer.sendLowStockAlert(event);
+                            log.info("LowStockAlert sent: itemId={}, stockAfter={}, minStock={}",
+                                    item.getId(), stockAfter, item.getMinStock());
+                        } catch (Exception e) {
+                            log.error("Failed to send LowStockAlert for itemId={}: {}", item.getId(), e.getMessage());
+                        }
+                    }
+                });
+            }
+
+            log.info("Write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
                     itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
             metricService.increment("warehouse.movements.writeoff.total");
 
-            return mapper.toResponse(stockMovement, stockAfter);
+            return mapper.toResponse(stockMovement, stockAfter, lowStock);
         } catch (InsufficientStockException e) {
             metricService.increment("warehouse.movements.writeoff.rejected.total");
             throw e;
@@ -139,7 +171,7 @@ public class StockMovementServiceImpl implements StockMovementService {
                                                                              int size) {
         if (!itemRepository.existsById(itemId)) {
             log.warn("Item с id={} не найден", itemId);
-            throw  EntityNotFoundException.forId("Item", itemId);
+            throw EntityNotFoundException.forId("Item", itemId);
         }
 
         Pageable pageable = PageRequest.of(page, size);

@@ -1,4 +1,4 @@
-package com.warehouse.config.security;
+package com.warehouse.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.response.error.ErrorResponse;

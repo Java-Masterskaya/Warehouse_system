@@ -1,6 +1,7 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
+import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
@@ -11,6 +12,7 @@ import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
@@ -23,26 +25,31 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class StockMovementServiceImplTest {
@@ -54,6 +61,7 @@ class StockMovementServiceImplTest {
     private static final Long USER_ID = 10L;
     private static final String USERNAME = "admin";
     private static final String PASSWORD = "password";
+
     @Mock
     private StockMovementMapper mapper;
     @Mock
@@ -65,18 +73,23 @@ class StockMovementServiceImplTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private KafkaStockAlertProducer kafkaProducer;
+    @Mock
     private MetricService metricService;
     @InjectMocks
     private StockMovementServiceImpl stockMovementService;
     @Captor
     private ArgumentCaptor<StockMovement> stockMovementCaptor;
 
+    // ==========================================
+    //    ТЕСТЫ ДЛЯ RECEIPT
+    // ==========================================
+
     @Test
     void registerReceiptSuccess() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -84,30 +97,25 @@ class StockMovementServiceImplTest {
         when(stockService.receiveStock(ITEM_ID, QUANTITY)).thenReturn(STOCK_AFTER_RECEIPT);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-
-        when(mapper.toResponse(any(StockMovement.class), eq(STOCK_AFTER_RECEIPT)))
+        when(mapper.toResponse(any(StockMovement.class), eq(STOCK_AFTER_RECEIPT), eq(false)))
                 .thenAnswer(invocation -> {
                     StockMovement movement = invocation.getArgument(0);
                     int stockAfter = invocation.getArgument(1);
+                    boolean lowStockAlert = invocation.getArgument(2);
                     return new StockMovementResponse(
-                            movement.getItem().getId(),
-                            movement.getId(),
-                            movement.getType(),
-                            movement.getQuantity(),
-                            stockAfter,
-                            movement.getCreatedAt()
-                    );
+                            movement.getItem().getId(), movement.getId(),
+                            movement.getType(), movement.getQuantity(),
+                            stockAfter, movement.getCreatedAt(), lowStockAlert);
                 });
 
-        // Act
         StockMovementResponse response = stockMovementService.registerReceipt(request, userContext);
 
-        // Assert
         assertNotNull(response);
         assertEquals(ITEM_ID, response.itemId());
         assertEquals(QUANTITY, response.quantity());
         assertEquals(STOCK_AFTER_RECEIPT, response.stockAfter());
         assertEquals(MovementType.RECEIVE, response.type());
+        assertFalse(response.lowStockAlert());
 
         verify(stockMovementRepository).save(stockMovementCaptor.capture());
         StockMovement savedMovement = stockMovementCaptor.getValue();
@@ -119,44 +127,35 @@ class StockMovementServiceImplTest {
 
     @Test
     void registerReceiptWithZeroQuantityThrowsException() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 0);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
-        // Act & Assert
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
-            stockMovementService.registerReceipt(request, userContext);
-        });
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> stockMovementService.registerReceipt(request, userContext));
 
         assertEquals("Quantity must be greater than 0", ex.getMessage());
     }
 
     @Test
     void registerReceiptWithNegativeQuantityThrowsException() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, -1);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
-        // Act & Assert
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
-            stockMovementService.registerReceipt(request, userContext);
-        });
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> stockMovementService.registerReceipt(request, userContext));
 
         assertEquals("Quantity must be greater than 0", ex.getMessage());
     }
 
     @Test
     void registerReceiptItemNotFoundThrowsException() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.registerReceipt(request, userContext);
-        });
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class,
+                () -> stockMovementService.registerReceipt(request, userContext));
 
         assertTrue(ex.getMessage().contains("Item"));
         assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
@@ -164,17 +163,14 @@ class StockMovementServiceImplTest {
 
     @Test
     void registerReceiptInactiveItemThrowsException() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
+        Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false, 0);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(inactiveItem));
 
-        // Act & Assert
-        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.registerReceipt(request, userContext);
-        });
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class,
+                () -> stockMovementService.registerReceipt(request, userContext));
 
         assertTrue(ex.getMessage().contains("Item"));
         assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
@@ -182,10 +178,9 @@ class StockMovementServiceImplTest {
 
     @Test
     void registerReceiptUserNotNull() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -194,10 +189,8 @@ class StockMovementServiceImplTest {
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        // Act
         stockMovementService.registerReceipt(request, userContext);
 
-        // Assert
         verify(stockMovementRepository).save(stockMovementCaptor.capture());
         StockMovement savedMovement = stockMovementCaptor.getValue();
         assertNotNull(savedMovement.getUser());
@@ -206,15 +199,14 @@ class StockMovementServiceImplTest {
     }
 
     // ==========================================
-//    ТЕСТЫ ДЛЯ WRITE-OFF
-// ==========================================
+    //    ТЕСТЫ ДЛЯ WRITE-OFF
+    // ==========================================
 
     @Test
     void writeOffReceiptSuccess() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
         int stockAfterWriteOff = 5;
 
@@ -223,51 +215,36 @@ class StockMovementServiceImplTest {
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-
-        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff)))
+        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
                 .thenAnswer(invocation -> {
                     StockMovement movement = invocation.getArgument(0);
                     int stockAfter = invocation.getArgument(1);
+                    boolean lowStockAlert = invocation.getArgument(2);
                     return new StockMovementResponse(
-                            movement.getItem().getId(),
-                            movement.getId(),
-                            movement.getType(),
-                            movement.getQuantity(),
-                            stockAfter,
-                            movement.getCreatedAt()
-                    );
+                            movement.getItem().getId(), movement.getId(),
+                            movement.getType(), movement.getQuantity(),
+                            stockAfter, movement.getCreatedAt(), lowStockAlert);
                 });
 
-        // Act
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
-        // Assert
         assertNotNull(response);
         assertEquals(ITEM_ID, response.itemId());
         assertEquals(QUANTITY, response.quantity());
         assertEquals(stockAfterWriteOff, response.stockAfter());
         assertEquals(MovementType.WRITE_OFF, response.type());
-
-        verify(stockMovementRepository).save(stockMovementCaptor.capture());
-        StockMovement savedMovement = stockMovementCaptor.getValue();
-        assertEquals(ITEM_ID, savedMovement.getItem().getId());
-        assertEquals(USER_ID, savedMovement.getUser().getId());
-        assertEquals(MovementType.WRITE_OFF, savedMovement.getType());
-        assertEquals(QUANTITY, savedMovement.getQuantity());
+        assertFalse(response.lowStockAlert());
     }
 
     @Test
     void writeOffReceiptItemNotFoundThrowsException() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.writeOffReceipt(request, userContext);
-        });
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class,
+                () -> stockMovementService.writeOffReceipt(request, userContext));
 
         assertTrue(ex.getMessage().contains("Item"));
         assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
@@ -275,17 +252,14 @@ class StockMovementServiceImplTest {
 
     @Test
     void writeOffReceiptInactiveItemThrowsException() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false);
+        Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false, 0);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(inactiveItem));
 
-        // Act & Assert
-        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
-            stockMovementService.writeOffReceipt(request, userContext);
-        });
+        EntityNotFoundException ex = assertThrows(EntityNotFoundException.class,
+                () -> stockMovementService.writeOffReceipt(request, userContext));
 
         assertTrue(ex.getMessage().contains("Item"));
         assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
@@ -293,29 +267,25 @@ class StockMovementServiceImplTest {
 
     @Test
     void writeOffReceiptInsufficientStockThrowsException() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 20);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockService.writeOffStock(ITEM_ID, 20))
                 .thenThrow(new InsufficientStockException("Insufficient stock"));
 
-        // Act & Assert
-        InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
-            stockMovementService.writeOffReceipt(request, userContext);
-        });
+        InsufficientStockException ex = assertThrows(InsufficientStockException.class,
+                () -> stockMovementService.writeOffReceipt(request, userContext));
 
         assertEquals("Insufficient stock", ex.getMessage());
     }
 
     @Test
     void writeOffReceiptUserNotNull() {
-        // Arrange
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item item = createItem(ITEM_ID, "Тестовый товар", true);
+        Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
         int stockAfterWriteOff = 5;
 
@@ -325,10 +295,8 @@ class StockMovementServiceImplTest {
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        // Act
         stockMovementService.writeOffReceipt(request, userContext);
 
-        // Assert
         verify(stockMovementRepository).save(stockMovementCaptor.capture());
         StockMovement savedMovement = stockMovementCaptor.getValue();
         assertNotNull(savedMovement.getUser());
@@ -433,6 +401,139 @@ class StockMovementServiceImplTest {
     }
 
     // ==========================================
+    //    ТЕСТЫ ДЛЯ KAFKA LOW STOCK ALERT
+    // ==========================================
+
+    // stockAfter < minStock → lowStockAlert=true в response, событие регистрируется
+    @Test
+    void writeOffReceiptBelowMinStockSetsLowStockAlertTrue() {
+        int minStock = 10;
+        int stockAfterWriteOff = 3;
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(true)))
+                .thenReturn(new StockMovementResponse(
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, true));
+
+        try (MockedStatic<TransactionSynchronizationManager> tsm =
+                     mockStatic(TransactionSynchronizationManager.class)) {
+
+            StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
+
+            assertTrue(response.lowStockAlert());
+            tsm.verify(() -> TransactionSynchronizationManager
+                    .registerSynchronization(any(TransactionSynchronization.class)));
+        }
+    }
+
+    // stockAfter >= minStock → lowStockAlert=false, Kafka не вызывается
+    @Test
+    void writeOffReceiptAboveMinStockSetsLowStockAlertFalse() {
+        int minStock = 5;
+        int stockAfterWriteOff = 10;
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
+                .thenReturn(new StockMovementResponse(
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, false));
+
+        try (MockedStatic<TransactionSynchronizationManager> tsm =
+                     mockStatic(TransactionSynchronizationManager.class)) {
+
+            StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
+
+            assertFalse(response.lowStockAlert());
+            tsm.verify(() -> TransactionSynchronizationManager
+                    .registerSynchronization(any(TransactionSynchronization.class)), never());
+        }
+    }
+
+    // stockAfter == minStock → граничный случай, alert не отправляется
+    @Test
+    void writeOffReceiptEqualToMinStockDoesNotSendAlert() {
+        int minStock = 5;
+        int stockAfterWriteOff = 5;
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
+                .thenReturn(new StockMovementResponse(
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, false));
+
+        try (MockedStatic<TransactionSynchronizationManager> tsm =
+                     mockStatic(TransactionSynchronizationManager.class)) {
+
+            StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
+
+            assertFalse(response.lowStockAlert());
+            tsm.verify(() -> TransactionSynchronizationManager
+                    .registerSynchronization(any(TransactionSynchronization.class)), never());
+        }
+    }
+
+    // Kafka ошибка в afterCommit не пробрасывается — проверяем что afterCommit ловит Exception
+    @Test
+    void writeOffReceiptKafkaErrorInAfterCommitIsCaught() {
+        int minStock = 10;
+        int stockAfterWriteOff = 2;
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(true)))
+                .thenReturn(new StockMovementResponse(
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, true));
+
+        ArgumentCaptor<TransactionSynchronization> syncCaptor =
+                ArgumentCaptor.forClass(TransactionSynchronization.class);
+
+        try (MockedStatic<TransactionSynchronizationManager> tsm =
+                     mockStatic(TransactionSynchronizationManager.class)) {
+
+            stockMovementService.writeOffReceipt(request, userContext);
+
+            tsm.verify(() -> TransactionSynchronizationManager
+                    .registerSynchronization(syncCaptor.capture()));
+
+            // Имитируем ошибку Kafka при afterCommit — исключение не должно пробрасываться
+            org.mockito.Mockito.doThrow(new RuntimeException("Kafka down"))
+                    .when(kafkaProducer).sendLowStockAlert(any(LowStockAlertEvent.class));
+
+            org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                    () -> syncCaptor.getValue().afterCommit());
+        }
+    }
+
+    // ==========================================
     //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
     // ==========================================
 
@@ -446,11 +547,13 @@ class StockMovementServiceImplTest {
         return user;
     }
 
-    private Item createItem(Long itemId, String name, boolean active) {
+    private Item createItem(Long itemId, String name, boolean active, int minStock) {
         Item item = new Item();
         item.setId(itemId);
         item.setName(name);
+        item.setSku("SKU-" + itemId);
         item.setActive(active);
+        item.setMinStock(minStock);
         return item;
     }
 

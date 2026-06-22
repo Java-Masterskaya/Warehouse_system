@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
  * @param quantity Количество изменённых единиц
  * @param stockAfter Остаток после операции
  * @param createdAt Время операции
+ * @param lowStockAlert true, если остаток опустился ниже минимального
  */
 public record StockMovementResponse(
     Long itemId,
@@ -20,5 +21,6 @@ public record StockMovementResponse(
     MovementType type,
     int quantity,
     int stockAfter,
-    LocalDateTime createdAt
+    LocalDateTime createdAt,
+    boolean lowStockAlert
 ) {}

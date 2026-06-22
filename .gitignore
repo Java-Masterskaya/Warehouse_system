@@ -8,6 +8,7 @@
 build/
 .gradle/
 out/
+bin/
 
 # IDE
 .idea/
