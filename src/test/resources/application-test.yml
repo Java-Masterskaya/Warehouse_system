@@ -14,8 +14,7 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
       properties:
-        spring.json.trusted.packages: "com.warehouse.event"
-        spring.json.value.default.type: "com.warehouse.dto.event.LowStockAlertEvent"
+        spring.json.trusted.packages: "com.warehouse.dto.event"
 
 app:
   jwt:
