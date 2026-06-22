@@ -6,7 +6,7 @@ springdoc:
 
 spring:
   datasource:
-    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+    url: jdbc:postgresql://postgres:${POSTGRES_PORT}/${POSTGRES_DB}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
   data:

@@ -48,6 +48,7 @@ public class AuthServiceImpl implements AuthService {
 
             return new LoginResponse(token, expiresIn);
         } catch (AuthenticationException e) {
+            log.warn("Authentication failed for user '{}': {}", request.username(), e.getMessage());
             metricService.increment("warehouse.auth.login.failure.total");
             throw e;
         }
