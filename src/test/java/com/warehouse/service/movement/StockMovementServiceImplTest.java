@@ -3,6 +3,8 @@ package com.warehouse.service.movement;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
@@ -12,6 +14,7 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockMovementMapper;
+import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.UserRepository;
@@ -24,9 +27,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,11 +44,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class StockMovementServiceImplTest {
@@ -64,6 +75,8 @@ class StockMovementServiceImplTest {
     private UserRepository userRepository;
     @Mock
     private KafkaStockAlertProducer kafkaProducer;
+    @Mock
+    private MetricService metricService;
     @InjectMocks
     private StockMovementServiceImpl stockMovementService;
     @Captor
@@ -292,6 +305,102 @@ class StockMovementServiceImplTest {
         assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
+    @Test
+    void getItemMovementHistorySuccess() {
+        Long itemId = 1L;
+        MovementType type = MovementType.WRITE_OFF;
+        int page = 0;
+        int size = 20;
+
+        StockMovementHistoryResponse movement =
+                new StockMovementHistoryResponse(
+                        102L,
+                        MovementType.WRITE_OFF,
+                        10,
+                        "admin",
+                        LocalDateTime.of(2026, 5, 28, 11, 30)
+                );
+
+        Page<StockMovementHistoryResponse> historyPage =
+                new PageImpl<>(
+                        List.of(movement),
+                        PageRequest.of(page, size),
+                        1
+                );
+
+        when(itemRepository.existsById(itemId))
+                .thenReturn(true);
+
+        when(stockMovementRepository.findHistoryByItemId(
+                eq(itemId),
+                eq(type),
+                any(Pageable.class)
+        )).thenReturn(historyPage);
+
+        PageResponse<StockMovementHistoryResponse> result =
+                stockMovementService.getItemMovementHistory(
+                        itemId,
+                        type,
+                        page,
+                        size
+                );
+
+        assertEquals(1, result.content().size());
+        assertEquals(1, result.totalElements());
+        assertEquals(1, result.totalPages());
+        assertEquals(0, result.page());
+        assertEquals(20, result.size());
+
+        StockMovementHistoryResponse response = result.content().get(0);
+
+        assertEquals(102L, response.id());
+        assertEquals(MovementType.WRITE_OFF, response.type());
+        assertEquals(10, response.quantity());
+        assertEquals("admin", response.performedBy());
+
+        verify(itemRepository).existsById(itemId);
+        verify(stockMovementRepository).findHistoryByItemId(
+                eq(itemId),
+                eq(type),
+                any(Pageable.class)
+        );
+    }
+
+    @Test
+    void getItemMovementHistoryItemNotFound() {
+        Long itemId = 999L;
+        MovementType type = MovementType.RECEIVE;
+        int page = 0;
+        int size = 20;
+
+        when(itemRepository.existsById(itemId))
+                .thenReturn(false);
+
+        EntityNotFoundException exception =
+                assertThrows(
+                        EntityNotFoundException.class,
+                        () -> stockMovementService.getItemMovementHistory(
+                                itemId,
+                                type,
+                                page,
+                                size
+                        )
+                );
+
+        assertEquals(
+                "Item with id 999 not found",
+                exception.getMessage()
+        );
+
+        verify(itemRepository).existsById(itemId);
+
+        verify(stockMovementRepository, never()).findHistoryByItemId(
+                anyLong(),
+                any(),
+                any(Pageable.class)
+        );
+    }
+
     // ==========================================
     //    ТЕСТЫ ДЛЯ KAFKA LOW STOCK ALERT
     // ==========================================
@@ -448,4 +557,5 @@ class StockMovementServiceImplTest {
         item.setMinStock(minStock);
         return item;
     }
+
 }

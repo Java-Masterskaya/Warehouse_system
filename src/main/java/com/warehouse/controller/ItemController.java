@@ -6,9 +6,13 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.service.item.ItemService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,16 +26,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.DeleteMapping;
 
-/**
- * Эндпоинты для управления товарами.
- */
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/items")
 @RequiredArgsConstructor
+@Slf4j
+@Tag(name = "Товары", description = "Управление каталогом товаров")
+@SecurityRequirement(name = "bearerAuth")
 public class ItemController {
 
     private final ItemService itemService;
 
+    @Operation(summary = "Список товаров", description = "Постраничный список с фильтрацией и сортировкой")
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
@@ -42,57 +49,56 @@ public class ItemController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        log.debug("Received get items request: sort={}, order={}, category={}, search={}, page={}, size={}",
+                sort, order, category, search, page, size);
         return itemService.getItems(sort, order, category, search, page, size);
     }
 
-    /**
-     * Создаёт новый товар.
-     *
-     * @param request запрос на создание товара
-     * @return созданный товар
-     */
+    @Operation(summary = "Создать товар")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
     public ItemResponse createItem(@Valid @RequestBody CreateItemRequest request) {
+        log.debug("Received create item request: sku={}, name={}", request.sku(), request.name());
         return itemService.createItem(request);
     }
 
-    /**
-     * Редактирует товар.
-     *
-     * @param itemId  id товара
-     * @param request запрос на обновление товара
-     * @return обновлённый товар
-     */
+    @Operation(summary = "Редактировать товар")
     @PutMapping("/{itemId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
     public ItemResponse updateItem(
             @PathVariable Long itemId,
             @Valid @RequestBody UpdateItemRequest request) {
+        log.debug("Received update item request: itemId={}, name={}, category={}", itemId, request.name(),
+                request.category());
         return itemService.updateItem(itemId, request);
     }
 
+    @Operation(summary = "Карточка товара")
     @GetMapping("/{itemId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ItemDetailsResponse getItem(@PathVariable Long itemId) {
+        log.debug("Received get item request: itemId={}", itemId);
         return itemService.getItem(itemId);
     }
 
-    /**
-     * Скрывает товар из выдачи по его идентификатору.
-     * <p>
-     * Доступен только пользователям с ролью ADMIN.
-     *
-     * @param itemId идентификатор скрываемого товара
-     * @throws EntityNotFoundException если товар не найден
-     */
+    @Operation(summary = "Удалить товар (soft delete)")
     @DeleteMapping("/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
     public void softDeleteItem(@PathVariable Long itemId) {
+        log.debug("Received soft delete item request: itemId={}", itemId);
         itemService.softDeleteItem(itemId);
+    }
+
+    @Operation(summary = "Список категорий")
+    @GetMapping("/categories")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    public List<String> getCategories() {
+        log.debug("Received get categories request");
+        return itemService.getCategories();
     }
 }

@@ -15,11 +15,16 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -32,6 +37,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
+    @CacheEvict(value = "categories", allEntries = true)
     public ItemResponse createItem(CreateItemRequest request) {
         log.debug("Creating item with SKU '{}'", request.sku());
 
@@ -54,6 +60,10 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
+    @Caching(evict = {
+        @CacheEvict(value = "item", key = "#itemId"),
+        @CacheEvict(value = "categories", allEntries = true)
+    })
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
         log.debug("Updating item with id={}", itemId);
 
@@ -115,6 +125,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "item", key = "#itemId")
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
         ItemDetailsResponse item = itemRepository.findWithStock(itemId)
@@ -133,6 +144,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
+    @CacheEvict(value = "item", key = "#itemId")
     public void softDeleteItem(Long itemId) {
         Item item = itemRepository.findById(itemId).orElseThrow(() -> {
             log.warn("Item с id={} не найден", itemId);
@@ -148,4 +160,13 @@ public class ItemServiceImpl implements ItemService {
         log.info("Item c id={} успешно деактивирован", itemId);
     }
 
+    @Cacheable(value = "categories")
+    @Transactional(readOnly = true)
+    @Override
+    public List<String> getCategories() {
+        log.debug("Getting all active categories");
+        List<String> categories = itemRepository.findDistinctCategories();
+        log.info("Found {} categories: {}", categories.size(), categories);
+        return categories;
+    }
 }

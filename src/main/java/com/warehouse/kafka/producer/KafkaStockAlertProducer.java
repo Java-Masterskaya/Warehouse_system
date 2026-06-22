@@ -1,6 +1,7 @@
 package com.warehouse.kafka.producer;
 
 import com.warehouse.dto.event.LowStockAlertEvent;
+import com.warehouse.metric.MetricService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -14,9 +15,11 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
     private static final String TOPIC_NAME = "low-stock-alerts";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final MetricService metricService;
 
-    public KafkaStockAlertProducer(KafkaTemplate<String, Object> kafkaTemplate) {
+    public KafkaStockAlertProducer(KafkaTemplate<String, Object> kafkaTemplate, MetricService metricService) {
         this.kafkaTemplate = kafkaTemplate;
+        this.metricService = metricService;
     }
 
     @Retryable(
@@ -35,7 +38,9 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
                     TOPIC_NAME, alert.itemId(),
                     result.getRecordMetadata().partition(),
                     result.getRecordMetadata().offset());
+            metricService.increment("warehouse.stock.low_alert.total");
         } catch (Exception e) {
+            log.error("Error while sending low stock alert to Kafka", e);
             throw new RuntimeException("Error while sending message to Kafka", e);
         }
     }
