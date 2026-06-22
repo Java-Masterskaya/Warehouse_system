@@ -7,6 +7,14 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+  kafka:
+    consumer:
+      group-id: warehouse-alerts-test
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.warehouse.dto.event"
 
 app:
   jwt:

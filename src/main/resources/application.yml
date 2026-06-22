@@ -14,6 +14,12 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         allow.auto.create.topics: false
+    consumer:
+      group-id: warehouse-alerts
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.warehouse.dto.event"
   jackson:
     serialization:
       write-dates-as-timestamps: false
