@@ -148,6 +148,9 @@ class StockServiceImplTest {
 
     /**
      * Вспомогательные методы.
+     *
+     * @param itemId ID товара
+     * @return Созданный товар
      */
     private Item createItem(Long itemId) {
         Item item = new Item();

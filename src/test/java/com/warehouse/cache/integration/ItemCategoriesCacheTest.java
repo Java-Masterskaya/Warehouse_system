@@ -9,7 +9,6 @@ import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
@@ -77,6 +76,12 @@ class ItemCategoriesCacheTest extends AbstractIntegrationTest {
 
     /**
      * Вспомогательный метод для создания тестового товара.
+     *
+     * @param sku      SKU товара
+     * @param name     Название товара
+     * @param category Категория товара
+     * @param active   Активен ли товар
+     * @return Созданный товар
      */
     private Item createItem(String sku, String name, String category, boolean active) {
         Item item = new Item();

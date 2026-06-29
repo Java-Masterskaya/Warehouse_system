@@ -190,7 +190,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(userRequest)))
                 .andExpect(status().isCreated());
 
-        String userToken = obtainToken(uniqueUsername, "testpassword123");
+        String userTokenForTest = obtainToken(uniqueUsername, "testpassword123");
 
         UserCreateRequest anotherRequest = new UserCreateRequest();
         anotherRequest.setUsername("another");
@@ -198,7 +198,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         anotherRequest.setRole(Role.ROLE_USER);
 
         mockMvc.perform(post("/api/users")
-                        .header("Authorization", "Bearer " + userToken)
+                        .header("Authorization", "Bearer " + userTokenForTest)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(anotherRequest)))
                 .andExpect(status().isForbidden())
@@ -226,7 +226,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void disabledUserLoginReturnsUnauthorized() throws Exception {
-        String adminToken = obtainAdminToken();
+        String adminTokenForTest = obtainAdminToken();
         String username = "disabled_user_" + System.currentTimeMillis();
         String password = "password123";
 
@@ -236,7 +236,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         createRequest.setRole(Role.ROLE_USER);
 
         mockMvc.perform(post("/api/users")
-                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Authorization", "Bearer " + adminTokenForTest)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isCreated());

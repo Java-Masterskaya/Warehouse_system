@@ -578,6 +578,10 @@ class StockMovementServiceImplTest {
 
     /**
      * Вспомогательные методы.
+     *
+     * @param userId   ID пользователя
+     * @param username Имя пользователя
+     * @return Созданный пользователь
      */
     private User createUserReference(Long userId, String username) {
         User user = new User();
