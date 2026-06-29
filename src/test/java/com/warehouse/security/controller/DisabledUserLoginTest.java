@@ -17,6 +17,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Интеграционный тест для проверки входа деактивированного пользователя.
+ */
 @AutoConfigureMockMvc
 class DisabledUserLoginTest extends AbstractIntegrationTest {
 
@@ -29,7 +32,9 @@ class DisabledUserLoginTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    // Дефолтный admin из V5__insert_default_admin.sql должен успешно логиниться
+    /**
+     * Дефолтный admin из V5__insert_default_admin.sql должен успешно логиниться.
+     */
     @Test
     void defaultAdminLoginReturnsToken() throws Exception {
         LoginRequest request = new LoginRequest("admin", "secret");
@@ -41,7 +46,9 @@ class DisabledUserLoginTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.token").isNotEmpty());
     }
 
-    // Деактивированный пользователь (is_active = false) должен получать 401
+    /**
+     * Деактивированный пользователь (is_active = false) должен получать 401.
+     */
     @Test
     void disabledUserLoginReturnsUnauthorized() throws Exception {
         String adminToken = obtainAdminToken();
@@ -71,6 +78,9 @@ class DisabledUserLoginTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /**
+     * Вспомогательный метод для получения JWT токена администратора.
+     */
     private String obtainAdminToken() throws Exception {
         LoginRequest request = new LoginRequest("admin", "secret");
         String response = mockMvc.perform(post("/api/auth/login")

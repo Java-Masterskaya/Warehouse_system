@@ -8,9 +8,15 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
 
-// Singleton-паттерн: контейнеры запускаются один раз в static-блоке и живут
-// до завершения JVM (Ryuk их убьёт). Порты не меняются между тест-классами,
-// поэтому кэшированный Spring-контекст всегда имеет актуальные адреса.
+/**
+ * Абстрактный базовый класс для интеграционных тестов.
+ * Управляет жизненным циклом тестовых контейнеров через static-блок.
+ *
+ * <p>Контейнеры запускаются один раз при загрузке контекста и живут до завершения JVM
+ * (Ryuk автоматически останавливает их после завершения тестов).
+ * Порты не меняются между тест-классами, поэтому кэшированный Spring-контекст
+ * всегда имеет актуальные адреса.
+ */
 @SpringBootTest
 public abstract class AbstractIntegrationTest {
 
@@ -35,8 +41,6 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-        // application-test.yml задаёт ContainerDatabaseDriver для jdbc:tc: URL.
-        // Наш URL — обычный jdbc:postgresql://, поэтому переопределяем драйвер явно.
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.kafka.bootstrap-servers", redpanda::getBootstrapServers);
         registry.add("spring.data.redis.host", redis::getHost);

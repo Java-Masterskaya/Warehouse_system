@@ -15,6 +15,9 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Интеграционный тест для проверки кэширования карточки товара.
+ */
 @ActiveProfiles("test")
 class ItemCardCacheTest extends AbstractIntegrationTest {
 
@@ -54,6 +57,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         itemId = item.getId();
     }
 
+    /**
+     * getItem возвращает детали товара.
+     */
     @Test
     void getItemShouldReturnItemDetails() {
         ItemDetailsResponse response = itemService.getItem(itemId);
@@ -64,6 +70,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         assertThat(response.currentStock()).isEqualTo(10);
     }
 
+    /**
+     * getItem возвращает данные из кэша даже после удаления из БД.
+     */
     @Test
     void getItemShouldBeCached() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);

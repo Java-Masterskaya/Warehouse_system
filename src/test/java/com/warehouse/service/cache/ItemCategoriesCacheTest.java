@@ -15,6 +15,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Интеграционный тест для проверки кэширования категорий товаров.
+ */
 @ActiveProfiles("test")
 class ItemCategoriesCacheTest extends AbstractIntegrationTest {
 
@@ -44,6 +47,9 @@ class ItemCategoriesCacheTest extends AbstractIntegrationTest {
         itemRepository.saveAll(List.of(item1, item2, item3, item4));
     }
 
+    /**
+     * getCategories возвращает список distinct активных категорий.
+     */
     @Test
     void getCategoriesShouldReturnDistinctActiveCategories() {
         List<String> categories = itemService.getCategories();
@@ -54,6 +60,9 @@ class ItemCategoriesCacheTest extends AbstractIntegrationTest {
                 .doesNotHaveDuplicates();
     }
 
+    /**
+     * getCategories возвращает данные из кэша даже после удаления из БД.
+     */
     @Test
     void getCategoriesShouldBeCached() {
         List<String> firstCall = itemService.getCategories();
@@ -67,6 +76,9 @@ class ItemCategoriesCacheTest extends AbstractIntegrationTest {
                 .hasSize(2);
     }
 
+    /**
+     * Вспомогательный метод для создания тестового товара.
+     */
     private Item createItem(String sku, String name, String category, boolean active) {
         Item item = new Item();
         item.setSku(sku);

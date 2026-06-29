@@ -23,6 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Unit-тест для UserServiceImpl.
+ * Тестирует операции управления пользователями.
+ */
+
 @ExtendWith(MockitoExtension.class)
 public class UserServiceImplTest {
 
@@ -41,6 +46,9 @@ public class UserServiceImplTest {
         userService = new UserServiceImpl(userRepository, userMapper, passwordEncoder);
     }
 
+    /**
+     * Возвращает список всех пользователей.
+     */
     @Test
     void shouldReturnAllUsers() {
         User firstUser = createUser(1L);
@@ -53,6 +61,9 @@ public class UserServiceImplTest {
         verify(userRepository).findAll();
     }
 
+    /**
+     * Успешная деактивация пользователя.
+     */
     @Test
     void successDeactivationUser() {
         User user = createUser(1L);
@@ -68,6 +79,9 @@ public class UserServiceImplTest {
         assertFalse(user.isActive());
     }
 
+    /**
+     * Выбрасывает исключение, когда пользователь пытается деактивировать самого себя.
+     */
     @Test
     void shouldThrowExceptionWhenUserGoingToDeactivateHimself() {
         User user = createUser(1L);

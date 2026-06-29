@@ -73,6 +73,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
         createItem("SKU-SORT-D-" + suffix, "DELL Monitor", "Компьютеры");
     }
 
+    /**
+     * ADMIN может создать товар и получить 201 CREATED с телом ответа.
+     */
     @Test
     void createItemAdminTokenReturns201WithBody() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell", "Электроника", 5);
@@ -87,6 +90,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.isActive").value(true));
     }
 
+    /**
+     * Попытка создать товар с дублирующимся SKU возвращает 409 Conflict.
+     */
     @Test
     void createItemDuplicateSkuReturns409() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар", "Категория", 0);
@@ -105,6 +111,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("DUPLICATE_SKU"));
     }
 
+    /**
+     * Запрос без токена создать товар возвращает 401 Unauthorized.
+     */
     @Test
     void createItemNoTokenReturns401() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар", "Категория", 0);
@@ -116,6 +125,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
+    /**
+     * USER не может создать товар (доступ запрещен), возвращает 403 Forbidden.
+     */
     @Test
     void createItemUserTokenReturns403() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар", "Категория", 0);
@@ -128,6 +140,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
     }
 
+    /**
+     * Валидация: пустой SKU возвращает 400 Bad Request.
+     */
     @Test
     void createItemBlankSkuReturns400() throws Exception {
         String body = """
@@ -142,6 +157,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
     }
 
+    /**
+     * Валидация: отрицательный minStock возвращает 400 Bad Request.
+     */
     @Test
     void createItemNegativeMinStockReturns400() throws Exception {
         String body = """
@@ -156,6 +174,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
     }
 
+    /**
+     * Сортировка по SKU по убыванию: первый SKU больше или равен второму.
+     */
     @Test
     void sortBySkuDescFirstSkuGreaterThanSecond() throws Exception {
         String response = mockMvc.perform(get(BASE_URL)
@@ -175,6 +196,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
         }
     }
 
+    /**
+     * Фильтрация по категории возвращает только товары этой категории.
+     */
     @Test
     void filterByCategoryReturnsOnlyMatchingItems() throws Exception {
         mockMvc.perform(get(BASE_URL)
@@ -187,6 +211,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                                 org.hamcrest.Matchers.is("Электроника"))));
     }
 
+    /**
+     * Поиск по имени (без учета регистра) возвращает совпадения.
+     */
     @Test
     void searchByNameCaseInsensitiveReturnsMatches() throws Exception {
         mockMvc.perform(get(BASE_URL)
@@ -200,6 +227,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                                 org.hamcrest.Matchers.containsStringIgnoringCase("dell"))));
     }
 
+    /**
+     * Поиск по имени в верхнем регистре возвращает те же результаты, что и в нижнем.
+     */
     @Test
     void searchByNameUppercaseReturnsMatches() throws Exception {
         String lowerResult = mockMvc.perform(get(BASE_URL)
@@ -221,6 +251,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(lower).isEqualTo(upper);
     }
 
+    /**
+     * Пагинация возвращает корректный размер страницы.
+     */
     @Test
     void paginationReturnsCorrectPageSize() throws Exception {
         mockMvc.perform(get(BASE_URL)
@@ -235,6 +268,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.totalElements").isNumber());
     }
 
+    /**
+     * Ответ содержит обязательные поля (content, totalElements, totalPages, page, size).
+     */
     @Test
     void responseContainsRequiredFields() throws Exception {
         mockMvc.perform(get(BASE_URL)
@@ -247,6 +283,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.size").isNumber());
     }
 
+    /**
+     * USER может получить список товаров (GET /api/items).
+     */
     @Test
     void userTokenCanAccessGetItems() throws Exception {
         mockMvc.perform(get(BASE_URL)
@@ -254,6 +293,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Запрос без токена получить список товаров возвращает 401 Unauthorized.
+     */
     @Test
     void noTokenReturns401() throws Exception {
         mockMvc.perform(get(BASE_URL))

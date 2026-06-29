@@ -228,10 +228,6 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         return objectMapper.readTree(response).get("token").asText();
     }
 
-    // ==========================================
-//    ТЕСТЫ ДЛЯ WRITE-OFF ENDPOINT
-// ==========================================
-
     /**
      * ADMIN может списать товар со склада,
      * остаток на складе уменьшается на указанное количество.

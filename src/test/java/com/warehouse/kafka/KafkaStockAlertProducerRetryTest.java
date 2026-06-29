@@ -19,6 +19,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit-тест для KafkaStockAlertProducer.
+ * Тестирует повторные попытки отправки сообщений при ошибках.
+ */
+
 @SpringBootTest
 class KafkaStockAlertProducerRetryTest {
 
@@ -34,6 +39,17 @@ class KafkaStockAlertProducerRetryTest {
 
     @MockitoBean
     private KafkaTemplate<String, Object> kafkaTemplate;
+
+    /**
+
+
+     * Тестирует метод sendLowStockAlertShouldRetryThreeTimesOnFailure.
+
+
+     */
+
+
+    
 
     @Test
     void sendLowStockAlertShouldRetryThreeTimesOnFailure() {

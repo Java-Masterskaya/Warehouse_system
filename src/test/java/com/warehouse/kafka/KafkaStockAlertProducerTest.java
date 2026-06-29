@@ -25,6 +25,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit-тест для KafkaStockAlertProducer.
+ * Тестирует отправку сообщений о низких остатках в Kafka.
+ */
+
 @ExtendWith(MockitoExtension.class)
 class KafkaStockAlertProducerTest {
     private static final String TOPIC_NAME = "low-stock-alerts";
@@ -49,6 +54,17 @@ class KafkaStockAlertProducerTest {
         producer = new KafkaStockAlertProducer(kafkaTemplate, metricService);
     }
 
+    /**
+
+
+     * Тестирует метод sendLowStockAlertShouldSendMessageWithoutException.
+
+
+     */
+
+
+    
+
     @Test
     void sendLowStockAlertShouldSendMessageWithoutException() {
         // Arrange
@@ -70,6 +86,17 @@ class KafkaStockAlertProducerTest {
         // Verify (что send вызван с правильными параметрами)
         verify(kafkaTemplate, times(1)).send(TOPIC_NAME, String.valueOf(ITEM_ID), alert);
     }
+
+    /**
+
+
+     * Тестирует метод sendLowStockAlertShouldUseItemIdAsKey.
+
+
+     */
+
+
+    
 
     @Test
     void sendLowStockAlertShouldUseItemIdAsKey() {
@@ -100,6 +127,17 @@ class KafkaStockAlertProducerTest {
         // Assert – проверяем, что send был вызван ровно один раз с ключом "42"
         verify(kafkaTemplate).send(TOPIC_NAME, "42", alert);
     }
+
+    /**
+
+
+     * Тестирует метод sendLowStockAlertShouldThrowRuntimeExceptionWhenSendFails.
+
+
+     */
+
+
+    
 
     @Test
     void sendLowStockAlertShouldThrowRuntimeExceptionWhenSendFails() {

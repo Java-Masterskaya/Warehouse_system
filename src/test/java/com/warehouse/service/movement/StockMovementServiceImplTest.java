@@ -51,6 +51,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit-тест для StockMovementServiceImpl.
+ * Тестирует операции регистрации прихода и списания товаров, а также Kafka low stock alert.
+ */
 @ExtendWith(MockitoExtension.class)
 class StockMovementServiceImplTest {
 
@@ -81,10 +85,9 @@ class StockMovementServiceImplTest {
     @Captor
     private ArgumentCaptor<StockMovement> stockMovementCaptor;
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ RECEIPT
-    // ==========================================
-
+    /**
+     * Регистрация прихода товара.
+     */
     @Test
     void registerReceiptSuccess() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
@@ -125,6 +128,9 @@ class StockMovementServiceImplTest {
         assertEquals(QUANTITY, savedMovement.getQuantity());
     }
 
+    /**
+     * Попытка зарегистрировать приход с количеством = 0 выбрасывает IllegalArgumentException.
+     */
     @Test
     void registerReceiptWithZeroQuantityThrowsException() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 0);
@@ -136,6 +142,9 @@ class StockMovementServiceImplTest {
         assertEquals("Quantity must be greater than 0", ex.getMessage());
     }
 
+    /**
+     * Количество = 0 выбрасывает IllegalArgumentException.
+     */
     @Test
     void registerReceiptWithNegativeQuantityThrowsException() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, -1);
@@ -147,6 +156,9 @@ class StockMovementServiceImplTest {
         assertEquals("Quantity must be greater than 0", ex.getMessage());
     }
 
+    /**
+     * Товар не найден выбрасывает EntityNotFoundException.
+     */
     @Test
     void registerReceiptItemNotFoundThrowsException() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
@@ -161,6 +173,9 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
     }
 
+    /**
+     * Неактивный товар выбрасывает EntityNotFoundException.
+     */
     @Test
     void registerReceiptInactiveItemThrowsException() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
@@ -176,6 +191,9 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
     }
 
+    /**
+     * Пользователь в request корректно устанавливается в сущность движения.
+     */
     @Test
     void registerReceiptUserNotNull() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
@@ -198,10 +216,9 @@ class StockMovementServiceImplTest {
         assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ WRITE-OFF
-    // ==========================================
-
+    /**
+     * Регистрация списания товара.
+     */
     @Test
     void writeOffReceiptSuccess() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
@@ -236,6 +253,9 @@ class StockMovementServiceImplTest {
         assertFalse(response.lowStockAlert());
     }
 
+    /**
+     * Товар не найден при списании выбрасывает EntityNotFoundException.
+     */
     @Test
     void writeOffReceiptItemNotFoundThrowsException() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
@@ -250,6 +270,9 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(NON_EXISTENT_ITEM_ID)));
     }
 
+    /**
+     * Неактивный товар при списании выбрасывает EntityNotFoundException.
+     */
     @Test
     void writeOffReceiptInactiveItemThrowsException() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
@@ -265,6 +288,9 @@ class StockMovementServiceImplTest {
         assertTrue(ex.getMessage().contains(String.valueOf(ITEM_ID)));
     }
 
+    /**
+     * Недостаточный остаток выбрасывает InsufficientStockException.
+     */
     @Test
     void writeOffReceiptInsufficientStockThrowsException() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 20);
@@ -281,6 +307,9 @@ class StockMovementServiceImplTest {
         assertEquals("Insufficient stock", ex.getMessage());
     }
 
+    /**
+     * Пользователь в request корректно устанавливается в сущность движения при списании.
+     */
     @Test
     void writeOffReceiptUserNotNull() {
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
@@ -304,6 +333,9 @@ class StockMovementServiceImplTest {
         assertEquals(USERNAME, savedMovement.getUser().getUsername());
     }
 
+    /**
+     * История движения товара возвращается корректно.
+     */
     @Test
     void getItemMovementHistorySuccess() {
         Long itemId = 1L;
@@ -365,6 +397,9 @@ class StockMovementServiceImplTest {
         );
     }
 
+    /**
+     * История для несуществующего товара выбрасывает EntityNotFoundException.
+     */
     @Test
     void getItemMovementHistoryItemNotFound() {
         Long itemId = 999L;
@@ -400,11 +435,12 @@ class StockMovementServiceImplTest {
         );
     }
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ KAFKA LOW STOCK ALERT
-    // ==========================================
-
-    // stockAfter < minStock → lowStockAlert=true в response, событие регистрируется
+    /**
+     * Тесты для Kafka low stock alert.
+     */
+    /**
+     * При списании ниже minStock устанавливается lowStockAlert=true.
+     */
     @Test
     void writeOffReceiptBelowMinStockSetsLowStockAlertTrue() {
         int minStock = 10;
@@ -434,7 +470,9 @@ class StockMovementServiceImplTest {
         }
     }
 
-    // stockAfter >= minStock → lowStockAlert=false, Kafka не вызывается
+    /**
+     * При списании выше minStock устанавливается lowStockAlert=false.
+     */
     @Test
     void writeOffReceiptAboveMinStockSetsLowStockAlertFalse() {
         int minStock = 5;
@@ -464,7 +502,9 @@ class StockMovementServiceImplTest {
         }
     }
 
-    // stockAfter == minStock → граничный случай, alert не отправляется
+    /**
+     * При списании равном minStock alert не отправляется (граничный случай).
+     */
     @Test
     void writeOffReceiptEqualToMinStockDoesNotSendAlert() {
         int minStock = 5;
@@ -494,7 +534,9 @@ class StockMovementServiceImplTest {
         }
     }
 
-    // Kafka ошибка в afterCommit не пробрасывается — проверяем что afterCommit ловит Exception
+    /**
+     * Ошибка Kafka в afterCommit не пробрасывается (исключение перехватывается).
+     */
     @Test
     void writeOffReceiptKafkaErrorInAfterCommitIsCaught() {
         int minStock = 10;
@@ -533,10 +575,9 @@ class StockMovementServiceImplTest {
         }
     }
 
-    // ==========================================
-    //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
-    // ==========================================
-
+    /**
+     * Вспомогательные методы.
+     */
     private User createUserReference(Long userId, String username) {
         User user = new User();
         user.setId(userId);

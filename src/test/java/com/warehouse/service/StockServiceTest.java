@@ -23,6 +23,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit-тест для StockServiceImpl.
+ * Тестирует операции списания товара и обработку недостаточного остатка.
+ */
 @ExtendWith(MockitoExtension.class)
 class StockServiceImplTest {
 
@@ -41,10 +45,9 @@ class StockServiceImplTest {
     @InjectMocks
     private StockServiceImpl stockService;
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ МЕТОДА writeOffStock
-    // ==========================================
-
+    /**
+     * Тесты для метода writeOffStock.
+     */
     @Test
     void writeOffStockSuccess() {
         // Arrange
@@ -66,6 +69,9 @@ class StockServiceImplTest {
         ));
     }
 
+    /**
+     * Списание ровно столько, сколько есть, возвращает 0.
+     */
     @Test
     void exactQuantityReturnsZero() {
         // Arrange - списываем ровно столько, сколько есть
@@ -83,6 +89,9 @@ class StockServiceImplTest {
         assertEquals(0, stock.getQuantity());
     }
 
+    /**
+     * Товар не найден выбрасывает EntityNotFoundException.
+     */
     @Test
     void stockNotFoundThrowsEntityNotFoundException() {
         // Arrange
@@ -105,6 +114,9 @@ class StockServiceImplTest {
         verify(stockRepository, never()).save(any());
     }
 
+    /**
+     * Недостаточный остаток выбрасывает InsufficientStockException.
+     */
     @Test
     void insufficientStockThrowsInsufficientStockException() {
         // Arrange
@@ -134,10 +146,9 @@ class StockServiceImplTest {
         verify(stockRepository, never()).save(any());
     }
 
-    // ==========================================
-    //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
-    // ==========================================
-
+    /**
+     * Вспомогательные методы.
+     */
     private Item createItem(Long itemId) {
         Item item = new Item();
         item.setId(itemId);
