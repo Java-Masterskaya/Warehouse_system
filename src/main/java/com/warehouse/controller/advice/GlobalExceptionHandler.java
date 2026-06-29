@@ -19,6 +19,25 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
 
+/**
+ * GlobalExceptionHandler обрабатывает исключения, которые выбрасываются из контроллеров:
+ * сущностные ошибки (Not found, Insufficient stock, Duplicate), валидацию и общие ошибки.
+ *
+ * <p>Обработка исключений 401 (Unauthorized) и 403 (Forbidden) происходит в
+ * {@link com.warehouse.security.config.SecurityConfig SecurityConfig} через
+ * {@link com.warehouse.security.config.SecurityConfig#authenticationEntryPoint() authenticationEntryPoint}
+ * и {@link com.warehouse.security.config.SecurityConfig#accessDeniedHandler() accessDeniedHandler},
+ * которые возвращают JSON-ответ.
+ * Эти обработчики в SecurityConfig срабатывают до контроллера, так как:</p>
+ *
+ * <ul>
+ *   <li>Проверка токена происходит на уровне фильтров (JwtAuthFilter)</li>
+ *   <li>Проверка ролей происходит на уровне @PreAuthorize аннотаций</li>
+ * </ul>
+ *
+ * <p>Обработчики 401/403 в этом классе остаются только для совместимости с тестами,
+ * которые ожидают JSON-ответ через Spring MVC контроллеры.</p>
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
