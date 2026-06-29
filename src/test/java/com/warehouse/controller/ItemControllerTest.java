@@ -17,14 +17,21 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Интеграционный тест HTTP-слоя: реальный Spring-контекст + Testcontainers (из AbstractIntegrationTest).
-// Проверяет: статусы ответов, тело JSON, Security (401/403).
+/**
+ * Интеграционный тест для проверки эндпоинтов управления товарами.
+ * Тестирует POST /api/items (создание) и GET /api/items (список с фильтрацией, сортировкой, пагинацией).
+ */
 @AutoConfigureMockMvc
 class ItemControllerTest extends AbstractIntegrationTest {
+
+    private static final String BASE_URL = "/api/items";
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,10 +53,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Получаем реальный токен через /api/auth/login — admin создаётся миграцией V5
         adminToken = obtainToken("admin", "secret");
 
-        // Создаём пользователя testuser, если его нет
         User testUser = userRepository.findByUsername("testuser").orElseGet(() -> {
             User user = new User();
             user.setUsername("testuser");
@@ -59,12 +64,14 @@ class ItemControllerTest extends AbstractIntegrationTest {
             return userRepository.save(user);
         });
 
-        // USER нет в миграциях — генерируем токен напрямую.
-        // JwtAuthFilter читает роли из claims, не обращаясь к БД, поэтому это корректно.
         userToken = jwtUtil.generateToken(testUser.getUsername(), testUser.getId(), List.of("ROLE_USER"));
-    }
 
-    // --- Acceptance criteria задачи #1 ---
+        String suffix = String.valueOf(System.currentTimeMillis());
+        createItem("SKU-SORT-A-" + suffix, "Альфа", "Электроника");
+        createItem("SKU-SORT-B-" + suffix, "Бета", "Электроника");
+        createItem("SKU-SORT-C-" + suffix, "Dell Laptop", "Компьютеры");
+        createItem("SKU-SORT-D-" + suffix, "DELL Monitor", "Компьютеры");
+    }
 
     @Test
     void createItemAdminTokenReturns201WithBody() throws Exception {
@@ -84,14 +91,12 @@ class ItemControllerTest extends AbstractIntegrationTest {
     void createItemDuplicateSkuReturns409() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар", "Категория", 0);
 
-        // Создаём первый раз — успешно
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
-        // Тот же SKU — должен вернуть 409
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -123,8 +128,6 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
     }
 
-    // --- Валидация входных данных ---
-
     @Test
     void createItemBlankSkuReturns400() throws Exception {
         String body = """
@@ -153,7 +156,120 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
     }
 
-    // Вспомогательный метод для получения токена через /api/auth/login
+    @Test
+    void sortBySkuDescFirstSkuGreaterThanSecond() throws Exception {
+        String response = mockMvc.perform(get(BASE_URL)
+                        .param("sort", "sku")
+                        .param("order", "desc")
+                        .param("size", "50")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        var tree = objectMapper.readTree(response);
+        var content = tree.get("content");
+        if (content.size() >= 2) {
+            String first = content.get(0).get("sku").asText();
+            String second = content.get(1).get("sku").asText();
+            org.assertj.core.api.Assertions.assertThat(first.compareTo(second)).isGreaterThanOrEqualTo(0);
+        }
+    }
+
+    @Test
+    void filterByCategoryReturnsOnlyMatchingItems() throws Exception {
+        mockMvc.perform(get(BASE_URL)
+                        .param("category", "Электроника")
+                        .param("size", "50")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].category",
+                        org.hamcrest.Matchers.everyItem(
+                                org.hamcrest.Matchers.is("Электроника"))));
+    }
+
+    @Test
+    void searchByNameCaseInsensitiveReturnsMatches() throws Exception {
+        mockMvc.perform(get(BASE_URL)
+                        .param("search", "dell")
+                        .param("size", "50")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name",
+                        org.hamcrest.Matchers.hasItems(
+                                org.hamcrest.Matchers.containsStringIgnoringCase("dell"),
+                                org.hamcrest.Matchers.containsStringIgnoringCase("dell"))));
+    }
+
+    @Test
+    void searchByNameUppercaseReturnsMatches() throws Exception {
+        String lowerResult = mockMvc.perform(get(BASE_URL)
+                        .param("search", "dell")
+                        .param("size", "50")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String upperResult = mockMvc.perform(get(BASE_URL)
+                        .param("search", "DELL")
+                        .param("size", "50")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        var lower = objectMapper.readTree(lowerResult).get("totalElements").asLong();
+        var upper = objectMapper.readTree(upperResult).get("totalElements").asLong();
+        org.assertj.core.api.Assertions.assertThat(lower).isEqualTo(upper);
+    }
+
+    @Test
+    void paginationReturnsCorrectPageSize() throws Exception {
+        mockMvc.perform(get(BASE_URL)
+                        .param("page", "0")
+                        .param("size", "2")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(lessThanOrEqualTo(2))))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.totalPages").isNumber())
+                .andExpect(jsonPath("$.totalElements").isNumber());
+    }
+
+    @Test
+    void responseContainsRequiredFields() throws Exception {
+        mockMvc.perform(get(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.totalElements").isNumber())
+                .andExpect(jsonPath("$.totalPages").isNumber())
+                .andExpect(jsonPath("$.page").isNumber())
+                .andExpect(jsonPath("$.size").isNumber());
+    }
+
+    @Test
+    void userTokenCanAccessGetItems() throws Exception {
+        mockMvc.perform(get(BASE_URL)
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void noTokenReturns401() throws Exception {
+        mockMvc.perform(get(BASE_URL))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
+
+    private void createItem(String sku, String name, String category) throws Exception {
+        CreateItemRequest request = new CreateItemRequest(sku, name, category, 0);
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+    }
+
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
         String response = mockMvc.perform(post("/api/auth/login")
