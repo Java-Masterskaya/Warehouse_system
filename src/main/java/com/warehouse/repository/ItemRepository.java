@@ -32,6 +32,8 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 i.category,
                 i.minStock,
                 s.quantity,
+                i.price,
+                i.cost,
                 i.active,
                 i.createdAt,
                 i.updatedAt

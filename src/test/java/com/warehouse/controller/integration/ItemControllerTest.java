@@ -3,6 +3,7 @@ package com.warehouse.controller.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
@@ -15,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -78,7 +80,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemAdminTokenReturns201WithBody() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell", "Электроника", 5);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell", "Электроника", 5, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -95,7 +97,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemDuplicateSkuReturns409() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар", "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -116,7 +118,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemNoTokenReturns401() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар", "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -130,7 +132,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemUserTokenReturns403() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар", "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + userToken)
@@ -146,7 +148,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemBlankSkuReturns400() throws Exception {
         String body = """
-                {"sku": "", "name": "Товар", "category": "Категория", "minStock": 0}
+                {"sku": "", "name": "Товар", "category": "Категория", "minStock": 0, "price": 100.00, "cost": 50.00}
                 """;
 
         mockMvc.perform(post("/api/items")
@@ -163,7 +165,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemNegativeMinStockReturns400() throws Exception {
         String body = """
-                {"sku": "SKU-CTRL-004", "name": "Товар", "category": "Категория", "minStock": -1}
+                {"sku": "SKU-CTRL-004", "name": "Товар", "category": "Категория", "minStock": -1, "price": 100.00, "cost": 50.00}
                 """;
 
         mockMvc.perform(post("/api/items")
@@ -304,7 +306,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     }
 
     private void createItem(String sku, String name, String category) throws Exception {
-        CreateItemRequest request = new CreateItemRequest(sku, name, category, 0);
+        CreateItemRequest request = new CreateItemRequest(sku, name, category, 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)

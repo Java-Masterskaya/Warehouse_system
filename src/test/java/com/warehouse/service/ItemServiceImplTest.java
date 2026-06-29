@@ -27,6 +27,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
@@ -76,12 +77,14 @@ class ItemServiceImplTest {
      */
     @Test
     void createItemSuccess() {
-        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5);
+        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
 
         Item item = new Item();
         item.setId(1L);
         item.setSku("SKU-001");
         item.setCreatedAt(LocalDateTime.now());
+        item.setPrice(BigDecimal.valueOf(100.50));
+        item.setCost(BigDecimal.valueOf(75.25));
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(false);
         when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> {
@@ -110,7 +113,7 @@ class ItemServiceImplTest {
      */
     @Test
     void createItemDuplicateSkuThrowsDuplicateSkuException() {
-        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5);
+        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(true);
 
@@ -134,8 +137,10 @@ class ItemServiceImplTest {
         existingItem.setCategory("Старая категория");
         existingItem.setMinStock(5);
         existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.50));
+        existingItem.setCost(BigDecimal.valueOf(75.25));
 
-        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория", 10);
+        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория", 10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -157,7 +162,7 @@ class ItemServiceImplTest {
     @Test
     void updateItemItemNotFoundThrowsException() {
         Long itemId = 3L;
-        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10);
+        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
@@ -178,8 +183,10 @@ class ItemServiceImplTest {
         Item inactiveItem = new Item();
         inactiveItem.setId(itemId);
         inactiveItem.setActive(false);
+        inactiveItem.setPrice(BigDecimal.valueOf(50.00));
+        inactiveItem.setCost(BigDecimal.valueOf(30.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10);
+        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
@@ -256,6 +263,7 @@ class ItemServiceImplTest {
     void shouldReturnItemWhenItemExistsAndActive() {
         ItemDetailsResponse response = new ItemDetailsResponse(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
                 true, LocalDateTime.now(), LocalDateTime.now()
         );
 
@@ -288,6 +296,7 @@ class ItemServiceImplTest {
     void shouldThrowEntityNotFoundExceptionWhenItemNotActive() {
         ItemDetailsResponse response = new ItemDetailsResponse(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
                 false, LocalDateTime.now(), LocalDateTime.now()
         );
 

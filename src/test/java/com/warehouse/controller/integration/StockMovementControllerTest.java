@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,6 +69,8 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         testItem.setCategory("Категория");
         testItem.setMinStock(5);
         testItem.setActive(true);
+        testItem.setPrice(BigDecimal.valueOf(500.00));
+        testItem.setCost(BigDecimal.valueOf(300.00));
         testItem = itemRepository.save(testItem);
 
         Stock stock = new Stock();

@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -155,6 +156,13 @@ class StockServiceImplTest {
     private Item createItem(Long itemId) {
         Item item = new Item();
         item.setId(itemId);
+        item.setSku("SKU-" + itemId);
+        item.setName("Тестовый товар " + itemId);
+        item.setCategory("Тестовая категория");
+        item.setMinStock(0);
+        item.setActive(true);
+        item.setPrice(BigDecimal.valueOf(100.00));
+        item.setCost(BigDecimal.valueOf(50.00));
         return item;
     }
 
