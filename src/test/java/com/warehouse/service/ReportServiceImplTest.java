@@ -16,6 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit-тест для ReportServiceImpl.
+ * Тестирует генерацию отчетов по низким остаткам.
+ */
+
 @ExtendWith(MockitoExtension.class)
 public class ReportServiceImplTest {
 
@@ -29,6 +34,9 @@ public class ReportServiceImplTest {
         reportService = new ReportServiceImpl(itemRepository);
     }
 
+    /**
+     * Построение списка товаров с низким остатком.
+     */
     @Test
     public void shouldBuildLowStockItems() {
         LowStockProjection projection = mock(LowStockProjection.class);
@@ -51,6 +59,9 @@ public class ReportServiceImplTest {
         assertEquals(5, item.minStock());
     }
 
+    /**
+     * Расчет дефицита для товаров с низким остатком.
+     */
     @Test
     public void shouldCalculateDeficit() {
         LowStockProjection projection = mock(LowStockProjection.class);

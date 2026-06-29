@@ -17,6 +17,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit-тест для UserDetailsServiceImpl.
+ * Тестирует загрузку пользователей для аутентификации.
+ */
+
 @ExtendWith(MockitoExtension.class)
 class UserDetailsServiceImplTest {
 

@@ -1,4 +1,4 @@
-package com.warehouse.service.cache;
+package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
@@ -14,13 +14,14 @@ import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@ActiveProfiles("test")
+/**
+ * Интеграционный тест для проверки инвалидации кэша.
+ */
 class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -62,6 +63,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         itemId = item.getId();
     }
 
+    /**
+     * updateItem очищает кэш карточки товара.
+     */
     @Test
     void updateItemShouldEvictItemCache() {
         itemService.getItem(itemId);
@@ -74,6 +78,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         assertThat(response.minStock()).isEqualTo(10);
     }
 
+    /**
+     * softDeleteItem очищает кэш карточки товара.
+     */
     @Test
     void softDeleteItemShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
@@ -88,6 +95,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         }
     }
 
+    /**
+     * receiveMovement очищает кэш карточки товара.
+     */
     @Test
     void receiveMovementShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
@@ -101,6 +111,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         assertThat(response.currentStock()).isEqualTo(15);
     }
 
+    /**
+     * writeOffMovement очищает кэш карточки товара.
+     */
     @Test
     void writeOffMovementShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
@@ -114,6 +127,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         assertThat(response.currentStock()).isEqualTo(7);
     }
 
+    /**
+     * createItem с новой категорией очищает кэш категорий.
+     */
     @Test
     void createItemWithNewCategoryShouldEvictCategoriesCache() {
         List<String> firstCall = itemService.getCategories();
@@ -127,6 +143,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         assertThat(secondCall).contains("Электроника", "Мебель");
     }
 
+    /**
+     * updateItem с изменением категории очищает кэш категорий.
+     */
     @Test
     void updateItemWithCategoryChangeShouldEvictCategoriesCache() {
         com.warehouse.dto.request.item.CreateItemRequest createRequest =

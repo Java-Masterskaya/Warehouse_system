@@ -1,4 +1,4 @@
-package com.warehouse.service.cache;
+package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
@@ -11,11 +11,12 @@ import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@ActiveProfiles("test")
+/**
+ * Интеграционный тест для проверки кэширования карточки товара.
+ */
 class ItemCardCacheTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -54,6 +55,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         itemId = item.getId();
     }
 
+    /**
+     * getItem возвращает детали товара.
+     */
     @Test
     void getItemShouldReturnItemDetails() {
         ItemDetailsResponse response = itemService.getItem(itemId);
@@ -64,6 +68,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         assertThat(response.currentStock()).isEqualTo(10);
     }
 
+    /**
+     * getItem возвращает данные из кэша даже после удаления из БД.
+     */
     @Test
     void getItemShouldBeCached() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);

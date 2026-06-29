@@ -1,4 +1,4 @@
-package com.warehouse.controller;
+package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
@@ -227,10 +227,6 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                 .getContentAsString();
         return objectMapper.readTree(response).get("token").asText();
     }
-
-    // ==========================================
-//    ТЕСТЫ ДЛЯ WRITE-OFF ENDPOINT
-// ==========================================
 
     /**
      * ADMIN может списать товар со склада,

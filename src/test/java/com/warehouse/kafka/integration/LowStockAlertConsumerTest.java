@@ -26,6 +26,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+/**
+ * Интеграционный тест для проверки потребления alertов о низких остатках из Kafka.
+ */
 @Tag("integration")
 @Testcontainers
 @SpringBootTest(classes = WarehouseApp.class)
@@ -73,6 +76,9 @@ class LowStockAlertConsumerTest {
         testItemId = item.getId();
     }
 
+    /**
+     * Событие низкого остатка сохраняется в БД после получения из Kafka.
+     */
     @Test
     void shouldSaveAlertOnMessage() {
         LowStockAlertEvent event = new LowStockAlertEvent(
