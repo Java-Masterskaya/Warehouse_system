@@ -1,4 +1,4 @@
-package com.warehouse.security.controller;
+package com.warehouse.security.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
