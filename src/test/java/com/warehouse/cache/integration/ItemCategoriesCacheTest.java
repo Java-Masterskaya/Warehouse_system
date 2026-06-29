@@ -1,4 +1,4 @@
-package com.warehouse.service.cache;
+package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.entity.Item;
@@ -18,7 +18,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Интеграционный тест для проверки кэширования категорий товаров.
  */
-@ActiveProfiles("test")
 class ItemCategoriesCacheTest extends AbstractIntegrationTest {
 
     @Autowired

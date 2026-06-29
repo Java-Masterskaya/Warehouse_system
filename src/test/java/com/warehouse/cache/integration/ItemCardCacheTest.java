@@ -1,4 +1,4 @@
-package com.warehouse.service.cache;
+package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
@@ -18,7 +18,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Интеграционный тест для проверки кэширования карточки товара.
  */
-@ActiveProfiles("test")
 class ItemCardCacheTest extends AbstractIntegrationTest {
 
     @Autowired

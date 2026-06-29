@@ -1,4 +1,4 @@
-package com.warehouse.service.movement;
+package com.warehouse.service;
 
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
@@ -18,6 +18,7 @@ import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.movement.StockMovementServiceImpl;
 import com.warehouse.service.stock.StockService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

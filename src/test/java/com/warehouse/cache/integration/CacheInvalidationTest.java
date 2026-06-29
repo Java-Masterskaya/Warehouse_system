@@ -1,4 +1,4 @@
-package com.warehouse.service.cache;
+package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Интеграционный тест для проверки инвалидации кэша.
  */
-@ActiveProfiles("test")
 class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
