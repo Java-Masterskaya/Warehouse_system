@@ -62,20 +62,14 @@ class ItemServiceImplTest {
     @Mock
     private StockRepository stockRepository;
 
-    @Mock
-    private ItemMapper itemMapper;
+    private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 
     private ItemService itemService;
 
     @BeforeEach
     void setUp() {
-        ItemMapper mapper = Mappers.getMapper(ItemMapper.class);
-        itemService = new ItemServiceImpl(itemRepository, stockRepository, mapper);
+        itemService = new ItemServiceImpl(itemRepository, stockRepository, itemMapper);
     }
-
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ createItem
-    // ==========================================
 
     /**
      * ADMIN может успешно создать товар,
@@ -88,17 +82,27 @@ class ItemServiceImplTest {
         Item item = new Item();
         item.setId(1L);
         item.setSku("SKU-001");
-
-        ItemResponse expected = new ItemResponse(1L, "SKU-001", "Ноутбук", "Электроника", 5, true, LocalDateTime.now());
+        item.setCreatedAt(LocalDateTime.now());
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(false);
-        when(itemMapper.toEntity(request)).thenReturn(item);
-        when(itemMapper.toResponse(item)).thenReturn(expected);
+        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> {
+            Item savedItem = invocation.getArgument(0);
+            savedItem.setId(1L);
+            savedItem.setCreatedAt(LocalDateTime.now());
+            return savedItem;
+        });
+        when(stockRepository.save(any(Stock.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.createItem(request);
 
-        assertThat(result).isEqualTo(expected);
-        verify(itemRepository).save(item);
+        assertThat(result.id()).isEqualTo(1L);
+        assertThat(result.sku()).isEqualTo("SKU-001");
+        assertThat(result.name()).isEqualTo("Ноутбук");
+        assertThat(result.category()).isEqualTo("Электроника");
+        assertThat(result.minStock()).isEqualTo(5);
+        assertThat(result.active()).isTrue();
+        assertThat(result.createdAt()).isNotNull();
+        verify(itemRepository).save(any(Item.class));
         verify(stockRepository).save(any(Stock.class));
     }
 
@@ -118,10 +122,6 @@ class ItemServiceImplTest {
         verify(itemRepository, never()).save(any());
         verify(stockRepository, never()).save(any());
     }
-
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ updateItem
-    // ==========================================
 
     /**
      * ADMIN может успешно обновить активный товар.
@@ -192,10 +192,6 @@ class ItemServiceImplTest {
         verify(itemRepository, never()).save(any(Item.class));
     }
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ softDeleteItem
-    // ==========================================
-
     /**
      * ADMIN может успешно деактивировать существующий товар.
      */
@@ -254,10 +250,6 @@ class ItemServiceImplTest {
         verifyNoInteractions(stockRepository);
     }
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ getItem
-    // ==========================================
-
     /**
      * Возвращает детали товара, если он существует и активен.
      */
@@ -309,22 +301,22 @@ class ItemServiceImplTest {
         assertEquals("Товар неактивен", exception.getMessage());
     }
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ getItems (сортировка, фильтрация, пагинация)
-    // ==========================================
-
     /**
      * getItems с дефолтными параметрами возвращает страницу товаров.
      */
     @Test
     void getItemsDefaultParamsReturnsPage() {
-        ItemResponse response = stubResponse("SKU-1", "Ноутбук", "Электроника");
         Item item = new Item();
+        item.setId(1L);
+        item.setSku("SKU-1");
+        item.setName("Ноутбук");
+        item.setCategory("Электроника");
+        item.setMinStock(5);
+        item.setActive(true);
 
         PageRequest pageable = PageRequest.of(0, 20);
         when(itemRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(item), pageable, 1));
-        when(itemMapper.toResponse(item)).thenReturn(response);
 
         PageResponse<ItemResponse> result = itemService.getItems("name", "asc", null, null, 0, 20);
 
@@ -388,10 +380,6 @@ class ItemServiceImplTest {
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
     }
 
-    // ==========================================
-    //    ТЕСТЫ ДЛЯ getCategories
-    // ==========================================
-
     /**
      * getCategories возвращает списокdistinct категорий.
      */
@@ -426,13 +414,5 @@ class ItemServiceImplTest {
         assertTrue(categories.isEmpty());
 
         verify(itemRepository, times(1)).findDistinctCategories();
-    }
-
-    // ==========================================
-    //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
-    // ==========================================
-
-    private ItemResponse stubResponse(String sku, String name, String category) {
-        return new ItemResponse(1L, sku, name, category, 5, true, LocalDateTime.now());
     }
 }
