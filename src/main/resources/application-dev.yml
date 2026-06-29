@@ -5,11 +5,11 @@ spring:
     password: ${POSTGRES_PASSWORD}
   data:
     redis:
-      host: localhost
+      host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
   jpa:
     show-sql: true
     open-in-view: false

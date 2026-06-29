@@ -37,21 +37,20 @@ services:
     image: docker.redpanda.com/redpandadata/redpanda:v23.2.11
     container_name: kafka
     ports:
-      - "9092:9092"  # Kafka API (для приложения и CLI)
-      - "8081:8081"  # Schema Registry (для управления схемами)
-    command:
-      - redpanda
-      - start
-      - --kafka-addr
-      - 0.0.0.0:9092
-      - --advertise-kafka-addr
-      - localhost:9092
-      - --schema-registry-addr
-      - 0.0.0.0:8081
-      - --mode
-      - dev-container
+      - "9092:9092"   # OUTSIDE: для хоста/IDE
+      - "29092:29092" # PLAINTEXT: для других контейнеров
+      - "8081:8081"   # Schema Registry
+    command: >
+      redpanda start
+      --smp 1
+      --overprovisioned
+      --node-id 0
+      --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      --advertise-kafka-addr PLAINTEXT://kafka:29092,OUTSIDE://localhost:9092
+      --schema-registry-addr 0.0.0.0:8081
+      --mode dev-container
     healthcheck:
-      test: ["CMD", "rpk", "cluster", "info"]
+      test: [ "CMD", "rpk", "cluster", "info" ]
       interval: 15s
       timeout: 10s
       retries: 10
