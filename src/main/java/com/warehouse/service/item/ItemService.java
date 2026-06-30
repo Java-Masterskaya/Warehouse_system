@@ -6,6 +6,7 @@ import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 
+
 import java.util.List;
 
 public interface ItemService {
@@ -21,4 +22,5 @@ public interface ItemService {
     List<String> getCategories();
 
     void softDeleteItem(Long itemId);
+
 }
