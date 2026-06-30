@@ -12,7 +12,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,7 +24,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "items")
 @Getter
-@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -78,7 +76,6 @@ public class Item {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-
     @Column(nullable = false, columnDefinition = "DECIMAL(19,2)")
     private BigDecimal price;
 
@@ -96,6 +93,41 @@ public class Item {
         updatedAt = LocalDateTime.now();
     }
 
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setSku(String sku) {
+        if (sku == null || sku.trim().isEmpty()) {
+            throw new IllegalArgumentException("SKU cannot be null or empty");
+        }
+        this.sku = sku.trim();
+    }
+
+    public void setName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Name cannot be null or empty");
+        }
+        this.name = name.trim();
+    }
+
+    public void setCategory(String category) {
+        if (category == null || category.trim().isEmpty()) {
+            throw new IllegalArgumentException("Category cannot be null or empty");
+        }
+        this.category = category.trim();
+    }
+
+    public void setMinStock(int minStock) {
+        if (minStock < 0) {
+            throw new IllegalArgumentException("Min stock cannot be negative");
+        }
+        this.minStock = minStock;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
 
     public void setPrice(BigDecimal price) {
         if (price != null && price.compareTo(BigDecimal.ZERO) < 0) {
@@ -113,5 +145,13 @@ public class Item {
         this.cost = cost != null
                 ? cost.setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }
