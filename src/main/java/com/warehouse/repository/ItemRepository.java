@@ -17,6 +17,8 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
 
     boolean existsBySku(String sku);
 
+    Optional<Item> findBySku(String sku);
+
     @Query("""
             SELECT DISTINCT i.category
             FROM Item i

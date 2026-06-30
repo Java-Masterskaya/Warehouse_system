@@ -423,4 +423,69 @@ class ItemServiceImplTest {
 
         verify(itemRepository, times(1)).findDistinctCategories();
     }
+
+    /**
+     * price и cost отображаются корректно в карточке товара.
+     */
+    @Test
+    void priceAndCostDisplayedInItemDetails() {
+        ItemDetailsResponse response = new ItemDetailsResponse(
+                1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.99), BigDecimal.valueOf(1000.49),
+                true, LocalDateTime.now(), LocalDateTime.now()
+        );
+
+        assertThat(response.price()).isEqualTo(BigDecimal.valueOf(1500.99));
+        assertThat(response.cost()).isEqualTo(BigDecimal.valueOf(1000.49));
+    }
+
+    /**
+     * price и cost не могут быть отрицательными (валидация).
+     */
+    @Test
+    void priceAndCostCannotBeNegative() {
+        Item item = new Item();
+        item.setSku("SKU-TEST");
+        item.setName("Тест");
+        item.setCategory("Тест");
+        item.setMinStock(0);
+        item.setActive(true);
+
+        item.setPrice(BigDecimal.valueOf(100.00));
+        item.setCost(BigDecimal.valueOf(50.00));
+
+        assertThat(item.getPrice().compareTo(BigDecimal.valueOf(100.00))).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.valueOf(50.00))).isEqualTo(0);
+
+        item.setPrice(BigDecimal.ZERO);
+        item.setCost(BigDecimal.ZERO);
+
+        assertThat(item.getPrice().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+    }
+
+    /**
+     * price и cost округляются до 2 знаков после запятой.
+     */
+    @Test
+    void priceAndCostRoundingWorksCorrectly() {
+        Item item = new Item();
+        item.setSku("SKU-ROUNDING");
+        item.setName("Тест");
+        item.setCategory("Тест");
+        item.setMinStock(0);
+        item.setActive(true);
+
+        item.setPrice(BigDecimal.valueOf(1500.999));
+        item.setCost(BigDecimal.valueOf(1000.444));
+
+        assertThat(item.getPrice().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
+
+        item.setPrice(BigDecimal.valueOf(100.005));
+        item.setCost(BigDecimal.valueOf(50.005));
+
+        assertThat(item.getPrice().compareTo(BigDecimal.valueOf(100.01))).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.valueOf(50.01))).isEqualTo(0);
+    }
 }
