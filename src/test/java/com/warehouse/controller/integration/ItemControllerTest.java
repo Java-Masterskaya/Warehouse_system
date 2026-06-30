@@ -320,6 +320,157 @@ class ItemControllerTest extends AbstractIntegrationTest {
     }
 
     /**
+     * ADMIN может обновить товар и изменить price и cost.
+     */
+    @Test
+    void updateItemSuccessWithPriceAndCost() throws Exception {
+        String sku = "SKU-UPDATE-TEST-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"sku\": \"" + sku + "\"," +
+                                "\"name\": \"Товар для обновления\"," +
+                                "\"category\": \"Тест\"," +
+                                "\"minStock\": 5," +
+                                "\"price\": 100.00," +
+                                "\"cost\": 50.00" +
+                                "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findAll().stream()
+                .filter(i -> i.getSku().equals(sku))
+                .findFirst()
+                .orElseThrow();
+
+        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория", 10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+
+        mockMvc.perform(put("/api/items/" + item.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Обновленный товар"))
+                .andExpect(jsonPath("$.category").value("Обновленная категория"))
+                .andExpect(jsonPath("$.minStock").value(10))
+                .andExpect(jsonPath("$.price").value(150.00))
+                .andExpect(jsonPath("$.cost").value(80.00));
+
+        Item updatedItem = itemRepository.findById(item.getId()).orElseThrow();
+        assertThat(updatedItem.getPrice().compareTo(BigDecimal.valueOf(150.00))).isEqualTo(0);
+        assertThat(updatedItem.getCost().compareTo(BigDecimal.valueOf(80.00))).isEqualTo(0);
+        assertThat(updatedItem.getName()).isEqualTo("Обновленный товар");
+    }
+
+    /**
+     * ADMIN может обновить price и cost до нуля.
+     */
+    @Test
+    void updateItemPriceAndCostToZero() throws Exception {
+        String sku = "SKU-UPDATE-ZERO-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"sku\": \"" + sku + "\"," +
+                                "\"name\": \"Товар\"," +
+                                "\"category\": \"Тест\"," +
+                                "\"minStock\": 5," +
+                                "\"price\": 100.00," +
+                                "\"cost\": 50.00" +
+                                "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findAll().stream()
+                .filter(i -> i.getSku().equals(sku))
+                .findFirst()
+                .orElseThrow();
+
+        UpdateItemRequest request = new UpdateItemRequest("Товар", "Тест", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        mockMvc.perform(put("/api/items/" + item.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price").value(0.00))
+                .andExpect(jsonPath("$.cost").value(0.00));
+
+        Item updatedItem = itemRepository.findById(item.getId()).orElseThrow();
+        assertThat(updatedItem.getPrice().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+        assertThat(updatedItem.getCost().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+    }
+
+    /**
+     * Обновление товара без токена возвращает 401 Unauthorized.
+     */
+    @Test
+    void updateItemNoTokenReturns401() throws Exception {
+        String sku = "SKU-UPDATE-NO-TOKEN-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"sku\": \"" + sku + "\"," +
+                                "\"name\": \"Товар\"," +
+                                "\"category\": \"Тест\"," +
+                                "\"minStock\": 5," +
+                                "\"price\": 100.00," +
+                                "\"cost\": 50.00" +
+                                "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findAll().stream()
+                .filter(i -> i.getSku().equals(sku))
+                .findFirst()
+                .orElseThrow();
+
+        String updateBody = """
+                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, "price": 150.00, "cost": 80.00}
+                """;
+
+        mockMvc.perform(put("/api/items/" + item.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
+
+    /**
+     * USER не может обновить товар (доступ запрещен), возвращает 403 Forbidden.
+     */
+    @Test
+    void updateItemUserTokenReturns403() throws Exception {
+        String sku = "SKU-UPDATE-USER-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"sku\": \"" + sku + "\"," +
+                                "\"name\": \"Товар\"," +
+                                "\"category\": \"Тест\"," +
+                                "\"minStock\": 5," +
+                                "\"price\": 100.00," +
+                                "\"cost\": 50.00" +
+                                "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findAll().stream()
+                .filter(i -> i.getSku().equals(sku))
+                .findFirst()
+                .orElseThrow();
+
+        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Тест", 10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+
+        mockMvc.perform(put("/api/items/" + item.getId())
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+    }
+
+    /**
      * Тесты для карточки товара с новыми полями price и cost.
      */
     /**

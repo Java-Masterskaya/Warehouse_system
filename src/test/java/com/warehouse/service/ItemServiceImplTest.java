@@ -151,9 +151,94 @@ class ItemServiceImplTest {
         assertEquals("Новое название", existingItem.getName());
         assertEquals("Новая категория", existingItem.getCategory());
         assertEquals(10, existingItem.getMinStock());
+        assertThat(existingItem.getPrice().compareTo(BigDecimal.valueOf(120.00))).isEqualTo(0);
+        assertThat(existingItem.getCost().compareTo(BigDecimal.valueOf(85.00))).isEqualTo(0);
 
         verify(itemRepository, times(1)).findById(itemId);
         verify(itemRepository, times(1)).save(existingItem);
+    }
+
+    /**
+     * Обновление товара с изменением цены и себестоимости.
+     */
+    @Test
+    void updateItemPriceAndCostChange() {
+        Long itemId = 5L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory("Категория");
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+
+        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория", 10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ItemResponse result = itemService.updateItem(itemId, request);
+
+        assertNotNull(result);
+        assertThat(existingItem.getPrice().compareTo(BigDecimal.valueOf(150.00))).isEqualTo(0);
+        assertThat(existingItem.getCost().compareTo(BigDecimal.valueOf(80.00))).isEqualTo(0);
+        assertEquals("Обновленный товар", existingItem.getName());
+        assertEquals("Обновленная категория", existingItem.getCategory());
+    }
+
+    /**
+     * Обновление товара с price и cost = 0.
+     */
+    @Test
+    void updateItemPriceAndCostZero() {
+        Long itemId = 7L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory("Категория");
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+
+        UpdateItemRequest request = new UpdateItemRequest("Товар с нулевой ценой", "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ItemResponse result = itemService.updateItem(itemId, request);
+
+        assertNotNull(result);
+        assertThat(existingItem.getPrice().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+        assertThat(existingItem.getCost().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+    }
+
+    /**
+     * Обновление товара с дефолтными значениями price и cost.
+     */
+    @Test
+    void updateItemDefaultPriceAndCost() {
+        Long itemId = 9L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory("Категория");
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+
+        UpdateItemRequest request = new UpdateItemRequest("Товар", "Категория", 5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ItemResponse result = itemService.updateItem(itemId, request);
+
+        assertNotNull(result);
+        assertThat(existingItem.getPrice().compareTo(BigDecimal.valueOf(100.00))).isEqualTo(0);
+        assertThat(existingItem.getCost().compareTo(BigDecimal.valueOf(50.00))).isEqualTo(0);
     }
 
     /**
