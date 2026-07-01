@@ -1,0 +1,11 @@
+#Config для бизнес-параметров
+warehouse:
+  low-stock-threshold: 5
+
+app:
+  jwt:
+    expiration-ms: 86400000
+
+redis:
+  cache:
+    ttl: 360000
