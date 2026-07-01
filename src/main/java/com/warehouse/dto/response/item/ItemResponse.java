@@ -2,6 +2,7 @@ package com.warehouse.dto.response.item;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record ItemResponse(
@@ -10,6 +11,8 @@ public record ItemResponse(
         String name,
         String category,
         int minStock,
+        BigDecimal price,
+        BigDecimal cost,
         @JsonProperty("isActive") boolean active,
         LocalDateTime createdAt
 ) {}

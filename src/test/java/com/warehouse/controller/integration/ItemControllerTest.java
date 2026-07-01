@@ -3,10 +3,15 @@ package com.warehouse.controller.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.CreateItemRequest;
+import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Item;
 import com.warehouse.entity.User;
+import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.JwtUtil;
+import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,12 +20,15 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,10 +51,16 @@ class ItemControllerTest extends AbstractIntegrationTest {
     private JwtUtil jwtUtil;
 
     @Autowired
+    private ItemRepository itemRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ItemService itemService;
 
     private String adminToken;
     private String userToken;
@@ -78,7 +92,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemAdminTokenReturns201WithBody() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell", "Электроника", 5);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell",
+                "Электроника", 5, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -95,7 +110,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemDuplicateSkuReturns409() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар",
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -116,7 +132,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemNoTokenReturns401() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар",
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -130,7 +147,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemUserTokenReturns403() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар", "Категория", 0);
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар",
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + userToken)
@@ -146,7 +164,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemBlankSkuReturns400() throws Exception {
         String body = """
-                {"sku": "", "name": "Товар", "category": "Категория", "minStock": 0}
+                {"sku": "", "name": "Товар", "category": "Категория", "minStock": 0,
+                 "price": 100.00, "cost": 50.00}
                 """;
 
         mockMvc.perform(post("/api/items")
@@ -163,7 +182,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemNegativeMinStockReturns400() throws Exception {
         String body = """
-                {"sku": "SKU-CTRL-004", "name": "Товар", "category": "Категория", "minStock": -1}
+                {"sku": "SKU-CTRL-004", "name": "Товар", "category":
+                 "Категория", "minStock": -1, "price": 100.00, "cost": 50.00}
                 """;
 
         mockMvc.perform(post("/api/items")
@@ -192,7 +212,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
         if (content.size() >= 2) {
             String first = content.get(0).get("sku").asText();
             String second = content.get(1).get("sku").asText();
-            org.assertj.core.api.Assertions.assertThat(first.compareTo(second)).isGreaterThanOrEqualTo(0);
+            org.assertj.core.api.Assertions.assertThat(first.compareTo(second))
+                    .isGreaterThanOrEqualTo(0);
         }
     }
 
@@ -303,8 +324,328 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
+    /**
+     * ADMIN может обновить товар и изменить price и cost.
+     */
+    @Test
+    void updateItemSuccessWithPriceAndCost() throws Exception {
+        String sku = "SKU-UPDATE-TEST-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар для обновления\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findAll().stream()
+                .filter(i -> i.getSku().equals(sku))
+                .findFirst()
+                .orElseThrow();
+
+        UpdateItemRequest request = new UpdateItemRequest(
+                "Обновленный товар", "Обновленная категория", 10,
+                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+
+        mockMvc.perform(put("/api/items/" + item.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Обновленный товар"))
+                .andExpect(jsonPath("$.category").value("Обновленная категория"))
+                .andExpect(jsonPath("$.minStock").value(10))
+                .andExpect(jsonPath("$.price").value(150.00))
+                .andExpect(jsonPath("$.cost").value(80.00));
+
+        Item updatedItem = itemRepository.findById(item.getId()).orElseThrow();
+        assertThat(updatedItem.getPrice().compareTo(BigDecimal.valueOf(150.00))).isEqualTo(0);
+        assertThat(updatedItem.getCost().compareTo(BigDecimal.valueOf(80.00))).isEqualTo(0);
+        assertThat(updatedItem.getName()).isEqualTo("Обновленный товар");
+    }
+
+    /**
+     * ADMIN может обновить price и cost до нуля.
+     */
+    @Test
+    void updateItemPriceAndCostToZero() throws Exception {
+        String sku = "SKU-UPDATE-ZERO-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findAll().stream()
+                .filter(i -> i.getSku().equals(sku))
+                .findFirst()
+                .orElseThrow();
+
+        UpdateItemRequest request = new UpdateItemRequest(
+                "Товар", "Тест", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        mockMvc.perform(put("/api/items/" + item.getId())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price").value(0.00))
+                .andExpect(jsonPath("$.cost").value(0.00));
+
+        Item updatedItem = itemRepository.findById(item.getId()).orElseThrow();
+        assertThat(updatedItem.getPrice().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+        assertThat(updatedItem.getCost().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+    }
+
+    /**
+     * Обновление товара без токена возвращает 401 Unauthorized.
+     */
+    @Test
+    void updateItemNoTokenReturns401() throws Exception {
+        String sku = "SKU-UPDATE-NO-TOKEN-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findAll().stream()
+                .filter(i -> i.getSku().equals(sku))
+                .findFirst()
+                .orElseThrow();
+
+        String updateBody = """
+                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, \
+                "price": 150.00, "cost": 80.00}
+                """;
+
+        mockMvc.perform(put("/api/items/" + item.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
+
+    /**
+     * USER не может обновить товар (доступ запрещен), возвращает 403 Forbidden.
+     */
+    @Test
+    void updateItemUserTokenReturns403() throws Exception {
+        String sku = "SKU-UPDATE-USER-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findAll().stream()
+                .filter(i -> i.getSku().equals(sku))
+                .findFirst()
+                .orElseThrow();
+
+        UpdateItemRequest request = new UpdateItemRequest(
+                "Обновленный товар", "Тест", 10,
+                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+
+        mockMvc.perform(put("/api/items/" + item.getId())
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+    }
+
+    /**
+     * Тесты для карточки товара с новыми полями price и cost.
+     */
+    /**
+     * Карточка товара содержит поля price и cost.
+     */
+    @Test
+    void itemCardContainsPriceAndCost() throws Exception {
+        String sku = "SKU-PRICE-TEST-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар с ценой\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 1500.995,"
+                                + "\"cost\": 1000.495"
+                                + "}"))
+                .andExpect(status().isCreated());
+
+        ItemDetailsResponse response = itemService.getItem(
+                itemRepository.findBySku(sku).get().getId());
+
+        assertThat(response.price().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(response.cost().compareTo(BigDecimal.valueOf(1000.50))).isEqualTo(0);
+    }
+
+    /**
+     * Валидация: отрицательная цена возвращает 400 Bad Request.
+     */
+    @Test
+    void createItemNegativePriceReturns400() throws Exception {
+        String body = """
+                {"sku": "SKU-NEG-PRICE", "name": "Товар", "category": "Категория", \
+                "minStock": 0, "price": -100.00, "cost": 50.00}
+                """;
+
+        mockMvc.perform(post("/api/items")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    /**
+     * Валидация: отрицательная себестоимость возвращает 400 Bad Request.
+     */
+    @Test
+    void createItemNegativeCostReturns400() throws Exception {
+        String body = """
+                {"sku": "SKU-NEG-COST", "name": "Товар", "category": "Категория", \
+                "minStock": 0, "price": 100.00, "cost": -50.00}
+                """;
+
+        mockMvc.perform(post("/api/items")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    /**
+     * Обновление товара с отрицательной ценой возвращает 400 Bad Request.
+     */
+    @Test
+    void updateItemNegativePriceReturns400() throws Exception {
+        String sku = "SKU-UPDATE-TEST-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар для обновления\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
+                .andExpect(status().isCreated());
+
+        Long itemId = itemRepository.findBySku(sku).get().getId();
+
+        String updateBody = """
+                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, \
+                "price": -100.00, "cost": 50.00}
+                """;
+
+        mockMvc.perform(put("/api/items/" + itemId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    /**
+     * Обновление товара с отрицательной себестоимостью возвращает 400 Bad Request.
+     */
+    @Test
+    void updateItemNegativeCostReturns400() throws Exception {
+        String sku = "SKU-UPDATE-TEST-2" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар для обновления\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
+                .andExpect(status().isCreated());
+
+        Long itemId = itemRepository.findBySku(sku).get().getId();
+
+        String updateBody = """
+                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, \
+                "price": 100.00, "cost": -50.00}
+                """;
+
+        mockMvc.perform(put("/api/items/" + itemId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    /**
+     * Цена и себестоимость округляются до 2 знаков после запятой.
+     */
+    @Test
+    void priceAndCostRoundingWorksCorrectly() throws Exception {
+        String sku = "SKU-ROUNDING-TEST-" + System.currentTimeMillis();
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар с округлением\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 1500.999,"
+                                + "\"cost\": 1000.444"
+                                + "}"))
+                .andExpect(status().isCreated());
+
+        Item item = itemRepository.findBySku(sku).get();
+
+        assertThat(item.getPrice().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
+
+        ItemDetailsResponse response = itemService.getItem(item.getId());
+        assertThat(response.price().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(response.cost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
+    }
+
     private void createItem(String sku, String name, String category) throws Exception {
-        CreateItemRequest request = new CreateItemRequest(sku, name, category, 0);
+        CreateItemRequest request = new CreateItemRequest(
+                sku, name, category, 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)

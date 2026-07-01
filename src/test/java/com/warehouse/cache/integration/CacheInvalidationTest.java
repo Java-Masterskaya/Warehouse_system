@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +54,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         item.setCategory("Электроника");
         item.setMinStock(5);
         item.setActive(true);
+        item.setPrice(BigDecimal.valueOf(1500.00));
+        item.setCost(BigDecimal.valueOf(1000.00));
         itemRepository.save(item);
 
         Stock stock = new Stock();
@@ -70,7 +73,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     void updateItemShouldEvictItemCache() {
         itemService.getItem(itemId);
 
-        UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук Pro", "Электроника", 10);
+        UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук Pro", "Электроника",
+                10, BigDecimal.valueOf(1700.00), BigDecimal.valueOf(1100.00));
         itemService.updateItem(itemId, updateRequest);
 
         ItemDetailsResponse response = itemService.getItem(itemId);
@@ -136,7 +140,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         assertThat(firstCall).contains("Электроника");
 
         com.warehouse.dto.request.item.CreateItemRequest createRequest =
-                new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель", 3);
+                new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель",
+                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00));
         itemService.createItem(createRequest);
 
         List<String> secondCall = itemService.getCategories();
@@ -149,13 +154,15 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void updateItemWithCategoryChangeShouldEvictCategoriesCache() {
         com.warehouse.dto.request.item.CreateItemRequest createRequest =
-                new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель", 3);
+                new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель",
+                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00));
         itemService.createItem(createRequest);
 
         List<String> firstCall = itemService.getCategories();
         assertThat(firstCall).contains("Электроника", "Мебель");
 
-        UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук", "Мебель", 5);
+        UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук", "Мебель", 5,
+                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00));
         itemService.updateItem(itemId, updateRequest);
 
         List<String> secondCall = itemService.getCategories();

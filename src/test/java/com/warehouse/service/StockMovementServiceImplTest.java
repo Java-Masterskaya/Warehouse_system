@@ -35,6 +35,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -598,8 +599,11 @@ class StockMovementServiceImplTest {
         item.setId(itemId);
         item.setName(name);
         item.setSku("SKU-" + itemId);
+        item.setCategory("Тестовая категория");
         item.setActive(active);
         item.setMinStock(minStock);
+        item.setPrice(BigDecimal.valueOf(100.00));
+        item.setCost(BigDecimal.valueOf(50.00));
         return item;
     }
 

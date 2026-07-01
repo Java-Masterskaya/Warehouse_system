@@ -21,4 +21,5 @@ public interface ItemService {
     List<String> getCategories();
 
     void softDeleteItem(Long itemId);
+
 }

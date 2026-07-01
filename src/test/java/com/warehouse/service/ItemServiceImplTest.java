@@ -27,6 +27,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
@@ -76,12 +77,15 @@ class ItemServiceImplTest {
      */
     @Test
     void createItemSuccess() {
-        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5);
+        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
 
         Item item = new Item();
         item.setId(1L);
         item.setSku("SKU-001");
         item.setCreatedAt(LocalDateTime.now());
+        item.setPrice(BigDecimal.valueOf(100.50));
+        item.setCost(BigDecimal.valueOf(75.25));
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(false);
         when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> {
@@ -90,7 +94,8 @@ class ItemServiceImplTest {
             savedItem.setCreatedAt(LocalDateTime.now());
             return savedItem;
         });
-        when(stockRepository.save(any(Stock.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(stockRepository.save(any(Stock.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.createItem(request);
 
@@ -110,7 +115,8 @@ class ItemServiceImplTest {
      */
     @Test
     void createItemDuplicateSkuThrowsDuplicateSkuException() {
-        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5);
+        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(true);
 
@@ -134,11 +140,15 @@ class ItemServiceImplTest {
         existingItem.setCategory("Старая категория");
         existingItem.setMinStock(5);
         existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.50));
+        existingItem.setCost(BigDecimal.valueOf(75.25));
 
-        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория", 10);
+        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -146,9 +156,100 @@ class ItemServiceImplTest {
         assertEquals("Новое название", existingItem.getName());
         assertEquals("Новая категория", existingItem.getCategory());
         assertEquals(10, existingItem.getMinStock());
+        assertThat(existingItem.getPrice().compareTo(BigDecimal.valueOf(120.00))).isEqualTo(0);
+        assertThat(existingItem.getCost().compareTo(BigDecimal.valueOf(85.00))).isEqualTo(0);
 
         verify(itemRepository, times(1)).findById(itemId);
         verify(itemRepository, times(1)).save(existingItem);
+    }
+
+    /**
+     * Обновление товара с изменением цены и себестоимости.
+     */
+    @Test
+    void updateItemPriceAndCostChange() {
+        Long itemId = 5L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory("Категория");
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+
+        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория",
+                10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ItemResponse result = itemService.updateItem(itemId, request);
+
+        assertNotNull(result);
+        assertThat(existingItem.getPrice().compareTo(BigDecimal.valueOf(150.00))).isEqualTo(0);
+        assertThat(existingItem.getCost().compareTo(BigDecimal.valueOf(80.00))).isEqualTo(0);
+        assertEquals("Обновленный товар", existingItem.getName());
+        assertEquals("Обновленная категория", existingItem.getCategory());
+    }
+
+    /**
+     * Обновление товара с price и cost = 0.
+     */
+    @Test
+    void updateItemPriceAndCostZero() {
+        Long itemId = 7L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory("Категория");
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+
+        UpdateItemRequest request = new UpdateItemRequest("Товар с нулевой ценой",
+                "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ItemResponse result = itemService.updateItem(itemId, request);
+
+        assertNotNull(result);
+        assertThat(existingItem.getPrice().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+        assertThat(existingItem.getCost().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+    }
+
+    /**
+     * Обновление товара с дефолтными значениями price и cost.
+     */
+    @Test
+    void updateItemDefaultPriceAndCost() {
+        Long itemId = 9L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory("Категория");
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+
+        UpdateItemRequest request = new UpdateItemRequest("Товар", "Категория",
+                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ItemResponse result = itemService.updateItem(itemId, request);
+
+        assertNotNull(result);
+        assertThat(existingItem.getPrice().compareTo(BigDecimal.valueOf(100.00))).isEqualTo(0);
+        assertThat(existingItem.getCost().compareTo(BigDecimal.valueOf(50.00))).isEqualTo(0);
     }
 
     /**
@@ -157,7 +258,8 @@ class ItemServiceImplTest {
     @Test
     void updateItemItemNotFoundThrowsException() {
         Long itemId = 3L;
-        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10);
+        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
@@ -178,8 +280,11 @@ class ItemServiceImplTest {
         Item inactiveItem = new Item();
         inactiveItem.setId(itemId);
         inactiveItem.setActive(false);
+        inactiveItem.setPrice(BigDecimal.valueOf(50.00));
+        inactiveItem.setCost(BigDecimal.valueOf(30.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10);
+        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
@@ -256,6 +361,7 @@ class ItemServiceImplTest {
     void shouldReturnItemWhenItemExistsAndActive() {
         ItemDetailsResponse response = new ItemDetailsResponse(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
                 true, LocalDateTime.now(), LocalDateTime.now()
         );
 
@@ -288,6 +394,7 @@ class ItemServiceImplTest {
     void shouldThrowEntityNotFoundExceptionWhenItemNotActive() {
         ItemDetailsResponse response = new ItemDetailsResponse(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
                 false, LocalDateTime.now(), LocalDateTime.now()
         );
 
@@ -317,7 +424,8 @@ class ItemServiceImplTest {
         when(itemRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(item), pageable, 1));
 
-        PageResponse<ItemResponse> result = itemService.getItems("name", "asc", null, null, 0, 20);
+        PageResponse<ItemResponse> result = itemService.getItems("name", "asc",
+                null, null, 0, 20);
 
         assertThat(result.content()).hasSize(1);
         assertThat(result.totalElements()).isEqualTo(1);
@@ -413,5 +521,70 @@ class ItemServiceImplTest {
         assertTrue(categories.isEmpty());
 
         verify(itemRepository, times(1)).findDistinctCategories();
+    }
+
+    /**
+     * price и cost отображаются корректно в карточке товара.
+     */
+    @Test
+    void priceAndCostDisplayedInItemDetails() {
+        ItemDetailsResponse response = new ItemDetailsResponse(
+                1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.99), BigDecimal.valueOf(1000.49),
+                true, LocalDateTime.now(), LocalDateTime.now()
+        );
+
+        assertThat(response.price()).isEqualTo(BigDecimal.valueOf(1500.99));
+        assertThat(response.cost()).isEqualTo(BigDecimal.valueOf(1000.49));
+    }
+
+    /**
+     * price и cost не могут быть отрицательными (валидация).
+     */
+    @Test
+    void priceAndCostCannotBeNegative() {
+        Item item = new Item();
+        item.setSku("SKU-TEST");
+        item.setName("Тест");
+        item.setCategory("Тест");
+        item.setMinStock(0);
+        item.setActive(true);
+
+        item.setPrice(BigDecimal.valueOf(100.00));
+        item.setCost(BigDecimal.valueOf(50.00));
+
+        assertThat(item.getPrice().compareTo(BigDecimal.valueOf(100.00))).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.valueOf(50.00))).isEqualTo(0);
+
+        item.setPrice(BigDecimal.ZERO);
+        item.setCost(BigDecimal.ZERO);
+
+        assertThat(item.getPrice().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.ZERO)).isEqualTo(0);
+    }
+
+    /**
+     * price и cost округляются до 2 знаков после запятой.
+     */
+    @Test
+    void priceAndCostRoundingWorksCorrectly() {
+        Item item = new Item();
+        item.setSku("SKU-ROUNDING");
+        item.setName("Тест");
+        item.setCategory("Тест");
+        item.setMinStock(0);
+        item.setActive(true);
+
+        item.setPrice(BigDecimal.valueOf(1500.999));
+        item.setCost(BigDecimal.valueOf(1000.444));
+
+        assertThat(item.getPrice().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
+
+        item.setPrice(BigDecimal.valueOf(100.005));
+        item.setCost(BigDecimal.valueOf(50.005));
+
+        assertThat(item.getPrice().compareTo(BigDecimal.valueOf(100.01))).isEqualTo(0);
+        assertThat(item.getCost().compareTo(BigDecimal.valueOf(50.01))).isEqualTo(0);
     }
 }

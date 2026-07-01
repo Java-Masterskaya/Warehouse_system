@@ -81,6 +81,8 @@ public class ItemServiceImpl implements ItemService {
         item.setName(request.name());
         item.setCategory(request.category());
         item.setMinStock(request.minStock());
+        item.setPrice(request.price());
+        item.setCost(request.cost());
 
         Item savedItem = itemRepository.save(item);
         log.info("Item updated: id={}, SKU='{}'", savedItem.getId(), savedItem.getSku());

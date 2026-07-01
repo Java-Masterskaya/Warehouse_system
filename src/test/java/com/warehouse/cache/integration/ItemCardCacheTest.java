@@ -12,6 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -45,6 +47,8 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         item.setCategory("Электроника");
         item.setMinStock(5);
         item.setActive(true);
+        item.setPrice(BigDecimal.valueOf(1500.00));
+        item.setCost(BigDecimal.valueOf(1000.00));
         itemRepository.save(item);
 
         Stock stock = new Stock();
