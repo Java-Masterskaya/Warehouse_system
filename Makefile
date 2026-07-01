@@ -27,6 +27,14 @@ health: ## Проверка работоспособности через Actuat
 	@echo "Проверка статуса приложения..."
 	@curl -s -H "Accept: application/json" http://localhost:8080/actuator/health
 
+liveness: ## Проверка liveness-пробы
+	@echo "Проверка liveness..."
+	@curl -s -H "Accept: application/json" http://localhost:8080/actuator/health/liveness
+
+readiness: ## Проверка readiness-пробы
+	@echo "Проверка readiness..."
+	@curl -s -H "Accept: application/json" http://localhost:8080/actuator/health/readiness
+
 ## --- Тестирование ---
 test: ## Запуск тестов
 	./gradlew clean test
