@@ -30,6 +30,17 @@ spring:
       idle-timeout: 300000
       max-lifetime: 1200000
       connection-timeout: 20000
+  config:
+    import: "optional:consul:"
+    cloud:
+      consul:
+        host: ${CONSUL_HOST:localhost}
+        port: 8500
+        config:
+          enabled: true
+          format: yaml
+          prefix: config
+          default-context: warehouse-system
   lifecycle:
     timeout-per-shutdown-phase: 20s
 

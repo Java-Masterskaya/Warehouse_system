@@ -20,4 +20,4 @@ spring:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    expiration-ms: ${JWT_EXPIRATION_MS}
+#    expiration-ms: ${JWT_EXPIRATION_MS} TODO Удалить
