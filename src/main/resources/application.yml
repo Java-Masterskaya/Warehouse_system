@@ -30,6 +30,8 @@ spring:
       idle-timeout: 300000
       max-lifetime: 1200000
       connection-timeout: 20000
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
 
 app:
   kafka:
@@ -47,6 +49,19 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+server:
+  shutdown: graceful
 
 logging:
   level:
