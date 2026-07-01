@@ -133,18 +133,22 @@ public class Item {
         if (price != null && price.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Price cannot be negative");
         }
-        this.price = price != null
-                ? price.setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+        if (price != null) {
+            this.price = price.setScale(2, RoundingMode.HALF_UP);
+        } else {
+            this.price = BigDecimal.ZERO;
+        }
     }
 
     public void setCost(BigDecimal cost) {
         if (cost != null && cost.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Cost cannot be negative");
         }
-        this.cost = cost != null
-                ? cost.setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+        if (cost != null) {
+            this.cost = cost.setScale(2, RoundingMode.HALF_UP);
+        } else {
+            this.cost = BigDecimal.ZERO;
+        }
     }
 
     public void setCreatedAt(LocalDateTime createdAt) {

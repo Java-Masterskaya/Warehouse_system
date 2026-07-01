@@ -38,7 +38,8 @@ public class ReportController {
         return new LowStockReportResponse(LocalDateTime.now(), items.size(), items);
     }
 
-    @Operation(summary = "Оценка складских запасов", description = "Σ quantity × cost с разрезом по категориям. Доступно только ADMIN.")
+    @Operation(summary = "Оценка складских запасов",
+            description = "Σ quantity × cost с разрезом по категориям. Доступно только ADMIN.")
     @GetMapping("/stock-valuation")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")

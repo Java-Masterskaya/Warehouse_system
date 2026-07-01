@@ -73,6 +73,8 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
     /**
      * Суммарная стоимость запасов: Σ quantity × cost.
      * COALESCE защищает от NULL (старые товары без cost, товары без stock).
+     *
+     * @return суммарная стоимость всех активных товаров
      */
     @Query("""
             SELECT COALESCE(SUM(COALESCE(s.quantity, 0) * COALESCE(i.cost, 0)), 0)
@@ -83,7 +85,9 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
     BigDecimal calculateTotalStockValuation();
 
     /**
-     * Разрез по категориям.
+     * Разрез стоимости по категориям.
+     *
+     * @return список CategoryValuation с суммами по каждой категории
      */
     @Query("""
             SELECT new com.warehouse.dto.response.valuation.CategoryValuation(

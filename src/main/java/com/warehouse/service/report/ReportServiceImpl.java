@@ -60,6 +60,4 @@ public class ReportServiceImpl implements ReportService {
 
         return new StockValuationResponse(roundedTotal, roundedByCategory);
     }
-
-
 }
