@@ -22,7 +22,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -63,7 +62,6 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Autowired
     private ItemService itemService;
 
-
     private String adminToken;
     private String userToken;
 
@@ -94,7 +92,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemAdminTokenReturns201WithBody() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell", "Электроника", 5, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00));
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell",
+                "Электроника", 5, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -111,7 +110,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemDuplicateSkuReturns409() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар", "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар",
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -132,7 +132,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemNoTokenReturns401() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар", "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар",
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -146,7 +147,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void createItemUserTokenReturns403() throws Exception {
-        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар", "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+        CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар",
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + userToken)
@@ -162,7 +164,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemBlankSkuReturns400() throws Exception {
         String body = """
-                {"sku": "", "name": "Товар", "category": "Категория", "minStock": 0, "price": 100.00, "cost": 50.00}
+                {"sku": "", "name": "Товар", "category": "Категория", "minStock": 0,
+                 "price": 100.00, "cost": 50.00}
                 """;
 
         mockMvc.perform(post("/api/items")
@@ -179,7 +182,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemNegativeMinStockReturns400() throws Exception {
         String body = """
-                {"sku": "SKU-CTRL-004", "name": "Товар", "category": "Категория", "minStock": -1, "price": 100.00, "cost": 50.00}
+                {"sku": "SKU-CTRL-004", "name": "Товар", "category":
+                 "Категория", "minStock": -1, "price": 100.00, "cost": 50.00}
                 """;
 
         mockMvc.perform(post("/api/items")
@@ -208,7 +212,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
         if (content.size() >= 2) {
             String first = content.get(0).get("sku").asText();
             String second = content.get(1).get("sku").asText();
-            org.assertj.core.api.Assertions.assertThat(first.compareTo(second)).isGreaterThanOrEqualTo(0);
+            org.assertj.core.api.Assertions.assertThat(first.compareTo(second))
+                    .isGreaterThanOrEqualTo(0);
         }
     }
 
@@ -328,14 +333,14 @@ class ItemControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"sku\": \"" + sku + "\"," +
-                                "\"name\": \"Товар для обновления\"," +
-                                "\"category\": \"Тест\"," +
-                                "\"minStock\": 5," +
-                                "\"price\": 100.00," +
-                                "\"cost\": 50.00" +
-                                "}"))
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар для обновления\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
                 .andExpect(status().isCreated());
 
         Item item = itemRepository.findAll().stream()
@@ -343,7 +348,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория", 10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+        UpdateItemRequest request = new UpdateItemRequest(
+                "Обновленный товар", "Обновленная категория", 10,
+                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
 
         mockMvc.perform(put("/api/items/" + item.getId())
                         .header("Authorization", "Bearer " + adminToken)
@@ -371,14 +378,14 @@ class ItemControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"sku\": \"" + sku + "\"," +
-                                "\"name\": \"Товар\"," +
-                                "\"category\": \"Тест\"," +
-                                "\"minStock\": 5," +
-                                "\"price\": 100.00," +
-                                "\"cost\": 50.00" +
-                                "}"))
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
                 .andExpect(status().isCreated());
 
         Item item = itemRepository.findAll().stream()
@@ -386,7 +393,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        UpdateItemRequest request = new UpdateItemRequest("Товар", "Тест", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+        UpdateItemRequest request = new UpdateItemRequest(
+                "Товар", "Тест", 5, BigDecimal.ZERO, BigDecimal.ZERO);
 
         mockMvc.perform(put("/api/items/" + item.getId())
                         .header("Authorization", "Bearer " + adminToken)
@@ -410,14 +418,14 @@ class ItemControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"sku\": \"" + sku + "\"," +
-                                "\"name\": \"Товар\"," +
-                                "\"category\": \"Тест\"," +
-                                "\"minStock\": 5," +
-                                "\"price\": 100.00," +
-                                "\"cost\": 50.00" +
-                                "}"))
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
                 .andExpect(status().isCreated());
 
         Item item = itemRepository.findAll().stream()
@@ -426,7 +434,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .orElseThrow();
 
         String updateBody = """
-                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, "price": 150.00, "cost": 80.00}
+                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, \
+                "price": 150.00, "cost": 80.00}
                 """;
 
         mockMvc.perform(put("/api/items/" + item.getId())
@@ -445,14 +454,14 @@ class ItemControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"sku\": \"" + sku + "\"," +
-                                "\"name\": \"Товар\"," +
-                                "\"category\": \"Тест\"," +
-                                "\"minStock\": 5," +
-                                "\"price\": 100.00," +
-                                "\"cost\": 50.00" +
-                                "}"))
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
                 .andExpect(status().isCreated());
 
         Item item = itemRepository.findAll().stream()
@@ -460,7 +469,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Тест", 10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+        UpdateItemRequest request = new UpdateItemRequest(
+                "Обновленный товар", "Тест", 10,
+                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
 
         mockMvc.perform(put("/api/items/" + item.getId())
                         .header("Authorization", "Bearer " + userToken)
@@ -482,17 +493,18 @@ class ItemControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"sku\": \"" + sku + "\"," +
-                                "\"name\": \"Товар с ценой\"," +
-                                "\"category\": \"Тест\"," +
-                                "\"minStock\": 5," +
-                                "\"price\": 1500.995," +
-                                "\"cost\": 1000.495" +
-                                "}"))
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар с ценой\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 1500.995,"
+                                + "\"cost\": 1000.495"
+                                + "}"))
                 .andExpect(status().isCreated());
 
-        ItemDetailsResponse response = itemService.getItem(itemRepository.findBySku(sku).get().getId());
+        ItemDetailsResponse response = itemService.getItem(
+                itemRepository.findBySku(sku).get().getId());
 
         assertThat(response.price().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
         assertThat(response.cost().compareTo(BigDecimal.valueOf(1000.50))).isEqualTo(0);
@@ -504,7 +516,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemNegativePriceReturns400() throws Exception {
         String body = """
-                {"sku": "SKU-NEG-PRICE", "name": "Товар", "category": "Категория", "minStock": 0, "price": -100.00, "cost": 50.00}
+                {"sku": "SKU-NEG-PRICE", "name": "Товар", "category": "Категория", \
+                "minStock": 0, "price": -100.00, "cost": 50.00}
                 """;
 
         mockMvc.perform(post("/api/items")
@@ -521,7 +534,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemNegativeCostReturns400() throws Exception {
         String body = """
-                {"sku": "SKU-NEG-COST", "name": "Товар", "category": "Категория", "minStock": 0, "price": 100.00, "cost": -50.00}
+                {"sku": "SKU-NEG-COST", "name": "Товар", "category": "Категория", \
+                "minStock": 0, "price": 100.00, "cost": -50.00}
                 """;
 
         mockMvc.perform(post("/api/items")
@@ -541,20 +555,21 @@ class ItemControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"sku\": \"" + sku + "\"," +
-                                "\"name\": \"Товар для обновления\"," +
-                                "\"category\": \"Тест\"," +
-                                "\"minStock\": 5," +
-                                "\"price\": 100.00," +
-                                "\"cost\": 50.00" +
-                                "}"))
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар для обновления\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
                 .andExpect(status().isCreated());
 
         Long itemId = itemRepository.findBySku(sku).get().getId();
 
         String updateBody = """
-                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, "price": -100.00, "cost": 50.00}
+                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, \
+                "price": -100.00, "cost": 50.00}
                 """;
 
         mockMvc.perform(put("/api/items/" + itemId)
@@ -574,20 +589,21 @@ class ItemControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"sku\": \"" + sku + "\"," +
-                                "\"name\": \"Товар для обновления\"," +
-                                "\"category\": \"Тест\"," +
-                                "\"minStock\": 5," +
-                                "\"price\": 100.00," +
-                                "\"cost\": 50.00" +
-                                "}"))
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар для обновления\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 100.00,"
+                                + "\"cost\": 50.00"
+                                + "}"))
                 .andExpect(status().isCreated());
 
         Long itemId = itemRepository.findBySku(sku).get().getId();
 
         String updateBody = """
-                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, "price": 100.00, "cost": -50.00}
+                {"name": "Обновленный товар", "category": "Тест", "minStock": 10, \
+                "price": 100.00, "cost": -50.00}
                 """;
 
         mockMvc.perform(put("/api/items/" + itemId)
@@ -607,14 +623,14 @@ class ItemControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"sku\": \"" + sku + "\"," +
-                                "\"name\": \"Товар с округлением\"," +
-                                "\"category\": \"Тест\"," +
-                                "\"minStock\": 5," +
-                                "\"price\": 1500.999," +
-                                "\"cost\": 1000.444" +
-                                "}"))
+                        .content("{"
+                                + "\"sku\": \"" + sku + "\","
+                                + "\"name\": \"Товар с округлением\","
+                                + "\"category\": \"Тест\","
+                                + "\"minStock\": 5,"
+                                + "\"price\": 1500.999,"
+                                + "\"cost\": 1000.444"
+                                + "}"))
                 .andExpect(status().isCreated());
 
         Item item = itemRepository.findBySku(sku).get();
@@ -628,7 +644,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
     }
 
     private void createItem(String sku, String name, String category) throws Exception {
-        CreateItemRequest request = new CreateItemRequest(sku, name, category, 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+        CreateItemRequest request = new CreateItemRequest(
+                sku, name, category, 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)

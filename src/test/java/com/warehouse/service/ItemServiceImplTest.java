@@ -77,7 +77,8 @@ class ItemServiceImplTest {
      */
     @Test
     void createItemSuccess() {
-        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
+        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
 
         Item item = new Item();
         item.setId(1L);
@@ -93,7 +94,8 @@ class ItemServiceImplTest {
             savedItem.setCreatedAt(LocalDateTime.now());
             return savedItem;
         });
-        when(stockRepository.save(any(Stock.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(stockRepository.save(any(Stock.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.createItem(request);
 
@@ -113,7 +115,8 @@ class ItemServiceImplTest {
      */
     @Test
     void createItemDuplicateSkuThrowsDuplicateSkuException() {
-        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
+        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(true);
 
@@ -140,10 +143,12 @@ class ItemServiceImplTest {
         existingItem.setPrice(BigDecimal.valueOf(100.50));
         existingItem.setCost(BigDecimal.valueOf(75.25));
 
-        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория", 10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
+        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -173,10 +178,12 @@ class ItemServiceImplTest {
         existingItem.setPrice(BigDecimal.valueOf(100.00));
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория", 10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория",
+                10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -202,10 +209,12 @@ class ItemServiceImplTest {
         existingItem.setPrice(BigDecimal.valueOf(100.00));
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Товар с нулевой ценой", "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+        UpdateItemRequest request = new UpdateItemRequest("Товар с нулевой ценой",
+                "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -229,10 +238,12 @@ class ItemServiceImplTest {
         existingItem.setPrice(BigDecimal.valueOf(100.00));
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Товар", "Категория", 5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+        UpdateItemRequest request = new UpdateItemRequest("Товар", "Категория",
+                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -247,7 +258,8 @@ class ItemServiceImplTest {
     @Test
     void updateItemItemNotFoundThrowsException() {
         Long itemId = 3L;
-        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
+        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
@@ -271,7 +283,8 @@ class ItemServiceImplTest {
         inactiveItem.setPrice(BigDecimal.valueOf(50.00));
         inactiveItem.setCost(BigDecimal.valueOf(30.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
+        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
@@ -411,7 +424,8 @@ class ItemServiceImplTest {
         when(itemRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(item), pageable, 1));
 
-        PageResponse<ItemResponse> result = itemService.getItems("name", "asc", null, null, 0, 20);
+        PageResponse<ItemResponse> result = itemService.getItems("name", "asc",
+                null, null, 0, 20);
 
         assertThat(result.content()).hasSize(1);
         assertThat(result.totalElements()).isEqualTo(1);
