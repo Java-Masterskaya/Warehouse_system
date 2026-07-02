@@ -2,7 +2,9 @@ package com.warehouse.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -19,10 +21,14 @@ import java.util.Map;
 
 @Configuration
 @EnableCaching
+@RefreshScope
 public class RedisConfig {
 
-    private static final int CATEGORIES_TTL_MINUTES = 10;
-    private static final int ITEM_TTL_MINUTES = 5;
+    @Value("${redis.cache.categories-ttl-minutes:10}")
+    private int categoriesTtlMinutes;
+
+    @Value("${redis.cache.item-ttl-minutes:5}")
+    private int itemTtlMinutes;
 
     @Bean
     public RedisCacheManager cacheManager(
@@ -38,7 +44,7 @@ public class RedisConfig {
                 .disableCachingNullValues();
 
         RedisCacheConfiguration categoriesConfig = baseConfig
-                .entryTtl(Duration.ofMinutes(CATEGORIES_TTL_MINUTES))
+                .entryTtl(Duration.ofMinutes(categoriesTtlMinutes))
                 .serializeValuesWith(
                         RedisSerializationContext.SerializationPair.fromSerializer(
                                 new Jackson2JsonRedisSerializer<>(
@@ -49,7 +55,7 @@ public class RedisConfig {
                 );
 
         RedisCacheConfiguration itemConfig = baseConfig
-                .entryTtl(Duration.ofMinutes(ITEM_TTL_MINUTES))
+                .entryTtl(Duration.ofMinutes(itemTtlMinutes))
                 .serializeValuesWith(
                         RedisSerializationContext.SerializationPair.fromSerializer(
                                 new Jackson2JsonRedisSerializer<>(

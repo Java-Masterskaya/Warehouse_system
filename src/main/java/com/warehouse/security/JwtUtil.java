@@ -7,6 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -18,6 +19,7 @@ import java.util.Optional;
 
 @Slf4j
 @Component
+@RefreshScope
 public class JwtUtil {
 
     private final SecretKey key;
