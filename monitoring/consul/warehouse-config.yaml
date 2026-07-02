@@ -8,4 +8,5 @@ app:
 
 redis:
   cache:
-    ttl: 360000
+    categories-ttl-minutes: 10
+    item-ttl-minutes: 5
