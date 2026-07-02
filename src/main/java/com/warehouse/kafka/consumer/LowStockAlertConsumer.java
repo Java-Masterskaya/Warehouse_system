@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 /**
  * Потребитель событий о низком остатке товара.
  * Сохраняет каждый полученный алерт в базу данных.
+ * Использует кастомный container factory с errorHandler и DLT.
  */
 @Slf4j
 @Component
@@ -29,10 +30,11 @@ public class LowStockAlertConsumer {
     /**
      * Обрабатывает событие низкого остатка из топика Kafka.
      * Создаёт и сохраняет запись в таблице stock_alerts.
+     * Использует container factory с errorHandler и DLT.
      *
      * @param event событие с данными об остатке
      */
-    @KafkaListener(topics = "low-stock-alerts", groupId = "warehouse-alerts")
+    @KafkaListener(topics = "low-stock-alerts", groupId = "warehouse-alerts", containerFactory = "kafkaListenerContainerFactory")
     public void consume(LowStockAlertEvent event) {
         log.info("Received low stock alert for itemId={}, currentStock={}, minStock={}",
                 event.itemId(), event.currentStock(), event.minStock());
