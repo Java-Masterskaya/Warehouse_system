@@ -7,10 +7,7 @@ import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
-import com.warehouse.entity.StockMovement;
-import com.warehouse.entity.User;
+import com.warehouse.entity.*;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
@@ -569,13 +566,6 @@ class StockMovementServiceImplTest {
         }
     }
 
-    /**
-     * Вспомогательные методы.
-     *
-     * @param userId   ID пользователя
-     * @param username Имя пользователя
-     * @return Созданный пользователь
-     */
     // ==========================================
     //    ТЕСТЫ ДЛЯ ADJUSTMENT
     // ==========================================

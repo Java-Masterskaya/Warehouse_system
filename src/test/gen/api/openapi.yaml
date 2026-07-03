@@ -1,0 +1,502 @@
+openapi: 3.0.3
+info:
+  description: API для системы управления складом (с поддержкой ролей Admin/User)
+  title: Warehouse Management API
+  version: 1.0.0
+servers:
+- url: /
+paths:
+  /api/v1/items:
+    get:
+      description: Доступно ролям User и Admin
+      parameters:
+      - explode: true
+        in: query
+        name: category
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Item'
+                type: array
+          description: Успешный ответ
+      summary: Получить каталог товаров
+      x-accepts:
+      - application/json
+    post:
+      description: Доступно только роли Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCreateRequest'
+        required: true
+      responses:
+        "201":
+          description: Товар успешно создан
+        "403":
+          description: Доступ запрещен (необходима роль Admin)
+      summary: Добавить новый товар в каталог
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /api/v1/items/{itemId}:
+    get:
+      description: Доступно ролям User и Admin
+      parameters:
+      - explode: false
+        in: path
+        name: itemId
+        required: true
+        schema:
+          format: int64
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemDetails'
+          description: Успешный ответ
+        "404":
+          description: Товар не найден
+      summary: Получить информацию о товаре и его текущем остатке
+      x-accepts:
+      - application/json
+    put:
+      description: Доступно только Admin. SKU изменить нельзя. Требуется полная замена
+        (все поля обязательны).
+      operationId: updateItem
+      parameters:
+      - explode: false
+        in: path
+        name: itemId
+        required: true
+        schema:
+          format: int64
+          type: integer
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemResponse'
+          description: Товар успешно обновлен
+        "400":
+          description: "Неверный запрос (отрицательный minStock, пустая строка или\
+            \ отсутствует обязательное поле)"
+        "401":
+          description: Не авторизован (отсутствует или недействительный токен)
+        "403":
+          description: Доступ запрещен (необходима роль Admin)
+        "404":
+          description: Товар не найден или неактивен (is_active = false)
+      summary: Обновить информацию о товаре
+      tags:
+      - items
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /api/v1/items/{itemId}/movements:
+    get:
+      description: Доступно ролям User и Admin
+      parameters:
+      - explode: false
+        in: path
+        name: itemId
+        required: true
+        schema:
+          format: int64
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/MovementRecord'
+                type: array
+          description: Успешный ответ
+      summary: Получить историю движения товара
+      x-accepts:
+      - application/json
+    post:
+      description: Доступно только роли Admin
+      parameters:
+      - explode: false
+        in: path
+        name: itemId
+        required: true
+        schema:
+          format: int64
+          type: integer
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovementRequest'
+        required: true
+      responses:
+        "201":
+          description: Операция успешно выполнена
+        "400":
+          description: "Ошибка валидации (например, попытка списать больше, чем ес\
+            ть на складе)"
+        "403":
+          description: Доступ запрещен (необходима роль Admin)
+      summary: Оформить приход или расход товара
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+  /api/v1/inventory/stocktake:
+    post:
+      description: Доступно только роли Admin. Сравнивает учётный остаток с фактическим
+        и создаёт корректирующее движение ADJUSTMENT.
+      operationId: stocktake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StocktakeRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovementResponse'
+          description: Инвентаризация проведена
+        "400":
+          description: Ошибка валидации
+        "401":
+          description: Не авторизован
+        "403":
+          description: Доступ запрещен (необходима роль Admin)
+        "404":
+          description: Товар или остаток не найден
+      summary: Провести инвентаризацию (скорректировать остаток)
+      tags:
+      - inventory
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+components:
+  schemas:
+    Item:
+      description: Базовая информация о товаре
+      example:
+        createdAt: 2023-10-25T10:00:00Z
+        name: Механическая клавиатура
+        active: true
+        id: 101
+        sku: KEY-001
+        category: Электроника
+        minStock: 5
+        updatedAt: 2023-10-26T12:30:00Z
+      properties:
+        id:
+          description: Уникальный идентификатор товара
+          example: 101
+          format: int64
+          type: integer
+        sku:
+          description: Уникальный артикул товара
+          example: KEY-001
+          maxLength: 100
+          type: string
+        name:
+          description: Название товара
+          example: Механическая клавиатура
+          maxLength: 255
+          type: string
+        category:
+          description: Категория товара
+          example: Электроника
+          maxLength: 100
+          type: string
+        minStock:
+          description: Минимальный уровень остатка для уведомлений
+          example: 5
+          type: integer
+        active:
+          description: "Флаг активности товара (true - активен, false - снят с уче\
+            та/архив)"
+          example: true
+          type: boolean
+        createdAt:
+          description: Дата и время создания записи
+          example: 2023-10-25T10:00:00Z
+          format: date-time
+          type: string
+        updatedAt:
+          description: Дата и время последнего обновления записи
+          example: 2023-10-26T12:30:00Z
+          format: date-time
+          type: string
+      type: object
+    ItemCreateRequest:
+      example:
+        name: Механическая клавиатура
+        sku: KEY-256
+        category: Электроника
+        minStock: 5
+      properties:
+        sku:
+          description: Уникальный артикул товара
+          example: KEY-256
+          maxLength: 100
+          type: string
+        name:
+          description: Название товара
+          example: Механическая клавиатура
+          maxLength: 255
+          type: string
+        category:
+          description: Категория товара
+          example: Электроника
+          maxLength: 100
+          type: string
+        minStock:
+          description: "Минимальный уровень остатка, при котором нужно отправить у\
+            ведомление (Kafka)"
+          example: 5
+          minimum: 0
+          type: integer
+      required:
+      - category
+      - minStock
+      - name
+      - sku
+      type: object
+    UpdateItemRequest:
+      description: Данные для обновления товара. SKU изменить нельзя.
+      example:
+        name: Ноутбук Dell
+        category: Электроника
+        minStock: 10
+      properties:
+        name:
+          description: Название товара
+          example: Ноутбук Dell
+          type: string
+        category:
+          description: Категория товара
+          example: Электроника
+          type: string
+        minStock:
+          description: Минимальный уровень остатка
+          example: 10
+          minimum: 0
+          type: integer
+      required:
+      - category
+      - minStock
+      - name
+      type: object
+    ItemResponse:
+      description: Ответ с информацией о товаре
+      example:
+        createdAt: 2023-10-25T10:00:00Z
+        name: Механическая клавиатура
+        id: 101
+        sku: KEY-001
+        category: Электроника
+        isActive: true
+        minStock: 5
+      properties:
+        id:
+          description: Уникальный идентификатор товара
+          example: 101
+          format: int64
+          type: integer
+        sku:
+          description: Уникальный артикул товара
+          example: KEY-001
+          maxLength: 100
+          type: string
+        name:
+          description: Название товара
+          example: Механическая клавиатура
+          maxLength: 255
+          type: string
+        category:
+          description: Категория товара
+          example: Электроника
+          maxLength: 100
+          type: string
+        minStock:
+          description: Минимальный уровень остатка для уведомлений
+          example: 5
+          minimum: 0
+          type: integer
+        isActive:
+          description: Флаг активности товара
+          example: true
+          type: boolean
+        createdAt:
+          description: Дата и время создания записи
+          example: 2023-10-25T10:00:00Z
+          format: date-time
+          type: string
+      type: object
+    ItemDetails:
+      allOf:
+      - $ref: '#/components/schemas/Item'
+      - properties:
+          currentStock:
+            description: Текущее количество товара на складе
+            example: 42
+            format: int32
+            type: integer
+        type: object
+      example:
+        createdAt: 2023-10-25T10:00:00Z
+        name: Механическая клавиатура
+        active: true
+        currentStock: 42
+        id: 101
+        sku: KEY-001
+        category: Электроника
+        minStock: 5
+        updatedAt: 2023-10-26T12:30:00Z
+    MovementRequest:
+      example:
+        quantity: 10
+        comment: Поступление от поставщика
+        type: RECEIVE
+      properties:
+        type:
+          description: "RECEIVE - приход, WRITE_OFF - списание, ADJUSTMENT - корре\
+            ктировка"
+          enum:
+          - RECEIVE
+          - WRITE_OFF
+          - ADJUSTMENT
+          type: string
+        quantity:
+          example: 10
+          minimum: 1
+          type: integer
+        comment:
+          example: Поступление от поставщика
+          type: string
+      required:
+      - quantity
+      - type
+      type: object
+    MovementRecord:
+      example:
+        createdAt: 2000-01-23T04:56:07.000+00:00
+        quantity: 6
+        createdBy: createdBy
+        comment: comment
+        id: 0
+        type: RECEIVE
+      properties:
+        id:
+          format: int64
+          type: integer
+        type:
+          description: "RECEIVE - приход, WRITE_OFF - списание, ADJUSTMENT - корре\
+            ктировка"
+          enum:
+          - RECEIVE
+          - WRITE_OFF
+          - ADJUSTMENT
+          type: string
+        quantity:
+          type: integer
+        createdAt:
+          format: date-time
+          type: string
+        createdBy:
+          description: "Username администратора, выполнившего операцию"
+          type: string
+        comment:
+          type: string
+      type: object
+    StocktakeRequest:
+      example:
+        itemId: 1
+        countedQuantity: 18
+      properties:
+        itemId:
+          description: ID товара
+          example: 1
+          format: int64
+          type: integer
+        countedQuantity:
+          description: "Фактическое количество, насчитанное на складе"
+          example: 18
+          minimum: 0
+          type: integer
+      required:
+      - countedQuantity
+      - itemId
+      type: object
+    StockMovementResponse:
+      description: "Ответ при операции движения товара (приход, списание, инвентар\
+        изация)"
+      example:
+        stockAfter: 18
+        itemId: 1
+        createdAt: 2026-07-02T14:30:00Z
+        quantity: -3
+        type: RECEIVE
+        lowStockAlert: false
+        movementId: 42
+      properties:
+        itemId:
+          description: ID товара
+          example: 1
+          format: int64
+          type: integer
+        movementId:
+          description: "ID созданного движения (null, если изменений не было)"
+          example: 42
+          format: int64
+          nullable: true
+          type: integer
+        type:
+          description: "Тип движения (null, если изменений не было)"
+          enum:
+          - RECEIVE
+          - WRITE_OFF
+          - ADJUSTMENT
+          nullable: true
+          type: string
+        quantity:
+          description: Количество операции (дельта для ADJUSTMENT)
+          example: -3
+          type: integer
+        stockAfter:
+          description: Остаток после операции
+          example: 18
+          type: integer
+        createdAt:
+          example: 2026-07-02T14:30:00Z
+          format: date-time
+          nullable: true
+          type: string
+        lowStockAlert:
+          description: Флаг низкого остатка
+          example: false
+          type: boolean
+      type: object
+

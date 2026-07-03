@@ -1,3 +1,63 @@
+openapi: 3.0.3
+info:
+  title: Warehouse Management API
+  version: 1.0.0
+  description: API для системы управления складом (с поддержкой ролей Admin/User)
+paths:
+  /api/v1/items:
+    get:
+      summary: Получить каталог товаров
+      description: Доступно ролям User и Admin
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Item'
+    post:
+      summary: Добавить новый товар в каталог
+      description: Доступно только роли Admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCreateRequest'
+      responses:
+        '201':
+          description: Товар успешно создан
+        '403':
+          description: Доступ запрещен (необходима роль Admin)
+
+  /api/v1/items/{itemId}:
+    get:
+      summary: Получить информацию о товаре и его текущем остатке
+      description: Доступно ролям User и Admin
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemDetails'
+        '404':
+          description: Товар не найден
 
     put:
       summary: Обновить информацию о товаре
@@ -232,7 +292,7 @@ components:
           minimum: 0
           description: "Минимальный уровень остатка для уведомлений"
           example: 5
-        isActive: # Имя поля соответствует @JsonProperty("isActive")
+        isActive:
           type: boolean
           description: "Флаг активности товара"
           example: true
