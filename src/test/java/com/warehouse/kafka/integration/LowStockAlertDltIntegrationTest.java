@@ -276,13 +276,15 @@ class LowStockAlertDltIntegrationTest {
     }
 
     /**
-     * Тест 4: Проверяем заголовки DLT сообщения.
+     * Тест 3: Проверяем заголовки DLT сообщения.
+     * Критерий: "В DLT-сообщении сохранены заголовки с причиной (kafka_dlt-exception-message)"
      */
     @Test
     void shouldIncludeAllRequiredDltHeaders() throws Exception {
         // given
+        String uniqueSku = "TEST-HEADERS-" + System.currentTimeMillis();
         LowStockAlertEvent event = new LowStockAlertEvent(
-                3L, "TEST-HEADERS-SKU", "Test Headers",
+                3L, uniqueSku, "Test Headers",
                 5, 10, "admin", LocalDateTime.now()
         );
 
@@ -296,37 +298,108 @@ class LowStockAlertDltIntegrationTest {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 
                     List<ConsumerRecord<String, String>> relevant = records.stream()
-                            .filter(r -> r.value() != null && r.value().contains("\"itemId\":3"))
+                            .filter(r -> r.value() != null && r.value().contains(uniqueSku))
                             .toList();
 
-                    assertThat(relevant).isNotEmpty();
+                    assertThat(relevant)
+                            .as("Should find DLT message for SKU: " + uniqueSku)
+                            .isNotEmpty();
 
                     ConsumerRecord<String, String> record = relevant.get(0);
 
-                    // Проверяем обязательные заголовки DLT
-                    String[] requiredHeaders = {
-                            "kafka_dlt-exception-message",
-                            "kafka_dlt-exception-stacktrace",
-                            "kafka_dlt-original-topic",
-                            "kafka_dlt-original-partition",
-                            "kafka_dlt-original-offset"
-                    };
+                    // === Проверка kafka_dlt-exception-message (КРИТЕРИЙ ЗАДАЧИ) ===
+                    Header exceptionMsgHeader = record.headers().lastHeader("kafka_dlt-exception-message");
+                    assertThat(exceptionMsgHeader)
+                            .as("Header 'kafka_dlt-exception-message' must be present")
+                            .isNotNull();
 
-                    for (String headerName : requiredHeaders) {
-                        Header header = record.headers().lastHeader(headerName);
-                        assertThat(header)
-                                .as("Header '%s' should be present", headerName)
-                                .isNotNull();
-                        log.info("Header '{}': {}", headerName,
-                                headerName.contains("stacktrace") ? "<stacktrace>" : new String(header.value()));
-                    }
+                    String exceptionMessage = new String(exceptionMsgHeader.value());
+                    assertThat(exceptionMessage)
+                            .as("Exception message should not be empty")
+                            .isNotEmpty();
 
-                    // Проверяем содержимое заголовков
-                    String originalTopic = new String(record.headers().lastHeader("kafka_dlt-original-topic").value());
-                    assertThat(originalTopic).isEqualTo("low-stock-alerts");
+                    assertThat(exceptionMessage)
+                            .as("Exception message should contain error cause")
+                            .containsAnyOf(
+                                    "DataIntegrityViolationException",
+                                    "constraint",
+                                    "violates foreign key"
+                            );
 
-                    String exceptionMessage = new String(record.headers().lastHeader("kafka_dlt-exception-message").value());
-                    assertThat(exceptionMessage).isNotEmpty();
+                    log.info("Exception message: {}",
+                            exceptionMessage.substring(0, Math.min(200, exceptionMessage.length())));
+
+                    // === Проверка kafka_dlt-exception-fqcn ===
+                    Header fqcnHeader = record.headers().lastHeader("kafka_dlt-exception-fqcn");
+                    assertThat(fqcnHeader)
+                            .as("Header 'kafka_dlt-exception-fqcn' must be present")
+                            .isNotNull();
+
+                    String fqcn = new String(fqcnHeader.value());
+                    assertThat(fqcn)
+                            .as("Should contain exception class name")
+                            .contains("ListenerExecutionFailedException");
+                    log.info("Exception FQCN: {}", fqcn);
+
+                    // === Проверка kafka_dlt-exception-cause-fqcn ===
+                    Header causeFqcnHeader = record.headers().lastHeader("kafka_dlt-exception-cause-fqcn");
+                    assertThat(causeFqcnHeader)
+                            .as("Header 'kafka_dlt-exception-cause-fqcn' must be present")
+                            .isNotNull();
+
+                    String causeFqcn = new String(causeFqcnHeader.value());
+                    assertThat(causeFqcn)
+                            .as("Should contain root cause exception class")
+                            .contains("DataIntegrityViolationException");
+                    log.info("Exception cause FQCN: {}", causeFqcn);
+
+                    // === Проверка kafka_dlt-exception-stacktrace ===
+                    Header stacktraceHeader = record.headers().lastHeader("kafka_dlt-exception-stacktrace");
+                    assertThat(stacktraceHeader)
+                            .as("Header 'kafka_dlt-exception-stacktrace' must be present")
+                            .isNotNull();
+
+                    String stacktrace = new String(stacktraceHeader.value());
+                    assertThat(stacktrace)
+                            .as("Stacktrace should contain error details")
+                            .contains("DataIntegrityViolationException");
+                    log.info("Stacktrace present (length: {} chars)", stacktrace.length());
+
+                    // === Проверка kafka_dlt-original-topic ===
+                    Header originalTopicHeader = record.headers().lastHeader("kafka_dlt-original-topic");
+                    assertThat(originalTopicHeader)
+                            .as("Header 'kafka_dlt-original-topic' must be present")
+                            .isNotNull();
+
+                    String originalTopic = new String(originalTopicHeader.value());
+                    assertThat(originalTopic)
+                            .as("Original topic should be 'low-stock-alerts'")
+                            .isEqualTo("low-stock-alerts");
+                    log.info("Original topic: {}", originalTopic);
+
+                    // === Проверка kafka_dlt-original-partition ===
+                    Header originalPartitionHeader = record.headers().lastHeader("kafka_dlt-original-partition");
+                    assertThat(originalPartitionHeader)
+                            .as("Header 'kafka_dlt-original-partition' must be present")
+                            .isNotNull();
+                    log.info("Original partition: {}",
+                            new String(originalPartitionHeader.value()));
+
+                    // === Проверка kafka_dlt-original-offset ===
+                    Header originalOffsetHeader = record.headers().lastHeader("kafka_dlt-original-offset");
+                    assertThat(originalOffsetHeader)
+                            .as("Header 'kafka_dlt-original-offset' must be present")
+                            .isNotNull();
+                    log.info("Original offset present");
+
+                    // === Проверка kafka_dlt-original-timestamp ===
+                    Header originalTimestampHeader = record.headers().lastHeader("kafka_dlt-original-timestamp");
+                    assertThat(originalTimestampHeader)
+                            .as("Header 'kafka_dlt-original-timestamp' must be present")
+                            .isNotNull();
+                    log.info("Original timestamp present");
+
+                    log.info("=== All {} required DLT headers verified successfully ===", 7);
                 });
     }
 }
