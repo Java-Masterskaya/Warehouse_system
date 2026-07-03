@@ -47,6 +47,8 @@ public class ItemServiceImpl implements ItemService {
         }
 
         Item item = itemMapper.toEntity(request);
+        item.setPrice(request.price());
+        item.setCost(request.cost());
         itemRepository.save(item);
 
         Stock stock = new Stock();

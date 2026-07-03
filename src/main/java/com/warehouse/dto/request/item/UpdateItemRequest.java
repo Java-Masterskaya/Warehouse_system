@@ -20,8 +20,10 @@ public record UpdateItemRequest(
         @NotNull(message = "Минимальный остаток не может быть null")
         Integer minStock,
 
+        @NotNull
         @PositiveOrZero(message = "Цена не может быть отрицательной")
         BigDecimal price,
+        @NotNull
         @PositiveOrZero(message = "Себестоимость не может быть отрицательной")
         BigDecimal cost
 ) {
