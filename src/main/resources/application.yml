@@ -38,6 +38,7 @@ app:
         name: low-stock-alerts
         partitions: 3
         replicas: 1
+        reprocess-batch-size: 100
 
 management:
   endpoints:
