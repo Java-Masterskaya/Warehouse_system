@@ -24,40 +24,61 @@ import java.time.LocalDateTime;
  * Запись движения товара на складе.
  * Фиксирует операции прихода или списания товара с указанием пользователя и количества.
  */
-@Entity @Table(name = "stock_movements")
-@Getter @Setter @Builder
-@NoArgsConstructor @AllArgsConstructor
+@Entity
+@Table(name = "stock_movements")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class StockMovement {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Товар, к которому относится движение. */
+    /**
+     * Товар, к которому относится движение.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
 
-    /** Пользователь, выполнивший операцию. */
+    /**
+     * Пользователь, выполнивший операцию.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** Тип движения (приход/списание). */
+    /**
+     * Тип движения (приход/списание).
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MovementType type;
 
-    /** Количество изменённых единиц. */
+    /**
+     * Количество изменённых единиц.
+     */
     @Column(nullable = false)
     private int quantity;
 
-    /** Время операции. */
+    /**
+     * Время операции.
+     */
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     private void prePersist() {
         createdAt = LocalDateTime.now();
+        validateQuantity();
+    }
+
+    private void validateQuantity() {
+        if (type != MovementType.ADJUSTMENT && quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be greater than zero for type " + type);
+        }
     }
 }

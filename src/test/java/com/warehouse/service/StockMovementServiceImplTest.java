@@ -3,6 +3,7 @@ package com.warehouse.service;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -17,6 +18,7 @@ import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementServiceImpl;
 import com.warehouse.service.stock.StockService;
@@ -39,11 +41,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -77,6 +75,8 @@ class StockMovementServiceImplTest {
     private StockMovementRepository stockMovementRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private StockRepository stockRepository;
     @Mock
     private KafkaStockAlertProducer kafkaProducer;
     @Mock
@@ -436,12 +436,11 @@ class StockMovementServiceImplTest {
         );
     }
 
-    /**
-     * Тесты для Kafka low stock alert.
-     */
-    /**
-     * При списании ниже minStock устанавливается lowStockAlert=true.
-     */
+    // ==========================================
+    //    ТЕСТЫ ДЛЯ KAFKA LOW STOCK ALERT
+    // ==========================================
+
+    // stockAfter < minStock → lowStockAlert=true в response, событие регистрируется
     @Test
     void writeOffReceiptBelowMinStockSetsLowStockAlertTrue() {
         int minStock = 10;
@@ -471,9 +470,7 @@ class StockMovementServiceImplTest {
         }
     }
 
-    /**
-     * При списании выше minStock устанавливается lowStockAlert=false.
-     */
+    // stockAfter >= minStock → lowStockAlert=false, Kafka не вызывается
     @Test
     void writeOffReceiptAboveMinStockSetsLowStockAlertFalse() {
         int minStock = 5;
@@ -503,9 +500,7 @@ class StockMovementServiceImplTest {
         }
     }
 
-    /**
-     * При списании равном minStock alert не отправляется (граничный случай).
-     */
+    // stockAfter == minStock → граничный случай, alert не отправляется
     @Test
     void writeOffReceiptEqualToMinStockDoesNotSendAlert() {
         int minStock = 5;
@@ -535,9 +530,7 @@ class StockMovementServiceImplTest {
         }
     }
 
-    /**
-     * Ошибка Kafka в afterCommit не пробрасывается (исключение перехватывается).
-     */
+    // Kafka ошибка в afterCommit не пробрасывается — проверяем что afterCommit ловит Exception
     @Test
     void writeOffReceiptKafkaErrorInAfterCommitIsCaught() {
         int minStock = 10;
@@ -583,6 +576,84 @@ class StockMovementServiceImplTest {
      * @param username Имя пользователя
      * @return Созданный пользователь
      */
+    // ==========================================
+    //    ТЕСТЫ ДЛЯ ADJUSTMENT
+    // ==========================================
+
+    @Test
+    void stocktakeShouldDecreaseStockWhenCountedLess() {
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 7);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setQuantity(10);
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
+        when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null, false));
+
+        StockMovementResponse response = stockMovementService.stocktake(request, userContext);
+
+        assertEquals(7, response.stockAfter());
+        assertEquals(-3, response.quantity());
+        assertEquals(MovementType.ADJUSTMENT, response.type());
+        assertEquals(7, stock.getQuantity());
+        verify(stockMovementRepository).save(any());
+    }
+
+    @Test
+    void stocktakeShouldIncreaseStockWhenCountedGreater() {
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 15);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setQuantity(10);
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
+        when(mapper.toResponse(any(), eq(15), eq(false))).thenReturn(
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5, 15, null, false));
+
+        StockMovementResponse response = stockMovementService.stocktake(request, userContext);
+
+        assertEquals(15, response.stockAfter());
+        assertEquals(5, response.quantity());
+        assertEquals(15, stock.getQuantity());
+    }
+
+    @Test
+    void stocktakeNoChangeDoesNotCreateMovement() {
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 10);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setQuantity(10);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+
+        StockMovementResponse response = stockMovementService.stocktake(request, userContext);
+
+        assertEquals(10, response.stockAfter());
+        assertNull(response.movementId());
+        verify(stockRepository, never()).save(any());
+        verify(stockMovementRepository, never()).save(any());
+    }
+
+    // ==========================================
+    //    ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    // ==========================================
+
     private User createUserReference(Long userId, String username) {
         User user = new User();
         user.setId(userId);

@@ -2,10 +2,12 @@ package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.MovementType;
+import com.warehouse.exception.EntityNotFoundException;
 
 /**
  * Сервис для управления движениями товаров на складе.
@@ -17,7 +19,7 @@ public interface StockMovementService {
      * Регистрирует приход товара на склад.
      *
      * @param request данные запроса на приход товара
-     * @param ctx пользователь, выполняющий операцию
+     * @param ctx     пользователь, выполняющий операцию
      * @return ответ с информацией о движении товара
      */
     StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
@@ -26,7 +28,7 @@ public interface StockMovementService {
      * Регистрирует списание товара со склада.
      *
      * @param request данные запроса на списание товара
-     * @param ctx пользователь, выполняющий операцию
+     * @param ctx     пользователь, выполняющий операцию
      * @return ответ с информацией о движении товара
      */
     StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
@@ -47,4 +49,14 @@ public interface StockMovementService {
                                                                       int page,
                                                                       int size);
 
+    /**
+     * Выполняет инвентаризацию товара: сверяет фактический остаток
+     * с учётным и при расхождении создаёт корректирующее движение.
+     *
+     * @param request данные переучёта: ID товара и фактически подсчитанное количество
+     * @param ctx     пользователь, выполняющий операцию
+     * @return ответ о созданном движении товара; если дельта равна нулю —
+     * возвращает текущее состояние без движения
+     */
+    StockMovementResponse stocktake(StocktakeRequest request, UserContext ctx);
 }

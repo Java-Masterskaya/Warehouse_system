@@ -78,6 +78,7 @@ make up
 | `POST`   | `/api/movements/receive`          | Зарегистрировать поступление   |
 | `POST`   | `/api/movements/write-off`        | Списать товар                  |
 | `GET`    | `/api/movements/{itemId}/history` | История движения               |
+| `POST`   | `/api/inventory/stocktake`        | Инвентаризация                 |
 
 Полная спецификация: `docs/warehouse_openapi.yaml`
 

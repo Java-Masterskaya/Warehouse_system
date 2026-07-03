@@ -8,5 +8,8 @@ public enum MovementType {
     RECEIVE,
     
     /** Списание товара. */
-    WRITE_OFF
+    WRITE_OFF,
+
+    /** Корректировка остатков. */
+    ADJUSTMENT
 }
