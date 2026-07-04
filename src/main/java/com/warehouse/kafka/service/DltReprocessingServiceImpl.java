@@ -1,4 +1,4 @@
-package com.warehouse.service;
+package com.warehouse.kafka.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.event.LowStockAlertEvent;
@@ -29,7 +29,7 @@ import java.util.UUID;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class DltReprocessingService {
+public class DltReprocessingServiceImpl implements DltReprocessingService {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final KafkaTopicProperties topicProperties;
@@ -51,6 +51,7 @@ public class DltReprocessingService {
      * Обрабатывает не более reprocessBatchSize сообщений за один вызов.
      * @return статистика по перепrocessed сообщениям
      */
+    @Override
     public DltReprocessResponse reprocessAllDltMessages() {
         log.info("Starting DLT reprocessing for topic: {} with batch size: {}", DLT_TOPIC, reprocessBatchSize);
 

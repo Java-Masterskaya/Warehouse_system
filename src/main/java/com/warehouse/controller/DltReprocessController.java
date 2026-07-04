@@ -1,7 +1,7 @@
 package com.warehouse.controller;
 
 import com.warehouse.dto.response.DltReprocessResponse;
-import com.warehouse.service.DltReprocessingService;
+import com.warehouse.kafka.service.DltReprocessingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
