@@ -1,5 +1,5 @@
 # Makefile для управления стеком приложения Warehouse System
-.PHONY: up down app-up app-down infra-up infra-down health test build checkstyle help
+.PHONY: up down app-up app-down infra-up infra-down consul-up consul-down health test build checkstyle help
 
 ## --- Управление всем стеком ---
 up: ## Запуск всего стека (инфраструктура, приложение)
@@ -9,11 +9,18 @@ down: ## Остановка всех контейнеров
 	docker-compose down
 
 ## --- Управление инфраструктурой (БД, Kafka) ---
-infra-up: ## Запуск только инфраструктуры (PostgreSQL, Redis, Kafka)
-	docker-compose up -d postgres kafka redis
+infra-up: ## Запуск только инфраструктуры (PostgreSQL, Redis, Kafka, Consul + Seed)
+	docker-compose up -d postgres redis kafka consul consul-seed
 
 infra-down: ## Остановка инфраструктуры
-	docker-compose down postgres kafka redis --remove-orphans
+	docker-compose down postgres redis kafka consul consul-seed --remove-orphans
+
+## --- Управление Consul ---
+consul-up: ## Запуск только Consul и Seed
+	docker-compose up -d consul consul-seed
+
+consul-down: ## Остановка Consul
+	docker-compose down consul consul-seed
 
 ## --- Управление приложением ---
 app-up: ## Запуск приложения в терминале (инфраструктура должна быть запущена через docker-compose)
