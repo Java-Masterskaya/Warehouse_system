@@ -18,6 +18,13 @@ spring:
   cloud:
     consul:
       enabled: false
+    compatibility-verifier:
+      enabled: false
+
+redis:
+  cache:
+    categories-ttl-minutes: 10
+    item-ttl-minutes: 5
 
 app:
   jwt:
