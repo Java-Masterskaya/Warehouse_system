@@ -68,16 +68,17 @@ make up
 
 ## Основные эндпоинты
 
-| Метод    | Путь                              | Описание                       |
-|----------|-----------------------------------|--------------------------------|
-| `GET`    | `/api/items`                      | Список товаров (фильтр, поиск) |
-| `POST`   | `/api/items`                      | Создать товар                  |
-| `PUT`    | `/api/items/{id}`                 | Редактировать товар            |
-| `DELETE` | `/api/items/{id}`                 | Удалить товар                  |
-| `GET`    | `/api/items/{id}/stock`           | Текущий остаток                |
-| `POST`   | `/api/movements/receive`          | Зарегистрировать поступление   |
-| `POST`   | `/api/movements/write-off`        | Списать товар                  |
-| `GET`    | `/api/movements/{itemId}/history` | История движения               |
+| Метод    | Путь                                 | Описание                       |
+|----------|--------------------------------------|--------------------------------|
+| `GET`    | `/api/items`                         | Список товаров (фильтр, поиск) |
+| `POST`   | `/api/items`                         | Создать товар                  |
+| `PUT`    | `/api/items/{id}`                    | Редактировать товар            |
+| `DELETE` | `/api/items/{id}`                    | Удалить товар                  |
+| `GET`    | `/api/items/{id}/stock`              | Текущий остаток                |
+| `POST`   | `/api/movements/receive`             | Зарегистрировать поступление   |
+| `POST`   | `/api/movements/write-off`           | Списать товар                  |
+| `GET`    | `/api/movements/{itemId}/history`    | История движения               |
+| `POST`   | `/api/admin/dlq/low-stock/reprocess` | Реобработка DLT                |
 
 Полная спецификация: `docs/warehouse_openapi.yaml`
 
