@@ -3,13 +3,11 @@ package com.warehouse.service;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
-import com.warehouse.entity.StockMovement;
-import com.warehouse.entity.User;
+import com.warehouse.entity.*;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
@@ -17,6 +15,7 @@ import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementServiceImpl;
 import com.warehouse.service.stock.StockService;
@@ -39,11 +38,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -73,6 +68,8 @@ class StockMovementServiceImplTest {
     private StockService stockService;
     @Mock
     private ItemRepository itemRepository;
+    @Mock
+    private StockRepository stockRepository;
     @Mock
     private StockMovementRepository stockMovementRepository;
     @Mock
@@ -574,6 +571,88 @@ class StockMovementServiceImplTest {
             org.junit.jupiter.api.Assertions.assertDoesNotThrow(
                     () -> syncCaptor.getValue().afterCommit());
         }
+    }
+
+    /**
+     * Инвентаризация: фактический остаток МЕНЬШЕ учётного.
+     * Создаётся отрицательное движение ADJUSTMENT, остаток уменьшается.
+     */
+    @Test
+    void stocktakeShouldDecreaseStockWhenCountedLess() {
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 7);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setQuantity(10);
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
+        when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null, false));
+
+        StockMovementResponse response = stockMovementService.stocktake(request, userContext);
+
+        assertEquals(7, response.stockAfter());
+        assertEquals(-3, response.quantity());
+        assertEquals(MovementType.ADJUSTMENT, response.type());
+        assertEquals(7, stock.getQuantity());
+        verify(stockMovementRepository).save(any());
+    }
+
+    /**
+     * Инвентаризация: фактический остаток БОЛЬШЕ учётного.
+     * Создаётся положительное движение ADJUSTMENT, остаток увеличивается.
+     */
+    @Test
+    void stocktakeShouldIncreaseStockWhenCountedGreater() {
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 15);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setQuantity(10);
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
+        when(mapper.toResponse(any(), eq(15), eq(false))).thenReturn(
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5, 15, null, false));
+
+        StockMovementResponse response = stockMovementService.stocktake(request, userContext);
+
+        assertEquals(15, response.stockAfter());
+        assertEquals(5, response.quantity());
+        assertEquals(15, stock.getQuantity());
+    }
+
+    /**
+     * Инвентаризация: фактический остаток РАВЕН учётному.
+     * Движение не создаётся, остаток не меняется.
+     */
+    @Test
+    void stocktakeNoChangeDoesNotCreateMovement() {
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 10);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setQuantity(10);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+
+        StockMovementResponse response = stockMovementService.stocktake(request, userContext);
+
+        assertEquals(10, response.stockAfter());
+        assertNull(response.movementId());
+        verify(stockRepository, never()).save(any());
+        verify(stockMovementRepository, never()).save(any());
     }
 
     /**

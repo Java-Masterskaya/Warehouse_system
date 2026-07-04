@@ -3,13 +3,11 @@ package com.warehouse.service.movement;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
-import com.warehouse.entity.StockMovement;
-import com.warehouse.entity.User;
+import com.warehouse.entity.*;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
@@ -17,6 +15,7 @@ import com.warehouse.metric.MetricService;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
@@ -49,6 +48,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
+    StockRepository stockRepository;
     KafkaStockAlertProducer kafkaProducer;
     MetricService metricService;
 
@@ -186,6 +186,56 @@ public class StockMovementServiceImpl implements StockMovementService {
         return PageResponse.from(history);
     }
 
+    @Override
+    @Transactional
+    @CacheEvict(value = "item", key = "#request.itemId")
+    public StockMovementResponse stocktake(StocktakeRequest request, UserContext ctx) {
+        Long itemId = request.itemId();
+        int counted = request.countedQuantity();
+
+        Item item = itemCheckForExist(itemId);
+        itemCheckForActive(item);
+
+        Stock stock = stockRepository.findByItemId(itemId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
+
+        int current = stock.getQuantity();
+        int delta = counted - current;
+
+        if (delta == 0) {
+            log.info("Stocktake: no change for itemId={}", itemId);
+            return new StockMovementResponse(
+                    itemId,
+                    null,      // movementId
+                    null,      // type
+                    0,         // quantity
+                    counted,   // stockAfter
+                    null,      // createdAt
+                    false      // lowStockAlert
+            );
+        }
+
+        stock.setQuantity(counted);
+        stockRepository.save(stock);
+
+        User userRef = userRepository.getReferenceById(ctx.userId());
+
+        StockMovement stockMovement = StockMovement.builder()
+                .item(item)
+                .user(userRef)
+                .type(MovementType.ADJUSTMENT)
+                .quantity(delta)
+                .build();
+        stockMovementRepository.save(stockMovement);
+
+        boolean lowStock = counted < item.getMinStock();
+
+        log.info("Stocktake: itemId={}, current={}, counted={}, delta={}, userId={}",
+                itemId, current, counted, delta, ctx.userId());
+
+        return mapper.toResponse(stockMovement, counted, lowStock);
+    }
+
     private void itemCheckForActive(Item item) {
         if (!item.isActive()) {
             log.warn("Attempt to receive inactive item: itemId={}", item.getId());
@@ -200,5 +250,4 @@ public class StockMovementServiceImpl implements StockMovementService {
                     return EntityNotFoundException.forId("Item", itemId);
                 });
     }
-
 }

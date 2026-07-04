@@ -59,5 +59,12 @@ public class StockMovement {
     @PrePersist
     private void prePersist() {
         createdAt = LocalDateTime.now();
+        validateQuantity();
+    }
+
+    private void validateQuantity() {
+        if (type != MovementType.ADJUSTMENT && quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be greater than zero for type " + type);
+        }
     }
 }
