@@ -31,6 +31,7 @@ public class RedisConfig {
     private int itemTtlMinutes;
 
     @Bean
+    @RefreshScope
     public RedisCacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
             ObjectMapper objectMapper

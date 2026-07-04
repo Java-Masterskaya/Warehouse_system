@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,15 +23,19 @@ import java.util.Optional;
 @RefreshScope
 public class JwtUtil {
 
-    private final SecretKey key;
+    @Value("${app.jwt.secret}")
+    private String secret;
 
     @Getter
-    private final long expirationMs;
+    @Value("${app.jwt.expiration-ms:86400000}")
+    private long expirationMs;
 
-    public JwtUtil(@Value("${app.jwt.secret}") String secret,
-                   @Value("${app.jwt.expiration-ms}") long expirationMs) {
+    private SecretKey key;
+
+    @PostConstruct
+    public void init() {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.expirationMs = expirationMs;
+        log.info("🔐 JwtUtil initialized with expirationMs: {}", expirationMs);
     }
 
     public String generateToken(String username, Long userId, List<String> roles) {

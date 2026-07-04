@@ -1,4 +1,3 @@
-#Config для бизнес-параметров
 app:
   jwt:
     expiration-ms: 86400000

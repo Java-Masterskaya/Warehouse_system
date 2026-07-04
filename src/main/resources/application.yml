@@ -32,17 +32,19 @@ spring:
       connection-timeout: 20000
   config:
     import: "optional:consul:"
-    cloud:
-      consul:
-        host: ${CONSUL_HOST:localhost}
-        port: 8500
-        config:
-          enabled: true
-          format: yaml
-          prefix: config
-          default-context: warehouse-system
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: 8500
+      config:
+        enabled: true
+        format: yaml
+        prefix: config
+        default-context: warehouse-system
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  main:
+    allow-bean-definition-overriding: true
 
 app:
   kafka:
@@ -56,7 +58,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics
+        include: health,info,prometheus,metrics,env,refresh
   endpoint:
     health:
       show-details: always
@@ -65,6 +67,8 @@ management:
       group:
         readiness:
           include: readinessState,db
+    refresh:
+      enabled: true
   health:
     livenessstate:
       enabled: true

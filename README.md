@@ -134,6 +134,9 @@ cp .env.example .env.local
 # - SPRING_PROFILES_ACTIVE=dev (или другой профиль)
 # - Хосты баз данных и kafka: localhost вместо имен контейнеров
 # - Пароли и секреты
+# - СМ. Детали ниже - порт кафки при локальном запуске меняется на 9092
+```
+```bash
 
 # 3. Поднимите только инфраструктуру
 docker compose up postgres redis kafka -d
