@@ -6,6 +6,7 @@ import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.StockRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -61,6 +62,9 @@ class LowStockAlertDltIntegrationTest {
     private StockAlertRepository stockAlertRepository;
 
     @Autowired
+    private StockRepository stockRepository;
+
+    @Autowired
     private ItemRepository itemRepository;
 
     private long testStartTime;
@@ -70,6 +74,7 @@ class LowStockAlertDltIntegrationTest {
         testStartTime = System.currentTimeMillis();
         log.info("=== Starting test setup ===");
         stockAlertRepository.deleteAll();
+        stockRepository.deleteAll();
         itemRepository.deleteAll();
         log.info("=== Test setup completed ===");
     }
