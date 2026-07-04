@@ -59,7 +59,6 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Slf4j
@@ -330,8 +329,8 @@ class DltReprocessingControllerTest {
 
         LocalDateTime now = LocalDateTime.now();
         jdbcTemplate.update(
-                "INSERT INTO items (id, sku, name, category, min_stock, is_active, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO items (id, sku, name, category, min_stock, is_active, created_at, updated_at) "
+                      + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 invalidItemId, uniqueSku, itemName, "TestCategory", minStock, true, now, now
         );
         assertThat(itemRepository.findById(invalidItemId)).isPresent();

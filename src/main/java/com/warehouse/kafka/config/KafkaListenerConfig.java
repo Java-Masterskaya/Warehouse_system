@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.SerializationException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -27,30 +28,41 @@ public class KafkaListenerConfig {
     private final KafkaTopicProperties topicProperties;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
+    @Value("${app.kafka.consumer.concurrency}")
+    private int concurrency;
+
+    @Value("${app.kafka.retry.initial-interval-ms}")
+    private long initialIntervalMs;
+
+    @Value("${app.kafka.retry.multiplier}")
+    private double multiplier;
+
+    @Value("${app.kafka.retry.max-interval-ms}")
+    private long maxIntervalMs;
+
+    @Value("${app.kafka.retry.max-attempts}")
+    private int maxAttempts;
+
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
             ConsumerFactory<String, Object> consumerFactory) {
 
         var factory = new ConcurrentKafkaListenerContainerFactory<String, Object>();
         factory.setConsumerFactory(consumerFactory);
-        factory.setConcurrency(3);
+        factory.setConcurrency(concurrency);
         factory.getContainerProperties().setAckMode(RECORD);
 
-        // Настройка errorHandler с ретраями и DLT
         var dltTopicName = topicProperties.getName() + ".DLT";
-
         factory.setCommonErrorHandler(errorHandler(dltTopicName));
 
         return factory;
     }
 
     private CommonErrorHandler errorHandler(String dltTopicName) {
-        // Экспоненциальный бэкофф: начальный интервал 1 сек, множитель 2, макс. интервал 10 сек, макс. попыток 3
-        var backOff = new ExponentialBackOff(1000L, 2);
-        backOff.setMaxInterval(10000L);
-        backOff.setMaxAttempts(3);
+        var backOff = new ExponentialBackOff(initialIntervalMs, multiplier);
+        backOff.setMaxInterval(maxIntervalMs);
+        backOff.setMaxAttempts(maxAttempts);
 
-        // DeadLetterPublishingRecoverer для отправки в DLT — стандартный, без кастомных заголовков
         BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> topicResolver =
                 (cr, ex) -> {
                     log.error("Sending to DLT: topic={}, partition={}, offset={}",
@@ -60,10 +72,8 @@ public class KafkaListenerConfig {
 
         var recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate, topicResolver);
 
-        // DefaultErrorHandler с recoverer и backOff
         var handler = new DefaultErrorHandler(recoverer, backOff);
 
-        // Добавляем исключения, которые НЕ должны retry-аться (битый JSON)
         handler.addNotRetryableExceptions(
                 SerializationException.class,
                 com.fasterxml.jackson.core.JsonParseException.class,
@@ -71,7 +81,6 @@ public class KafkaListenerConfig {
                 org.springframework.messaging.converter.MessageConversionException.class
         );
 
-        // Добавляем исключения, которые должны retry-аться (временные ошибки)
         handler.addRetryableExceptions(
                 org.springframework.dao.DataAccessException.class,
                 java.util.concurrent.TimeoutException.class

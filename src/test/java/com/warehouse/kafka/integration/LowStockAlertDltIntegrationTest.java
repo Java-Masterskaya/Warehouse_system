@@ -1,6 +1,5 @@
 package com.warehouse.kafka.integration;
 
-import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.StockAlert;
@@ -31,9 +30,12 @@ import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.UUID;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -126,7 +128,7 @@ class LowStockAlertDltIntegrationTest {
 
     /**
      * Тест 1: Проверяем, что битый JSON попадает в DLT БЕЗ ретраев.
-     *
+     * <p>
      * Ключевой критерий: время между отправкой и попаданием в DLT
      * должно быть < 3 секунд (без задержек ретраев).
      */
@@ -151,8 +153,8 @@ class LowStockAlertDltIntegrationTest {
 
                     // Ищем наше сообщение по уникальному маркеру
                     Optional<ConsumerRecord<String, String>> ourRecord = records.stream()
-                            .filter(record -> record.value() != null &&
-                                    record.value().contains(uniqueMarker))
+                            .filter(record -> record.value() != null
+                                    && record.value().contains(uniqueMarker))
                             .findFirst();
 
                     assertThat(ourRecord)
@@ -176,14 +178,16 @@ class LowStockAlertDltIntegrationTest {
                             .contains("MessageConversionException");
                 });
     }
+
     /**
      * Тест 2: Проверяем, что ошибки БД ретраятся 3 раза и потом попадают в DLT.
-     *
+     * <p>
      * Ключевой критерий:
      * - В DLT ровно 1 сообщение (не 3-4)
      * - Время > 5 секунд (были ретраи)
      * - В логах видно 4 попытки обработки (1 основная + 3 ретрая)
      */
+
     @Test
     void shouldRetryAndSendToDltAfterDbError() throws Exception {
         // given: валидный JSON, но запись в БД упадет из-за foreign key
@@ -244,7 +248,7 @@ class LowStockAlertDltIntegrationTest {
 
     /**
      * Тест 3: Проверяем, что ретраев ровно 3 (4 попытки всего).
-     *
+     * <p>
      * Проверяем по логам: должно быть 4 вызова consumer'а для одного сообщения.
      */
     @Test
@@ -274,10 +278,10 @@ class LowStockAlertDltIntegrationTest {
                 });
 
         log.info("""
-            ⚠️ MANUAL CHECK REQUIRED: 
-            Check logs above for 'Received low stock alert for itemId=2'.
-            Should appear exactly 4 times (1 initial + 3 retries).
-            """);
+                ⚠️ MANUAL CHECK REQUIRED: 
+                Check logs above for 'Received low stock alert for itemId=2'.
+                Should appear exactly 4 times (1 initial + 3 retries).
+                """);
     }
 
     /**
@@ -328,8 +332,7 @@ class LowStockAlertDltIntegrationTest {
                             .containsAnyOf(
                                     "DataIntegrityViolationException",
                                     "constraint",
-                                    "violates foreign key"
-                            );
+                                    "violates foreign key");
 
                     log.info("Exception message: {}",
                             exceptionMessage.substring(0, Math.min(200, exceptionMessage.length())));

@@ -34,7 +34,8 @@ public class LowStockAlertConsumer {
      *
      * @param event событие с данными об остатке
      */
-    @KafkaListener(topics = "low-stock-alerts", groupId = "warehouse-alerts", containerFactory = "kafkaListenerContainerFactory")
+    @KafkaListener(topics = "low-stock-alerts", groupId = "warehouse-alerts",
+            containerFactory = "kafkaListenerContainerFactory")
     public void consume(LowStockAlertEvent event) {
         log.info("Received low stock alert for itemId={}, currentStock={}, minStock={}",
                 event.itemId(), event.currentStock(), event.minStock());
