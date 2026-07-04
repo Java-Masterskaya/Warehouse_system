@@ -7,7 +7,6 @@ import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.MovementType;
-import com.warehouse.exception.EntityNotFoundException;
 
 /**
  * Сервис для управления движениями товаров на складе.
