@@ -15,6 +15,9 @@ spring:
       auto-offset-reset: earliest
       properties:
         spring.json.trusted.packages: "com.warehouse.dto.event"
+  cloud:
+    consul:
+      enabled: false
 
 app:
   jwt:
