@@ -113,8 +113,15 @@ public class KafkaListenerConfig {
         );
 
         handler.addRetryableExceptions(
+
                 org.springframework.dao.DataAccessException.class,
-                java.util.concurrent.TimeoutException.class
+                org.springframework.dao.TransientDataAccessResourceException.class,
+                org.springframework.transaction.TransactionSystemException.class,
+                java.util.concurrent.TimeoutException.class,
+                java.net.SocketTimeoutException.class,
+                java.net.ConnectException.class,
+                org.springframework.web.client.ResourceAccessException.class,
+                java.util.concurrent.RejectedExecutionException.class
         );
 
         return handler;
