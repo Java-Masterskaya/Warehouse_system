@@ -59,6 +59,9 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+  metrics:
+    tags:
+      application: warehouse-system
 
 server:
   shutdown: graceful
