@@ -15,6 +15,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -51,8 +53,9 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
      * Обрабатывает не более reprocessBatchSize сообщений за один вызов.
      * @return статистика по перепrocessed сообщениям
      */
+    @Async
     @Override
-    public DltReprocessResponse reprocessAllDltMessages() {
+    public CompletableFuture<DltReprocessResponse> reprocessAllDltMessages() {
         log.info("Starting DLT reprocessing for topic: {} with batch size: {}", DLT_TOPIC, reprocessBatchSize);
 
         List<DltReprocessDetail> details = new ArrayList<>();
@@ -111,12 +114,16 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
                     }
                 }
             }
+        } catch (Exception e) {
+            log.error("Error during DLT reprocessing", e);
+            return CompletableFuture.completedFuture(new DltReprocessResponse(
+                    totalMessages, successfullyReprocessed, failed, details));
         }
 
         log.info("DLT reprocessing completed: total={}, success={}, failed={}, batchProcessed={}",
                 totalMessages, successfullyReprocessed, failed, batchCount);
 
-        return new DltReprocessResponse(totalMessages, successfullyReprocessed, failed, details);
+        return CompletableFuture.completedFuture(new DltReprocessResponse(totalMessages, successfullyReprocessed, failed, details));
     }
 
     private Consumer<String, String> createDltConsumer() {
@@ -152,10 +159,10 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
         // Парсим в LowStockAlertEvent
         LowStockAlertEvent event = objectMapper.readValue(value, LowStockAlertEvent.class);
 
-        // Отправляем обратно в основной топик
-        kafkaTemplate.send(new ProducerRecord<>(MAIN_TOPIC, record.key(), event)).get();
+        // Асинхронная отправка обратно в основной топик (без .get())
+        kafkaTemplate.send(new ProducerRecord<>(MAIN_TOPIC, record.key(), event));
         
-        log.info("Reprocessed message from DLT: key={}, partition={}, offset={}", 
+        log.info("Sent to main topic from DLT: key={}, partition={}, offset={}", 
                 record.key(), record.partition(), record.offset());
     }
 

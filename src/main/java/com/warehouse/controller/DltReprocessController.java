@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.concurrent.CompletableFuture;
+
 @RestController
 @RequestMapping("/api/admin/dlq/low-stock")
 @RequiredArgsConstructor
@@ -21,12 +23,12 @@ public class DltReprocessController {
 
     private final DltReprocessingService dltReprocessingService;
 
-    @Operation(summary = "Ручная реобработка DLT", 
-            description = "Вычитывает все сообщения из DLT и отправляет их обратно в основной топик")
+    @Operation(summary = "Асинхронная реобработка DLT", 
+            description = "Запускает асинхронную обработку всех сообщений из DLT и отправляет их обратно в основной топик")
     @PostMapping("/reprocess")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<DltReprocessResponse> reprocessDltMessages() {
-        DltReprocessResponse response = dltReprocessingService.reprocessAllDltMessages();
-        return ResponseEntity.ok(response);
+    public ResponseEntity<Void> reprocessDltMessages() {
+        dltReprocessingService.reprocessAllDltMessages();
+        return ResponseEntity.accepted().build();
     }
 }

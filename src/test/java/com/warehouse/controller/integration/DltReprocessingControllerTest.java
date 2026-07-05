@@ -340,26 +340,16 @@ class DltReprocessingControllerTest {
 
         // ===== ФАЗА 3: Репроцессинг =====
 
-        String response = mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .andExpect(status().isAccepted());
 
-        log.info("Phase 3: {}", response);
+        log.info("Phase 3: DLT reprocessing started asynchronously");
 
         // ===== ФАЗА 4: Проверяем ответ API =====
 
-        DltReprocessResponse dltResponse = objectMapper.readValue(response, DltReprocessResponse.class);
-        assertThat(dltResponse.totalMessages()).isGreaterThanOrEqualTo(1);
-        assertThat(dltResponse.successfullyReprocessed()).isGreaterThanOrEqualTo(1);
-        assertThat(dltResponse.details()).isNotEmpty();
 
-        log.info("Phase 4 complete: API OK");
-
-        // ===== ФАЗА 5: Проверяем БД =====
 
         await().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(1, TimeUnit.SECONDS)

@@ -2,6 +2,8 @@ package com.warehouse.kafka.service;
 
 import com.warehouse.dto.response.DltReprocessResponse;
 
+import java.util.concurrent.CompletableFuture;
+
 public interface DltReprocessingService {
-    DltReprocessResponse reprocessAllDltMessages();
+    CompletableFuture<DltReprocessResponse> reprocessAllDltMessages();
 }
