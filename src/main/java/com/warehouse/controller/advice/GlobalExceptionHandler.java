@@ -8,6 +8,8 @@ import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.SelfDeactivationException;
+import com.warehouse.exception.InvalidMovementRequestException;
+import com.warehouse.exception.StockMovementInvariantException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -94,11 +96,18 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("UNAUTHORIZED", "Authentication failed");
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
+    @ExceptionHandler(InvalidMovementRequestException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleIllegalArgument(IllegalArgumentException ex) {
-        log.warn("Illegal argument: {}", ex.getMessage());
-        return new ErrorResponse("ILLEGAL_ARGUMENT", ex.getMessage());
+    public ErrorResponse handleInvalidMovementRequest(InvalidMovementRequestException ex) {
+        log.warn("Invalid movement request: {}", ex.getMessage());
+        return new ErrorResponse("INVALID_MOVEMENT_REQUEST", ex.getMessage());
+    }
+
+    @ExceptionHandler(StockMovementInvariantException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleStockMovementInvariant(StockMovementInvariantException ex) {
+        log.error("Stock movement invariant violated: {}", ex.getMessage(), ex);
+        return new ErrorResponse("INTERNAL_ERROR", "Internal server error");
     }
 
     @ExceptionHandler(Exception.class)

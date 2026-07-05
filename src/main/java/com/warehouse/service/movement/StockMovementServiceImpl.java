@@ -14,6 +14,7 @@ import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.metric.MetricService;
 import com.warehouse.mapper.StockMovementMapper;
@@ -74,7 +75,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         if (quantity <= 0) {
             log.warn("Invalid quantity for stock receipt: itemId={}, quantity={}", itemId, quantity);
-            throw new IllegalArgumentException("Quantity must be greater than 0");
+            throw new InvalidMovementRequestException("Quantity must be greater than 0");
         }
 
         Item item = itemCheckForExist(itemId);
@@ -208,15 +209,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         if (delta == 0) {
             log.info("Stocktake: no change for itemId={}", itemId);
-            return new StockMovementResponse(
-                    itemId,
-                    null,      // movementId
-                    null,      // type
-                    0,         // quantity
-                    counted,   // stockAfter
-                    null,      // createdAt
-                    false      // lowStockAlert
-            );
+            return mapper.toNoMovementResponse(itemId, counted);
         }
 
         stock.setQuantity(counted);
@@ -233,9 +226,35 @@ public class StockMovementServiceImpl implements StockMovementService {
         stockMovementRepository.save(stockMovement);
 
         boolean lowStock = counted < item.getMinStock();
+        if (lowStock) {
+            LowStockAlertEvent event = new LowStockAlertEvent(
+                    item.getId(),
+                    item.getSku(),
+                    item.getName(),
+                    counted,
+                    item.getMinStock(),
+                    ctx.username(),
+                    LocalDateTime.now()
+            );
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        kafkaProducer.sendLowStockAlert(event);
+                        log.info("LowStockAlert sent from stocktake: itemId={}, counted={}, minStock={}",
+                                item.getId(), counted, item.getMinStock());
+                    } catch (Exception e) {
+                        log.error("Failed to send LowStockAlert from stocktake for itemId={}: {}",
+                                item.getId(), e.getMessage());
+                    }
+                }
+            });
+        }
 
         log.info("Stocktake: itemId={}, current={}, counted={}, delta={}, userId={}",
                 itemId, current, counted, delta, ctx.userId());
+
+        metricService.increment("warehouse.movements.adjustment.total");
 
         return mapper.toResponse(stockMovement, counted, lowStock);
     }
