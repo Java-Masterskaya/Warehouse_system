@@ -41,10 +41,12 @@ class LowStockAlertConsumerTest {
     private static final int TEST_CURRENT_STOCK = 5;
     private static final String TEST_TRIGGERED_BY = "admin";
 
-    @Container
-    static RedpandaContainer redpanda = new RedpandaContainer(
-            DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1")
-    );
+    static final RedpandaContainer redpanda =
+            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1"));
+
+    static {
+        redpanda.start();
+    }
 
     @DynamicPropertySource
     static void kafkaProperties(DynamicPropertyRegistry registry) {

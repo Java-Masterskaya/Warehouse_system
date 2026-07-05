@@ -69,10 +69,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers
 class DltReprocessingControllerTest {
 
-    @Container
-    static final RedpandaContainer redpanda = new RedpandaContainer(
-            DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1")
-    );
+    static final RedpandaContainer redpanda =
+            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1"));
+
+    static {
+        redpanda.start();
+    }
 
     @DynamicPropertySource
     static void kafkaProperties(DynamicPropertyRegistry registry) {

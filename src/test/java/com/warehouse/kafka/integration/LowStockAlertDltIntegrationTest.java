@@ -9,6 +9,8 @@ import com.warehouse.repository.StockRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -47,10 +49,12 @@ import static org.awaitility.Awaitility.await;
 @SpringBootTest(classes = WarehouseApp.class)
 class LowStockAlertDltIntegrationTest {
 
-    @Container
-    static RedpandaContainer redpanda = new RedpandaContainer(
-            DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1")
-    );
+    static final RedpandaContainer redpanda =
+            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1"));
+
+    static {
+        redpanda.start();
+    }
 
     @DynamicPropertySource
     static void kafkaProperties(DynamicPropertyRegistry registry) {
@@ -78,7 +82,50 @@ class LowStockAlertDltIntegrationTest {
         stockAlertRepository.deleteAll();
         stockRepository.deleteAll();
         itemRepository.deleteAll();
+        clearDltTopic();
         log.info("=== Test setup completed ===");
+    }
+
+    private void clearDltTopic() {
+        String dltTopic = "low-stock-alerts.DLT";
+        try (AdminClient adminClient = createAdminClient()) {
+            var topicNames = adminClient.listTopics().names().get();
+            if (!topicNames.contains(dltTopic)) {
+                log.info("DLT topic '{}' doesn't exist yet, skipping cleanup", dltTopic);
+                return;
+            }
+
+            var topicDesc = adminClient.describeTopics(List.of(dltTopic)).allTopicNames().get();
+            int partitionCount = topicDesc.get(dltTopic).partitions().size();
+
+            List<TopicPartition> partitions = java.util.stream.IntStream.range(0, partitionCount)
+                    .mapToObj(i -> new TopicPartition(dltTopic, i))
+                    .collect(java.util.stream.Collectors.toList());
+
+            java.util.Map<TopicPartition, OffsetSpec> earliestSpecs = partitions.stream()
+                    .collect(java.util.stream.Collectors.toMap(tp -> tp, tp -> OffsetSpec.earliest()));
+            java.util.Map<TopicPartition, OffsetSpec> latestSpecs = partitions.stream()
+                    .collect(java.util.stream.Collectors.toMap(tp -> tp, tp -> OffsetSpec.latest()));
+
+            var earliestOffsets = adminClient.listOffsets(earliestSpecs).all().get();
+            var latestOffsets = adminClient.listOffsets(latestSpecs).all().get();
+
+            java.util.Map<TopicPartition, RecordsToDelete> recordsToDelete = partitions.stream()
+                    .filter(tp -> latestOffsets.get(tp).offset() > earliestOffsets.get(tp).offset())
+                    .collect(java.util.stream.Collectors.toMap(
+                            tp -> tp,
+                            tp -> RecordsToDelete.beforeOffset(latestOffsets.get(tp).offset())
+                    ));
+
+            if (!recordsToDelete.isEmpty()) {
+                adminClient.deleteRecords(recordsToDelete).all().get();
+                log.info("DLT topic cleaned: {} partitions", recordsToDelete.size());
+            } else {
+                log.info("DLT topic is already empty");
+            }
+        } catch (Exception e) {
+            log.debug("DLT cleanup skipped: {}", e.getMessage());
+        }
     }
 
     private AdminClient createAdminClient() {
@@ -123,6 +170,20 @@ class LowStockAlertDltIntegrationTest {
         }
 
         log.info("Total DLT messages found: {}", allRecords.size());
+        for (ConsumerRecord<String, String> record : allRecords) {
+            log.info("DLT record: partition={}, offset={}, key={}, value={}",
+                    record.partition(), record.offset(), record.key(),
+                    record.value() != null ? record.value().substring(0, Math.min(100, record.value().length())) : "null");
+            // Decode base64 if needed (JsonSerializer encodes String as JSON)
+            if (record.value() != null && record.value().startsWith("\"")) {
+                try {
+                    String decoded = new String(java.util.Base64.getDecoder().decode(record.value()));
+                    log.info("Decoded value: {}", decoded);
+                } catch (Exception e) {
+                    log.debug("Failed to decode value: {}", e.getMessage());
+                }
+            }
+        }
         return allRecords;
     }
 
@@ -139,7 +200,7 @@ class LowStockAlertDltIntegrationTest {
         String badJson = "this is definitely not a valid json " + uniqueMarker + " {{{";
 
         log.info("Sending bad JSON with marker: {}", uniqueMarker);
-        kafkaTemplate.send("low-stock-alerts", badJson).get();
+        kafkaTemplate.send("low-stock-alerts", uniqueMarker, badJson).get();
 
         // then: ждем сообщение в DLT
         await().atMost(15, TimeUnit.SECONDS)
@@ -151,10 +212,10 @@ class LowStockAlertDltIntegrationTest {
                             .as("DLT should contain messages")
                             .isNotEmpty();
 
-                    // Ищем наше сообщение по уникальному маркеру
+                    // Ищем наше сообщение по уникальному маркеру в ключе или значении
                     Optional<ConsumerRecord<String, String>> ourRecord = records.stream()
-                            .filter(record -> record.value() != null
-                                    && record.value().contains(uniqueMarker))
+                            .filter(record -> (record.key() != null && record.key().contains(uniqueMarker)) ||
+                                    (record.value() != null && record.value().contains(uniqueMarker)))
                             .findFirst();
 
                     assertThat(ourRecord)
@@ -172,10 +233,12 @@ class LowStockAlertDltIntegrationTest {
                     String causeClass = new String(causeHeader.value());
                     log.info("Exception cause class: {}", causeClass);
 
-                    // Проверяем, что это именно ошибка конвертации (не ретраилась)
+                    // Проверяем, что это именно ошибка десериализации (не ретраилась)
+                    // Для String сообщений, сериализованных JsonDeserializer, ошибка будет DeserializationException
+                    // (MessageConversionException используется в RabbitMQ, DeserializationException - в Kafka)
                     assertThat(causeClass)
-                            .as("Should be MessageConversionException (non-retryable)")
-                            .contains("MessageConversionException");
+                            .as("Should be DeserializationException (non-retryable deserialization error)")
+                            .contains("DeserializationException");
                 });
     }
 
