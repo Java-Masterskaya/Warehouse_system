@@ -16,7 +16,6 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -181,7 +180,6 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
 
         try {
             reprocessSingleMessageSync(record, mainTopic);
-            commitOffset(consumer, tp, record.offset() + 1);
             return SingleProcessResult.success(tp, record.offset() + 1,
                     createDetail(record, true, null));
         } catch (Exception e) {
@@ -189,12 +187,6 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
                     record.partition(), record.offset(), e.getMessage());
             return SingleProcessResult.failure(createDetail(record, false, e.getMessage()));
         }
-    }
-
-    private void commitOffset(Consumer<String, String> consumer, TopicPartition tp, long offset) {
-        Map<TopicPartition, OffsetAndMetadata> offsetToCommit = new HashMap<>();
-        offsetToCommit.put(tp, new OffsetAndMetadata(offset));
-        consumer.commitSync(offsetToCommit);
     }
 
     private DltReprocessDetail createDetail(ConsumerRecord<String, String> record,

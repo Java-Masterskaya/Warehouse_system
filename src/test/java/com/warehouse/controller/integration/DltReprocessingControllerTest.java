@@ -910,4 +910,161 @@ class DltReprocessingControllerTest {
 
         log.info("=== Multiple reprocessing calls test PASSED ===");
     }
+
+    /**
+     * Проверяет, что при batchSize < размера DLT хвост достижим через несколько вызовов.
+     * Отправляет 12 сообщений в DLT, создаёт 12 items, вызывает репроцессинг 3 раза (batch=5).
+     * Каждый вызов должен прогрессировать offset, а не застревать на одних и тех же сообщениях.
+     */
+    @Test
+    void shouldReachDltTailWithMultipleBatchCalls() throws Exception {
+        log.info("=== Starting DLT tail reachability test ===");
+
+        int totalMessages = 12;
+        String uniqueSkuPrefix = "TAIL-TEST-" + System.currentTimeMillis();
+        LocalDateTime now = LocalDateTime.now();
+
+        // Phase 1: Send 12 messages directly to DLT (bypass main topic retries)
+        for (int i = 0; i < totalMessages; i++) {
+            long itemId = 700000L + i;
+            String sku = uniqueSkuPrefix + "-" + i;
+            LowStockAlertEvent event = new LowStockAlertEvent(
+                    itemId, sku, "Tail test item " + i,
+                    5, 10, "test-user", now
+            );
+            kafkaTemplate.send(DLT_TOPIC, event).get();
+        }
+        log.info("Sent {} messages directly to DLT", totalMessages);
+
+        // Verify all 12 messages are in DLT
+        await().atMost(15, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    int dltCount = readAllDltMessages().size();
+                    assertThat(dltCount)
+                            .as("Expected %d messages in DLT, found %d", totalMessages, dltCount)
+                            .isEqualTo(totalMessages);
+                });
+        log.info("All {} messages confirmed in DLT", totalMessages);
+
+        // Phase 2: Create all 12 items so messages become processable
+        for (int i = 0; i < totalMessages; i++) {
+            long itemId = 700000L + i;
+            String sku = uniqueSkuPrefix + "-" + i;
+            jdbcTemplate.update(
+                    "INSERT INTO items (id, sku, name, category, min_stock, is_active, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    itemId, sku, "Tail test item " + i, "TestCategory", 10, true, now, now
+            );
+        }
+        log.info("Created {} items", totalMessages);
+
+        // Phase 3: First reprocessing call (batch size = 5)
+        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted());
+        log.info("First reprocessing call (batch=5)");
+
+        // Wait for first 5 StockAlerts
+        await().atMost(20, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    List<StockAlert> alerts = stockAlertRepository.findAll();
+                    long count = alerts.stream()
+                            .filter(a -> a.getItem() != null && a.getItem().getId() >= 700000L)
+                            .count();
+                    assertThat(count)
+                            .as("After 1st call: expected 5 StockAlerts, found %d", count)
+                            .isEqualTo(5);
+                });
+
+        // Verify DLT has 7 remaining messages
+        await().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    int remaining = readAllDltMessages().size();
+                    assertThat(remaining)
+                            .as("After 1st call: expected 7 messages in DLT, found %d", remaining)
+                            .isEqualTo(7);
+                });
+        log.info("Call 1: 5 processed, 7 remain in DLT");
+
+        // Phase 4: Second reprocessing call (should process next 5)
+        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted());
+        log.info("Second reprocessing call (batch=5)");
+
+        // Wait for 10 StockAlerts total
+        await().atMost(20, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    List<StockAlert> alerts = stockAlertRepository.findAll();
+                    long count = alerts.stream()
+                            .filter(a -> a.getItem() != null && a.getItem().getId() >= 700000L)
+                            .count();
+                    assertThat(count)
+                            .as("After 2nd call: expected 10 StockAlerts, found %d", count)
+                            .isEqualTo(10);
+                });
+
+        // Verify DLT has 2 remaining messages
+        await().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    int remaining = readAllDltMessages().size();
+                    assertThat(remaining)
+                            .as("After 2nd call: expected 2 messages in DLT, found %d", remaining)
+                            .isEqualTo(2);
+                });
+        log.info("Call 2: 10 processed, 2 remain in DLT");
+
+        // Phase 5: Third reprocessing call (should process final 2)
+        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted());
+        log.info("Third reprocessing call (batch=5)");
+
+        // Wait for all 12 StockAlerts
+        await().atMost(20, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    List<StockAlert> alerts = stockAlertRepository.findAll();
+                    long count = alerts.stream()
+                            .filter(a -> a.getItem() != null && a.getItem().getId() >= 700000L)
+                            .count();
+                    assertThat(count)
+                            .as("After 3rd call: expected 12 StockAlerts, found %d", count)
+                            .isEqualTo(12);
+                });
+
+        // Verify DLT is empty
+        await().atMost(15, TimeUnit.SECONDS)
+                .pollInterval(1, TimeUnit.SECONDS)
+                .untilAsserted(() -> {
+                    var messages = readAllDltMessages();
+                    assertThat(messages)
+                            .as("After 3rd call: DLT should be empty, found %d messages", messages.size())
+                            .isEmpty();
+                });
+        log.info("Call 3: all 12 processed, DLT empty");
+
+        // Final verification: all items have exactly 1 StockAlert (no duplicates)
+        List<StockAlert> allAlerts = stockAlertRepository.findAll();
+        for (int i = 0; i < totalMessages; i++) {
+            long itemId = 700000L + i;
+            long itemCount = allAlerts.stream()
+                    .filter(a -> a.getItem() != null && a.getItem().getId().equals(itemId))
+                    .count();
+            assertThat(itemCount)
+                    .as("Item %d should have exactly 1 StockAlert, found %d", itemId, itemCount)
+                    .isEqualTo(1);
+        }
+
+        log.info("=== DLT tail reachability test PASSED ===");
+    }
+
 }
