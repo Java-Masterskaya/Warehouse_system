@@ -19,12 +19,14 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
-@TestPropertySource(properties = {
-        "spring.retry.maxAttempts=3"
-})
+@TestPropertySource(properties = {"spring.retry.maxAttempts=3"})
 class KafkaStockAlertProducerRetryTest {
 
     @Autowired
@@ -62,7 +64,6 @@ class KafkaStockAlertProducerRetryTest {
 
         // Act & Assert
         assertThrows(RuntimeException.class, () -> producer.sendLowStockAlert(alert));
-
 
         verify(kafkaTemplate, times(3)).send(any(ProducerRecord.class));
         verify(metricService, never()).increment(anyString());
