@@ -146,8 +146,7 @@ public class UserServiceImplTest {
         verify(userRepository, never()).findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN);
         verify(userRepository).save(user);
     }
-
-
+    
     private User createUser(Long id) {
         User user = new User();
         user.setId(id);
