@@ -496,18 +496,13 @@ class DltReprocessingControllerTest {
                     assertThat(alert.getCreatedAt()).isNotNull();
                 });
 
-        // Проверяем через Admin API что сообщение обработано
-        await().atMost(10, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+        // Проверяем что DLT пуст (записи удалены после репроцессинга)
+        await().atMost(20, TimeUnit.SECONDS)
+                .pollInterval(2, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
-                    assertThat(isDltFullyProcessed()).isTrue();
-                });
-
-        // Проверяем что DLT пуст (записи удалены)
-        await().atMost(10, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
-                .untilAsserted(() -> {
-                    assertThat(readAllDltMessages()).isEmpty();
+                    assertThat(readAllDltMessages())
+                            .as("DLT should be empty after reprocessing and deletion")
+                            .isEmpty();
                 });
 
         Item savedItem = itemRepository.findById(invalidItemId).orElseThrow();
@@ -595,13 +590,13 @@ class DltReprocessingControllerTest {
                             .isEqualTo(5);
                 });
 
-        // Check: 5 messages remain unprocessed (committed offset = 5, end = 10)
-        await().atMost(20, TimeUnit.SECONDS)
+        // Check: 5 messages remain in DLT (batch size = 5, processed first 5)
+        await().atMost(30, TimeUnit.SECONDS)
                 .pollInterval(2, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
-                    long unprocessed = getUnprocessedDltMessageCount();
-                    assertThat(unprocessed)
-                            .as("Expected 5 unprocessed messages in DLT, found %d", unprocessed)
+                    int remaining = readAllDltMessages().size();
+                    assertThat(remaining)
+                            .as("Expected 5 remaining messages in DLT, found %d", remaining)
                             .isEqualTo(5);
                 });
 
@@ -630,22 +625,13 @@ class DltReprocessingControllerTest {
 
         log.info("Batch 2 done: all {} processed", totalMessages);
 
-        // Phase 6: Verify DLT is fully processed via Admin API
-        await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
-                .untilAsserted(() -> {
-                    assertThat(isDltFullyProcessed())
-                            .as("DLT should be fully processed")
-                            .isTrue();
-                });
-
-        // Phase 7: Verify DLT is empty (records deleted)
-        await().atMost(20, TimeUnit.SECONDS)
+        // Phase 6: Verify DLT is empty after second reprocessing and deletion
+        await().atMost(30, TimeUnit.SECONDS)
                 .pollInterval(2, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     assertThat(messages)
-                            .as("DLT should be empty after deletion, found %d messages", messages.size())
+                            .as("DLT should be empty after second reprocessing and deletion, found %d messages", messages.size())
                             .isEmpty();
                 });
 

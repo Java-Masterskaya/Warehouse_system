@@ -15,6 +15,7 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -243,17 +244,16 @@ class LowStockAlertDltIntegrationTest {
     }
 
     /**
-     * Тест 2: Проверяем, что ошибки БД ретраятся 3 раза и потом попадают в DLT.
+     * Тест 2: Проверяем, что ошибка "Item not found" ретраится 3 раза и потом попадает в DLT.
      * <p>
      * Ключевой критерий:
      * - В DLT ровно 1 сообщение (не 3-4)
      * - Время > 5 секунд (были ретраи)
      * - В логах видно 4 попытки обработки (1 основная + 3 ретрая)
      */
-
     @Test
-    void shouldRetryAndSendToDltAfterDbError() throws Exception {
-        // given: валидный JSON, но запись в БД упадет из-за foreign key
+    void shouldRetryAndSendToDltAfterItemNotFound() throws Exception {
+        // given: валидный JSON, но item не существует в БД
         LowStockAlertEvent event = new LowStockAlertEvent(
                 1L, "TEST-RETRY-SKU", "Test Retry",
                 5, 10, "admin", LocalDateTime.now()
@@ -287,10 +287,10 @@ class LowStockAlertDltIntegrationTest {
                     String exceptionMsg = new String(exceptionHeader.value());
                     log.info("Exception in DLT: {}", exceptionMsg);
 
-                    // Проверяем, что это ошибка целостности данных (БД)
-                    assertThat(exceptionMsg.toLowerCase())
-                            .as("Should contain database constraint violation")
-                            .containsAnyOf("constraint", "violates foreign key", "dataintegrity");
+                    // Проверяем, что это ошибка "Item not found" (EntityNotFoundException)
+                    assertThat(exceptionMsg)
+                            .as("Should contain 'Item not found' message")
+                            .contains("Item not found");
                 });
 
         long dltTime = System.currentTimeMillis();
@@ -316,7 +316,7 @@ class LowStockAlertDltIntegrationTest {
      */
     @Test
     void shouldHaveExactlyFourAttemptsBeforeDlt() throws Exception {
-        // given
+        // given: item не существует в БД
         LowStockAlertEvent event = new LowStockAlertEvent(
                 2L, "TEST-ATTEMPTS-SKU", "Test Attempts",
                 5, 10, "admin", LocalDateTime.now()
@@ -348,12 +348,12 @@ class LowStockAlertDltIntegrationTest {
     }
 
     /**
-     * Тест 3: Проверяем заголовки DLT сообщения.
+     * Тест 4: Проверяем заголовки DLT сообщения.
      * Критерий: "В DLT-сообщении сохранены заголовки с причиной (kafka_dlt-exception-message)"
      */
     @Test
     void shouldIncludeAllRequiredDltHeaders() throws Exception {
-        // given
+        // given: item не существует в БД
         String uniqueSku = "TEST-HEADERS-" + System.currentTimeMillis();
         LowStockAlertEvent event = new LowStockAlertEvent(
                 3L, uniqueSku, "Test Headers",
@@ -391,11 +391,8 @@ class LowStockAlertDltIntegrationTest {
                             .isNotEmpty();
 
                     assertThat(exceptionMessage)
-                            .as("Exception message should contain error cause")
-                            .containsAnyOf(
-                                    "DataIntegrityViolationException",
-                                    "constraint",
-                                    "violates foreign key");
+                            .as("Exception message should contain 'Item not found'")
+                            .contains("Item not found");
 
                     log.info("Exception message: {}",
                             exceptionMessage.substring(0, Math.min(200, exceptionMessage.length())));
@@ -421,7 +418,7 @@ class LowStockAlertDltIntegrationTest {
                     String causeFqcn = new String(causeFqcnHeader.value());
                     assertThat(causeFqcn)
                             .as("Should contain root cause exception class")
-                            .contains("DataIntegrityViolationException");
+                            .contains("EntityNotFoundException");
                     log.info("Exception cause FQCN: {}", causeFqcn);
 
                     // === Проверка kafka_dlt-exception-stacktrace ===
@@ -433,7 +430,7 @@ class LowStockAlertDltIntegrationTest {
                     String stacktrace = new String(stacktraceHeader.value());
                     assertThat(stacktrace)
                             .as("Stacktrace should contain error details")
-                            .contains("DataIntegrityViolationException");
+                            .contains("EntityNotFoundException");
                     log.info("Stacktrace present (length: {} chars)", stacktrace.length());
 
                     // === Проверка kafka_dlt-original-topic ===
