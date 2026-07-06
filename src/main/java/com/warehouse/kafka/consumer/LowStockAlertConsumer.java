@@ -8,6 +8,7 @@ import com.warehouse.repository.StockAlertRepository;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
+import jakarta.annotation.PostConstruct;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -18,7 +19,6 @@ import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -37,6 +37,8 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class LowStockAlertConsumer {
+
+    private static final int TRACEPARENT_PARTS_COUNT = 3;
 
     StockAlertRepository stockAlertRepository;
     StockAlertMapper stockAlertMapper;
@@ -65,9 +67,7 @@ public class LowStockAlertConsumer {
     @KafkaListener(
             topics = "low-stock-alerts",
             groupId = "warehouse-alerts",
-            properties = {
-                    "auto.offset.reset=earliest"
-            }
+            properties = {"auto.offset.reset=earliest"}
     )
     public void consume(ConsumerRecord<String, LowStockAlertEvent> record) {
         Span span = null;
@@ -198,7 +198,7 @@ public class LowStockAlertConsumer {
 
     private String extractSpanId(String traceparent) {
         String[] parts = traceparent.split("-");
-        if (parts.length >= 3) {
+        if (parts.length >= TRACEPARENT_PARTS_COUNT) {
             return parts[2];
         }
         return null;
