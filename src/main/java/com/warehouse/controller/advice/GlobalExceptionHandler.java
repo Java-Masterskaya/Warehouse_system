@@ -29,7 +29,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleEntityNotFound(EntityNotFoundException ex) {
         log.warn("Entity not found: {}", ex.getMessage());
-        String message = isAdmin() ? ex.getMessage() : "Resource not found";
+        String message;
+        if (isAdmin()) {
+            message = ex.getMessage();
+        } else {
+            message = "Resource not found";
+        }
         return new ErrorResponse("ENTITY_NOT_FOUND", message);
     }
 
@@ -42,14 +47,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateSkuException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDuplicateSku(DuplicateSkuException ex) {
-        String message = isAdmin() ? ex.getMessage() : "SKU already exists";
+        String message;
+        if (isAdmin()) {
+            message = ex.getMessage();
+        } else {
+            message = "SKU already exists";
+        }
         return new ErrorResponse("DUPLICATE_SKU", message);
     }
 
     @ExceptionHandler(DuplicateUsernameException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDuplicateUsername(DuplicateUsernameException ex) {
-        String message = isAdmin() ? ex.getMessage() : "Username already exists";
+        String message;
+        if (isAdmin()) {
+            message = ex.getMessage();
+        } else {
+            message = "Username already exists";
+        }
         return new ErrorResponse("DUPLICATE_USERNAME", message);
     }
 
@@ -85,15 +100,21 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleGeneral(Exception ex) {
         log.error("Unhandled exception: {}", ex.getMessage(), ex);
-        String message = isAdmin()
-                ? ex.getClass().getSimpleName() + ": " + ex.getMessage()
-                : "Internal server error";
+        String message;
+        if (isAdmin()) {
+            message = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+        } else {
+            message = "Internal server error";
+        }
         return new ErrorResponse("INTERNAL_ERROR", message);
     }
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth != null && auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (auth != null) {
+            return auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        }
+        return false;
     }
 }
