@@ -3,6 +3,9 @@ package com.warehouse.kafka;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.metric.MetricService;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +42,15 @@ class KafkaStockAlertProducerTest {
     @Mock
     private MetricService metricService;
 
+    @Mock
+    private Tracer tracer;
+
+    @Mock
+    private Propagator propagator;
+
+    @Mock
+    private Span span;
+
     private KafkaStockAlertProducer producer;
 
     private static final Long ITEM_ID = 1L;
@@ -50,7 +62,8 @@ class KafkaStockAlertProducerTest {
 
     @BeforeEach
     void setUp() {
-        producer = new KafkaStockAlertProducer(kafkaTemplate, metricService);
+        when(tracer.currentSpan()).thenReturn(span);
+        producer = new KafkaStockAlertProducer(kafkaTemplate, metricService, tracer, propagator);
     }
 
     /**
@@ -79,7 +92,7 @@ class KafkaStockAlertProducerTest {
     }
 
     /**
-     *ItemId используется как ключ сообщения.
+     * ItemId используется как ключ сообщения.
      */
     @Test
     void sendLowStockAlertShouldUseItemIdAsKey() {

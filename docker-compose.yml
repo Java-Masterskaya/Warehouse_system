@@ -109,6 +109,19 @@ services:
       - ./monitoring/grafana/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml
       - ./monitoring/grafana/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
       - ./monitoring/grafana/dashboards/warehouse.json:/etc/grafana/provisioning/dashboards/warehouse.json
+      - ./monitoring/grafana/datasources/tempo.yaml:/etc/grafana/provisioning/datasources/tempo.yaml
+    networks:
+      - app-network
+
+  # -- Tempo --
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./monitoring/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+      - "4318:4318"
     networks:
       - app-network
 
