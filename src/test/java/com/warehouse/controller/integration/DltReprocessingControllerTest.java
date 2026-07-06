@@ -18,7 +18,6 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
-import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -40,14 +39,19 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -171,7 +175,7 @@ class DltReprocessingControllerTest {
     }
 
     /**
-     * Удаляет и пересоздаёт DLT топик — гарантирует чистое состояние
+     * Удаляет и пересоздаёт DLT топик для гарантии чистого состояния.
      */
     private void deleteAndRecreateDltTopic() {
         try (AdminClient adminClient = createAdminClient()) {
@@ -236,7 +240,7 @@ class DltReprocessingControllerTest {
     }
 
     /**
-     * Сбрасывает offset consumer group в начало (для чистого старта)
+     * Сбрасывает offset consumer group в начало для чистого старта.
      */
     private void resetConsumerGroupOffsets() {
         try (AdminClient adminClient = createAdminClient()) {
@@ -276,7 +280,9 @@ class DltReprocessingControllerTest {
     // ==================== DLT Reading ====================
 
     /**
-     * Читает ВСЕ сообщения из DLT (с earliest) — для проверки наличия
+     * Читает все сообщения из DLT (с earliest) для проверки наличия.
+     *
+     * @return список записей из DLT
      */
     private List<ConsumerRecord<String, String>> readAllDltMessages() {
         List<ConsumerRecord<String, String>> allRecords = new ArrayList<>();
@@ -333,11 +339,12 @@ class DltReprocessingControllerTest {
         return allRecords;
     }
 
-    // ==================== NEW: Admin API Checks ====================
+    // ==================== Admin API Checks ====================
 
     /**
-     * Проверяет, что consumer group обработала все сообщения в DLT
-     * (committed offset == end offset для всех партиций)
+     * Проверяет, что consumer group обработала все сообщения в DLT.
+     *
+     * @return true если все сообщения обработаны, false в противном случае
      */
     private boolean isDltFullyProcessed() {
         try (AdminClient adminClient = createAdminClient()) {
@@ -366,8 +373,12 @@ class DltReprocessingControllerTest {
 
             for (TopicPartition tp : partitions) {
                 long endOffset = endOffsets.get(tp).offset();
-                Long committedOffset = committed.containsKey(tp) ?
-                        committed.get(tp).offset() : null;
+                Long committedOffset;
+                if (committed.containsKey(tp)) {
+                    committedOffset = committed.get(tp).offset();
+                } else {
+                    committedOffset = null;
+                }
 
                 log.debug("Partition {}: endOffset={}, committedOffset={}",
                         tp.partition(), endOffset, committedOffset);
@@ -385,8 +396,9 @@ class DltReprocessingControllerTest {
     }
 
     /**
-     * Возвращает количество необработанных сообщений в DLT
-     * (end offset - committed offset для reprocess group)
+     * Возвращает количество необработанных сообщений в DLT.
+     *
+     * @return количество необработанных сообщений
      */
     private long getUnprocessedDltMessageCount() {
         try (AdminClient adminClient = createAdminClient()) {
@@ -416,8 +428,12 @@ class DltReprocessingControllerTest {
             long unprocessed = 0;
             for (TopicPartition tp : partitions) {
                 long endOffset = endOffsets.get(tp).offset();
-                long committedOffset = committed.containsKey(tp) ?
-                        committed.get(tp).offset() : 0;
+                long committedOffset;
+                if (committed.containsKey(tp)) {
+                    committedOffset = committed.get(tp).offset();
+                } else {
+                    committedOffset = 0;
+                }
                 unprocessed += Math.max(0, endOffset - committedOffset);
             }
 
@@ -631,7 +647,8 @@ class DltReprocessingControllerTest {
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     assertThat(messages)
-                            .as("DLT should be empty after second reprocessing and deletion, found %d messages", messages.size())
+                            .as("DLT should be empty after second reprocessing and deletion, found %d messages",
+                                    messages.size())
                             .isEmpty();
                 });
 

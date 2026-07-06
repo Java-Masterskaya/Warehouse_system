@@ -47,6 +47,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DltReprocessingServiceImpl implements DltReprocessingService {
 
+    private static final int MAX_EXCEPTION_MESSAGE_LENGTH = 200;
+    private static final Duration POLL_TIMEOUT = Duration.ofSeconds(2);
+    private static final int MAX_EMPTY_POLLS = 3;
+
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final KafkaTopicProperties topicProperties;
     private final ObjectMapper objectMapper;
@@ -59,9 +63,6 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
 
     @Value("${app.kafka.topics.low-stock.reprocess-send-timeout-sec:10}")
     private int sendTimeoutSec;
-
-    private static final Duration POLL_TIMEOUT = Duration.ofSeconds(2);
-    private static final int MAX_EMPTY_POLLS = 3;
 
     @Async
     @Override
@@ -139,7 +140,7 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
             }
 
             totalMessages++;
-            String recordKey = record.key() != null ? record.key() : "";
+            String recordKey = getRecordKey(record);
             String dedupKey = recordKey + "@" + record.partition() + "@" + record.offset();
 
             if (!processedKeys.add(dedupKey)) {
@@ -164,6 +165,13 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
 
         return new BatchProcessResult(totalMessages, successCount, failedCount,
                 skippedDuplicates, processedCount, details, maxProcessedOffsets);
+    }
+
+    private String getRecordKey(ConsumerRecord<String, String> record) {
+        if (record.key() != null) {
+            return record.key();
+        }
+        return "";
     }
 
     private SingleProcessResult processSingleRecord(ConsumerRecord<String, String> record,
@@ -334,7 +342,10 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
         var header = record.headers().lastHeader("kafka_dlt-exception-message");
         if (header != null) {
             String msg = new String(header.value());
-            return msg.length() > 200 ? msg.substring(0, 200) + "..." : msg;
+            if (msg.length() > MAX_EXCEPTION_MESSAGE_LENGTH) {
+                return msg.substring(0, MAX_EXCEPTION_MESSAGE_LENGTH) + "...";
+            }
+            return msg;
         }
         var causeHeader = record.headers().lastHeader("kafka_dlt-exception-cause-fqcn");
         if (causeHeader != null) {

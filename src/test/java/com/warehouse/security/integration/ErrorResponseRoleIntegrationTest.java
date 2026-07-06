@@ -111,7 +111,6 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.message").value("Access denied"));
     }
 
-
     private String obtainToken(String username, String password) throws Exception {
         return objectMapper.readTree(mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

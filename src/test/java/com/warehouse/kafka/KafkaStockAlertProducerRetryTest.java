@@ -24,13 +24,13 @@ import static org.mockito.Mockito.when;
  * Тестирует повторные попытки отправки сообщений при ошибках.
  */
 @SpringBootTest(properties = {
-        "spring.kafka.bootstrap-servers=localhost:9092",
-        "spring.kafka.consumer.group-id=test-group",
-        "app.kafka.consumer.concurrency=1",
-        "app.kafka.retry.initial-interval-ms=100",
-        "app.kafka.retry.multiplier=1.0",
-        "app.kafka.retry.max-interval-ms=1000",
-        "app.kafka.retry.max-attempts=3"
+    "spring.kafka.bootstrap-servers=localhost:9092",
+    "spring.kafka.consumer.group-id=test-group",
+    "app.kafka.consumer.concurrency=1",
+    "app.kafka.retry.initial-interval-ms=100",
+    "app.kafka.retry.multiplier=1.0",
+    "app.kafka.retry.max-interval-ms=1000",
+    "app.kafka.retry.max-attempts=3"
 })
 class KafkaStockAlertProducerRetryTest {
 

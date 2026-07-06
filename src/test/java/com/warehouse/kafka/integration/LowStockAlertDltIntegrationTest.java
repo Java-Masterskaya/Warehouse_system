@@ -15,7 +15,6 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -27,7 +26,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -36,9 +34,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -172,9 +170,14 @@ class LowStockAlertDltIntegrationTest {
 
         log.info("Total DLT messages found: {}", allRecords.size());
         for (ConsumerRecord<String, String> record : allRecords) {
+            String valuePreview;
+            if (record.value() != null) {
+                valuePreview = record.value().substring(0, Math.min(100, record.value().length()));
+            } else {
+                valuePreview = "null";
+            }
             log.info("DLT record: partition={}, offset={}, key={}, value={}",
-                    record.partition(), record.offset(), record.key(),
-                    record.value() != null ? record.value().substring(0, Math.min(100, record.value().length())) : "null");
+                    record.partition(), record.offset(), record.key(), valuePreview);
             // Decode base64 if needed (JsonSerializer encodes String as JSON)
             if (record.value() != null && record.value().startsWith("\"")) {
                 try {
@@ -215,8 +218,7 @@ class LowStockAlertDltIntegrationTest {
 
                     // Ищем наше сообщение по уникальному маркеру в ключе или значении
                     Optional<ConsumerRecord<String, String>> ourRecord = records.stream()
-                            .filter(record -> (record.key() != null && record.key().contains(uniqueMarker)) ||
-                                    (record.value() != null && record.value().contains(uniqueMarker)))
+                            .filter(record -> isMatchingRecord(record, uniqueMarker))
                             .findFirst();
 
                     assertThat(ourRecord)
@@ -235,12 +237,18 @@ class LowStockAlertDltIntegrationTest {
                     log.info("Exception cause class: {}", causeClass);
 
                     // Проверяем, что это именно ошибка десериализации (не ретраилась)
-                    // Для String сообщений, сериализованных JsonDeserializer, ошибка будет DeserializationException
-                    // (MessageConversionException используется в RabbitMQ, DeserializationException - в Kafka)
+                    // Для String сообщений, сериализованных JsonDeserializer,
+                    // ошибка будет DeserializationException
                     assertThat(causeClass)
                             .as("Should be DeserializationException (non-retryable deserialization error)")
                             .contains("DeserializationException");
                 });
+    }
+
+    private boolean isMatchingRecord(ConsumerRecord<String, String> record, String uniqueMarker) {
+        boolean keyMatches = record.key() != null && record.key().contains(uniqueMarker);
+        boolean valueMatches = record.value() != null && record.value().contains(uniqueMarker);
+        return keyMatches || valueMatches;
     }
 
     /**
@@ -380,7 +388,8 @@ class LowStockAlertDltIntegrationTest {
                     ConsumerRecord<String, String> record = relevant.get(0);
 
                     // === Проверка kafka_dlt-exception-message (КРИТЕРИЙ ЗАДАЧИ) ===
-                    Header exceptionMsgHeader = record.headers().lastHeader("kafka_dlt-exception-message");
+                    Header exceptionMsgHeader = record.headers()
+                            .lastHeader("kafka_dlt-exception-message");
                     assertThat(exceptionMsgHeader)
                             .as("Header 'kafka_dlt-exception-message' must be present")
                             .isNotNull();
@@ -410,7 +419,8 @@ class LowStockAlertDltIntegrationTest {
                     log.info("Exception FQCN: {}", fqcn);
 
                     // === Проверка kafka_dlt-exception-cause-fqcn ===
-                    Header causeFqcnHeader = record.headers().lastHeader("kafka_dlt-exception-cause-fqcn");
+                    Header causeFqcnHeader = record.headers()
+                            .lastHeader("kafka_dlt-exception-cause-fqcn");
                     assertThat(causeFqcnHeader)
                             .as("Header 'kafka_dlt-exception-cause-fqcn' must be present")
                             .isNotNull();
@@ -422,7 +432,8 @@ class LowStockAlertDltIntegrationTest {
                     log.info("Exception cause FQCN: {}", causeFqcn);
 
                     // === Проверка kafka_dlt-exception-stacktrace ===
-                    Header stacktraceHeader = record.headers().lastHeader("kafka_dlt-exception-stacktrace");
+                    Header stacktraceHeader = record.headers()
+                            .lastHeader("kafka_dlt-exception-stacktrace");
                     assertThat(stacktraceHeader)
                             .as("Header 'kafka_dlt-exception-stacktrace' must be present")
                             .isNotNull();
@@ -434,7 +445,8 @@ class LowStockAlertDltIntegrationTest {
                     log.info("Stacktrace present (length: {} chars)", stacktrace.length());
 
                     // === Проверка kafka_dlt-original-topic ===
-                    Header originalTopicHeader = record.headers().lastHeader("kafka_dlt-original-topic");
+                    Header originalTopicHeader = record.headers()
+                            .lastHeader("kafka_dlt-original-topic");
                     assertThat(originalTopicHeader)
                             .as("Header 'kafka_dlt-original-topic' must be present")
                             .isNotNull();
@@ -446,7 +458,8 @@ class LowStockAlertDltIntegrationTest {
                     log.info("Original topic: {}", originalTopic);
 
                     // === Проверка kafka_dlt-original-partition ===
-                    Header originalPartitionHeader = record.headers().lastHeader("kafka_dlt-original-partition");
+                    Header originalPartitionHeader = record.headers()
+                            .lastHeader("kafka_dlt-original-partition");
                     assertThat(originalPartitionHeader)
                             .as("Header 'kafka_dlt-original-partition' must be present")
                             .isNotNull();
@@ -454,14 +467,16 @@ class LowStockAlertDltIntegrationTest {
                             new String(originalPartitionHeader.value()));
 
                     // === Проверка kafka_dlt-original-offset ===
-                    Header originalOffsetHeader = record.headers().lastHeader("kafka_dlt-original-offset");
+                    Header originalOffsetHeader = record.headers()
+                            .lastHeader("kafka_dlt-original-offset");
                     assertThat(originalOffsetHeader)
                             .as("Header 'kafka_dlt-original-offset' must be present")
                             .isNotNull();
                     log.info("Original offset present");
 
                     // === Проверка kafka_dlt-original-timestamp ===
-                    Header originalTimestampHeader = record.headers().lastHeader("kafka_dlt-original-timestamp");
+                    Header originalTimestampHeader = record.headers()
+                            .lastHeader("kafka_dlt-original-timestamp");
                     assertThat(originalTimestampHeader)
                             .as("Header 'kafka_dlt-original-timestamp' must be present")
                             .isNotNull();
