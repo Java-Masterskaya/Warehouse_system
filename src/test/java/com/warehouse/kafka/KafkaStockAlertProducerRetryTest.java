@@ -2,11 +2,16 @@ package com.warehouse.kafka;
 
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
+import com.warehouse.metric.MetricService;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
@@ -14,24 +19,13 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
-/**
- * Unit-тест для KafkaStockAlertProducer.
- * Тестирует повторные попытки отправки сообщений при ошибках.
- */
 @SpringBootTest
+@TestPropertySource(properties = {
+        "spring.retry.maxAttempts=3"
+})
 class KafkaStockAlertProducerRetryTest {
-
-    private static final Long ITEM_ID = 1L;
-    private static final String ITEM_SKU = "KEY-001";
-    private static final String ITEM_NAME = "Тестовый товар";
-    private static final int CURRENT_STOCK = 2;
-    private static final int MIN_STOCK = 5;
-    private static final String TRIGGERED_BY = "admin";
 
     @Autowired
     private KafkaStockAlertProducer producer;
@@ -39,31 +33,38 @@ class KafkaStockAlertProducerRetryTest {
     @MockitoBean
     private KafkaTemplate<String, Object> kafkaTemplate;
 
-    /**
-     * Тестирует метод sendLowStockAlertShouldRetryThreeTimesOnFailure.
-     */
+    @MockitoBean
+    private MetricService metricService;
+
+    @MockitoBean
+    private Tracer tracer;
+
+    @MockitoBean
+    private Propagator propagator;
+
     @Test
     void sendLowStockAlertShouldRetryThreeTimesOnFailure() {
         // Arrange
         LowStockAlertEvent alert = new LowStockAlertEvent(
-                ITEM_ID,
-                ITEM_SKU,
-                ITEM_NAME,
-                CURRENT_STOCK,
-                MIN_STOCK,
-                TRIGGERED_BY,
+                1L,
+                "KEY-001",
+                "Тестовый товар",
+                2,
+                5,
+                "admin",
                 LocalDateTime.now());
 
         CompletableFuture<SendResult<String, Object>> failedFuture = new CompletableFuture<>();
         failedFuture.completeExceptionally(new RuntimeException("Kafka broker unavailable"));
 
-        when(kafkaTemplate.send(anyString(), anyString(), any()))
+        when(kafkaTemplate.send(any(ProducerRecord.class)))
                 .thenReturn(failedFuture);
 
         // Act & Assert
         assertThrows(RuntimeException.class, () -> producer.sendLowStockAlert(alert));
 
-        // Проверяем, что send был вызван 3 раза (1 попытка + 2 retry)
-        verify(kafkaTemplate, times(3)).send(anyString(), anyString(), any());
+
+        verify(kafkaTemplate, times(3)).send(any(ProducerRecord.class));
+        verify(metricService, never()).increment(anyString());
     }
 }
