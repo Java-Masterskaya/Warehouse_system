@@ -48,7 +48,6 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
                 alert
         );
 
-        // Явно добавляем заголовки для проброса traceId
         if (span != null) {
             span.tag("kafka.topic", TOPIC_NAME);
             span.tag("item.id", String.valueOf(alert.itemId()));
