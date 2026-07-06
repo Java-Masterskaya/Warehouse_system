@@ -37,15 +37,19 @@ public class LowStockAlertConsumer {
     @KafkaListener(topics = "low-stock-alerts", groupId = "warehouse-alerts",
             containerFactory = "kafkaListenerContainerFactory")
     public void consume(LowStockAlertEvent event) {
-        log.info("Received low stock alert for itemId={}, currentStock={}, minStock={}",
-                event.itemId(), event.currentStock(), event.minStock());
+        log.info("Received low stock alert for itemId={}", event.itemId());
 
-        StockAlert alert = stockAlertMapper.toEntity(
-                event,
-                itemRepository.getReferenceById(event.itemId())
-        );
-        stockAlertRepository.save(alert);
+        var item = itemRepository.findById(event.itemId())
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(
+                        "Item not found: " + event.itemId()));
 
-        log.info("StockAlert saved with id={}", alert.getId());
+        try {
+            StockAlert alert = stockAlertMapper.toEntity(event, item);
+            stockAlertRepository.save(alert);
+            log.info("StockAlert saved with id={}", alert.getId());
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.warn("Duplicate alert skipped: itemId={}, triggeredAt={}",
+                    event.itemId(), event.triggeredAt());
+        }
     }
 }
