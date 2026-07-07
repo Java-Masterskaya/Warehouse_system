@@ -21,6 +21,9 @@ spring:
     compatibility-verifier:
       enabled: false
 
+  cache:
+    type: redis
+
 redis:
   cache:
     categories-ttl-minutes: 10
