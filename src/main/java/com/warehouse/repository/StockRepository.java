@@ -11,6 +11,7 @@ import java.util.Optional;
 
 @Repository
 public interface StockRepository extends JpaRepository<Stock, Long> {
+
     Optional<Stock> findByItemId(Long itemId);
 
     @Query("select s.quantity from Stock s where s.item.id = :itemId")

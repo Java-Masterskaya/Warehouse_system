@@ -11,6 +11,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -45,6 +46,10 @@ public class Stock {
     /** Время последнего обновления остатка. */
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /** Версия для optimistic locking. */
+    @Version
+    private Long version;
 
     @PrePersist
     @PreUpdate
