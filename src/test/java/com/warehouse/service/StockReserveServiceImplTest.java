@@ -19,7 +19,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -68,7 +67,7 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(itemId)).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findAllByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(List.of());
+        when(stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(0L);
 
         when(userRepository.getReferenceById(10L)).thenReturn(user);
 
@@ -135,8 +134,8 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(itemId)).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findAllByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(
-                List.of(oldReservation));
+        when(stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(
+                (long) oldReservation.getQuantity());
 
         assertThrows(InsufficientStockException.class, () -> service.reserve(itemId, request, ctx));
 
@@ -166,8 +165,8 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(itemId)).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findAllByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(
-                List.of(reservation1, reservation2));
+        when(stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(
+                (long) reservation1.getQuantity() + reservation2.getQuantity());
 
         assertThrows(InsufficientStockException.class, () -> service.reserve(itemId, request, ctx));
     }

@@ -1,6 +1,7 @@
 package com.warehouse.service.reservation;
 
 import com.warehouse.dto.UserContext;
+import com.warehouse.dto.request.reservation.ReleaseRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
 
 /**
@@ -17,4 +18,13 @@ public interface StockReserveService {
      * @param ctx     пользователь проводящий операцию
      */
     void reserve(Long itemId, ReserveRequest request, UserContext ctx);
+
+    /**
+     * Регистрирует бронирование остатков.
+     *
+     * @param itemId  идентификатор зарезервированного товара
+     * @param request запрос с id резервирования которое нужно снять
+     * @param ctx     пользователь проводящий операцию
+     */
+    void release(Long itemId, ReleaseRequest request, UserContext ctx);
 }
