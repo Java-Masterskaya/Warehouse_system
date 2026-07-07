@@ -44,7 +44,7 @@ public class OutboxEvent {
     /**
      * JSON-данные события.
      */
-    @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "payload", nullable = false)
     private String payload;
 
     /**

@@ -15,13 +15,13 @@ import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
-import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.metric.MetricService;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.outbox.OutboxService;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -36,14 +36,15 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 
 /**
  * Реализация сервиса для управления движениями товаров на складе.
  * Обрабатывает операции прихода товара и сохраняет записи о движениях.
+ * 
+ * <p>LowStockAlert события сохраняются в outbox (атомарно с движением), а затем
+ * релей отправляет их в Kafka. Это гарантирует, что событие не потеряется даже при краше.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -57,7 +58,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
     StockRepository stockRepository;
-    KafkaStockAlertProducer kafkaProducer;
+    OutboxService outboxService;
     MetricService metricService;
 
     /**
@@ -145,18 +146,10 @@ public class StockMovementServiceImpl implements StockMovementService {
                         ctx.username(),
                         LocalDateTime.now()
                 );
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            kafkaProducer.sendLowStockAlert(event);
-                            log.info("LowStockAlert sent: itemId={}, stockAfter={}, minStock={}",
-                                    item.getId(), stockAfter, item.getMinStock());
-                        } catch (Exception e) {
-                            log.error("Failed to send LowStockAlert for itemId={}: {}", item.getId(), e.getMessage());
-                        }
-                    }
-                });
+                // Сохраняем событие в outbox атомарно с движением
+                outboxService.saveLowStockAlertEvent(event);
+                log.info("LowStockAlert saved to outbox: itemId={}, stockAfter={}, minStock={}",
+                        item.getId(), stockAfter, item.getMinStock());
             }
 
             log.info("Write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
@@ -244,19 +237,10 @@ public class StockMovementServiceImpl implements StockMovementService {
                     ctx.username(),
                     LocalDateTime.now()
             );
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        kafkaProducer.sendLowStockAlert(event);
-                        log.info("LowStockAlert sent from stocktake: itemId={}, counted={}, minStock={}",
-                                item.getId(), counted, item.getMinStock());
-                    } catch (Exception e) {
-                        log.error("Failed to send LowStockAlert from stocktake for itemId={}: {}",
-                                item.getId(), e.getMessage());
-                    }
-                }
-            });
+            // Сохраняем событие в outbox атомарно с движением
+            outboxService.saveLowStockAlertEvent(event);
+            log.info("LowStockAlert saved to outbox from stocktake: itemId={}, counted={}, minStock={}",
+                    item.getId(), counted, item.getMinStock());
         }
 
         log.info("Stocktake: itemId={}, current={}, counted={}, delta={}, userId={}",
