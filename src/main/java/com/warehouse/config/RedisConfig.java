@@ -2,6 +2,7 @@ package com.warehouse.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,11 @@ import java.util.Map;
 
 @Configuration
 @EnableCaching
+@ConditionalOnProperty(
+        name = "app.redis.enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class RedisConfig {
 
     private static final int CATEGORIES_TTL_MINUTES = 10;
