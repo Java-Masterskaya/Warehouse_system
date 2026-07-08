@@ -100,7 +100,11 @@ public class StockReserveServiceImpl implements StockReserveService {
     @Scheduled(fixedDelay = 60000)
     @Transactional
     public void expireReservations() {
-        stockReserveRepository.expireReservations(LocalDateTime.now());
+        int updated = stockReserveRepository.expireReservations(LocalDateTime.now());
+
+        if (updated > 0) {
+            log.info("Expired {} reservations", updated);
+        }
     }
 
     private Stock lockStock(Long itemId) {
@@ -134,7 +138,7 @@ public class StockReserveServiceImpl implements StockReserveService {
         }
 
         // check reservation expired
-        if (reservation.getExpiredAt().isBefore(LocalDateTime.now())) {
+        if (!reservation.getExpiredAt().isAfter(LocalDateTime.now())) {
             log.warn("Reservation expired but stay Active.");
             throw ReservationException.ofStatus(ReservationStatus.EXPIRED, ReservationStatus.ACTIVE);
         }

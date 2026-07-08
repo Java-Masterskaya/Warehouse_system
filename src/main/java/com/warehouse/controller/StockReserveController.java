@@ -63,6 +63,6 @@ public class StockReserveController {
     public void writeOff(@PathVariable Long itemId, @Valid @RequestBody ReservationActionRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Write-off item request: itemId={}, reservationId={}", itemId, request.reservationId());
-        //stockReserveService.release(itemId, request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+        stockReserveService.writeOff(itemId, request, new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 }
