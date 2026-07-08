@@ -27,21 +27,34 @@ public class JwtUtil {
     private String secret;
 
     @Getter
-    @Value("${app.jwt.expiration-ms:86400000}")
+    @Value("${app.jwt.expiration-ms:86400000}") // access token expiration / 1 day
     private long expirationMs;
+
+    @Getter
+    @Value("${app.jwt.refresh-expiration-ms:604800000}") // refresh token expiration / 7 days
+    private long refreshExpirationMs;
 
     private SecretKey key;
 
     @PostConstruct
     public void init() {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        log.info("🔐 JwtUtil initialized with expirationMs: {}", expirationMs);
+        log.info("🔐 JwtUtil initialized with expirationMs: {}, refreshExpirationMs: {}",
+                expirationMs, refreshExpirationMs);
     }
 
     public String generateToken(String username, Long userId, List<String> roles) {
-        log.debug("Generating JWT for user: {}", username);
+        return generateToken(username, userId, roles, expirationMs);
+    }
+
+    public String generateRefreshToken(String username, Long userId, List<String> roles) {
+        return generateToken(username, userId, roles, refreshExpirationMs);
+    }
+
+    private String generateToken(String username, Long userId, List<String> roles, long expiration) {
+        log.debug("Generating token for user: {}", username);
         Instant now = Instant.now();
-        Instant expiry = now.plusMillis(expirationMs);
+        Instant expiry = now.plusMillis(expiration);
 
         String token = Jwts.builder()
                 .subject(username)
@@ -52,11 +65,19 @@ public class JwtUtil {
                 .signWith(key)
                 .compact();
 
-        log.debug("JWT generated successfully for user: {} expires in {} ms", username, expirationMs);
+        log.debug("Token generated successfully for user: {} expires in {} ms", username, expiration);
         return token;
     }
 
     public Optional<JwtPayload> parseToken(String token) {
+        return parseTokenInternal(token);
+    }
+
+    public Optional<JwtPayload> parseRefreshToken(String token) {
+        return parseTokenInternal(token);
+    }
+
+    private Optional<JwtPayload> parseTokenInternal(String token) {
         try {
             Claims claims = parseClaims(token);
             String username = claims.getSubject();
@@ -83,6 +104,17 @@ public class JwtUtil {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public long getTokenRemainingTime(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            Date expiration = claims.getExpiration();
+            long remaining = expiration.getTime() - System.currentTimeMillis();
+            return Math.max(0, remaining);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     public record JwtPayload(Long userId, String username, List<String> roles) {
