@@ -6,6 +6,7 @@ import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
 import com.warehouse.exception.OutboxException;
+import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.repository.OutboxEventRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

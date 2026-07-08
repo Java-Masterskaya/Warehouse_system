@@ -23,17 +23,19 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     /**
      * Находит все неотправленные события, отсортированные по времени создания.
      * Используется релаем для отправки событий в Kafka.
+     * Использует FOR UPDATE SKIP LOCKED для параллельной обработки несколькими инстансами.
      *
      * @param limit максимальное количество событий для выборки
      * @return список неотправленных событий
      */
-    @Query("""
-            SELECT e
-            FROM OutboxEvent e
-            WHERE e.status = com.warehouse.entity.OutboxStatus.PENDING
-            ORDER BY e.createdAt ASC
+    @Query(value = """
+            SELECT *
+            FROM outbox
+            WHERE status = 'PENDING'
+            ORDER BY created_at ASC
             LIMIT :limit
-            """)
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
     List<OutboxEvent> findPendingEvents(@Param("limit") int limit);
 
     /**

@@ -20,6 +20,13 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.warehouse.dto.event"
+    # Настройки для outbox pattern
+    outbox:
+      polling:
+        # Максимальное количество событий для обработки за один вызов
+        limit: 100
+        # Интервал между опросами в миллисекундах
+        interval-ms: 5000
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -67,3 +74,4 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
+    com.warehouse.service.outbox: DEBUG

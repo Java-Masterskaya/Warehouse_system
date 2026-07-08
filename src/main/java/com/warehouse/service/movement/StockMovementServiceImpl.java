@@ -21,7 +21,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.service.outbox.OutboxService;
+import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

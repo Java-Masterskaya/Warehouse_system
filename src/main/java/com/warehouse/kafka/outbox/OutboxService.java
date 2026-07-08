@@ -1,4 +1,4 @@
-package com.warehouse.service.outbox;
+package com.warehouse.kafka.outbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.event.LowStockAlertEvent;
