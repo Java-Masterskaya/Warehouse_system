@@ -6,51 +6,31 @@ import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.repository.OutboxEventRepository;
-import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Scheduler для отправки событий из outbox в Kafka.
- * Регулярно опрашивает таблицу outbox и отправляет события с статусом PENDING.
- */
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
-@FieldDefaults(level = AccessLevel.PRIVATE)
 public class OutboxEventRelay {
 
-    OutboxEventRepository outboxEventRepository;
-    KafkaStockAlertProducer kafkaProducer;
-    ObjectMapper objectMapper;
+    private final OutboxEventRepository outboxEventRepository;
+    private final KafkaStockAlertProducer kafkaProducer;
+    private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
 
-    /**
-     * Конфигурируемые параметры из application.yml (kafka.outbox.polling)
-     */
     @Value("${spring.kafka.outbox.polling.limit:100}")
     private int pollingLimit;
 
-    @Value("${spring.kafka.outbox.polling.interval-ms:5000}")
-    private long pollingIntervalMs;
-
-    /**
-     * Регулярно опрашивает outbox и отправляет события в Kafka.
-     * Выполняется каждые pollingIntervalMs миллисекунд.
-     * Обрабатывает максимум pollingLimit событий за один вызов.
-     *
-     * <p>Если Kafka недоступна, события остаются в статусе PENDING
-     * и будут повторены при следующей попытке.</p>
-     */
     @Scheduled(fixedDelayString = "${spring.kafka.outbox.polling.interval-ms:5000}")
-    @Transactional
     public void relayPendingEvents() {
         log.debug("Checking for pending outbox events, limit={}", pollingLimit);
 
@@ -63,61 +43,51 @@ public class OutboxEventRelay {
 
         log.info("Found {} pending outbox events, processing...", pendingEvents.size());
 
-        // Обрабатываем каждое событие в отдельной транзакции
-        // Это гарантирует at-least-once доставку:
-        // - Если отправка в Kafka успешна, статус обновляется на SENT
-        // - Если краш после отправки но до обновления — событие повторится
-        // - Если ошибка при отправке — событие останется PENDING и повторится
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+
         for (OutboxEvent event : pendingEvents) {
             try {
-                processEventInSeparateTransaction(event);
+                txTemplate.executeWithoutResult(status -> processSingleEvent(event.getId()));
             } catch (Exception e) {
-                log.error("Failed to process outbox event with id={}, eventType={}",
+                // Логируем и продолжаем — событие останется PENDING
+                log.error("Failed to process outbox event id={}, eventType={}",
                         event.getId(), event.getEventType(), e);
-                // Продолжаем обработку остальных событий
             }
         }
 
         log.info("Processed {} outbox events", pendingEvents.size());
     }
 
-    /**
-     * Обрабатывает одно событие в отдельной транзакции.
-     * Это гарантирует at-least-once доставку без отката всей батчи при ошибке.
-     *
-     * @param event событие из outbox
-     * @throws Exception если произошла ошибка при обработке
-     */
-    @Transactional
-    public void processEventInSeparateTransaction(OutboxEvent event) throws Exception {
-        log.debug("Processing outbox event id={}, eventType={}", event.getId(), event.getEventType());
+    private void processSingleEvent(Long eventId) {
+        // Re-fetch в текущей транзакции — гарантируем attached entity
+        OutboxEvent event = outboxEventRepository.findById(eventId)
+                .orElseThrow(() -> new IllegalStateException("Event not found: " + eventId));
+
+        if (event.getStatus() != OutboxStatus.PENDING) {
+            log.debug("Event id={} already processed (status={}), skipping",
+                    eventId, event.getStatus());
+            return;
+        }
 
         try {
-            // Десериализуем событие
-            LowStockAlertEvent lowStockAlertEvent = objectMapper.readValue(
+            LowStockAlertEvent alertEvent = objectMapper.readValue(
                     event.getPayload(),
                     LowStockAlertEvent.class
             );
 
-            // Отправляем в Kafka
-            kafkaProducer.sendLowStockAlert(lowStockAlertEvent);
+            kafkaProducer.sendLowStockAlert(alertEvent);
 
-            // Обновляем статус на SENT
-            int updated = outboxEventRepository.updateToSent(
-                    event.getId(),
-                    LocalDateTime.now()
-            );
+            // WHERE status = PENDING — защита от race condition
+            int updated = outboxEventRepository.updateToSent(eventId, LocalDateTime.now());
 
             if (updated == 0) {
-                log.warn("Failed to update outbox event id={} to SENT status (may be concurrent update)", event.getId());
+                log.warn("Event id={} not updated to SENT (concurrent processing?)", eventId);
             } else {
-                log.debug("Successfully sent event id={} to Kafka, updated status to SENT",
-                        event.getId());
+                log.debug("Successfully sent event id={} to Kafka", eventId);
             }
         } catch (Exception e) {
-            log.error("Error processing outbox event id={}: {}", event.getId(), e.getMessage());
-            // Исключение будет перехвачено в relayPendingEvents, событие останется PENDING
-            throw e;
+            log.error("Error processing outbox event id={}: {}", eventId, e.getMessage());
+            throw new RuntimeException(e); // rollback -> останется PENDING
         }
     }
 }

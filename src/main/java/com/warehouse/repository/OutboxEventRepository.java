@@ -39,19 +39,6 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     List<OutboxEvent> findPendingEvents(@Param("limit") int limit);
 
     /**
-     * Находит событие по ID.
-     *
-     * @param id ID события
-     * @return событие или Optional.empty(), если не найдено
-     */
-    @Query("""
-            SELECT e
-            FROM OutboxEvent e
-            WHERE e.id = :id
-            """)
-    Optional<OutboxEvent> findById(@Param("id") Long id);
-
-    /**
      * Обновляет статус события на SENT после успешной отправки в Kafka.
      *
      * @param id ID события
@@ -59,13 +46,13 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
      * @return количество обновленных строк
      */
     @Modifying
-    @Transactional
     @Query("""
-            UPDATE OutboxEvent e
-            SET e.status = com.warehouse.entity.OutboxStatus.SENT,
-                e.sentAt = :sentAt
-            WHERE e.id = :id
-            """)
+    UPDATE OutboxEvent e
+    SET e.status = com.warehouse.entity.OutboxStatus.SENT,
+        e.sentAt = :sentAt
+    WHERE e.id = :id
+      AND e.status = com.warehouse.entity.OutboxStatus.PENDING
+    """)
     int updateToSent(@Param("id") Long id, @Param("sentAt") LocalDateTime sentAt);
 
     /**
