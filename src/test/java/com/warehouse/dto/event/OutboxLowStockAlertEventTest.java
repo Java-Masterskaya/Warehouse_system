@@ -55,15 +55,15 @@ class OutboxLowStockAlertEventTest {
 
         assertNotNull(json);
         // LocalDateTime сериализуется как массив [year,month,day,hour,minute]
-        String expectedJson = "{" +
-                "\"itemId\":" + ITEM_ID + "," +
-                "\"sku\":\"" + SKU + "\"," +
-                "\"itemName\":\"" + ITEM_NAME + "\"," +
-                "\"currentStock\":" + CURRENT_STOCK + "," +
-                "\"minStock\":" + MIN_STOCK + "," +
-                "\"triggeredBy\":\"" + TRIGGERED_BY + "\"," +
-                "\"triggeredAt\":[2026,7,7,12,0]" +
-                "}";
+        String expectedJson = "{"
+                + "\"itemId\":" + ITEM_ID + ","
+                + "\"sku\":\"" + SKU + "\","
+                + "\"itemName\":\"" + ITEM_NAME + "\","
+                + "\"currentStock\":" + CURRENT_STOCK + ","
+                + "\"minStock\":" + MIN_STOCK + ","
+                + "\"triggeredBy\":\"" + TRIGGERED_BY + "\","
+                + "\"triggeredAt\":[2026,7,7,12,0]"
+                + "}";
         assertEquals(expectedJson, json);
     }
 
@@ -72,15 +72,15 @@ class OutboxLowStockAlertEventTest {
      */
     @Test
     void deserializeFromJson() throws Exception {
-        String json = "{" +
-                "\"itemId\":" + ITEM_ID + "," +
-                "\"sku\":\"" + SKU + "\"," +
-                "\"itemName\":\"" + ITEM_NAME + "\"," +
-                "\"currentStock\":" + CURRENT_STOCK + "," +
-                "\"minStock\":" + MIN_STOCK + "," +
-                "\"triggeredBy\":\"" + TRIGGERED_BY + "\"," +
-                "\"triggeredAt\":\"" + TRIGGERED_AT + "\"" +
-                "}";
+        String json = "{"
+                + "\"itemId\":" + ITEM_ID + ","
+                + "\"sku\":\"" + SKU + "\","
+                + "\"itemName\":\"" + ITEM_NAME + "\","
+                + "\"currentStock\":" + CURRENT_STOCK + ","
+                + "\"minStock\":" + MIN_STOCK + ","
+                + "\"triggeredBy\":\"" + TRIGGERED_BY + "\","
+                + "\"triggeredAt\":\"" + TRIGGERED_AT + "\""
+                + "}";
 
         OutboxLowStockAlertEvent event = objectMapper.readValue(json, OutboxLowStockAlertEvent.class);
 

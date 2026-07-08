@@ -1,18 +1,15 @@
 package com.warehouse.kafka.integration;
 
-import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.config.KafkaTopicProperties;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -37,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
  */
 @Tag("integration")
 @Testcontainers
-@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 @SpringBootTest(classes = WarehouseApp.class)
 class KafkaTopicIntegrationTest {
 

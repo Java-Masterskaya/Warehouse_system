@@ -1,12 +1,11 @@
 package com.warehouse.service.outbox;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
 import com.warehouse.exception.OutboxException;
-import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.kafka.outbox.OutboxServiceImpl;
 import com.warehouse.repository.OutboxEventRepository;
 import org.junit.jupiter.api.Test;
@@ -21,7 +20,6 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -62,7 +60,15 @@ class OutboxServiceTest {
     void saveLowStockAlertEventSavesToOutbox() throws JsonProcessingException {
         LowStockAlertEvent event = createEvent();
 
-        String expectedPayload = "{\"itemId\":10,\"sku\":\"SKU-001\",\"itemName\":\"Тестовый товар\",\"currentStock\":5,\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"" + TRIGGERED_AT + "\"}";
+        String expectedPayload = "{"
+                + "\"itemId\":10,"
+                + "\"sku\":\"SKU-001\","
+                + "\"itemName\":\"Тестовый товар\","
+                + "\"currentStock\":5,"
+                + "\"minStock\":10,"
+                + "\"triggeredBy\":\"admin\","
+                + "\"triggeredAt\":\"" + TRIGGERED_AT + "\""
+                + "}";
         when(objectMapper.writeValueAsString(any())).thenReturn(expectedPayload);
         when(outboxEventRepository.save(any(OutboxEvent.class)))
                 .thenAnswer(invocation -> {
@@ -105,7 +111,15 @@ class OutboxServiceTest {
     void saveLowStockAlertEventSetsAllFields() throws JsonProcessingException {
         LowStockAlertEvent event = createEvent();
 
-        String expectedPayload = "{\"itemId\":" + ITEM_ID + ",\"sku\":\"" + SKU + "\",\"itemName\":\"" + ITEM_NAME + "\",\"currentStock\":" + CURRENT_STOCK + ",\"minStock\":" + MIN_STOCK + ",\"triggeredBy\":\"" + TRIGGERED_BY + "\",\"triggeredAt\":\"" + TRIGGERED_AT + "\"}";
+        String expectedPayload = "{"
+                + "\"itemId\":" + ITEM_ID + ","
+                + "\"sku\":\"" + SKU + "\","
+                + "\"itemName\":\"" + ITEM_NAME + "\","
+                + "\"currentStock\":" + CURRENT_STOCK + ","
+                + "\"minStock\":" + MIN_STOCK + ","
+                + "\"triggeredBy\":\"" + TRIGGERED_BY + "\","
+                + "\"triggeredAt\":\"" + TRIGGERED_AT + "\""
+                + "}";
         when(objectMapper.writeValueAsString(any())).thenReturn(expectedPayload);
         when(outboxEventRepository.save(any(OutboxEvent.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -122,6 +136,8 @@ class OutboxServiceTest {
 
     /**
      * Вспомогательный метод для создания LowStockAlertEvent.
+     *
+     * @return событие LowStockAlertEvent
      */
     private LowStockAlertEvent createEvent() {
         return new LowStockAlertEvent(

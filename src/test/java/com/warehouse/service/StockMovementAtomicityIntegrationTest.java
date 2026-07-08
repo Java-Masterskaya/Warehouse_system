@@ -239,7 +239,8 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         // Проверяем, что outbox событие сохранено
         List<OutboxEvent> outboxEvents = outboxEventRepository.findPendingEvents(10);
         assertThat(outboxEvents).hasSize(1)
-                .withFailMessage(() -> "Expected 1 PENDING event, found: " + outboxEventRepository.count() + " total events");
+                .withFailMessage(() -> "Expected 1 PENDING event, found: "
+                        + outboxEventRepository.count() + " total events");
         assertThat(outboxEvents.get(0).getEventType()).isEqualTo("LowStockAlert");
     }
 }

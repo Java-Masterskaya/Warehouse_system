@@ -1,7 +1,6 @@
 package com.warehouse.repository;
 
 import com.warehouse.entity.OutboxEvent;
-import com.warehouse.entity.OutboxStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -11,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Репозиторий для работы с событиями outbox.
@@ -41,24 +39,24 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     /**
      * Обновляет статус события на SENT после успешной отправки в Kafka.
      *
-     * @param id ID события
+     * @param id     ID события
      * @param sentAt время отправки
      * @return количество обновленных строк
      */
     @Modifying
     @Query("""
-    UPDATE OutboxEvent e
-    SET e.status = com.warehouse.entity.OutboxStatus.SENT,
-        e.sentAt = :sentAt
-    WHERE e.id = :id
-      AND e.status = com.warehouse.entity.OutboxStatus.PENDING
-    """)
+            UPDATE OutboxEvent e
+            SET e.status = com.warehouse.entity.OutboxStatus.SENT,
+                e.sentAt = :sentAt
+            WHERE e.id = :id
+              AND e.status = com.warehouse.entity.OutboxStatus.PENDING
+            """)
     int updateToSent(@Param("id") Long id, @Param("sentAt") LocalDateTime sentAt);
 
     /**
      * Обновляет статус события на FAILED при ошибке отправки.
      *
-     * @param id ID события
+     * @param id           ID события
      * @param errorMessage сообщение об ошибке
      * @return количество обновленных строк
      */

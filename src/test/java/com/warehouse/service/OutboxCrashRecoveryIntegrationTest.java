@@ -85,8 +85,8 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     void setUp() throws SQLException {
 
         jdbcTemplate.execute("""
-        TRUNCATE TABLE stock_alerts, stock_movements, stock, outbox, items RESTART IDENTITY CASCADE
-        """);
+                TRUNCATE TABLE stock_alerts, stock_movements, stock, outbox, items RESTART IDENTITY CASCADE
+                """);
 
         // Создаём тестовый товар
         testItem = new Item();
