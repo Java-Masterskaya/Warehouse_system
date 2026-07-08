@@ -6,8 +6,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -52,37 +50,4 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
               AND e.status = com.warehouse.entity.OutboxStatus.PENDING
             """)
     int updateToSent(@Param("id") Long id, @Param("sentAt") LocalDateTime sentAt);
-
-    /**
-     * Обновляет статус события на FAILED при ошибке отправки.
-     *
-     * @param id           ID события
-     * @param errorMessage сообщение об ошибке
-     * @return количество обновленных строк
-     */
-    @Modifying
-    @Transactional
-    @Query("""
-            UPDATE OutboxEvent e
-            SET e.status = com.warehouse.entity.OutboxStatus.FAILED,
-                e.errorMessage = :errorMessage
-            WHERE e.id = :id
-            """)
-    int updateToFailed(@Param("id") Long id, @Param("errorMessage") String errorMessage);
-
-    /**
-     * Обновляет статус события на PENDING для повторной попытки.
-     *
-     * @param id ID события
-     * @return количество обновленных строк
-     */
-    @Modifying
-    @Transactional
-    @Query("""
-            UPDATE OutboxEvent e
-            SET e.status = com.warehouse.entity.OutboxStatus.PENDING,
-                e.errorMessage = NULL
-            WHERE e.id = :id
-            """)
-    int resetToPending(@Param("id") Long id);
 }
