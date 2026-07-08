@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +66,8 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         stockReserveRepository.save(
                 Reservation.builder().stock(stock).user(userRef).quantity(quantity).status(ReservationStatus.ACTIVE)
-                        .expiredAt(LocalDateTime.now().plusDays(request.daysReserved())).build());
+                        .expiredAt(LocalDateTime.now().plusDays(request.daysReserved())).build()
+        );
 
         metricService.increment("warehouse.reservation.reserve.total");
     }
@@ -94,6 +96,13 @@ public class StockReserveServiceImpl implements StockReserveService {
         metricService.increment("warehouse.reservation.writeOff.total");
     }
 
+    @Override
+    @Scheduled(fixedDelay = 60000)
+    @Transactional
+    public void expireReservations() {
+        stockReserveRepository.expireReservations(LocalDateTime.now());
+    }
+
     private Stock lockStock(Long itemId) {
         return stockRepository.findByItemIdForUpdate(itemId).orElseThrow(() -> {
             log.warn("Stock not found: itemId={}", itemId);
@@ -114,8 +123,8 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         //      check reservation belong to current item
         if (!reservation.getStock().getItem().getId().equals(itemId)) {
-            log.warn("The requested reservation does not match the product. Reservation is for itemId = {}, but " +
-                    "current item has id = {}.", reservation.getStock().getItem().getId(), itemId);
+            log.warn("The requested reservation does not match the product. Reservation is for itemId = {}, but "
+                    + "current item has id = {}.", reservation.getStock().getItem().getId(), itemId);
             throw ReservationException.ofItem(reservation.getId(), itemId);
         }
         //        check status

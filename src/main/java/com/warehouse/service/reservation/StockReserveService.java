@@ -36,4 +36,9 @@ public interface StockReserveService {
      * @param ctx     пользователь проводящий операцию
      */
     void writeOff(Long itemId, ReservationActionRequest request, UserContext ctx);
+
+    /**
+     * Очистка протухших резервов.
+     */
+    void expireReservations();
 }

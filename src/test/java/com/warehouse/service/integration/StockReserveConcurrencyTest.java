@@ -1,5 +1,6 @@
-package com.warehouse.service;
+package com.warehouse.service.integration;
 
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.reservation.ReserveRequest;
 import com.warehouse.entity.Item;
@@ -14,7 +15,6 @@ import com.warehouse.repository.UserRepository;
 import com.warehouse.service.reservation.StockReserveService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
@@ -25,9 +25,8 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest(properties = "app.redis.enabled=false")
 @Testcontainers
-class StockReserveConcurrencyTest {
+class StockReserveConcurrencyTest extends AbstractIntegrationTest {
     @Autowired
     StockReserveService service;
     @Autowired

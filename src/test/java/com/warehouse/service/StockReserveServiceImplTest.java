@@ -65,21 +65,19 @@ public class StockReserveServiceImplTest {
     private Reservation reservation;
     private UserContext ctx;
 
-
     @BeforeEach
     void setUp() {
         item = Item.builder().id(10L).build();
 
-        stock = Stock.builder().id(1L).quantity(100).item(item).build();
+        stock = Stock.builder().id(1L).quantity(10).item(item).build();
 
-        reservation = Reservation.builder().id(5L).stock(stock).quantity(20).status(ReservationStatus.ACTIVE)
+        reservation = Reservation.builder().id(5L).stock(stock).quantity(5).status(ReservationStatus.ACTIVE)
                 .expiredAt(LocalDateTime.now().plusDays(1)).build();
 
         ctx = new UserContext(1L, "Username");
     }
 
     /** Reserve tests */
-
     /**
      * Успешное резервирование остатков.
      */
@@ -141,22 +139,16 @@ public class StockReserveServiceImplTest {
      */
     @Test
     void shouldThrowExceptionWhenNotEnoughAvailableStock() {
-
-        Long itemId = 1L;
-
-        ReserveRequest request = new ReserveRequest(15, 3);
-
-        Stock stock = new Stock();
-        stock.setQuantity(20);
+        ReserveRequest request = new ReserveRequest(5, 3);
 
         Reservation oldReservation = Reservation.builder().quantity(10).status(ReservationStatus.ACTIVE).build();
 
-        when(stockRepository.findByItemIdForUpdate(itemId)).thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
         when(stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(
                 (long) oldReservation.getQuantity());
 
-        assertThrows(InsufficientStockException.class, () -> service.reserve(itemId, request, ctx));
+        assertThrows(InsufficientStockException.class, () -> service.reserve(item.getId(), request, ctx));
 
         verify(stockReserveRepository, never()).save(any());
 
@@ -168,24 +160,16 @@ public class StockReserveServiceImplTest {
      */
     @Test
     void shouldConsiderExistingReservations() {
-
-        Long itemId = 1L;
-
         ReserveRequest request = new ReserveRequest(11, 2);
 
-        Stock stock = new Stock();
-        stock.setQuantity(20);
+        Reservation reservation1 = Reservation.builder().quantity(6).status(ReservationStatus.ACTIVE).build();
 
-        Reservation reservation1 = Reservation.builder().quantity(5).status(ReservationStatus.ACTIVE).build();
-
-        Reservation reservation2 = Reservation.builder().quantity(5).status(ReservationStatus.ACTIVE).build();
-
-        when(stockRepository.findByItemIdForUpdate(itemId)).thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
         when(stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(
-                (long) reservation1.getQuantity() + reservation2.getQuantity());
+                (long) reservation.getQuantity() + reservation1.getQuantity());
 
-        assertThrows(InsufficientStockException.class, () -> service.reserve(itemId, request, ctx));
+        assertThrows(InsufficientStockException.class, () -> service.reserve(item.getId(), request, ctx));
     }
 
     /**
@@ -194,8 +178,6 @@ public class StockReserveServiceImplTest {
 
     @Test
     void shouldReleaseReservation() {
-        Stock stock = Stock.builder().build();
-
         stock.setItem(item);
 
         ReservationActionRequest request = new ReservationActionRequest(reservation.getId());
@@ -229,8 +211,6 @@ public class StockReserveServiceImplTest {
     void shouldThrowWhenReservationNotFound() {
         Long itemId = 1L;
 
-        Stock stock = new Stock();
-
         when(stockRepository.findByItemIdForUpdate(itemId)).thenReturn(Optional.of(stock));
 
         when(stockReserveRepository.findById(5L)).thenReturn(Optional.empty());
@@ -243,24 +223,19 @@ public class StockReserveServiceImplTest {
     //reservation of another item
     @Test
     void shouldThrowWhenReservationBelongsToAnotherItem() {
-        Long itemId = 1L;
-
-        Item stockItem = Item.builder().id(itemId).build();
-        Stock stock = Stock.builder().item(stockItem).build();
-
         Item anotherItem = Item.builder().id(2L).build();
         Stock anotherStock = Stock.builder().item(anotherItem).build();
 
-        Reservation reservation = Reservation.builder().id(10L).stock(anotherStock).status(ReservationStatus.ACTIVE)
+        Reservation reservation2 = Reservation.builder().id(10L).stock(anotherStock).status(ReservationStatus.ACTIVE)
                 .build();
 
-        when(stockRepository.findByItemIdForUpdate(itemId)).thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(stockReserveRepository.findById(10L)).thenReturn(Optional.of(reservation2));
 
         ReservationActionRequest request = new ReservationActionRequest(10L);
 
-        assertThrows(ReservationException.class, () -> service.release(itemId, request, ctx));
+        assertThrows(ReservationException.class, () -> service.release(item.getId(), request, ctx));
 
         verify(stockReserveRepository, never()).save(any());
     }
@@ -268,21 +243,16 @@ public class StockReserveServiceImplTest {
     //reservation not active
     @Test
     void shouldThrowWhenReservationIsNotActive() {
-        Long itemId = 1L;
-
-        Item item = Item.builder().id(itemId).build();
-        Stock stock = Stock.builder().item(item).build();
-
-        Reservation reservation = Reservation.builder().id(10L).stock(stock).status(ReservationStatus.CANCELED)
+        Reservation reservation2 = Reservation.builder().id(10L).stock(stock).status(ReservationStatus.CANCELED)
                 .user(User.builder().id(ctx.userId()).build()).build();
 
-        when(stockRepository.findByItemIdForUpdate(itemId)).thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findById(10L)).thenReturn(Optional.of(reservation));
+        when(stockReserveRepository.findById(10L)).thenReturn(Optional.of(reservation2));
 
         ReservationActionRequest request = new ReservationActionRequest(10L);
 
-        assertThrows(ReservationException.class, () -> service.release(itemId, request, ctx));
+        assertThrows(ReservationException.class, () -> service.release(item.getId(), request, ctx));
 
         verify(stockReserveRepository, never()).save(any());
     }
@@ -290,136 +260,86 @@ public class StockReserveServiceImplTest {
     // write-off
     //success
     @Test
-    void writeOff_shouldConsumeReservationAndCreateMovement() {
+    void writeOffShouldConsumeReservationAndCreateMovement() {
 
-        ReservationActionRequest request = new ReservationActionRequest(5L);
+        ReservationActionRequest request = new ReservationActionRequest(reservation.getId());
 
+        when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockRepository.findByItemIdForUpdate(10L)).thenReturn(Optional.of(stock));
+        when(stockReserveRepository.findById(reservation.getId())).thenReturn(Optional.of(reservation));
 
-        when(stockReserveRepository.findById(5L)).thenReturn(Optional.of(reservation));
-
-
-        service.writeOff(10L, request, ctx);
-
+        service.writeOff(item.getId(), request, ctx);
 
         assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CONSUMED);
 
-
-        verify(movementService).writeOffReceipt(new ChangeQuantityMovementRequest(10L, 20), ctx);
-
+        verify(movementService).writeOffReceipt(new ChangeQuantityMovementRequest(item.getId(),
+                reservation.getQuantity()), ctx);
 
         verify(stockReserveRepository).save(reservation);
-
 
         verify(metricService).increment("warehouse.reservation.writeOff.total");
     }
 
     //reservation not found
     @Test
-    void writeOff_shouldThrow_whenReservationNotFound() {
+    void writeOffShouldThrowWhenReservationNotFound() {
 
-        when(stockRepository.findByItemIdForUpdate(10L))
-                .thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(10L)).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findById(5L))
-                .thenReturn(Optional.empty());
+        when(stockReserveRepository.findById(5L)).thenReturn(Optional.empty());
 
-
-        assertThatThrownBy(() ->
-                service.writeOff(
-                        10L,
-                        new ReservationActionRequest(5L),
-                        ctx
-                ))
-                .isInstanceOf(EntityNotFoundException.class);
-
+        assertThatThrownBy(() -> service.writeOff(10L, new ReservationActionRequest(5L), ctx)).isInstanceOf(
+                EntityNotFoundException.class);
 
         verifyNoInteractions(movementService);
     }
 
     //when itemId != reservation.getItem().getId()
     @Test
-    void writeOff_shouldThrow_whenReservationBelongsToAnotherItem() {
+    void writeOffShouldThrowWhenReservationBelongsToAnotherItem() {
 
-        Stock anotherStock = Stock.builder()
-                .item(Item.builder()
-                        .id(99L)
-                        .build())
-                .build();
+        Stock anotherStock = Stock.builder().item(Item.builder().id(99L).build()).build();
 
         reservation.setStock(anotherStock);
 
+        when(stockRepository.findByItemIdForUpdate(10L)).thenReturn(Optional.of(stock));
 
-        when(stockRepository.findByItemIdForUpdate(10L))
-                .thenReturn(Optional.of(stock));
+        when(stockReserveRepository.findById(5L)).thenReturn(Optional.of(reservation));
 
-        when(stockReserveRepository.findById(5L))
-                .thenReturn(Optional.of(reservation));
-
-
-        assertThatThrownBy(() ->
-                service.writeOff(
-                        10L,
-                        new ReservationActionRequest(5L),
-                        ctx
-                ))
-                .isInstanceOf(ReservationException.class);
-
+        assertThatThrownBy(() -> service.writeOff(10L, new ReservationActionRequest(5L), ctx)).isInstanceOf(
+                ReservationException.class);
 
         verifyNoInteractions(movementService);
     }
 
     //Reservation status is not active
     @Test
-    void writeOff_shouldThrow_whenReservationNotActive() {
+    void writeOffShouldThrowWhenReservationNotActive() {
 
         reservation.setStatus(ReservationStatus.CANCELED);
 
+        when(stockRepository.findByItemIdForUpdate(10L)).thenReturn(Optional.of(stock));
 
-        when(stockRepository.findByItemIdForUpdate(10L))
-                .thenReturn(Optional.of(stock));
+        when(stockReserveRepository.findById(5L)).thenReturn(Optional.of(reservation));
 
-        when(stockReserveRepository.findById(5L))
-                .thenReturn(Optional.of(reservation));
-
-
-        assertThatThrownBy(() ->
-                service.writeOff(
-                        10L,
-                        new ReservationActionRequest(5L),
-                        ctx
-                ))
-                .isInstanceOf(ReservationException.class);
-
+        assertThatThrownBy(() -> service.writeOff(10L, new ReservationActionRequest(5L), ctx)).isInstanceOf(
+                ReservationException.class);
 
         verifyNoInteractions(movementService);
     }
 
     // reservation expiredAt < LocalDateTime.now() but reservation is Active
     @Test
-    void writeOff_shouldThrow_whenReservationExpired() {
+    void writeOffShouldThrowWhenReservationExpired() {
 
-        reservation.setExpiredAt(
-                LocalDateTime.now().minusDays(1)
-        );
+        reservation.setExpiredAt(LocalDateTime.now().minusDays(1));
 
+        when(stockRepository.findByItemIdForUpdate(10L)).thenReturn(Optional.of(stock));
 
-        when(stockRepository.findByItemIdForUpdate(10L))
-                .thenReturn(Optional.of(stock));
+        when(stockReserveRepository.findById(5L)).thenReturn(Optional.of(reservation));
 
-        when(stockReserveRepository.findById(5L))
-                .thenReturn(Optional.of(reservation));
-
-
-        assertThatThrownBy(() ->
-                service.writeOff(
-                        10L,
-                        new ReservationActionRequest(5L),
-                        ctx
-                ))
-                .isInstanceOf(ReservationException.class);
-
+        assertThatThrownBy(() -> service.writeOff(10L, new ReservationActionRequest(5L), ctx)).isInstanceOf(
+                ReservationException.class);
 
         verifyNoInteractions(movementService);
     }
