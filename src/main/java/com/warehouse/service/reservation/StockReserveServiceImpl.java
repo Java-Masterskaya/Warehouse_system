@@ -4,6 +4,7 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
+import com.warehouse.dto.response.reservation.ReservationResponse;
 import com.warehouse.entity.Reservation;
 import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Stock;
@@ -11,6 +12,7 @@ import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.ReservationException;
+import com.warehouse.mapper.StockReservationMapper;
 import com.warehouse.metric.MetricService;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
@@ -38,11 +40,12 @@ public class StockReserveServiceImpl implements StockReserveService {
     StockReserveRepository stockReserveRepository;
     StockMovementService movementService;
     MetricService metricService;
+    StockReservationMapper mapper;
 
     @Override
     @Transactional
     @CacheEvict(value = "item", key = "#itemId")
-    public void reserve(Long itemId, ReserveRequest request, UserContext ctx) {
+    public ReservationResponse reserve(Long itemId, ReserveRequest request, UserContext ctx) {
         int quantity = request.quantity();
 
         if (quantity <= 0) {
@@ -64,29 +67,31 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         User userRef = userRepository.getReferenceById(ctx.userId());
 
-        stockReserveRepository.save(
+        Reservation reservation = stockReserveRepository.save(
                 Reservation.builder().stock(stock).user(userRef).quantity(quantity).status(ReservationStatus.ACTIVE)
                         .expiredAt(LocalDateTime.now().plusDays(request.daysReserved())).build()
         );
 
         metricService.increment("warehouse.reservation.reserve.total");
+        return mapper.mapReservationToResponse(reservation);
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "item", key = "#itemId")
-    public void release(Long itemId, ReservationActionRequest request, UserContext ctx) {
+    public ReservationResponse release(Long itemId, ReservationActionRequest request, UserContext ctx) {
         // Lock stock to serialize reservation modifications.
         lockStock(itemId);
         Reservation reservation = getActiveReservation(request.reservationId(), itemId);
         updateReservationStatus(reservation, ReservationStatus.CANCELED);
         metricService.increment("warehouse.reservation.release.total");
+        return mapper.mapReservationToResponse(reservation);
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "item", key = "#itemId")
-    public void writeOff(Long itemId, ReservationActionRequest request, UserContext ctx) {
+    public ReservationResponse writeOff(Long itemId, ReservationActionRequest request, UserContext ctx) {
         // Lock stock to serialize reservation modifications.
         lockStock(itemId);
 
@@ -94,6 +99,7 @@ public class StockReserveServiceImpl implements StockReserveService {
         movementService.writeOffReceipt(new ChangeQuantityMovementRequest(itemId, reservation.getQuantity()), ctx);
         updateReservationStatus(reservation, ReservationStatus.CONSUMED);
         metricService.increment("warehouse.reservation.writeOff.total");
+        return mapper.mapReservationToResponse(reservation);
     }
 
     @Override

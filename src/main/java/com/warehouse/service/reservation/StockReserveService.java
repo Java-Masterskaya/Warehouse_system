@@ -3,6 +3,7 @@ package com.warehouse.service.reservation;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
+import com.warehouse.dto.response.reservation.ReservationResponse;
 
 /**
  * Сервис для управления резервированием остатков.
@@ -16,8 +17,9 @@ public interface StockReserveService {
      * @param itemId  идентификатор бронируемого товара
      * @param request запрос на бронирование
      * @param ctx     пользователь проводящий операцию
+     * @return ответ с информацией о резервировании
      */
-    void reserve(Long itemId, ReserveRequest request, UserContext ctx);
+    ReservationResponse reserve(Long itemId, ReserveRequest request, UserContext ctx);
 
     /**
      * Регистрирует бронирование остатков.
@@ -25,8 +27,9 @@ public interface StockReserveService {
      * @param itemId  идентификатор зарезервированного товара
      * @param request запрос с id резервирования которое нужно снять
      * @param ctx     пользователь проводящий операцию
+     * @return ответ с информацией о резервировании
      */
-    void release(Long itemId, ReservationActionRequest request, UserContext ctx);
+    ReservationResponse release(Long itemId, ReservationActionRequest request, UserContext ctx);
 
     /**
      * Регистрирует бронирование остатков.
@@ -34,8 +37,9 @@ public interface StockReserveService {
      * @param itemId  идентификатор зарезервированного товара
      * @param request запрос с id резервирования которое нужно снять
      * @param ctx     пользователь проводящий операцию
+     * @return ответ с информацией о резервировании
      */
-    void writeOff(Long itemId, ReservationActionRequest request, UserContext ctx);
+    ReservationResponse writeOff(Long itemId, ReservationActionRequest request, UserContext ctx);
 
     /**
      * Очистка протухших резервов.

@@ -3,6 +3,7 @@ package com.warehouse.controller;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
+import com.warehouse.dto.response.reservation.ReservationResponse;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.reservation.StockReserveService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,12 +18,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 
 @RestController
 @RequestMapping("/api/stock")
@@ -40,29 +41,32 @@ public class StockReserveController {
     @PostMapping("/{itemId}/reserve")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public void reserve(@PathVariable Long itemId, @Valid @RequestBody ReserveRequest request,
+    public ReservationResponse reserve(@PathVariable Long itemId, @Valid @RequestBody ReserveRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Reserve item request: itemId={}, quantity={}", itemId, request.quantity());
-        stockReserveService.reserve(itemId, request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+        return stockReserveService.reserve(itemId, request,
+                new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 
     @Operation(summary = "Отмена резервирования")
     @PostMapping("/{itemId}/release")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public void release(@PathVariable Long itemId, @Valid @RequestBody ReservationActionRequest request,
+    public ReservationResponse release(@PathVariable Long itemId, @Valid @RequestBody ReservationActionRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Release item request: itemId={}, reservationId={}", itemId, request.reservationId());
-        stockReserveService.release(itemId, request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+        return stockReserveService.release(itemId, request,
+                new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 
     @Operation(summary = "Выкуп резерва")
     @PostMapping("/{itemId}/write-off")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public void writeOff(@PathVariable Long itemId, @Valid @RequestBody ReservationActionRequest request,
+    public ReservationResponse writeOff(@PathVariable Long itemId, @Valid @RequestBody ReservationActionRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Write-off item request: itemId={}, reservationId={}", itemId, request.reservationId());
-        stockReserveService.writeOff(itemId, request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+        return stockReserveService.writeOff(itemId, request,
+                new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 }

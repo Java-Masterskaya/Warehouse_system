@@ -4,7 +4,7 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.reservation.ReserveRequest;
 import com.warehouse.entity.Item;
-import com.warehouse.entity.Reservation;
+import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
@@ -65,7 +65,7 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
             }
         }).count();
         assertEquals(1, successfulReservations);
-        int reserved = reserveRepository.findAll().stream().mapToInt(Reservation::getQuantity).sum();
+        long reserved = reserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE);
         assertEquals(7, reserved);
     }
 }
