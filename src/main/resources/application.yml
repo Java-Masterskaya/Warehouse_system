@@ -43,8 +43,6 @@ spring:
         default-context: warehouse-system
   lifecycle:
     timeout-per-shutdown-phase: 20s
-  main:
-    allow-bean-definition-overriding: true
 
 app:
   kafka:
