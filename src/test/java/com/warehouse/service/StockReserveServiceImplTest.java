@@ -1,7 +1,7 @@
 package com.warehouse.service;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.reservation.ReleaseRequest;
+import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Reservation;
@@ -191,7 +191,7 @@ public class StockReserveServiceImplTest {
                 .user(User.builder().id(ctx.userId()).build())
                 .build();
 
-        ReleaseRequest request = new ReleaseRequest(reservationId);
+        ReservationActionRequest request = new ReservationActionRequest(reservationId);
 
         when(stockRepository.findByItemIdForUpdate(itemId))
                 .thenReturn(Optional.of(stock));
@@ -213,7 +213,7 @@ public class StockReserveServiceImplTest {
         when(stockRepository.findByItemIdForUpdate(itemId))
                 .thenReturn(Optional.empty());
 
-        ReleaseRequest request = new ReleaseRequest(1L);
+        ReservationActionRequest request = new ReservationActionRequest(1L);
 
         assertThrows(
                 EntityNotFoundException.class,
@@ -236,7 +236,7 @@ public class StockReserveServiceImplTest {
         when(stockReserveRepository.findById(5L))
                 .thenReturn(Optional.empty());
 
-        ReleaseRequest request = new ReleaseRequest(5L);
+        ReservationActionRequest request = new ReservationActionRequest(5L);
 
         assertThrows(
                 EntityNotFoundException.class,
@@ -267,7 +267,7 @@ public class StockReserveServiceImplTest {
         when(stockReserveRepository.findById(10L))
                 .thenReturn(Optional.of(reservation));
 
-        ReleaseRequest request = new ReleaseRequest(10L);
+        ReservationActionRequest request = new ReservationActionRequest(10L);
 
         assertThrows(
                 ReservationException.class,
@@ -298,7 +298,7 @@ public class StockReserveServiceImplTest {
         when(stockReserveRepository.findById(10L))
                 .thenReturn(Optional.of(reservation));
 
-        ReleaseRequest request = new ReleaseRequest(10L);
+        ReservationActionRequest request = new ReservationActionRequest(10L);
 
         assertThrows(
                 ReservationException.class,

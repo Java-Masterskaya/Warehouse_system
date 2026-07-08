@@ -1,7 +1,7 @@
 package com.warehouse.controller;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.reservation.ReleaseRequest;
+import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.reservation.StockReserveService;
@@ -50,9 +50,19 @@ public class StockReserveController {
     @PostMapping("/{itemId}/release")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public void release(@PathVariable Long itemId, @Valid @RequestBody ReleaseRequest request,
+    public void release(@PathVariable Long itemId, @Valid @RequestBody ReservationActionRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Release item request: itemId={}, reservationId={}", itemId, request.reservationId());
         stockReserveService.release(itemId, request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+    }
+
+    @Operation(summary = "Выкуп резерва")
+    @PostMapping("/{itemId}/write-off")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public void writeOff(@PathVariable Long itemId, @Valid @RequestBody ReservationActionRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        log.debug("Write-off item request: itemId={}, reservationId={}", itemId, request.reservationId());
+        //stockReserveService.release(itemId, request, new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 }
