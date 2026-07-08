@@ -8,11 +8,12 @@ import com.warehouse.entity.Item;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
 import com.warehouse.entity.Stock;
-
+import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
 import com.warehouse.kafka.outbox.OutboxEventRelay;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.OutboxEventRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
@@ -27,9 +28,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Integration-тест для проверки надежности доставки событий через outbox при краше приложения.
@@ -61,6 +64,9 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    private StockAlertRepository stockAlertRepository;
 
     @Autowired
     private StockMovementService stockMovementService;
@@ -118,6 +124,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
      * 3. Проверяем, что событие в статусе PENDING
      * 4. "Рестарт" - запускаем релей, который находит PENDING события и отправляет в Kafka
      * 5. Проверяем, что событие отправлено (статус SENT)
+     * 6. Проверяем, что Kafka consumer получил сообщение и сохранил alert в stock_alerts
      */
     @Test
     @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
@@ -162,15 +169,32 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         assertThat(sentEvent.getStatus()).isEqualTo(OutboxStatus.SENT);
         assertThat(sentEvent.getSentAt()).isNotNull();
 
+        // Assert 3 - проверяем, что Kafka consumer получил сообщение и сохранил alert
+        await().atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> {
+                    List<StockAlert> alerts = stockAlertRepository.findAll();
+                    assertThat(alerts).hasSize(1);
+
+                    StockAlert alert = alerts.get(0);
+                    assertThat(alert.getItem().getId()).isEqualTo(testItemId);
+                    assertThat(alert.getCurrentStock()).isEqualTo(4);
+                    assertThat(alert.getMinStock()).isEqualTo(10);
+                });
+
         // Act 3 - запускаем релей повторно (симуляция повторного запуска)
         outboxEventRelay.relayPendingEvents();
 
-        // Assert 3 - повторный запуск не должен изменить статус SENT
+        // Assert 4 - повторный запуск не должен изменить статус SENT
         OutboxEvent unchangedEvent = outboxEventRepository.findById(pendingEventsBeforeCrash.get(0).getId())
                 .orElseThrow(() -> new AssertionError("Outbox event not found after second relay"));
 
         assertThat(unchangedEvent.getStatus()).isEqualTo(OutboxStatus.SENT);
         assertThat(unchangedEvent.getSentAt()).isNotNull();
+
+        // Assert 5 - дублированный alert не создан (consumer идемпотентен)
+        List<StockAlert> finalAlerts = stockAlertRepository.findAll();
+        assertThat(finalAlerts).hasSize(1)
+                .withFailMessage(() -> "Expected 1 alert, but found " + finalAlerts.size());
     }
 
     /**
@@ -211,6 +235,12 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         assertThat(sentEvent.getStatus()).isEqualTo(OutboxStatus.SENT);
         assertThat(sentEvent.getSentAt()).isNotNull();
 
+        // Assert 2 - проверяем доставку в Kafka consumer
+        await().atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> {
+                    assertThat(stockAlertRepository.findAll()).hasSize(1);
+                });
+
         // Act 2 - симулируем "краш" и "рестарт"
         // В реальности это может быть ситуация, когда релей упал после отправки,
         // но до обновления статуса (race condition с базой)
@@ -219,15 +249,16 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         // Запускаем релей снова (рестарт)
         outboxEventRelay.relayPendingEvents();
 
-        // Assert 2 - событие должно оставаться SENT, не должно быть дубликатов
+        // Assert 3 - событие должно оставаться SENT, не должно быть дубликатов
         OutboxEvent finalEvent = outboxEventRepository.findById(eventId)
                 .orElseThrow();
         assertThat(finalEvent.getStatus()).isEqualTo(OutboxStatus.SENT);
         assertThat(finalEvent.getSentAt()).isNotNull();
 
-        // Проверяем, что в базе нет дубликатов
-        List<OutboxEvent> allEvents = outboxEventRepository.findAll();
-        assertThat(allEvents).hasSize(1); // Должно быть только одно событие
+        // Assert 4 - дублированный alert не создан
+        List<StockAlert> finalAlerts = stockAlertRepository.findAll();
+        assertThat(finalAlerts).hasSize(1)
+                .withFailMessage(() -> "Expected 1 alert, but found " + finalAlerts.size());
     }
 
     /**
@@ -264,8 +295,18 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
                 .orElseThrow();
         assertThat(sentEvent.getStatus()).isEqualTo(OutboxStatus.SENT);
 
+        // Assert 2 - проверяем доставку в Kafka consumer
+        await().atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> {
+                    assertThat(stockAlertRepository.findAll()).hasSize(1);
+                });
+
         // Проверяем, что в базе нет дубликатов
         List<OutboxEvent> allEvents = outboxEventRepository.findAll();
         assertThat(allEvents).hasSize(1);
+
+        // Проверяем, что дублированный alert не создан
+        List<StockAlert> finalAlerts = stockAlertRepository.findAll();
+        assertThat(finalAlerts).hasSize(1);
     }
 }
