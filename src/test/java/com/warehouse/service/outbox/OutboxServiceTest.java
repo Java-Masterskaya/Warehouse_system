@@ -7,6 +7,7 @@ import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
 import com.warehouse.exception.OutboxException;
 import com.warehouse.kafka.outbox.OutboxService;
+import com.warehouse.kafka.outbox.OutboxServiceImpl;
 import com.warehouse.repository.OutboxEventRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,7 +50,7 @@ class OutboxServiceTest {
     private ObjectMapper objectMapper;
 
     @InjectMocks
-    private OutboxService outboxService;
+    private OutboxServiceImpl outboxService;
 
     @Captor
     private ArgumentCaptor<OutboxEvent> eventCaptor;
