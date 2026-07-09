@@ -6,6 +6,7 @@ import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface ItemService {
@@ -22,4 +23,7 @@ public interface ItemService {
 
     void softDeleteItem(Long itemId);
 
+    BigDecimal confirmPrice(BigDecimal price);
+
+    BigDecimal confirmCost(BigDecimal cost);
 }

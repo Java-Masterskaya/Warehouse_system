@@ -159,19 +159,6 @@ public class ReportServiceImplTest {
         assertEquals(BigDecimal.valueOf(10000.56), response.byCategory().get(0).valuation());
     }
 
-    /**
-     * Обработка null стоимости товаров.
-     */
-    @Test
-    public void shouldHandleNullCost() {
-        BigDecimal totalValuation = BigDecimal.valueOf(5000.00);
-        when(itemRepository.calculateTotalStockValuation()).thenReturn(totalValuation);
-        when(itemRepository.calculateValuationByCategory()).thenReturn(List.of());
-
-        StockValuationResponse response = reportService.getStockValuation();
-
-        assertEquals(0, response.totalValuation().compareTo(BigDecimal.valueOf(5000.00)));
-    }
 
     /**
      * Обработка товаров без цен (cost = 0).

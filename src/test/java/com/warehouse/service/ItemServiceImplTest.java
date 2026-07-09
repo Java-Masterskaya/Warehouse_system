@@ -575,14 +575,14 @@ class ItemServiceImplTest {
         item.setMinStock(0);
         item.setActive(true);
 
-        item.setPrice(BigDecimal.valueOf(1500.999));
-        item.setCost(BigDecimal.valueOf(1000.444));
+        item.setPrice(itemService.confirmPrice(BigDecimal.valueOf(1500.999)));
+        item.setCost(itemService.confirmCost(BigDecimal.valueOf(1000.444)));
 
         assertThat(item.getPrice().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
         assertThat(item.getCost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
 
-        item.setPrice(BigDecimal.valueOf(100.005));
-        item.setCost(BigDecimal.valueOf(50.005));
+        item.setPrice(itemService.confirmPrice(BigDecimal.valueOf(100.005)));
+        item.setCost(itemService.confirmCost(BigDecimal.valueOf(50.005)));
 
         assertThat(item.getPrice().compareTo(BigDecimal.valueOf(100.01))).isEqualTo(0);
         assertThat(item.getCost().compareTo(BigDecimal.valueOf(50.01))).isEqualTo(0);
