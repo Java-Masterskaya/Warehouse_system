@@ -3,40 +3,42 @@ package com.warehouse.kafka.service;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Тест оптимизированного удаления оффсетов с учетом firstFailedOffsets.
  * 
- * ОПТИМАЛЬНОЕ РЕШЕНИЕ:
- * - Храним firstFailedOffset для каждой партиции (первый неуспешный оффсет)
- * - Удаляем до min(maxProcessedOffset + 1, firstFailedOffset)
- * - Это удаляет ВСЕ успешные оффсеты ДО первого неуспешного
- * - FAILED и все после него остаются в DLT
+ * Оптимальное решение:
+ * - Храним firstFailedOffset для каждой партиции (первый неуспешный оффсет).
+ * - Удаляем до min(maxProcessedOffset + 1, firstFailedOffset).
+ * - Это удаляет все успешные оффсеты ДО первого неуспешного.
+ * - FAILED и все после него остаются в DLT.
  * 
- * СЦЕНАРИЙ:
+ * Сценарий:
  *   offset 100: SUCCESS
  *   offset 101: FAILED
  *   offset 102: SUCCESS
  *   offset 103: SUCCESS
  * 
- * РЕЗУЛЬТАТ:
+ * Результат:
  *   maxProcessedOffsets[partition] = 104 (103 + 1)
  *   firstFailedOffsets[partition] = 101
  *   Удаляем до min(104, 101) = 101
  *   Удалены: 100
  *   Остались: 101 (FAILED), 102, 103
  * 
- * БЕЗОПАСНО: FAILED не удаляется!
- * ОПТИМАЛЬНО: Успешный 100 удален сразу!
+ * Безопасно: FAILED не удаляется!
+ * Оптимально: Успешный 100 удален сразу!
  */
 @DisplayName("Optimal Offset Deletion with firstFailedOffsets")
 class OptimalOffsetDeletionTest {
 
     /**
-     * Сценарий: SUCCESS, FAILED, SUCCESS - удаляем до первого FAILED
+     * Сценарий: SUCCESS, FAILED, SUCCESS - удаляем до первого FAILED.
      */
     @Test
     @DisplayName("SUCCESS, FAILED, SUCCESS - delete up to first FAILED")
@@ -74,7 +76,7 @@ class OptimalOffsetDeletionTest {
     }
     
     /**
-     * Сценарий: Все SUCCESS - удаляем всё
+     * Сценарий: Все SUCCESS - удаляем всё.
      */
     @Test
     @DisplayName("All SUCCESS - delete all")
@@ -111,7 +113,7 @@ class OptimalOffsetDeletionTest {
     }
     
     /**
-     * Сценарий: FAILED на первом оффсете - ничего не удаляем
+     * Сценарий: FAILED на первом оффсете - ничего не удаляем.
      */
     @Test
     @DisplayName("FAILED first - nothing deleted")
@@ -149,7 +151,7 @@ class OptimalOffsetDeletionTest {
     }
     
     /**
-     * Сценарий: Сравнение со старой логикой (БЕЗ firstFailedOffsets)
+     * Сценарий: Сравнение со старой логикой (БЕЗ firstFailedOffsets).
      */
     @Test
     @DisplayName("Old vs New logic comparison")
@@ -199,7 +201,7 @@ class OptimalOffsetDeletionTest {
     }
     
     /**
-     * Сценарий: Несколько успешных до первого FAILED
+     * Сценарий: Несколько успешных до первого FAILED.
      */
     @Test
     @DisplayName("Multiple SUCCESS before first FAILED")
