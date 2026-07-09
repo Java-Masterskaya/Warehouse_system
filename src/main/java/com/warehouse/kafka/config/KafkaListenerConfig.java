@@ -109,7 +109,9 @@ public class KafkaListenerConfig {
                 SerializationException.class,
                 com.fasterxml.jackson.core.JsonParseException.class,
                 com.fasterxml.jackson.databind.JsonMappingException.class,
-                org.springframework.messaging.converter.MessageConversionException.class
+                org.springframework.messaging.converter.MessageConversionException.class,
+                org.springframework.validation.BindException.class,
+                jakarta.validation.ConstraintViolationException.class
         );
 
         handler.addRetryableExceptions(
