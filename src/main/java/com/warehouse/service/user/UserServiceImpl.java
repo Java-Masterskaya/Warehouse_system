@@ -2,9 +2,11 @@ package com.warehouse.service.user;
 
 import com.warehouse.dto.request.user.UserCreateRequest;
 import com.warehouse.dto.response.user.UserResponse;
+import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.mapper.UserMapper;
 import com.warehouse.repository.UserRepository;
@@ -62,6 +64,15 @@ public class UserServiceImpl implements UserService {
             log.warn("User with id '{}' not found", userId);
             return EntityNotFoundException.forId("User", userId);
         });
+
+        if (user.getRole() == Role.ROLE_ADMIN) {
+            List<User> activeAdmins = userRepository.findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN);
+
+            if (activeAdmins.size() == 1) {
+                log.warn("Attempt to deactivate the last active admin: userId={}", userId);
+                throw LastAdminDeactivationException.forUser(userId);
+            }
+        }
 
         user.setActive(false);
         userRepository.save(user);

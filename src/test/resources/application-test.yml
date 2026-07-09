@@ -10,7 +10,24 @@ spring:
   kafka:
     consumer:
       group-id: warehouse-alerts-test
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.warehouse.dto.event"
+  cloud:
+    consul:
+      enabled: false
+    compatibility-verifier:
+      enabled: false
+
+  cache:
+    type: redis
+
+redis:
+  cache:
+    categories-ttl-minutes: 10
+    item-ttl-minutes: 5
 
 app:
   jwt:

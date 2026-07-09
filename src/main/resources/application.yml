@@ -27,6 +27,19 @@ spring:
       idle-timeout: 300000
       max-lifetime: 1200000
       connection-timeout: 20000
+  config:
+    import: "optional:consul:"
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: 8500
+      config:
+        enabled: true
+        format: yaml
+        prefix: config
+        default-context: warehouse-system
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
 
 app:
   kafka:
@@ -48,10 +61,25 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics
+        include: health,info,prometheus,metrics,env,refresh
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+    refresh:
+      enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+server:
+  shutdown: graceful
 
 logging:
   level:

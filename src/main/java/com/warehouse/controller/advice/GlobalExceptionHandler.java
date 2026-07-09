@@ -7,8 +7,12 @@ import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.SelfDeactivationException;
+import com.warehouse.exception.InvalidMovementRequestException;
+import com.warehouse.exception.StockMovementInvariantException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -68,6 +72,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("DUPLICATE_USERNAME", message);
     }
 
+    @ExceptionHandler(LastAdminDeactivationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleLastAdminDeactivation(LastAdminDeactivationException ex) {
+        return new ErrorResponse("LAST_ADMIN", ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ValidationErrorResponse handleValidation(MethodArgumentNotValidException ex) {
@@ -94,6 +104,28 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleAuthentication(AuthenticationException ex) {
         return new ErrorResponse("UNAUTHORIZED", "Authentication failed");
+    }
+
+    @ExceptionHandler(InvalidMovementRequestException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidMovementRequest(InvalidMovementRequestException ex) {
+        log.warn("Invalid movement request: {}", ex.getMessage());
+        return new ErrorResponse("INVALID_MOVEMENT_REQUEST", ex.getMessage());
+    }
+
+    @ExceptionHandler(StockMovementInvariantException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleStockMovementInvariant(StockMovementInvariantException ex) {
+        log.error("Stock movement invariant violated: {}", ex.getMessage(), ex);
+        return new ErrorResponse("INTERNAL_ERROR", "Internal server error");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleOptimisticLock(OptimisticLockingFailureException ex) {
+        log.warn("Concurrent stock modification detected: {}", ex.getMessage());
+        return new ErrorResponse("CONCURRENT_MODIFICATION",
+                "Resource was modified by another transaction. Please retry.");
     }
 
     @ExceptionHandler(Exception.class)

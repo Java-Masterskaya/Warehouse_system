@@ -1,0 +1,8 @@
+app:
+  jwt:
+    expiration-ms: 86400000
+
+redis:
+  cache:
+    categories-ttl-minutes: 10
+    item-ttl-minutes: 5
