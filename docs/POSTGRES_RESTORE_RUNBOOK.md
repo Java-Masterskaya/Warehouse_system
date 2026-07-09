@@ -98,7 +98,7 @@ docker compose exec postgres psql -U warehouse_user -d warehouse \
 
 > Если в `.env` изменены `POSTGRES_USER` / `POSTGRES_DB` — подставь свои значения.
 
-**Ожидаемый результат:** 9 строк (V1–V9), все `success = true`.
+**Ожидаемый результат:** все миграции из `flyway_schema_history`, каждая с `success = true`.
 
 ### Шаг 7. Запустить приложение
 ```bash
@@ -122,7 +122,7 @@ docker compose exec postgres psql -U warehouse_user -d warehouse \
 ### Шаг 9. Проверить Flyway validate
 При старте приложение выполнит `flyway.validate()`. Если в логах:
 ```
-Successfully validated 9 migrations
+Successfully validated all migrations
 ```
 — значит всё в порядке.
 
@@ -151,7 +151,7 @@ docker compose start warehouse-app
 Флаги `--no-owner --no-acl` решают 99% проблем. Если остались — проверь, что `POSTGRES_USER` в `.env` совпадает с тем, что был при создании дампа.
 
 ### Flyway validate failed после restore
-- Проверь `SELECT * FROM flyway_schema_history` — должны быть все 9 миграций.
+- Проверь `SELECT * FROM flyway_schema_history` — должны быть все миграции (V1–V9 и далее), каждая со `success = true`.
 - Если таблицы нет — значит дамп делался с `--data-only` (не тот случай, но проверь).
 - Если миграции есть, но validate падает — возможно, checksum mismatch. Это означает, что файлы миграций в `src/main/resources/db/migration/` изменились после создания дампа. **Никогда не редактируй уже применённые миграции.**
 

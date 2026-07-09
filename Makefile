@@ -8,7 +8,7 @@ up: ## Запуск всего стека (инфраструктура, при�
 down: ## Остановка всех контейнеров
 	docker-compose down
 
-## --- Управление инфраструктурой (БД, Kafka) ---
+## --- Управление инфраструктурой (БД, Kafka, Consul) ---
 infra-up: ## Запуск только инфраструктуры (PostgreSQL, Redis, Kafka, Consul + Seed)
 	docker-compose up -d postgres redis kafka consul consul-seed
 
@@ -64,7 +64,7 @@ help: ## Показать эту справку
 ## --- Backup & Restore ---
 
 backup-now: ## Создать бэкап немедленно
-	docker compose exec postgres-backup /backup.sh
+	docker compose exec postgres-backup sh -c '/backup.sh'
 
 backup-list: ## Показать список бэкапов
 	@docker compose exec postgres-backup sh -c 'ls -lt /backups/*.dump 2>/dev/null || echo "No backups found"'
@@ -75,40 +75,40 @@ backup-restore: ## Восстановить из последнего бэкап
 	docker compose stop warehouse-app
 	docker compose rm -f postgres
 	docker volume rm $$(docker compose ps -q postgres | xargs -I {} docker inspect --format='{{.Mounts}}' {} | grep -oP 'postgres_data[^ ]*' | head -1) 2>/dev/null || true
-	docker compose up -d postgres
+	docker compose up -d postgres postgres-backup
 	@sleep 5
 	LATEST=$$(docker compose exec postgres-backup sh -c 'ls -1t /backups/*.dump 2>/dev/null | head -n1'); \
-	if [ -z "$$LATEST" ]; then echo "No backup found!"; exit 1; fi; \
-	echo "Restoring from: $$LATEST"; \
-	docker compose exec -e PGPASSWORD=$$(grep POSTGRES_PASSWORD .env | cut -d= -f2) postgres-backup \
-		pg_restore --clean --if-exists --no-owner --no-acl -h postgres -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d $$(grep POSTGRES_DB .env | cut -d= -f2) "$$LATEST"
+		if [ -z "$$LATEST" ]; then echo "No backup found!"; exit 1; fi; \
+		echo "Restoring from: $$LATEST"; \
+		MSYS_NO_PATHCONV=1 docker compose exec -e PGPASSWORD=$$(grep POSTGRES_PASSWORD .env | cut -d= -f2) postgres-backup \
+			pg_restore --clean --if-exists --no-owner --no-acl -h postgres -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d $$(grep POSTGRES_DB .env | cut -d= -f2) "$$LATEST"
 	docker compose up -d warehouse-app
 	@echo "Restore complete. Check readiness: make readiness"
 
-backup-test: ## E2E-тест: бэкап → destroy → restore → проверка
+backup-test: ## E2E-тест: бэкап → destroy → restore → проверка (весь стек)
 	@echo "=== OPS-4 Backup/Restore E2E Test ==="
 	docker compose up -d
 	@sleep 30
 	@echo "[1/5] Creating backup..."
-	docker compose exec postgres-backup /backup.sh
+	docker compose exec postgres-backup sh -c '/backup.sh'
 	@echo "[2/5] Stopping app and destroying DB volume..."
 	docker compose stop warehouse-app
 	docker compose rm -f postgres
 	-docker volume rm $$(docker compose ps -q postgres 2>/dev/null | xargs -I {} docker inspect --format='{{.Mounts}}' {} 2>/dev/null | grep -oP 'postgres_data[^ ]*' | head -1) 2>/dev/null || true
 	@echo "[3/5] Starting fresh Postgres..."
-	docker compose up -d postgres
+	docker compose up -d postgres postgres-backup
 	@sleep 10
 	@echo "[4/5] Restoring from latest backup..."
 	LATEST=$$(docker compose exec postgres-backup sh -c 'ls -1t /backups/*.dump 2>/dev/null | head -n1'); \
-	if [ -z "$$LATEST" ]; then echo "FAIL: No backup found!"; exit 1; fi; \
-	docker compose exec -e PGPASSWORD=$$(grep POSTGRES_PASSWORD .env | cut -d= -f2) postgres-backup \
-		pg_restore --clean --if-exists --no-owner --no-acl -h postgres -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d $$(grep POSTGRES_DB .env | cut -d= -f2) "$$LATEST"
+		if [ -z "$$LATEST" ]; then echo "FAIL: No backup found!"; exit 1; fi; \
+		MSYS_NO_PATHCONV=1 docker compose exec -e PGPASSWORD=$$(grep POSTGRES_PASSWORD .env | cut -d= -f2) postgres-backup \
+			pg_restore --clean --if-exists --no-owner --no-acl -h postgres -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d $$(grep POSTGRES_DB .env | cut -d= -f2) "$$LATEST"
 	@echo "[5/5] Starting app and verifying..."
 	docker compose up -d warehouse-app
 	@sleep 15
 	curl -sf http://localhost:8080/actuator/health/readiness && echo "✅ App is ready" || (echo "❌ App healthcheck failed"; exit 1)
 	docker compose exec -e PGPASSWORD=$$(grep POSTGRES_PASSWORD .env | cut -d= -f2) postgres \
 		psql -U $$(grep POSTGRES_USER .env | cut -d= -f2) -d $$(grep POSTGRES_DB .env | cut -d= -f2) \
-		-c "SELECT COUNT(*) AS flyway_migrations FROM flyway_schema_history;" \
+		-c "SELECT CASE WHEN EXISTS (SELECT 1 FROM flyway_schema_history WHERE success = false) THEN 'FAILED' ELSE 'OK' END AS result;" | grep -q OK \
 		|| (echo "❌ Flyway validation failed"; exit 1)
 	@echo "✅ OPS-4 E2E test PASSED"
