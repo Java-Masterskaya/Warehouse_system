@@ -9,9 +9,11 @@ public interface TokenService {
     String generateAccessToken(String username, Long userId, List<String> roles);
     String generateRefreshToken(String username, Long userId, List<String> roles);
     boolean validateRefreshToken(String refreshToken);
+    boolean isRefreshTokenReused(String refreshToken);
     void revokeRefreshToken(String refreshToken);
     void revokeAllUserTokens(Long userId);
     void rotateRefreshToken(String oldRefreshToken, String newRefreshToken);
-    boolean isTokenBlacklisted(String accessToken);
+    boolean isAccessTokenBlacklisted(String accessToken);
     void blacklistAccessToken(String accessToken);
+    void blacklistAllUserAccessTokens(Long userId);
 }

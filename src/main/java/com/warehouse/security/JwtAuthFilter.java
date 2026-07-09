@@ -1,5 +1,6 @@
 package com.warehouse.security;
 
+import com.warehouse.security.service.TokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,27 +28,39 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final int BEARER_PREFIX_LENGTH = BEARER_PREFIX.length();
 
     private final JwtUtil jwtUtil;
+    private final TokenService tokenService;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
-        extractToken(request).flatMap(jwtUtil::parseToken).ifPresent(payload -> {
-            UserPrincipal userPrincipal = new UserPrincipal(
-                    payload.userId(),
-                    payload.username(),
-                    null,
-                    true,
-                    payload.roles().stream().map(SimpleGrantedAuthority::new).toList()
-            );
+        extractToken(request).flatMap(jwtUtil::parseToken).ifPresentOrElse(
+                payload -> {
+                    // Check if token is blacklisted
+                    String token = extractToken(request).orElse(null);
+                    if (token != null && tokenService.isAccessTokenBlacklisted(token)) {
+                        log.warn("Blacklisted token used: {}", payload.username());
+                        SecurityContextHolder.clearContext();
+                        return;
+                    }
+                    // Check if user is active
+                    UserPrincipal userPrincipal = new UserPrincipal(
+                            payload.userId(),
+                            payload.username(),
+                            null,
+                            true,
+                            payload.roles().stream().map(SimpleGrantedAuthority::new).toList()
+                    );
 
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    userPrincipal, null, userPrincipal.getAuthorities());
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            userPrincipal, null, userPrincipal.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.debug("Authenticated user '{}' from JWT", payload.username());
-        });
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    log.debug("Authenticated user '{}' from JWT", payload.username());
+                },
+                () -> log.debug("No valid JWT token found for request: {}", request.getRequestURI())
+                );
 
         filterChain.doFilter(request, response);
     }

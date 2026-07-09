@@ -23,6 +23,7 @@ public class TokenServiceImpl implements TokenService {
     private static final String BLACKLIST_PREFIX = "blacklist:";
     private static final String USER_TOKENS_PREFIX = "user:tokens:";
     private static final String REFRESH_ROTATION_PREFIX = "rotation:";
+    private static final String USER_ACCESS_PREFIX = "user:access:";
 
     @Override
     public TokenPair generateTokenPair(String username, Long userId, List<String> roles) {
@@ -33,6 +34,7 @@ public class TokenServiceImpl implements TokenService {
 
         // Store refresh token in Redis with TTL
         storeRefreshToken(refreshToken, userId);
+        storeAccessToken(accessToken, userId);
         log.info("Token pair generated successfully for user: userId={}", userId);
         return new TokenPair(accessToken, refreshToken);
     }
@@ -70,6 +72,12 @@ public class TokenServiceImpl implements TokenService {
     }
 
     @Override
+    public boolean isRefreshTokenReused(String refreshToken) {
+        String key = REFRESH_ROTATION_PREFIX + refreshToken;
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+    }
+
+    @Override
     public void revokeRefreshToken(String refreshToken) {
         log.info("Start the revoke of the refresh token");
         String key = REFRESH_PREFIX + refreshToken;
@@ -80,12 +88,20 @@ public class TokenServiceImpl implements TokenService {
     @Override
     public void revokeAllUserTokens(Long userId) {
         log.info("Revoking all tokens for user: userId={}", userId);
-        String pattern = USER_TOKENS_PREFIX + userId + ":*";
-        var keys = redisTemplate.keys(pattern);
-        if (keys != null && !keys.isEmpty()) {
-            redisTemplate.delete(keys);
-            log.info("All tokens revoked for user: {}", userId);
+        String refreshPattern = USER_TOKENS_PREFIX + userId + ":*";
+        var refreshKeys = redisTemplate.keys(refreshPattern);
+        if (refreshKeys != null && !refreshKeys.isEmpty()) {
+            redisTemplate.delete(refreshKeys);
+            log.info("All refresh tokens revoked for user: {}", userId);
         }
+        String accessPattern = USER_ACCESS_PREFIX + userId + ":*";
+        var accessKeys = redisTemplate.keys(accessPattern);
+        if (accessKeys != null && !accessKeys.isEmpty()) {
+            redisTemplate.delete(accessKeys);
+            log.info("All access tokens revoked for user: {}", userId);
+        }
+
+        log.info("All tokens revoked for user: {}", userId);
     }
 
     @Override
@@ -107,7 +123,7 @@ public class TokenServiceImpl implements TokenService {
     }
 
     @Override
-    public boolean isTokenBlacklisted(String accessToken) {
+    public boolean isAccessTokenBlacklisted(String accessToken) {
         log.info("Checking if token is blacklisted");
         String key = BLACKLIST_PREFIX + accessToken;
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
@@ -122,10 +138,27 @@ public class TokenServiceImpl implements TokenService {
                 long ttl = jwtUtil.getTokenRemainingTime(accessToken);
                 String key = BLACKLIST_PREFIX + accessToken;
                 redisTemplate.opsForValue().set(key, "blacklisted", ttl, TimeUnit.MILLISECONDS);
+                String userKey = USER_ACCESS_PREFIX + p.userId() + ":" + accessToken;
+                redisTemplate.opsForValue().set(userKey, "blacklisted", ttl, TimeUnit.MILLISECONDS);
                 log.debug("Access token blacklisted for user: {}", p.userId());
             });
         } catch (Exception e) {
             log.warn("Failed to blacklist token: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public void blacklistAllUserAccessTokens(Long userId) {
+        String pattern = USER_ACCESS_PREFIX + userId + ":*";
+        var keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            // Добавляем все токены в blacklist
+            keys.forEach(key -> {
+                String accessToken = key.substring(USER_ACCESS_PREFIX.length() +
+                        userId.toString().length() + 1);
+                blacklistAccessToken(accessToken);
+            });
+            log.info("All access tokens blacklisted for user: {}", userId);
         }
     }
 
@@ -138,6 +171,12 @@ public class TokenServiceImpl implements TokenService {
 
         // Link token to user for easy revocation
         String userKey = USER_TOKENS_PREFIX + userId + ":" + refreshToken;
+        redisTemplate.opsForValue().set(userKey, "active", ttl, TimeUnit.MILLISECONDS);
+    }
+
+    private void storeAccessToken(String accessToken, Long userId) {
+        long ttl = jwtUtil.getExpirationMs();
+        String userKey = USER_ACCESS_PREFIX + userId + ":" + accessToken;
         redisTemplate.opsForValue().set(userKey, "active", ttl, TimeUnit.MILLISECONDS);
     }
 }

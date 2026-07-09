@@ -20,4 +20,3 @@ spring:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    refresh-expiration-ms: 604800000
