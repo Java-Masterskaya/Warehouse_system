@@ -16,6 +16,28 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: postgres-backup
+    env_file:
+      - .env
+    environment:
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - TZ=${TZ}
+    volumes:
+      - postgres_backups:/backups
+      - ./scripts/backup.sh:/backup.sh
+      - ./scripts/restore.sh:/restore.sh
+    command: >
+      sh -c "echo '0 2 * * * sh /backup.sh >> /var/log/backup.log 2>&1' | crontab - &&
+             mkdir -p /var/log &&
+             touch /var/log/backup.log &&
+             crond -f -l 2"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -79,3 +101,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  postgres_backups:

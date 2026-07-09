@@ -59,6 +59,20 @@ make up
 | Redpanda (Kafka) | redpanda:v23.2.11  | 9092 (внутри Docker: 29092) |
 | Schema Registry  | встроен в Redpanda | 8081 |
 
+## Бэкап и восстановление БД
+
+| Команда | Описание |
+|---------|----------|
+| `make backup-now` | Создать дамп немедленно |
+| `make backup-list` | Показать список дампов |
+| `make backup-restore` | Восстановить из последнего дампа (⚠️ разрушительно) |
+| `make backup-test` | E2E-тест цикла backup → restore |
+
+Расписание: ежедневно в 02:00 (настраивается через TZ в .env, по умолчанию Europe/Moscow)
+через `postgres-backup` контейнер.
+
+Подробный рунбук: [`docs/POSTGRES_RESTORE_RUNBOOK.md`](docs/POSTGRES_RESTORE_RUNBOOK.md)
+
 ## Роли
 
 | Роль    | Права                                |
