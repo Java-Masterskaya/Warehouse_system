@@ -31,6 +31,7 @@ public class LowStockAlertConsumer {
      * Обрабатывает событие низкого остатка из топика Kafka.
      * Создаёт и сохраняет запись в таблице stock_alerts.
      * Использует container factory с errorHandler и DLT.
+     * Дубликаты (уникальный индекс) пропускаются, другие ошибки - в errorHandler.
      *
      * @param event событие с данными об остатке
      */
@@ -48,8 +49,26 @@ public class LowStockAlertConsumer {
             stockAlertRepository.save(alert);
             log.info("StockAlert saved with id={}", alert.getId());
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            log.warn("Duplicate alert skipped: itemId={}, triggeredAt={}",
-                    event.itemId(), event.triggeredAt());
+            if (isDuplicateViolation(e)) {
+                log.warn("Duplicate alert skipped (unique index violation): itemId={}, triggeredAt={}",
+                        event.itemId(), event.triggeredAt());
+            } else {
+                // Пробрасываем другие DataIntegrityViolationException в errorHandler
+                throw e;
+            }
         }
+    }
+
+    /**
+     * Проверяет, является ли исключение нарушением уникального индекса (дубликат).
+     * Другие нарушения целостности (NOT NULL, FOREIGN KEY, CHECK) пробрасываются.
+     *
+     * @param e исключение DataIntegrityViolationException
+     * @return true, если это дубликат по уникальному индексу
+     */
+    private boolean isDuplicateViolation(org.springframework.dao.DataIntegrityViolationException e) {
+        String message = e.getMessage();
+        return message != null && (message.contains("idx_stock_alerts_unique") || 
+                message.contains("duplicate key"));
     }
 }
