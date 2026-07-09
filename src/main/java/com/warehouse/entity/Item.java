@@ -76,10 +76,10 @@ public class Item {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(nullable = false, columnDefinition = "DECIMAL(19,2)")
+    @Column(columnDefinition = "DECIMAL(19,2)")
     private BigDecimal price;
 
-    @Column(nullable = false, columnDefinition = "DECIMAL(19,2)")
+    @Column(columnDefinition = "DECIMAL(19,2)")
     private BigDecimal cost;
 
     @PrePersist
@@ -136,7 +136,7 @@ public class Item {
         if (price != null) {
             this.price = price.setScale(2, RoundingMode.HALF_UP);
         } else {
-            this.price = BigDecimal.ZERO;
+            this.price = null;
         }
     }
 
@@ -147,7 +147,7 @@ public class Item {
         if (cost != null) {
             this.cost = cost.setScale(2, RoundingMode.HALF_UP);
         } else {
-            this.cost = BigDecimal.ZERO;
+            this.cost = null;
         }
     }
 
