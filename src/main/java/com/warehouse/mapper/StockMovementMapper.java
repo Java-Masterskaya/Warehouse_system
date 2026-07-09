@@ -44,4 +44,23 @@ public interface StockMovementMapper {
         }
         return null;
     }
+
+    /**
+     * Создаёт ответ при отсутствии изменения остатка (инвентаризация без движения).
+     *
+     * @param itemId     ID товара
+     * @param stockAfter текущий остаток
+     * @return ответ без записи движения
+     */
+    default StockMovementResponse toNoMovementResponse(Long itemId, int stockAfter) {
+        return new StockMovementResponse(
+                itemId,
+                null,      // movementId
+                null,      // type
+                0,         // quantity
+                stockAfter,
+                null,      // createdAt
+                false      // lowStockAlert
+        );
+    }
 }

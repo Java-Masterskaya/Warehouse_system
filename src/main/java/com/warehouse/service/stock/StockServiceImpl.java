@@ -1,6 +1,5 @@
 package com.warehouse.service.stock;
 
-import com.warehouse.entity.Stock;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.StockRepository;
@@ -19,39 +18,43 @@ public class StockServiceImpl implements StockService {
 
     @Override
     public int receiveStock(Long itemId, int quantity) {
-        Stock stock = stockRepository.findByItemId(itemId)
-                .orElseThrow(() -> {
-                    log.warn("Stock not found for item: itemId={}", itemId);
-                    return new EntityNotFoundException("Stock not found for item: " + itemId);
-                });
-        int newQuantity = stock.getQuantity() + quantity;
-        stock.setQuantity(newQuantity);
-        stockRepository.save(stock);
+        int updatedRows = stockRepository.increaseQuantity(itemId, quantity);
+        if (updatedRows == 0) {
+            throw stockNotFound(itemId);
+        }
+
+        int newQuantity = getCurrentQuantity(itemId);
+        log.info("Stock receipt completed: itemId={}, quantity={}, new stock={}",
+                itemId, quantity, newQuantity);
         return newQuantity;
     }
 
     @Override
     public int writeOffStock(Long itemId, int quantity) {
-        Stock stock = stockRepository.findByItemId(itemId)
-                .orElseThrow(() -> {
-                    log.warn("Stock not found for item: itemId={}", itemId);
-                    return new EntityNotFoundException("Stock not found for item: " + itemId);
-                });
-
-        int current = stock.getQuantity();
         log.debug("Write-off: itemId={}, quantity={}", itemId, quantity);
 
-        if (current < quantity) {
+        int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, quantity);
+        if (updatedRows == 0) {
+            int current = stockRepository.findQuantityByItemId(itemId)
+                    .orElseThrow(() -> stockNotFound(itemId));
             log.warn("Insufficient stock for itemId={}: requested {}, available {}",
                     itemId, quantity, current);
             throw InsufficientStockException.of(itemId, quantity, current);
         }
 
-        int newQuantity = current - quantity;
-        stock.setQuantity(newQuantity);
-        stockRepository.save(stock);
+        int newQuantity = getCurrentQuantity(itemId);
         log.info("Write-off completed: itemId={}, quantity={}, new stock={}",
                 itemId, quantity, newQuantity);
         return newQuantity;
+    }
+
+    private int getCurrentQuantity(Long itemId) {
+        return stockRepository.findQuantityByItemId(itemId)
+                .orElseThrow(() -> stockNotFound(itemId));
+    }
+
+    private EntityNotFoundException stockNotFound(Long itemId) {
+        log.warn("Stock not found for item: itemId={}", itemId);
+        return new EntityNotFoundException("Stock not found for item: " + itemId);
     }
 }
