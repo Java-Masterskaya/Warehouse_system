@@ -68,7 +68,7 @@ public class LowStockAlertConsumer {
      */
     private boolean isDuplicateViolation(org.springframework.dao.DataIntegrityViolationException e) {
         String message = e.getMessage();
-        return message != null && (message.contains("idx_stock_alerts_unique") || 
-                message.contains("duplicate key"));
+        return message != null && (message.contains("idx_stock_alerts_unique")
+                || message.contains("duplicate key"));
     }
 }
