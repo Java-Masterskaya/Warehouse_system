@@ -74,7 +74,7 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
         try (Consumer<String, String> consumer = createDltConsumer()) {
             assignPartitions(consumer, dltTopic);
             ReprocessResult result = processMessages(consumer, mainTopic);
-            deleteProcessedRecords(dltTopic, result.maxProcessedOffsets());
+            deleteProcessedRecords(dltTopic, result);
             logResult(result);
             return CompletableFuture.completedFuture(result.toResponse());
         } catch (Exception e) {
@@ -87,6 +87,8 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
         List<DltReprocessDetail> details = new ArrayList<>();
         Set<String> processedKeys = new HashSet<>();
         Map<TopicPartition, Long> maxProcessedOffsets = new HashMap<>();
+        Map<TopicPartition, Long> firstFailedOffsets = new HashMap<>();  // Храним первый FAILED
+        Set<TopicPartition> failedPartitions = new HashSet<>();
         int totalMessages = 0;
         int successfullyReprocessed = 0;
         int failed = 0;
@@ -113,10 +115,12 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
             batchCount += batchResult.processedCount();
             details.addAll(batchResult.details());
             mergeOffsets(maxProcessedOffsets, batchResult.maxProcessedOffsets());
+            mergeFirstFailedOffsets(firstFailedOffsets, batchResult.firstFailedOffsets());
+            failedPartitions.addAll(batchResult.failedPartitions());
         }
 
         return new ReprocessResult(totalMessages, successfullyReprocessed, failed,
-                skippedDuplicates, batchCount, details, maxProcessedOffsets);
+                skippedDuplicates, batchCount, details, maxProcessedOffsets, firstFailedOffsets, failedPartitions);
     }
 
     private BatchProcessResult processRecordBatch(ConsumerRecords<String, String> records,
@@ -126,6 +130,8 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
                                                   int currentBatchCount) {
         List<DltReprocessDetail> details = new ArrayList<>();
         Map<TopicPartition, Long> maxProcessedOffsets = new HashMap<>();
+        Map<TopicPartition, Long> firstFailedOffsets = new HashMap<>();  // Первый FAILED
+        Set<TopicPartition> failedPartitions = new HashSet<>();
         int totalMessages = 0;
         int successCount = 0;
         int failedCount = 0;
@@ -153,17 +159,23 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
             SingleProcessResult singleResult = processSingleRecord(record, mainTopic, consumer);
             details.add(singleResult.detail());
 
+            TopicPartition tp = singleResult.topicPartition();
+            long offset = record.offset();
+
             if (singleResult.success()) {
                 successCount++;
                 processedCount++;
-                maxProcessedOffsets.merge(singleResult.topicPartition(), singleResult.offset(), Math::max);
+                maxProcessedOffsets.merge(tp, singleResult.offset(), Math::max);
             } else {
                 failedCount++;
+                failedPartitions.add(tp);
+                // Запоминаем первый FAILED для этой партиции
+                firstFailedOffsets.merge(tp, offset, Math::min);
             }
         }
 
         return new BatchProcessResult(totalMessages, successCount, failedCount,
-                skippedDuplicates, processedCount, details, maxProcessedOffsets);
+                skippedDuplicates, processedCount, details, maxProcessedOffsets, firstFailedOffsets, failedPartitions);
     }
 
     private String getRecordKey(ConsumerRecord<String, String> record) {
@@ -185,7 +197,7 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
         } catch (Exception e) {
             log.error("Failed to reprocess DLT msg: partition={}, offset={}, error={}",
                     record.partition(), record.offset(), e.getMessage());
-            return SingleProcessResult.failure(createDetail(record, false, e.getMessage()));
+            return SingleProcessResult.failure(tp, createDetail(record, false, e.getMessage()));
         }
     }
 
@@ -204,16 +216,56 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
         source.forEach((tp, offset) -> target.merge(tp, offset, Math::max));
     }
 
+    private void mergeFirstFailedOffsets(Map<TopicPartition, Long> target, Map<TopicPartition, Long> source) {
+        source.forEach((tp, offset) -> target.merge(tp, offset, Math::min));
+    }
+
     private void logResult(ReprocessResult result) {
         log.info("DLT reprocessing done: total={}, success={}, failed={}, skippedDuplicates={}, batch={}",
                 result.totalMessages(), result.successfullyReprocessed(), result.failed(),
                 result.skippedDuplicates(), result.batchCount());
+        if (!result.failedPartitions().isEmpty()) {
+            log.warn("Partitions with failures (not deleted): {}", result.failedPartitions());
+            log.debug("First failed offsets by partition: {}", result.firstFailedOffsets());
+        }
     }
 
-    private void deleteProcessedRecords(String topic, Map<TopicPartition, Long> offsetsToDelete) {
+    private void deleteProcessedRecords(String topic, ReprocessResult result) {
+        // Формируем offsetsToDelete с учетом firstFailedOffsets
+        Map<TopicPartition, Long> offsetsToDelete = new HashMap<>();
+        
+        for (Map.Entry<TopicPartition, Long> entry : result.maxProcessedOffsets().entrySet()) {
+            TopicPartition tp = entry.getKey();
+            long maxOffset = entry.getValue(); // maxProcessedOffset + 1
+            
+            // Если в партиции был FAILED, удаляем только до первого FAILED
+            if (result.firstFailedOffsets().containsKey(tp)) {
+                long firstFailedOffset = result.firstFailedOffsets().get(tp);
+                long deleteUpTo = Math.min(maxOffset, firstFailedOffset);
+                
+                if (deleteUpTo > 0) {
+                    offsetsToDelete.put(tp, deleteUpTo);
+                    log.debug("Partition {}: delete up to {} (maxProcessed={}, firstFailed={})",
+                            tp, deleteUpTo, maxOffset, firstFailedOffset);
+                }
+            } else {
+                // Чистая партиция - удаляем до maxProcessed
+                if (maxOffset > 0) {
+                    offsetsToDelete.put(tp, maxOffset);
+                }
+            }
+        }
+        
         if (offsetsToDelete.isEmpty()) {
+            if (result.failedPartitions().isEmpty()) {
+                log.info("No records to delete (no successful reprocessing)");
+            } else {
+                log.info("No partitions safe to delete — all processed partitions contain failed messages");
+            }
             return;
         }
+
+        log.info("Deleting records from partitions: {}", offsetsToDelete);
 
         Map<TopicPartition, RecordsToDelete> recordsToDelete = buildRecordsToDelete(offsetsToDelete);
         if (recordsToDelete.isEmpty()) {
@@ -284,7 +336,7 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
         }
     }
 
-    private Consumer<String, String> createDltConsumer() {
+    protected Consumer<String, String> createDltConsumer() {
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -346,17 +398,19 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
         return "Unknown";
     }
 
-    private AdminClient createAdminClient() {
+    protected AdminClient createAdminClient() {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         return AdminClient.create(props);
     }
 
-    // --- Result records for method extraction ---
+    // --- Result records ---
 
     private record ReprocessResult(int totalMessages, int successfullyReprocessed, int failed,
                                    int skippedDuplicates, int batchCount, List<DltReprocessDetail> details,
-                                   Map<TopicPartition, Long> maxProcessedOffsets) {
+                                   Map<TopicPartition, Long> maxProcessedOffsets,
+                                   Map<TopicPartition, Long> firstFailedOffsets,
+                                   Set<TopicPartition> failedPartitions) {
         DltReprocessResponse toResponse() {
             return new DltReprocessResponse(totalMessages, successfullyReprocessed, failed, details);
         }
@@ -365,7 +419,9 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
     private record BatchProcessResult(int totalMessages, int successCount, int failedCount,
                                       int skippedDuplicates, int processedCount,
                                       List<DltReprocessDetail> details,
-                                      Map<TopicPartition, Long> maxProcessedOffsets) {
+                                      Map<TopicPartition, Long> maxProcessedOffsets,
+                                      Map<TopicPartition, Long> firstFailedOffsets,
+                                      Set<TopicPartition> failedPartitions) {
     }
 
     private record SingleProcessResult(boolean success, TopicPartition topicPartition,
@@ -374,8 +430,8 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
             return new SingleProcessResult(true, tp, offset, detail);
         }
 
-        static SingleProcessResult failure(DltReprocessDetail detail) {
-            return new SingleProcessResult(false, null, -1, detail);
+        static SingleProcessResult failure(TopicPartition tp, DltReprocessDetail detail) {
+            return new SingleProcessResult(false, tp, -1, detail);
         }
     }
 }
