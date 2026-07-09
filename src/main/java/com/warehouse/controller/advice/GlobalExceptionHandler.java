@@ -7,6 +7,7 @@ import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.StockMovementInvariantException;
@@ -69,6 +70,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("DUPLICATE_USERNAME", ex.getMessage());
     }
 
+    @ExceptionHandler(LastAdminDeactivationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleLastAdminDeactivation(LastAdminDeactivationException ex) {
+        return new ErrorResponse("LAST_ADMIN", ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ValidationErrorResponse handleValidation(MethodArgumentNotValidException ex) {
@@ -82,7 +89,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SelfDeactivationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleSelfDeactivation(SelfDeactivationException ex) {
-        return new  ErrorResponse("SELF_DEACTIVATION", ex.getMessage());
+        return new ErrorResponse("SELF_DEACTIVATION", ex.getMessage());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
