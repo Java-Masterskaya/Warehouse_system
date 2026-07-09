@@ -76,7 +76,6 @@ public class AuthServiceImpl implements AuthService {
         log.debug("Processing refresh token request");
 
         String refreshToken = request.refreshToken();
-        String accessToken = request.accessToken();
 
         // Validate refresh token
         if (!tokenService.validateRefreshToken(refreshToken)) {
@@ -114,7 +113,13 @@ public class AuthServiceImpl implements AuthService {
         log.info("Refresh token rotated for user: {}", p.userId());
 
         // Blacklist old access token
-        tokenService.blacklistAccessToken(accessToken);
+        String accessToken = request.accessToken();
+        if (accessToken != null && !accessToken.isBlank()) {
+            tokenService.blacklistAccessToken(accessToken);
+            log.info("Old access token blacklisted for user: {}", p.userId());
+        } else {
+            log.debug("No access token provided for blacklisting");
+        }
 
         log.info("Refresh token rotated, access blacklisted for user: {}", p.userId());
 
@@ -130,18 +135,15 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = request.refreshToken();
         String accessToken = request.accessToken();
 
-        var payload = jwtUtil.parseRefreshToken(refreshToken);
-        if (payload.isPresent()) {
             // Revoke refresh token
             tokenService.revokeRefreshToken(refreshToken);
 
             // Blacklist access token
             tokenService.blacklistAccessToken(accessToken);
 
-            // Revoke ALL user tokens (both access and refresh)
-            tokenService.revokeAllUserTokens(payload.get().userId());
-
-            log.info("User '{}' logged out successfully", payload.get().userId());
-        }
+        var payload = jwtUtil.parseRefreshToken(refreshToken);
+        payload.ifPresent(p ->
+                log.info("User '{}' logged out successfully", p.userId())
+        );
     }
 }

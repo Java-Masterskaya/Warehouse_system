@@ -79,6 +79,7 @@ public class UserServiceImpl implements UserService {
         user.setActive(false);
         userRepository.save(user);
 
+        tokenService.blacklistAllUserAccessTokens(userId);
         // Revoke all tokens for this user
         tokenService.revokeAllUserTokens(userId);
 
