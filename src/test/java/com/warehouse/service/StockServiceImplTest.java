@@ -1,7 +1,5 @@
 package com.warehouse.service;
 
-import com.warehouse.entity.Item;
-import com.warehouse.entity.Stock;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.StockRepository;
@@ -17,8 +15,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,7 +29,6 @@ class StockServiceImplTest {
     private static final Long ITEM_ID = 1L;
     private static final Long NON_EXISTENT_ITEM_ID = 99L;
 
-    private static final int INITIAL_STOCK_QUANTITY = 10;
     private static final int LOW_STOCK_QUANTITY = 3;
     private static final int WRITE_OFF_AMOUNT = 5;
     private static final int EXCESSIVE_AMOUNT = 15;
@@ -51,22 +46,15 @@ class StockServiceImplTest {
     @Test
     void writeOffStockSuccess() {
         // Arrange
-        Item item = createItem(ITEM_ID);
-        Stock stock = createStock(item, INITIAL_STOCK_QUANTITY);
-
-        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(stockRepository.decreaseQuantityIfEnough(ITEM_ID, WRITE_OFF_AMOUNT)).thenReturn(1);
+        when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(EXPECTED_STOCK_AFTER_WRITE_OFF));
 
         // Act
         int result = stockService.writeOffStock(ITEM_ID, WRITE_OFF_AMOUNT);
 
         // Assert
         assertEquals(EXPECTED_STOCK_AFTER_WRITE_OFF, result);
-        assertEquals(EXPECTED_STOCK_AFTER_WRITE_OFF, stock.getQuantity());
-
-        verify(stockRepository).save(argThat(savedStock ->
-                savedStock.getQuantity() == EXPECTED_STOCK_AFTER_WRITE_OFF
-        ));
+        verify(stockRepository).decreaseQuantityIfEnough(ITEM_ID, WRITE_OFF_AMOUNT);
     }
 
     /**
@@ -74,19 +62,15 @@ class StockServiceImplTest {
      */
     @Test
     void exactQuantityReturnsZero() {
-        // Arrange - списываем ровно столько, сколько есть
-        Item item = createItem(ITEM_ID);
-        Stock stock = createStock(item, WRITE_OFF_AMOUNT);
-
-        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(stockRepository.save(any(Stock.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Arrange
+        when(stockRepository.decreaseQuantityIfEnough(ITEM_ID, WRITE_OFF_AMOUNT)).thenReturn(1);
+        when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(0));
 
         // Act
         int result = stockService.writeOffStock(ITEM_ID, WRITE_OFF_AMOUNT);
 
         // Assert
         assertEquals(0, result);
-        assertEquals(0, stock.getQuantity());
     }
 
     /**
@@ -95,7 +79,8 @@ class StockServiceImplTest {
     @Test
     void stockNotFoundThrowsEntityNotFoundException() {
         // Arrange
-        when(stockRepository.findByItemId(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
+        when(stockRepository.decreaseQuantityIfEnough(NON_EXISTENT_ITEM_ID, WRITE_OFF_AMOUNT)).thenReturn(0);
+        when(stockRepository.findQuantityByItemId(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
 
         // Act & Assert
         EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
@@ -111,7 +96,7 @@ class StockServiceImplTest {
                 "Сообщение должно содержать 'not found'");
 
         // Сохранение не вызывалось
-        verify(stockRepository, never()).save(any());
+        verify(stockRepository, never()).findByItemId(NON_EXISTENT_ITEM_ID);
     }
 
     /**
@@ -120,10 +105,8 @@ class StockServiceImplTest {
     @Test
     void insufficientStockThrowsInsufficientStockException() {
         // Arrange
-        Item item = createItem(ITEM_ID);
-        Stock stock = createStock(item, LOW_STOCK_QUANTITY);
-
-        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.decreaseQuantityIfEnough(ITEM_ID, EXCESSIVE_AMOUNT)).thenReturn(0);
+        when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(LOW_STOCK_QUANTITY));
 
         // Act & Assert
         InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
@@ -142,26 +125,6 @@ class StockServiceImplTest {
                 "Сообщение должно содержать доступное количество");
 
         // Остаток не должен измениться
-        assertEquals(LOW_STOCK_QUANTITY, stock.getQuantity());
-        verify(stockRepository, never()).save(any());
-    }
-
-    /**
-     * Вспомогательные методы.
-     *
-     * @param itemId ID товара
-     * @return Созданный товар
-     */
-    private Item createItem(Long itemId) {
-        Item item = new Item();
-        item.setId(itemId);
-        return item;
-    }
-
-    private Stock createStock(Item item, int quantity) {
-        Stock stock = new Stock();
-        stock.setItem(item);
-        stock.setQuantity(quantity);
-        return stock;
+        verify(stockRepository, never()).findByItemId(ITEM_ID);
     }
 }

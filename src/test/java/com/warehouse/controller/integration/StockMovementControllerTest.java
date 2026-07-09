@@ -3,6 +3,7 @@ package com.warehouse.controller.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -327,6 +328,58 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error").value("INSUFFICIENT_STOCK"));
+    }
+
+    /**
+     * ADMIN проводит инвентаризацию: фактический остаток (7) меньше учётного (10).
+     * Создаётся движение ADJUSTMENT на -3, остаток обновляется до 7.
+     */
+    @Test
+    void adminStocktakeDecreasesStock() throws Exception {
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+
+        mockMvc.perform(post("/api/inventory/stocktake")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("ADJUSTMENT"))
+                .andExpect(jsonPath("$.quantity").value(-3))
+                .andExpect(jsonPath("$.stockAfter").value(7));
+
+        assertThat(stockRepository.findByItemId(testItemId).orElseThrow().getQuantity()).isEqualTo(7);
+    }
+
+    /**
+     * USER токен не может проводить инвентаризацию,
+     * возвращает статус 403 Forbidden.
+     */
+
+    @Test
+    void userCannotStocktakeReturns403() throws Exception {
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+
+        mockMvc.perform(post("/api/inventory/stocktake")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+    }
+
+    /**
+     * Запрос без токена не может проводить инвентаризацию,
+     * возвращает статус 401 Unauthorized.
+     */
+    @Test
+    void noTokenCannotStocktakeReturns401() throws Exception {
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+
+        mockMvc.perform(post("/api/inventory/stocktake")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
     /**

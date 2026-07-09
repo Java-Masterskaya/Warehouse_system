@@ -6,7 +6,10 @@ package com.warehouse.entity;
 public enum MovementType {
     /** Приход товара. */
     RECEIVE,
-    
+
     /** Списание товара. */
-    WRITE_OFF
+    WRITE_OFF,
+
+    /** Корректировка остатков. */
+    ADJUSTMENT
 }
