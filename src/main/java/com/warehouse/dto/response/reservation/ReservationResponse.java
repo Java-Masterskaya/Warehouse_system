@@ -14,7 +14,7 @@ public record ReservationResponse(
 
         Long userId,
 
-        LocalDateTime reservedAt,
+        LocalDateTime createdAt,
 
         LocalDateTime expiredAt,
 
