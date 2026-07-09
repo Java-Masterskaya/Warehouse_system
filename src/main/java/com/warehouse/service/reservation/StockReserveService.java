@@ -22,7 +22,7 @@ public interface StockReserveService {
     ReservationResponse reserve(Long itemId, ReserveRequest request, UserContext ctx);
 
     /**
-     * Регистрирует бронирование остатков.
+     * Списывает резервы.
      *
      * @param itemId  идентификатор зарезервированного товара
      * @param request запрос с id резервирования которое нужно снять
@@ -32,7 +32,7 @@ public interface StockReserveService {
     ReservationResponse release(Long itemId, ReservationActionRequest request, UserContext ctx);
 
     /**
-     * Регистрирует бронирование остатков.
+     * Списывает резервы и остаток.
      *
      * @param itemId  идентификатор зарезервированного товара
      * @param request запрос с id резервирования которое нужно снять

@@ -1,10 +1,10 @@
 package com.warehouse.service;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Reservation;
 import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Stock;
@@ -14,6 +14,7 @@ import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.ReservationException;
 import com.warehouse.mapper.StockReservationMapper;
 import com.warehouse.metric.MetricService;
+import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
@@ -48,6 +49,9 @@ public class StockReserveServiceImplTest {
 
     @Mock
     UserRepository userRepository;
+
+    @Mock
+    ItemRepository itemRepository;
 
     @Mock
     StockReserveRepository stockReserveRepository;
@@ -272,12 +276,13 @@ public class StockReserveServiceImplTest {
 
         when(stockReserveRepository.findById(reservation.getId())).thenReturn(Optional.of(reservation));
 
+        when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
         service.writeOff(item.getId(), request, ctx);
 
         assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CONSUMED);
 
-        verify(movementService).writeOffReceipt(new ChangeQuantityMovementRequest(item.getId(),
-                reservation.getQuantity()), ctx);
+        verify(movementService).newStockMovement(item, reservation.getQuantity(), ctx, MovementType.WRITE_OFF);
 
         verify(stockReserveRepository).save(reservation);
 

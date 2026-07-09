@@ -1,4 +1,4 @@
-package com.warehouse.service.integration;
+package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
