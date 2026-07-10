@@ -24,6 +24,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Slf4j
@@ -47,6 +49,8 @@ public class ItemServiceImpl implements ItemService {
         }
 
         Item item = itemMapper.toEntity(request);
+        item.setPrice(confirmPrice(request.price()));
+        item.setCost(confirmCost(request.cost()));
         itemRepository.save(item);
 
         Stock stock = new Stock();
@@ -81,6 +85,8 @@ public class ItemServiceImpl implements ItemService {
         item.setName(request.name());
         item.setCategory(request.category());
         item.setMinStock(request.minStock());
+        item.setPrice(confirmPrice(request.price()));
+        item.setCost(confirmCost(request.cost()));
 
         Item savedItem = itemRepository.save(item);
         log.info("Item updated: id={}, SKU='{}'", savedItem.getId(), savedItem.getSku());
@@ -168,5 +174,21 @@ public class ItemServiceImpl implements ItemService {
         List<String> categories = itemRepository.findDistinctCategories();
         log.info("Found {} categories: {}", categories.size(), categories);
         return categories;
+    }
+
+    @Override
+    public BigDecimal confirmPrice(BigDecimal price) {
+        if (price == null) {
+            return BigDecimal.ZERO;
+        }
+        return price.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    @Override
+    public BigDecimal confirmCost(BigDecimal cost) {
+        if (cost == null) {
+            return BigDecimal.ZERO;
+        }
+        return cost.setScale(2, RoundingMode.HALF_UP);
     }
 }
