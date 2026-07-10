@@ -1,6 +1,9 @@
 package com.warehouse.kafka.outbox;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
@@ -13,6 +16,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -42,7 +46,7 @@ public class OutboxEventRelay {
         // Сначала обрабатываем PENDING события
         List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingEvents(pollingLimit);
         List<OutboxEvent> failedEvents = outboxEventRepository.findFailedEventsForRetry(
-                pollingLimit - pendingEvents.size());
+                pollingLimit - pendingEvents.size(), maxRetries, retryBackoffMs);
 
         if (pendingEvents.isEmpty() && failedEvents.isEmpty()) {
             log.debug("No pending or failed outbox events found");
@@ -97,29 +101,83 @@ public class OutboxEventRelay {
             event.setSentAt(LocalDateTime.now());
 
             log.debug("Successfully sent event id={} to Kafka", event.getId());
+        } catch (JsonProcessingException e) {
+            // Deserialization errors (битый JSON) - немедленно в DLT без ретраев
+            log.warn("Deserialization error for event id={}: {}", event.getId(), e.getMessage());
+            
+            // Для deserialization errors retry_count НЕ увеличиваем (оставляем как есть)
+            // Считаем это permanent failure
+            Long dltId = outboxEventRepository.insertIntoDlt(
+                    event.getId(),
+                    "Deserialization error: " + e.getMessage(),
+                    event.getRetryCount(), // не увеличиваем!
+                    now
+            );
+            
+            if (dltId != null) {
+                int deleted = outboxEventRepository.deleteFromOutbox(event.getId());
+                if (deleted > 0) {
+                    outboxEventRepository.updateToPermanentFailure(event.getId());
+                    event.setStatus(OutboxStatus.PERMANENT_FAILURE);
+                    log.warn("Event id={} moved to DLT due to deserialization error (dlt_id={})", 
+                            event.getId(), dltId);
+                } else {
+                    log.error("Failed to delete event id={} from outbox", event.getId());
+                }
+            } else {
+                log.error("Failed to insert event id={} into DLT", event.getId());
+            }
         } catch (Exception e) {
             log.error("Error processing outbox event id={}: {}", event.getId(), e.getMessage(), e);
             
+            int newRetryCount = event.getRetryCount() + 1;
+            
             // Проверяем, достигнут ли лимит ретраев
-            if (event.getRetryCount() + 1 >= maxRetries) {
-                // Превышен лимит ретраев - помечаем как FAILED навсегда
-                outboxEventRepository.updateToFailed(
+            if (newRetryCount >= maxRetries) {
+                // Превышен лимит ретраев - перемещаем в DLT
+                Long dltId = outboxEventRepository.insertIntoDlt(
                         event.getId(),
-                        "Max retries exceeded (" + maxRetries + " attempts)",
-                        event.getRetryCount() + 1,
+                        "Max retries exceeded (" + maxRetries + " attempts). Last error: " + e.getMessage(),
+                        newRetryCount,
                         now
                 );
-                log.warn("Event id={} marked as FAILED after {} retries", event.getId(), maxRetries);
+                
+                if (dltId != null) {
+                    int deleted = outboxEventRepository.deleteFromOutbox(event.getId());
+                    if (deleted > 0) {
+                        outboxEventRepository.updateToPermanentFailure(event.getId());
+                        event.setStatus(OutboxStatus.PERMANENT_FAILURE);
+                        log.warn("Event id={} moved to DLT after {} retries (dlt_id={})", 
+                                event.getId(), maxRetries, dltId);
+                    } else {
+                        log.error("Failed to delete event id={} from outbox", event.getId());
+                    }
+                } else {
+                    log.error("Failed to insert event id={} into DLT", event.getId());
+                }
             } else {
+                // Ещё есть попытки - проверяем backoff
+                if (event.getLastAttemptAt() != null) {
+                    long timeSinceLastAttempt = Duration.between(event.getLastAttemptAt(), now).toMillis();
+                    if (timeSinceLastAttempt < retryBackoffMs) {
+                        log.debug("Event id={} skipped due to backoff ({}/{})",
+                                event.getId(), timeSinceLastAttempt, retryBackoffMs);
+                        return;  // Пропускаем до следующей итерации
+                    }
+                }
+                
                 // Ещё есть попытки - помечаем как FAILED для ретрая
                 outboxEventRepository.updateToFailed(
                         event.getId(),
                         e.getMessage(),
-                        event.getRetryCount() + 1,
+                        newRetryCount,
                         now
                 );
-                log.debug("Event id={} marked as FAILED for retry {} of {}", 
-                        event.getId(), event.getRetryCount() + 1, maxRetries);
+                event.setStatus(OutboxStatus.FAILED);
+                event.setRetryCount(newRetryCount);
+                event.setLastAttemptAt(now);
+                log.debug("Event id={} marked as FAILED for retry {} of {}",
+                        event.getId(), newRetryCount, maxRetries);
             }
         }
     }

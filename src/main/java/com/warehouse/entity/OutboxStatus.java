@@ -17,5 +17,10 @@ public enum OutboxStatus {
     /**
      * Ошибка при отправке.
      */
-    FAILED
+    FAILED,
+    
+    /**
+     * Событие перемещено в DLT (Dead Letter Table) после превышения лимита ретраев.
+     */
+    PERMANENT_FAILURE
 }

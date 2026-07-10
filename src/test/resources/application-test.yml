@@ -22,7 +22,7 @@ spring:
       enabled: false
 
   cache:
-    type: redis
+    type: none
 
 redis:
   cache:

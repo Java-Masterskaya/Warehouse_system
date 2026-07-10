@@ -6,7 +6,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication
+
 @EnableScheduling
 @SpringBootApplication(exclude = CacheAutoConfiguration.class)
 @EnableAsync
