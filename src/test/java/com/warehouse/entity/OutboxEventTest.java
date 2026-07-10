@@ -95,10 +95,11 @@ class OutboxEventTest {
      */
     @Test
     void outboxStatusValues() {
-        assertEquals(3, OutboxStatus.values().length);
+        assertEquals(4, OutboxStatus.values().length);
         assertEquals("PENDING", OutboxStatus.PENDING.name());
         assertEquals("SENT", OutboxStatus.SENT.name());
         assertEquals("FAILED", OutboxStatus.FAILED.name());
+        assertEquals("PERMANENT_FAILURE", OutboxStatus.PERMANENT_FAILURE.name());
     }
 
     /**
