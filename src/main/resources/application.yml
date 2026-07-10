@@ -61,6 +61,14 @@ app:
         name: low-stock-alerts
         partitions: 3
         replicas: 1
+        reprocess-batch-size: 100
+    consumer:
+      concurrency: 3
+    retry:
+      initial-interval-ms: 1000
+      multiplier: 2.0
+      max-interval-ms: 10000
+      max-attempts: 3
 
 management:
   endpoints:
