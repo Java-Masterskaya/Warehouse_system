@@ -16,10 +16,7 @@ spring:
         allow.auto.create.topics: false
     consumer:
       group-id: warehouse-alerts
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "com.warehouse.dto.event"
+
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -51,6 +48,14 @@ app:
         name: low-stock-alerts
         partitions: 3
         replicas: 1
+        reprocess-batch-size: 100
+    consumer:
+      concurrency: 3
+    retry:
+      initial-interval-ms: 1000
+      multiplier: 2.0
+      max-interval-ms: 10000
+      max-attempts: 3
 
 management:
   endpoints:
