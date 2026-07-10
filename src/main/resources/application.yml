@@ -27,6 +27,9 @@ spring:
         limit: 100
         # Интервал между опросами в миллисекундах
         interval-ms: 5000
+      # Настройки ретраев
+      max-retries: 3
+      retry-backoff-ms: 5000
   jackson:
     serialization:
       write-dates-as-timestamps: false

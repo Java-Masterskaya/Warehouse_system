@@ -11,8 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,50 +24,65 @@ public class OutboxEventRelay {
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaStockAlertProducer kafkaProducer;
     private final ObjectMapper objectMapper;
-    private final PlatformTransactionManager transactionManager;
 
     @Value("${spring.kafka.outbox.polling.limit:100}")
     private int pollingLimit;
 
+    @Value("${spring.kafka.outbox.max-retries:3}")
+    private int maxRetries;
+
+    @Value("${spring.kafka.outbox.retry-backoff-ms:5000}")
+    private long retryBackoffMs;
+
     @Scheduled(fixedDelayString = "${spring.kafka.outbox.polling.interval-ms:5000}")
+    @Transactional
     public void relayPendingEvents() {
         log.debug("Checking for pending outbox events, limit={}", pollingLimit);
 
+        // Сначала обрабатываем PENDING события
         List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingEvents(pollingLimit);
+        List<OutboxEvent> failedEvents = outboxEventRepository.findFailedEventsForRetry(
+                pollingLimit - pendingEvents.size());
 
-        if (pendingEvents.isEmpty()) {
-            log.debug("No pending outbox events found");
+        if (pendingEvents.isEmpty() && failedEvents.isEmpty()) {
+            log.debug("No pending or failed outbox events found");
             return;
         }
 
-        log.info("Found {} pending outbox events, processing...", pendingEvents.size());
-
-        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+        log.info("Found {} pending + {} failed events, processing...",
+                pendingEvents.size(), failedEvents.size());
 
         for (OutboxEvent event : pendingEvents) {
-            try {
-                txTemplate.executeWithoutResult(status -> processSingleEvent(event.getId()));
-            } catch (Exception e) {
-                // Логируем и продолжаем — событие останется PENDING
-                log.error("Failed to process outbox event id={}, eventType={}",
-                        event.getId(), event.getEventType(), e);
-            }
+            processSingleEvent(event);
         }
 
-        log.info("Processed {} outbox events", pendingEvents.size());
+        for (OutboxEvent event : failedEvents) {
+            processSingleEvent(event);
+        }
+
+        log.info("Processed {} events", pendingEvents.size() + failedEvents.size());
     }
 
-    private void processSingleEvent(Long eventId) {
-        // Re-fetch в текущей транзакции — гарантируем attached entity
-        OutboxEvent event = outboxEventRepository.findById(eventId)
-                .orElseThrow(() -> new IllegalStateException("Event not found: " + eventId));
+    /**
+     * Возвращает количество событий по статусу (для метрик).
+     *
+     * @param status статус
+     * @return количество событий
+     */
+    public long countByStatus(com.warehouse.entity.OutboxStatus status) {
+        return outboxEventRepository.countByStatus(status);
+    }
 
+    private void processSingleEvent(OutboxEvent event) {
+        // Entity уже attached в текущей транзакции
         if (event.getStatus() != OutboxStatus.PENDING) {
             log.debug("Event id={} already processed (status={}), skipping",
-                    eventId, event.getStatus());
+                    event.getId(), event.getStatus());
             return;
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        
         try {
             LowStockAlertEvent alertEvent = objectMapper.readValue(
                     event.getPayload(),
@@ -77,17 +91,36 @@ public class OutboxEventRelay {
 
             kafkaProducer.sendLowStockAlert(alertEvent);
 
-            // WHERE status = PENDING — защита от race condition
-            int updated = outboxEventRepository.updateToSent(eventId, LocalDateTime.now());
+            // Успешная отправка - помечаем как SENT
+            outboxEventRepository.updateToSent(event.getId(), LocalDateTime.now());
+            event.setStatus(OutboxStatus.SENT);
+            event.setSentAt(LocalDateTime.now());
 
-            if (updated == 0) {
-                log.warn("Event id={} not updated to SENT (concurrent processing?)", eventId);
-            } else {
-                log.debug("Successfully sent event id={} to Kafka", eventId);
-            }
+            log.debug("Successfully sent event id={} to Kafka", event.getId());
         } catch (Exception e) {
-            log.error("Error processing outbox event id={}: {}", eventId, e.getMessage());
-            throw new RuntimeException(e); // rollback -> останется PENDING
+            log.error("Error processing outbox event id={}: {}", event.getId(), e.getMessage(), e);
+            
+            // Проверяем, достигнут ли лимит ретраев
+            if (event.getRetryCount() + 1 >= maxRetries) {
+                // Превышен лимит ретраев - помечаем как FAILED навсегда
+                outboxEventRepository.updateToFailed(
+                        event.getId(),
+                        "Max retries exceeded (" + maxRetries + " attempts)",
+                        event.getRetryCount() + 1,
+                        now
+                );
+                log.warn("Event id={} marked as FAILED after {} retries", event.getId(), maxRetries);
+            } else {
+                // Ещё есть попытки - помечаем как FAILED для ретрая
+                outboxEventRepository.updateToFailed(
+                        event.getId(),
+                        e.getMessage(),
+                        event.getRetryCount() + 1,
+                        now
+                );
+                log.debug("Event id={} marked as FAILED for retry {} of {}", 
+                        event.getId(), event.getRetryCount() + 1, maxRetries);
+            }
         }
     }
 }

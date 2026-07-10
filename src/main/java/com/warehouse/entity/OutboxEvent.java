@@ -72,4 +72,17 @@ public class OutboxEvent {
      */
     @Column(name = "error_message", length = 500)
     private String errorMessage;
+
+    /**
+     * Количество попыток отправки (для ограничения ретраев).
+     */
+    @Column(name = "retry_count", nullable = false)
+    @Builder.Default
+    private int retryCount = 0;
+
+    /**
+     * Время последней попытки отправки (для экспоненциального бэкоффа).
+     */
+    @Column(name = "last_attempt_at")
+    private LocalDateTime lastAttemptAt;
 }

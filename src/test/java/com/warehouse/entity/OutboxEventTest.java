@@ -74,6 +74,8 @@ class OutboxEventTest {
                 OutboxStatus.PENDING,
                 CREATED_AT,
                 null,
+                null,
+                0,
                 null
         );
 
@@ -84,6 +86,8 @@ class OutboxEventTest {
         assertEquals(CREATED_AT, event.getCreatedAt());
         assertNull(event.getSentAt());
         assertNull(event.getErrorMessage());
+        assertEquals(0, event.getRetryCount());
+        assertNull(event.getLastAttemptAt());
     }
 
     /**
