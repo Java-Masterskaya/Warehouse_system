@@ -6,11 +6,13 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.Refill;
+import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -45,8 +47,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // Лимитирование POST /api/auth/login (JSON Body)
         if ("/api/auth/login".equals(path) && "POST".equalsIgnoreCase(method)) {
             // Лимит per IP: 5 запросов в минуту
-            if (!isAllowed("rl:login:ip:" + ip, 5, Duration.ofMinutes(1))) {
-                renderError(response, "Too many login attempts from this IP.");
+            long waitIp = getSecondsToWait("rl:login:ip:" + ip, 5, Duration.ofMinutes(1));
+            if (waitIp > 0) {
+                renderError(response, "Too many login attempts from this IP.", waitIp);
                 return;
             }
 
@@ -67,23 +70,26 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
             // Лимит per Username: 3 запроса в минуту
             if (username != null && !username.isBlank()) {
-                if (!isAllowed("rl:login:user:" + username, 3, Duration.ofMinutes(1))) {
-                    renderError(response, "Too many login attempts for this user.");
+                long waitUser = getSecondsToWait("rl:login:user:" + username, 3, Duration.ofMinutes(1));
+                if (waitUser > 0) {
+                    renderError(response, "Too many login attempts for this user.", waitUser);
                     return;
                 }
             }
         } else if (path.startsWith("/api/movements") && isWriteMethod(method)) {
             // Лимитирование write-эндпоинтов движений (работает по Principal из SecurityContext)
-            if (!isAllowed("rl:movements:ip:" + ip, 60, Duration.ofMinutes(1))) {
-                renderError(response, "Rate limit exceeded for actions from this IP.");
+            long waitIp = getSecondsToWait("rl:movements:ip:" + ip, 60, Duration.ofMinutes(1));
+            if (waitIp > 0) {
+                renderError(response, "Rate limit exceeded for actions from this IP.", waitIp);
                 return;
             }
 
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
                 String username = auth.getName();
-                if (!isAllowed("rl:movements:user:" + username, 30, Duration.ofMinutes(1))) {
-                    renderError(response, "Rate limit exceeded for this user.");
+                long waitUser = getSecondsToWait("rl:movements:user:" + username, 30, Duration.ofMinutes(1));
+                if (waitUser > 0) {
+                    renderError(response, "Rate limit exceeded for this user.", waitUser);
                     return;
                 }
             }
@@ -93,14 +99,25 @@ public class RateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(requestToProcess, response);
     }
 
-    private boolean isAllowed(String key, long capacity, Duration period) {
+    // Метод проверки лимита
+    private long getSecondsToWait(String key, long capacity, Duration period) {
         BucketConfiguration config = BucketConfiguration.builder()
                 .addLimit(Bandwidth.classic(capacity, Refill.greedy(capacity, period)))
                 .build();
+
         Bucket bucket = proxyManager.builder().build(key.getBytes(), config);
-        return bucket.tryConsume(1);
+        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+
+        if (probe.isConsumed()) {
+            return -1; // Доступ разрешён
+        }
+
+        // Переводим наносекунды в секунды с округлением вверх
+        long nanos = probe.getNanosToWaitForRefill();
+        return (long) Math.ceil((double) nanos / 1_000_000_000_000L);
     }
 
+    // Метод проверяет, имеем ли мы дело с write-эндпоинтом
     private boolean isWriteMethod(String method) {
         return "POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method)
                 || "PATCH".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method);
@@ -114,9 +131,21 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return request.getRemoteAddr();
     }
 
-    private void renderError(HttpServletResponse response, String message) throws IOException {
+    // Метод рендерит предупреждение о превышении лимита
+    private void renderError(HttpServletResponse response, String message, long secondsToWait) throws IOException {
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType("application/json");
-        response.getWriter().write("{\"error\": \"" + message + "\"}");
+
+        // Установка стандартного заголовка Retry-After в секундах
+        response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(secondsToWait));
+
+        // Для большей информативности дублируем информацию в само тело JSON
+        String jsonResponse = String.format(
+                "{\"error\": \"%s\", \"retry_after_seconds\": %d}",
+                message,
+                secondsToWait
+        );
+
+        response.getWriter().write(jsonResponse);
     }
 }
