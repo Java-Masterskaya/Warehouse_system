@@ -111,12 +111,6 @@ public class AuthServiceImpl implements AuthService {
 
         String refreshToken = request.refreshToken();
 
-        // Validate refresh token
-        if (!tokenService.validateRefreshToken(refreshToken)) {
-            log.warn("Invalid or expired refresh token");
-            throw new InvalidTokenException("Invalid or expired refresh token");
-        }
-
         // Check for token reuse
         if (tokenService.isRefreshTokenReused(refreshToken)) {
             log.warn("Refresh token reuse detected, revoking all tokens");
@@ -128,6 +122,12 @@ public class AuthServiceImpl implements AuthService {
                 log.warn("All tokens revoked for user: {} due to refresh token reuse", p.userId());
             });
             throw new TokenReuseException("Token reuse detected - all tokens revoked");
+        }
+
+        // Validate refresh token
+        if (!tokenService.validateRefreshToken(refreshToken)) {
+            log.warn("Invalid or expired refresh token");
+            throw new InvalidTokenException("Invalid or expired refresh token");
         }
 
         // Parse refresh token
@@ -146,7 +146,7 @@ public class AuthServiceImpl implements AuthService {
         );
 
         // Rotate refresh token
-        tokenService.rotateRefreshToken(refreshToken, newTokenPair.refreshToken());
+        tokenService.rotateRefreshToken(refreshToken);
 
         log.info("Refresh token rotated for user: {}", p.userId());
 

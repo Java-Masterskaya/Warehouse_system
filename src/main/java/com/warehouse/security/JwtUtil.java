@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Утилитный класс для работы с JWT токенами.
@@ -65,16 +66,19 @@ public class JwtUtil {
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(expiration);
 
+        String jti = UUID.randomUUID().toString();
+
         String token = Jwts.builder()
                 .subject(username)
                 .claim("userId", userId)
                 .claim("roles", roles)
+                .id(jti)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(key)
                 .compact();
 
-        log.debug("Token generated successfully for user: {} expires in {} ms", username, expiration);
+        log.debug("Token generated successfully for user: {} with jti: {} expires in {} ms", username, jti, expiration);
         return token;
     }
 

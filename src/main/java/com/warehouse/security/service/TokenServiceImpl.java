@@ -64,7 +64,9 @@ public class TokenServiceImpl implements TokenService {
 
             // Check if token is revoked
             String key = REFRESH_PREFIX + refreshToken;
-            return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+            boolean exists = Boolean.TRUE.equals(redisTemplate.hasKey(key));
+            log.debug("Refresh token exists in Redis: {}", exists);
+            return exists;
         } catch (Exception e) {
             log.warn("Refresh token validation failed: {}", e.getMessage());
             return false;
@@ -91,6 +93,16 @@ public class TokenServiceImpl implements TokenService {
         String refreshPattern = USER_TOKENS_PREFIX + userId + ":*";
         var refreshKeys = redisTemplate.keys(refreshPattern);
         if (refreshKeys != null && !refreshKeys.isEmpty()) {
+            // Для каждого refresh токена удаляем соответствующий ключ refresh:token
+            refreshKeys.forEach(key -> {
+                String refreshToken = key.substring(
+                        USER_TOKENS_PREFIX.length() + userId.toString().length() + 1
+                );
+                String refreshKey = REFRESH_PREFIX + refreshToken;
+                redisTemplate.delete(refreshKey);
+                log.debug("Removed refresh key: {}", refreshKey);
+            });
+            // Удаляем связи user:tokens:userId:*
             redisTemplate.delete(refreshKeys);
             log.info("All refresh tokens revoked for user: {}", userId);
         }
@@ -105,7 +117,7 @@ public class TokenServiceImpl implements TokenService {
     }
 
     @Override
-    public void rotateRefreshToken(String oldRefreshToken, String newRefreshToken) {
+    public void rotateRefreshToken(String oldRefreshToken) {
         log.info("Start of rotating refresh token");
         // Get user info from old token
         var oldPayload = jwtUtil.parseRefreshToken(oldRefreshToken);
@@ -116,8 +128,8 @@ public class TokenServiceImpl implements TokenService {
                     Duration.ofMinutes(5)); // Short TTL for rotation detection
             // Revoke old token
             revokeRefreshToken(oldRefreshToken);
-            // Store new token
-            storeRefreshToken(newRefreshToken, payload.userId());
+            // Store new token - already stored TODO delete
+            //storeRefreshToken(newRefreshToken, payload.userId());
             log.info("Refresh token rotated for user: {}", payload.userId());
         });
     }

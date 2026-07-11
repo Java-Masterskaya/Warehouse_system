@@ -26,7 +26,7 @@ public interface TokenService {
     boolean isRefreshTokenReused(String refreshToken);
     void revokeRefreshToken(String refreshToken);
     void revokeAllUserTokens(Long userId);
-    void rotateRefreshToken(String oldRefreshToken, String newRefreshToken);
+    void rotateRefreshToken(String oldRefreshToken);
     boolean isAccessTokenBlacklisted(String accessToken);
     void blacklistAccessToken(String accessToken);
     void blacklistAllUserAccessTokens(Long userId);
