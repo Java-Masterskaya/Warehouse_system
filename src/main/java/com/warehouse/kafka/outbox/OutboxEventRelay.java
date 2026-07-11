@@ -77,15 +77,32 @@ public class OutboxEventRelay {
         return outboxEventRepository.countByStatus(status);
     }
 
-    private void processSingleEvent(OutboxEvent event) {
+    /**
+     * Обрабатывает одно событие outbox.
+     * Защищенный метод для возможности тестирования.
+     *
+     * @param event событие
+     */
+    protected void processSingleEvent(OutboxEvent event) {
         // Entity уже attached в текущей транзакции
-        if (event.getStatus() != OutboxStatus.PENDING) {
+        // Обрабатываем только PENDING и FAILED события
+        if (event.getStatus() != OutboxStatus.PENDING && event.getStatus() != OutboxStatus.FAILED) {
             log.debug("Event id={} already processed (status={}), skipping",
                     event.getId(), event.getStatus());
             return;
         }
 
         LocalDateTime now = LocalDateTime.now();
+        
+        // Проверяем backoff ДО попытки отправки
+        if (event.getStatus() == OutboxStatus.FAILED && event.getLastAttemptAt() != null) {
+            long timeSinceLastAttempt = Duration.between(event.getLastAttemptAt(), now).toMillis();
+            if (timeSinceLastAttempt < retryBackoffMs) {
+                log.debug("Event id={} skipped due to backoff ({}/{})",
+                        event.getId(), timeSinceLastAttempt, retryBackoffMs);
+                return;  // Пропускаем, пока не пройдёт backoff
+            }
+        }
         
         try {
             LowStockAlertEvent alertEvent = objectMapper.readValue(
@@ -156,16 +173,7 @@ public class OutboxEventRelay {
                     log.error("Failed to insert event id={} into DLT", event.getId());
                 }
             } else {
-                // Ещё есть попытки - проверяем backoff
-                if (event.getLastAttemptAt() != null) {
-                    long timeSinceLastAttempt = Duration.between(event.getLastAttemptAt(), now).toMillis();
-                    if (timeSinceLastAttempt < retryBackoffMs) {
-                        log.debug("Event id={} skipped due to backoff ({}/{})",
-                                event.getId(), timeSinceLastAttempt, retryBackoffMs);
-                        return;  // Пропускаем до следующей итерации
-                    }
-                }
-                
+
                 // Ещё есть попытки - помечаем как FAILED для ретрая
                 outboxEventRepository.updateToFailed(
                         event.getId(),
@@ -176,6 +184,7 @@ public class OutboxEventRelay {
                 event.setStatus(OutboxStatus.FAILED);
                 event.setRetryCount(newRetryCount);
                 event.setLastAttemptAt(now);
+                event.setErrorMessage(e.getMessage());  // БЫЛО: missing!
                 log.debug("Event id={} marked as FAILED for retry {} of {}",
                         event.getId(), newRetryCount, maxRetries);
             }
