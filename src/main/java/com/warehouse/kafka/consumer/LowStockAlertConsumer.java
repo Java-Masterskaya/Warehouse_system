@@ -68,17 +68,4 @@ public class LowStockAlertConsumer {
                     event.itemId(), event.triggeredAt());
         }
     }
-
-    /**
-     * Проверяет, является ли исключение нарушением уникального индекса (дубликат).
-     * Другие нарушения целостности (NOT NULL, FOREIGN KEY, CHECK) пробрасываются.
-     *
-     * @param e исключение DataIntegrityViolationException
-     * @return true, если это дубликат по уникальному индексу
-     */
-    private boolean isDuplicateViolation(org.springframework.dao.DataIntegrityViolationException e) {
-        String message = e.getMessage();
-        return message != null && (message.contains("idx_stock_alerts_unique")
-                || message.contains("duplicate key"));
-    }
 }
