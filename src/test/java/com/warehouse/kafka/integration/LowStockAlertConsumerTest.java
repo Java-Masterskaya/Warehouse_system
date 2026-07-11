@@ -3,9 +3,11 @@ package com.warehouse.kafka.integration;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.StockRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -62,12 +64,17 @@ class LowStockAlertConsumerTest {
     @Autowired
     ItemRepository itemRepository;
 
+    @Autowired
+    StockRepository stockRepository;
+
     private Long testItemId;
 
     @BeforeEach
     void setUp() {
         stockAlertRepository.deleteAll();
+        stockRepository.deleteAll();
         itemRepository.deleteAll();
+        
         Item item = Item.builder()
                 .sku(TEST_SKU)
                 .name(TEST_ITEM_NAME)
