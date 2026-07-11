@@ -2,7 +2,12 @@ package com.warehouse.repository;
 
 import com.warehouse.entity.StockAlert;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,9 +30,28 @@ public interface StockAlertRepository extends JpaRepository<StockAlert, Long> {
 
     /**
      * Находит алерты по itemId.
-     *
-     * @param itemId ID товара
-     * @return список алертов
      */
     List<StockAlert> findByItemId(Long itemId);
+
+    /**
+     * Атомарная вставка с игнорированием дубликатов.
+     * Возвращает 1 если вставлено, 0 если дубликат.
+     *
+     * Уникальный индекс: (item_id, triggered_at)
+     */
+    @Modifying
+    @Query(value = """
+            INSERT INTO stock_alerts 
+                (item_id, current_stock, min_stock, triggered_by, triggered_at, created_at)
+            VALUES 
+                (:itemId, :currentStock, :minStock, :triggeredBy, :triggeredAt, NOW())
+            ON CONFLICT (item_id, triggered_at) DO NOTHING
+            """, nativeQuery = true)
+    int insertIgnore(
+            @Param("itemId") Long itemId,
+            @Param("currentStock") int currentStock,
+            @Param("minStock") int minStock,
+            @Param("triggeredBy") String triggeredBy,
+            @Param("triggeredAt") LocalDateTime triggeredAt
+    );
 }

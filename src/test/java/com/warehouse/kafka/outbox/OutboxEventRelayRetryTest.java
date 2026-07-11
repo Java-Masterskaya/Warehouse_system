@@ -173,7 +173,7 @@ class OutboxEventRelayRetryTest {
     }
 
     @Test
-    @DisplayName("Should skip FAILED event when backoff has not elapsed")
+    @DisplayName("Should skip FAILED event when backoff has not elapsed (before Kafka call)")
     void shouldSkipFailedEventWhenBackoffNotElapsed() {
         String validPayload = """
             {"itemId":4,"sku":"SKU-004","itemName":"Test","currentStock":2,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
@@ -184,21 +184,52 @@ class OutboxEventRelayRetryTest {
                 .status(OutboxStatus.FAILED)
                 .payload(validPayload)
                 .retryCount(1)
-                .lastAttemptAt(LocalDateTime.now().minusSeconds(1))
+                .lastAttemptAt(LocalDateTime.now().minusSeconds(1))  // Бэкофф не прошёл (1 сек < 5 сек)
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        // Нужно doThrow, чтобы попасть в catch блок, где проверяется backoff
-        doThrow(new RuntimeException("Broker unavailable")).when(kafkaProducer).sendLowStockAlert(any());
-
+        // После исправления: backoff проверяется ДО вызова Kafka
+        // Поэтому kafkaProducer НЕ должен быть вызван
         relay.processSingleEvent(event);
 
-        // kafkaProducer вызывается (backoff проверяется после вызова в catch блоке)
-        verify(kafkaProducer).sendLowStockAlert(any());
+        // kafkaProducer НЕ вызывается из-за backoff (backoff проверяется до sendLowStockAlert)
+        verify(kafkaProducer, never()).sendLowStockAlert(any());
         // updateToFailed НЕ вызывается из-за backoff
         verify(outboxEventRepository, never()).updateToFailed(any(), any(), anyInt(), any());
         verify(outboxEventRepository, never()).insertIntoDlt(any(), any(), anyInt(), any());
 
+        assertThat(event.getStatus()).isEqualTo(OutboxStatus.FAILED);
+        assertThat(event.getRetryCount()).isEqualTo(1);
+    }
+
+    /**
+     * Проверяет, что backoff проверяется ДО вызова Kafka для FAILED событий.
+     * Это исправление бага: ранее backoff проверялся только внутри catch блока,
+     * после неудачного вызова Kafka.
+     */
+    @Test
+    @DisplayName("Should check backoff BEFORE Kafka call for FAILED events")
+    void shouldCheckBackoffBeforeKafkaCall() {
+        String validPayload = """
+            {"itemId":100,"sku":"SKU-BACKOFF-BEFORE","itemName":"Test","currentStock":2,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            """;
+
+        OutboxEvent event = OutboxEvent.builder()
+                .id(100L)
+                .status(OutboxStatus.FAILED)
+                .payload(validPayload)
+                .retryCount(1)
+                .lastAttemptAt(LocalDateTime.now().minusSeconds(2))  // Бэкофф 5 сек, прошло только 2 сек
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        relay.processSingleEvent(event);
+
+        // Проверяем, что Kafka вызван НЕ БЫЛ из-за backoff
+        verify(kafkaProducer, never()).sendLowStockAlert(any());
+        verify(outboxEventRepository, never()).updateToFailed(any(), any(), anyInt(), any());
+
+        // Статус остаётся FAILED
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.FAILED);
         assertThat(event.getRetryCount()).isEqualTo(1);
     }
