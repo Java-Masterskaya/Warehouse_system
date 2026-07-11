@@ -81,6 +81,22 @@ management:
     tags:
       application: warehouse-system
 
+rate-limiting:
+  login:
+    ip:
+      capacity: 5
+      duration: 1m
+    username:
+      capacity: 3
+      duration: 1m
+  movements:
+    ip:
+      capacity: 60
+      duration: 1m
+    username:
+      capacity: 30
+      duration: 1m
+
 server:
   shutdown: graceful
 

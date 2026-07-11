@@ -4,7 +4,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
+@ConfigurationPropertiesScan
 @SpringBootApplication(exclude = CacheAutoConfiguration.class)
 @EnableAsync
 public class WarehouseApp {

@@ -2,6 +2,7 @@ package com.warehouse.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.security.config.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
@@ -20,15 +21,20 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Duration;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
+    private final RateLimitProperties properties;
     private final ProxyManager<byte[]> proxyManager;
     private final ObjectMapper objectMapper;
 
-    public RateLimitFilter(ProxyManager<byte[]> proxyManager, ObjectMapper objectMapper) {
+    public RateLimitFilter(
+            RateLimitProperties properties,
+            ProxyManager<byte[]> proxyManager,
+            ObjectMapper objectMapper
+    ) {
+        this.properties = properties;
         this.proxyManager = proxyManager;
         this.objectMapper = objectMapper;
     }
@@ -47,7 +53,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // Лимитирование POST /api/auth/login (JSON Body)
         if ("/api/auth/login".equals(path) && "POST".equalsIgnoreCase(method)) {
             // Лимит per IP: 5 запросов в минуту
-            long waitIp = getSecondsToWait("rl:login:ip:" + ip, 5, Duration.ofMinutes(1));
+            RateLimitProperties.LimitConfig loginConfig = properties.login();
+
+            long waitIp = getSecondsToWait("rl:login:ip:" + ip, loginConfig.ip());
             if (waitIp > 0) {
                 renderError(response, "Too many login attempts from this IP.", waitIp);
                 return;
@@ -70,7 +78,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
             // Лимит per Username: 3 запроса в минуту
             if (username != null && !username.isBlank()) {
-                long waitUser = getSecondsToWait("rl:login:user:" + username, 3, Duration.ofMinutes(1));
+                long waitUser = getSecondsToWait("rl:login:user:" + username, loginConfig.username());
                 if (waitUser > 0) {
                     renderError(response, "Too many login attempts for this user.", waitUser);
                     return;
@@ -78,7 +86,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             }
         } else if (path.startsWith("/api/movements") && isWriteMethod(method)) {
             // Лимитирование write-эндпоинтов движений (работает по Principal из SecurityContext)
-            long waitIp = getSecondsToWait("rl:movements:ip:" + ip, 60, Duration.ofMinutes(1));
+            RateLimitProperties.LimitConfig movementsConfig = properties.movements();
+
+            long waitIp = getSecondsToWait("rl:movements:ip:" + ip, movementsConfig.ip());
             if (waitIp > 0) {
                 renderError(response, "Rate limit exceeded for actions from this IP.", waitIp);
                 return;
@@ -87,7 +97,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
                 String username = auth.getName();
-                long waitUser = getSecondsToWait("rl:movements:user:" + username, 30, Duration.ofMinutes(1));
+                long waitUser = getSecondsToWait("rl:movements:user:" + username, movementsConfig.username());
                 if (waitUser > 0) {
                     renderError(response, "Rate limit exceeded for this user.", waitUser);
                     return;
@@ -100,12 +110,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     // Метод проверки лимита
-    private long getSecondsToWait(String key, long capacity, Duration period) {
-        BucketConfiguration config = BucketConfiguration.builder()
-                .addLimit(Bandwidth.classic(capacity, Refill.greedy(capacity, period)))
+    private long getSecondsToWait(String key, RateLimitProperties.BandwidthConfig config) {
+        BucketConfiguration bucketConfig = BucketConfiguration.builder()
+                .addLimit(Bandwidth.classic(config.capacity(), Refill.greedy(config.capacity(), config.duration())))
                 .build();
 
-        Bucket bucket = proxyManager.builder().build(key.getBytes(), config);
+        Bucket bucket = proxyManager.builder().build(key.getBytes(), bucketConfig);
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
 
         if (probe.isConsumed()) {
