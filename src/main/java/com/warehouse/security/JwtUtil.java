@@ -18,6 +18,15 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Утилитный класс для работы с JWT токенами.
+ * <p>
+ * Предоставляет функционал для генерации и валидации access и refresh токенов.
+ * Access токены имеют короткое время жизни (по умолчанию 1 день),
+ * refresh токены - длинное (по умолчанию 7 дней).
+ * </p>
+ *
+ */
 @Slf4j
 @Component
 @RefreshScope

@@ -1,7 +1,7 @@
 app:
   jwt:
-    expiration-ms: 86400000
-    refresh-expiration-ms: 604800000
+    expiration-ms: 86400000 //TTL access token
+    refresh-expiration-ms: 604800000 // TTL refresh token
 
 redis:
   cache:

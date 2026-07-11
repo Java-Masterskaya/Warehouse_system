@@ -5,6 +5,8 @@ import com.warehouse.dto.request.security.LogoutRequest;
 import com.warehouse.dto.request.security.RefreshRequest;
 import com.warehouse.dto.response.security.LoginResponse;
 import com.warehouse.dto.response.security.RefreshResponse;
+import com.warehouse.exception.InvalidTokenException;
+import com.warehouse.exception.TokenReuseException;
 import com.warehouse.metric.MetricService;
 import com.warehouse.security.JwtUtil;
 import com.warehouse.security.UserPrincipal;
@@ -30,6 +32,20 @@ public class AuthServiceImpl implements AuthService {
     private final TokenService tokenService;
     private final MetricService metricService;
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>При успешной аутентификации генерируется пара токенов:
+     * <ul>
+     *   <li>Access токен с коротким TTL (по умолчанию 1 день)</li>
+     *   <li>Refresh токен с длинным TTL (по умолчанию 7 дней)</li>
+     * </ul>
+     * </p>
+     *
+     * @param request запрос с логином и паролем
+     * @return ответ с токенами
+     * @throws AuthenticationException если аутентификация не удалась
+     */
     @Override
     public LoginResponse login(LoginRequest request) {
         log.debug("Attempting login for user: {}", request.username());
@@ -71,6 +87,24 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Процесс обновления:
+     * <ol>
+     *   <li>Проверка валидности refresh токена в Redis</li>
+     *   <li>Проверка на повторное использование (защита от кражи)</li>
+     *   <li>Генерация новой пары токенов</li>
+     *   <li>Ротация refresh (старый удаляется, новый сохраняется)</li>
+     *   <li>Опциональный blacklist старого access</li>
+     * </ol>
+     * </p>
+     *
+     * @param request запрос с refresh токеном и опционально старым access
+     * @return ответ с новой парой токенов
+     * @throws InvalidTokenException если refresh токен невалиден
+     * @throws TokenReuseException   если обнаружено повторное использование refresh
+     */
     @Override
     public RefreshResponse refresh(RefreshRequest request) {
         log.debug("Processing refresh token request");
@@ -80,7 +114,7 @@ public class AuthServiceImpl implements AuthService {
         // Validate refresh token
         if (!tokenService.validateRefreshToken(refreshToken)) {
             log.warn("Invalid or expired refresh token");
-            throw new RuntimeException("Invalid refresh token");
+            throw new InvalidTokenException("Invalid or expired refresh token");
         }
 
         // Check for token reuse
@@ -88,14 +122,18 @@ public class AuthServiceImpl implements AuthService {
             log.warn("Refresh token reuse detected, revoking all tokens");
             // Revoke entire chain
             var payload = jwtUtil.parseRefreshToken(refreshToken);
-            payload.ifPresent(p -> tokenService.revokeAllUserTokens(p.userId()));
-            throw new RuntimeException("Token reuse detected");
+            payload.ifPresent(p -> {
+                tokenService.blacklistAllUserAccessTokens(p.userId());
+                tokenService.revokeAllUserTokens(p.userId());
+                log.warn("All tokens revoked for user: {} due to refresh token reuse", p.userId());
+            });
+            throw new TokenReuseException("Token reuse detected - all tokens revoked");
         }
 
         // Parse refresh token
         var payload = jwtUtil.parseRefreshToken(refreshToken);
         if (payload.isEmpty()) {
-            throw new RuntimeException("Invalid refresh token");
+            throw new InvalidTokenException("Invalid refresh token");
         }
 
         var p = payload.get();
@@ -130,16 +168,28 @@ public class AuthServiceImpl implements AuthService {
         );
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>При выходе:
+     * <ul>
+     *   <li>Удаляется refresh токен из Redis</li>
+     *   <li>Access токен добавляется в blacklist</li>
+     * </ul>
+     * </p>
+     *
+     * @param request запрос с access и refresh токенами
+     */
     @Override
     public void logout(LogoutRequest request) {
         String refreshToken = request.refreshToken();
         String accessToken = request.accessToken();
 
-            // Revoke refresh token
-            tokenService.revokeRefreshToken(refreshToken);
+        // Revoke refresh token
+        tokenService.revokeRefreshToken(refreshToken);
 
-            // Blacklist access token
-            tokenService.blacklistAccessToken(accessToken);
+        // Blacklist access token
+        tokenService.blacklistAccessToken(accessToken);
 
         var payload = jwtUtil.parseRefreshToken(refreshToken);
         payload.ifPresent(p ->

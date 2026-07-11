@@ -149,6 +149,7 @@ public class TokenServiceImpl implements TokenService {
 
     @Override
     public void blacklistAllUserAccessTokens(Long userId) {
+        log.info("Blacklisting all access tokens for user: userId={}", userId);
         String pattern = USER_ACCESS_PREFIX + userId + ":*";
         var keys = redisTemplate.keys(pattern);
         if (keys != null && !keys.isEmpty()) {
