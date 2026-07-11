@@ -16,7 +16,7 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 @Configuration
 public class RateLimitConfig {
 
-    /*
+    /**
      * Создаём бин ProxyManager с использованием Lettuce (стандартного
      * драйвера Redis в Spring). Он управляет созданием и синхронизацией
      * корзин (buckets) прямо в Redis.

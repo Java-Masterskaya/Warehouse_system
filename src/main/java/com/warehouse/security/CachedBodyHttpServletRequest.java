@@ -9,7 +9,7 @@ import lombok.Getter;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
-/*
+/**
  * Этот класс перехватывает InputStream,
  * сохраняет ввод (байты) в массив и
  * позволяет читать тело запроса сколько угодно раз.

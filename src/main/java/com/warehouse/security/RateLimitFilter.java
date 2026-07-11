@@ -1,7 +1,5 @@
 package com.warehouse.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.security.config.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
@@ -13,6 +11,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -23,21 +22,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
+@RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitProperties properties;
     private final ProxyManager<byte[]> proxyManager;
-    private final ObjectMapper objectMapper;
-
-    public RateLimitFilter(
-            RateLimitProperties properties,
-            ProxyManager<byte[]> proxyManager,
-            ObjectMapper objectMapper
-    ) {
-        this.properties = properties;
-        this.proxyManager = proxyManager;
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -50,7 +39,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // Ссылка на запрос, которую мы сможем подменить на обёртку с кэшем
         HttpServletRequest requestToProcess = request;
 
-        // Лимитирование POST /api/auth/login (JSON Body)
+        // Лимитирование POST /api/auth/login (JSON Body) -> Проверяем ТОЛЬКО IP на входе
         if ("/api/auth/login".equals(path) && "POST".equalsIgnoreCase(method)) {
             // Лимит per IP: 5 запросов в минуту
             RateLimitProperties.LimitConfig loginConfig = properties.login();
@@ -61,29 +50,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // Оборачиваем запрос для безопасного чтения JSON
-            CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(request);
-            requestToProcess = new CachedBodyHttpServletRequest(request); // Передаём обёртку дальше в Spring Security
-
-            String username = null;
-            try {
-                // Извлекаем username из кэшированного тела
-                LoginRequest loginBody = objectMapper.readValue(cachedRequest.getCachedBody(), LoginRequest.class);
-                if (loginBody != null) {
-                    username = loginBody.username();
-                }
-            } catch (Exception e) {
-                // Если JSON невалидный, даём Spring Security / контроллеру обработать ошибку штатно
-            }
-
-            // Лимит per Username: 3 запроса в минуту
-            if (username != null && !username.isBlank()) {
-                long waitUser = getSecondsToWait("rl:login:user:" + username, loginConfig.username());
-                if (waitUser > 0) {
-                    renderError(response, "Too many login attempts for this user.", waitUser);
-                    return;
-                }
-            }
+            // Передаём обёртку дальше в Spring Security
+            requestToProcess = new CachedBodyHttpServletRequest(request);
         } else if (path.startsWith("/api/movements") && isWriteMethod(method)) {
             // Лимитирование write-эндпоинтов движений (работает по Principal из SecurityContext)
             RateLimitProperties.LimitConfig movementsConfig = properties.movements();
@@ -124,7 +92,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // Переводим наносекунды в секунды с округлением вверх
         long nanos = probe.getNanosToWaitForRefill();
-        return (long) Math.ceil((double) nanos / 1_000_000_000_000L);
+        return (long) Math.ceil((double) nanos / 1_000_000_000L);
     }
 
     // Метод проверяет, имеем ли мы дело с write-эндпоинтом
