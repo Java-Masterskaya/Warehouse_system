@@ -42,6 +42,7 @@ import java.time.LocalDateTime;
 public class StockReserveServiceImpl implements StockReserveService {
 
     StockRepository stockRepository;
+    StockAvailabilityService availabilityService;
     UserRepository userRepository;
     ItemRepository itemRepository;
     StockReserveRepository stockReserveRepository;
@@ -63,7 +64,7 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         Stock stock = lockStock(itemId);
 
-        int available = getAvailableItemStock(stock);
+        int available = availabilityService.getAvailable(stock);
         if (available < quantity) {
             log.warn("Reservation quantity is more then now available: available = {}, quantity = {}", available,
                     quantity);
@@ -199,12 +200,5 @@ public class StockReserveServiceImpl implements StockReserveService {
                 }
             });
         }
-    }
-
-    public int getAvailableItemStock(Stock stock) {
-        long reservations = stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE);
-
-        log.info("Start reservation. Current reservations = {}", reservations);
-        return Math.toIntExact(stock.getQuantity() - reservations);
     }
 }
