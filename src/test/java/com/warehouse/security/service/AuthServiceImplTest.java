@@ -182,7 +182,7 @@ class AuthServiceImplTest {
 
             // Verify rotation
             verify(tokenService).rotateRefreshToken(oldRefreshToken);
-            verify(tokenService).blacklistAccessToken(ACCESS_TOKEN);
+            verify(tokenService).blacklistAllUserAccessTokens(TEST_USER_ID);
         }
 
         @Test
@@ -210,7 +210,6 @@ class AuthServiceImplTest {
                     TEST_USER_ID, TEST_USERNAME, TEST_ROLES
             );
 
-            when(tokenService.validateRefreshToken(reusedRefreshToken)).thenReturn(true);
             when(tokenService.isRefreshTokenReused(reusedRefreshToken)).thenReturn(true);
             when(jwtUtil.parseRefreshToken(reusedRefreshToken)).thenReturn(Optional.of(payload));
 

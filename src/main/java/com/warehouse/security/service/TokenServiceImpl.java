@@ -128,8 +128,6 @@ public class TokenServiceImpl implements TokenService {
                     Duration.ofMinutes(5)); // Short TTL for rotation detection
             // Revoke old token
             revokeRefreshToken(oldRefreshToken);
-            // Store new token - already stored TODO delete
-            //storeRefreshToken(newRefreshToken, payload.userId());
             log.info("Refresh token rotated for user: {}", payload.userId());
         });
     }

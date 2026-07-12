@@ -147,17 +147,11 @@ public class AuthServiceImpl implements AuthService {
 
         // Rotate refresh token
         tokenService.rotateRefreshToken(refreshToken);
-
         log.info("Refresh token rotated for user: {}", p.userId());
 
-        // Blacklist old access token
-        String accessToken = request.accessToken();
-        if (accessToken != null && !accessToken.isBlank()) {
-            tokenService.blacklistAccessToken(accessToken);
-            log.info("Old access token blacklisted for user: {}", p.userId());
-        } else {
-            log.debug("No access token provided for blacklisting");
-        }
+        // Blacklist ALL old access tokens
+        tokenService.blacklistAllUserAccessTokens(p.userId());
+        log.info("All old access tokens blacklisted for user: {}", p.userId());
 
         log.info("Refresh token rotated, access blacklisted for user: {}", p.userId());
 
@@ -187,10 +181,10 @@ public class AuthServiceImpl implements AuthService {
 
         // Revoke refresh token
         tokenService.revokeRefreshToken(refreshToken);
-
+        log.info("Refresh token revoked");
         // Blacklist access token
         tokenService.blacklistAccessToken(accessToken);
-
+        log.info("Access token blacklisted");
         var payload = jwtUtil.parseRefreshToken(refreshToken);
         payload.ifPresent(p ->
                 log.info("User '{}' logged out successfully", p.userId())

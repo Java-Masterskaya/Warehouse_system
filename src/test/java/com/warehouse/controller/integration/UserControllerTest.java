@@ -105,6 +105,6 @@ class UserControllerTest extends AbstractIntegrationTest {
                 .getResponse()
                 .getContentAsString();
 
-        return objectMapper.readTree(response).get("token").asText();
+        return objectMapper.readTree(response).get("accessToken").asText();
     }
 }

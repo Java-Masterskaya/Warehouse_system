@@ -226,7 +226,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return objectMapper.readTree(response).get("token").asText();
+        return objectMapper.readTree(response).get("accessToken").asText();
     }
 
     /**
