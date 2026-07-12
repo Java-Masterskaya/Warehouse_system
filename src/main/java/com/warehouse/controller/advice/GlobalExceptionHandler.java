@@ -12,6 +12,7 @@ import com.warehouse.exception.ReservationException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.StockMovementInvariantException;
+import com.warehouse.exception.StocktakeConflictException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -77,6 +78,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleLastAdminDeactivation(LastAdminDeactivationException ex) {
         return new ErrorResponse("LAST_ADMIN", ex.getMessage());
+    }
+
+    @ExceptionHandler(StocktakeConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleStocktakeConflict(StocktakeConflictException ex) {
+        return new ErrorResponse("INVENTORY_RESULT_LESS_THAN_RESERVED", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -15,6 +15,7 @@ import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
+import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
@@ -22,6 +23,8 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.reservation.StockAvailabilityService;
+import com.warehouse.service.reservation.StockReserveService;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +56,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     StockMovementMapper mapper;
     StockService stockService;
+    StockAvailabilityService availabilityService;
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
@@ -174,8 +178,21 @@ public class StockMovementServiceImpl implements StockMovementService {
         Item item = itemCheckForExist(itemId);
         itemCheckForActive(item);
 
-        Stock stock = stockRepository.findByItemId(itemId)
+        //with lock
+        Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
+
+        int reserved = (int)availabilityService.getReserved(stock);
+        if(counted < reserved){
+            log.warn(
+                    "Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. " +
+                            "Physical quantity is lower than active reservations",
+                    itemId,
+                    counted,
+                    reserved
+            );
+            throw StocktakeConflictException.of(counted, reserved);
+        }
 
         int current = stock.getQuantity();
         int delta = counted - current;

@@ -16,4 +16,8 @@ public class StockAvailabilityService {
 
         return Math.toIntExact(stock.getQuantity() - reserved);
     }
+
+    public long getReserved(Stock stock){
+        return reservationRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE);
+    }
 }
