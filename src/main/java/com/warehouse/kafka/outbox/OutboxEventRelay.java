@@ -40,7 +40,7 @@ public class OutboxEventRelay {
     private long retryBackoffMs;
 
     @Scheduled(fixedDelayString = "${spring.kafka.outbox.polling.interval-ms:5000}")
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void relayPendingEvents() {
         log.debug("Checking for pending outbox events, limit={}", pollingLimit);
 
@@ -81,11 +81,9 @@ public class OutboxEventRelay {
     /**
      * Обрабатывает одно событие outbox.
      * Защищенный метод для возможности тестирования.
-     * Использует REQUIRES_NEW для изоляции обновлений статуса.
-     *
      * @param event событие
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+
     protected void processSingleEvent(OutboxEvent event) {
         // Entity уже attached в текущей транзакции
         // Обрабатываем только PENDING и FAILED события

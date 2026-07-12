@@ -114,13 +114,13 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
 
     /**
      * Перемещает событие из outbox в DLT (Dead Letter Table) после превышения лимита ретраев.
-     * Сначала вставляет в outbox_dlt, затем удаляет из outbox и обновляет статус.
+     * Вставляет в outbox_dlt, затем удаляет из outbox и обновляет статус.
      *
      * @param id            ID события
      * @param errorMessage  сообщение об ошибке
      * @param retryCount    количество попыток
      * @param lastAttemptAt время последней попытки
-     * @return количество перемещенных строк (1 если успешно, 0 если не найдено)
+     * @return ID новой записи в DLT (1 если успешно, null если не найдено)
      */
     @Modifying
     @Query(value = """
@@ -141,7 +141,10 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
                 :errorMessage,
                 :retryCount,
                 :lastAttemptAt,
-                'MAX_RETRIES_EXCEEDED'
+                CASE 
+                    WHEN :errorMessage LIKE '%Deserialization error%' THEN 'DESERIALIZATION_ERROR'
+                    ELSE 'MAX_RETRIES_EXCEEDED'
+                END
             FROM outbox o
             WHERE o.id = :id
             RETURNING id;
