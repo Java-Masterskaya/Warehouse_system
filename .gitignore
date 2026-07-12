@@ -36,3 +36,5 @@ logs/
 
 # Docker override (local only)
 docker-compose.override.yml
+
+note.txt
