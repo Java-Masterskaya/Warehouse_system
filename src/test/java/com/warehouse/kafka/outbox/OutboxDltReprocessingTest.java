@@ -149,8 +149,6 @@ class OutboxDltReprocessingTest {
                 .thenReturn(333L);
         when(outboxEventRepository.deleteFromOutbox(eq(53L)))
                 .thenReturn(1);
-        when(outboxEventRepository.updateToPermanentFailure(eq(53L)))
-                .thenReturn(1);
 
         relay.processSingleEvent(event);
 
@@ -161,7 +159,8 @@ class OutboxDltReprocessingTest {
                 any(LocalDateTime.class)
         );
         verify(outboxEventRepository).deleteFromOutbox(eq(53L));
-        verify(outboxEventRepository).updateToPermanentFailure(eq(53L));
+        // updateToPermanentFailure НЕ вызывается, так как deleteFromOutbox успешен (deleted > 0)
+        verify(outboxEventRepository, never()).updateToPermanentFailure(any());
 
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.PERMANENT_FAILURE);
         assertThat(event.getRetryCount()).isZero();

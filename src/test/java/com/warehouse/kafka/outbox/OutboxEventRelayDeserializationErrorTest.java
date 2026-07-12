@@ -64,8 +64,6 @@ class OutboxEventRelayDeserializationErrorTest {
                 .thenReturn(999L);
         when(outboxEventRepository.deleteFromOutbox(eq(1L)))
                 .thenReturn(1);
-        when(outboxEventRepository.updateToPermanentFailure(eq(1L)))
-                .thenReturn(1);
 
         relay.processSingleEvent(event);
 
@@ -84,7 +82,8 @@ class OutboxEventRelayDeserializationErrorTest {
                 .contains("Unexpected character");
 
         verify(outboxEventRepository, times(1)).deleteFromOutbox(eq(1L));
-        verify(outboxEventRepository, times(1)).updateToPermanentFailure(eq(1L));
+        // updateToPermanentFailure НЕ вызывается, так как deleteFromOutbox успешен (deleted > 0)
+        verify(outboxEventRepository, never()).updateToPermanentFailure(any());
         verify(kafkaProducer, never()).sendLowStockAlert(any());
 
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.PERMANENT_FAILURE);
@@ -138,8 +137,6 @@ class OutboxEventRelayDeserializationErrorTest {
                 .thenReturn(888L);  // DLT insert успешен
         when(outboxEventRepository.deleteFromOutbox(eq(3L)))
                 .thenReturn(1);
-        when(outboxEventRepository.updateToPermanentFailure(eq(3L)))
-                .thenReturn(1);
 
         relay.processSingleEvent(event);
 
@@ -158,7 +155,8 @@ class OutboxEventRelayDeserializationErrorTest {
                 .contains("Unexpected character");
 
         verify(outboxEventRepository).deleteFromOutbox(eq(3L));
-        verify(outboxEventRepository).updateToPermanentFailure(eq(3L));
+        // updateToPermanentFailure НЕ вызывается, так как deleteFromOutbox успешен (deleted > 0)
+        verify(outboxEventRepository, never()).updateToPermanentFailure(any());
         verify(kafkaProducer, never()).sendLowStockAlert(any());
 
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.PERMANENT_FAILURE);

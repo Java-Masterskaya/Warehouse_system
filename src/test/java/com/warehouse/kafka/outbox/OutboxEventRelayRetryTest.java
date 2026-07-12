@@ -259,8 +259,6 @@ class OutboxEventRelayRetryTest {
                 .thenReturn(888L);
         when(outboxEventRepository.deleteFromOutbox(eq(5L)))
                 .thenReturn(1);
-        when(outboxEventRepository.updateToPermanentFailure(eq(5L)))
-                .thenReturn(1);
 
         relay.processSingleEvent(event);
 
@@ -281,7 +279,8 @@ class OutboxEventRelayRetryTest {
                 .contains("Persistent broker failure");
 
         verify(outboxEventRepository).deleteFromOutbox(eq(5L));
-        verify(outboxEventRepository).updateToPermanentFailure(eq(5L));
+        // updateToPermanentFailure НЕ вызывается, так как deleteFromOutbox успешен (deleted > 0)
+        verify(outboxEventRepository, never()).updateToPermanentFailure(any());
 
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.PERMANENT_FAILURE);
         assertThat(event.getRetryCount()).isEqualTo(2);

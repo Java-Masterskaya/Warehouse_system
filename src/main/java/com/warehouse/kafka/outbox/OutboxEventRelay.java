@@ -141,9 +141,6 @@ public class OutboxEventRelay {
                 int deleted = outboxEventRepository.deleteFromOutbox(event.getId());
                 event.setStatus(OutboxStatus.PERMANENT_FAILURE);
                 if (deleted > 0) {
-                    // Строка успешно удалена из outbox, но вызываем updateToPermanentFailure для тестов
-                    // (он вернет 0, так как строка уже удалена)
-                    outboxEventRepository.updateToPermanentFailure(event.getId());
                     log.warn("Event id={} moved to DLT due to deserialization error (dlt_id={}), outbox row deleted", 
                             event.getId(), dltId);
                 } else {
@@ -182,9 +179,6 @@ public class OutboxEventRelay {
                     int deleted = outboxEventRepository.deleteFromOutbox(event.getId());
                     event.setStatus(OutboxStatus.PERMANENT_FAILURE);
                     if (deleted > 0) {
-                        // Строка успешно удалена из outbox, но вызываем updateToPermanentFailure для тестов
-                        // (он вернет 0, так как строка уже удалена)
-                        outboxEventRepository.updateToPermanentFailure(event.getId());
                         log.warn("Event id={} moved to DLT after {} retries (dlt_id={}), outbox row deleted", 
                                 event.getId(), maxRetries, dltId);
                     } else {
