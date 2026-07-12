@@ -19,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.util.concurrent.TimeUnit;
 import java.io.IOException;
 
 @Component
@@ -116,7 +117,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // Переводим наносекунды в секунды с округлением вверх
         long nanos = probe.getNanosToWaitForRefill();
-        int nanosPerSecond = 1_000_000_000;
+        long nanosPerSecond = TimeUnit.SECONDS.toNanos(1);
         return (long) Math.ceil((double) nanos / nanosPerSecond);
     }
 

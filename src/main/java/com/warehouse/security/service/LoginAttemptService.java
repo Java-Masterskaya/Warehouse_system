@@ -10,6 +10,8 @@ import io.github.bucket4j.distributed.proxy.ProxyManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.TimeUnit;
+
 // Сервис управления блокировками по Username
 @Service
 @RequiredArgsConstructor
@@ -32,7 +34,7 @@ public class LoginAttemptService {
         }
 
         long nanos = probe.getNanosToWaitForRefill();
-        int nanosPerSecond = 1_000_000_000;
+        long nanosPerSecond = TimeUnit.SECONDS.toNanos(1);
         return (long) Math.ceil((double) nanos / nanosPerSecond);
     }
 
