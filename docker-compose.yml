@@ -151,6 +151,7 @@ services:
       - ./monitoring/grafana/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
       - ./monitoring/grafana/dashboards/warehouse.json:/etc/grafana/provisioning/dashboards/warehouse.json
       - ./monitoring/grafana/datasources/tempo.yaml:/etc/grafana/provisioning/datasources/tempo.yaml
+      - ./monitoring/grafana/datasources/loki.yml:/etc/grafana/provisioning/datasources/loki.yml
     networks:
       - app-network
 
@@ -182,13 +183,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s    # ← добавить задержку перед первой проверкой
 
   # --- Promtail ---
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
     volumes:
-      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: -config.file=/etc/promtail/config.yml
