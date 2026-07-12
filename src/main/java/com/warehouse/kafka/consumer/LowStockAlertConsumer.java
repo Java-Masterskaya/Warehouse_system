@@ -46,6 +46,8 @@ public class LowStockAlertConsumer {
     Tracer tracer;
     Propagator propagator;
 
+    private static final int TRACEPARENT_PARTS_COUNT = 3;
+
     /**
      * Logs bean initialization for startup diagnostics.
      */
@@ -234,7 +236,7 @@ public class LowStockAlertConsumer {
 
     private String extractSpanId(String traceparent) {
         String[] parts = traceparent.split("-");
-        if (parts.length >= 3) {
+        if (parts.length >= TRACEPARENT_PARTS_COUNT) {
             return parts[2];
         }
         return null;
