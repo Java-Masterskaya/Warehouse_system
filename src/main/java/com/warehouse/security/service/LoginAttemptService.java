@@ -32,7 +32,7 @@ public class LoginAttemptService {
         }
 
         long nanos = probe.getNanosToWaitForRefill();
-        long nanosPerSecond = 1_000_000_000L;
+        int nanosPerSecond = 1_000_000_000;
         return (long) Math.ceil((double) nanos / nanosPerSecond);
     }
 

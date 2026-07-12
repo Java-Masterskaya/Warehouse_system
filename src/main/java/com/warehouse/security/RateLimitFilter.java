@@ -38,15 +38,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         HttpServletRequest requestToProcess = request;
 
-        // 1. Обработка эндпоинта авторизации
         if (isLoginRequest(path, method)) {
             if (isLoginRateLimited(ip, response)) {
                 return;
             }
             requestToProcess = new CachedBodyHttpServletRequest(request);
-        }
-        // 2. Обработка эндпоинтов движений
-        else if (isMovementsWriteRequest(path, method)) {
+        } else if (isMovementsWriteRequest(path, method)) {
             if (isMovementsRateLimited(ip, response)) {
                 return;
             }
@@ -119,7 +116,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // Переводим наносекунды в секунды с округлением вверх
         long nanos = probe.getNanosToWaitForRefill();
-        long nanosPerSecond = 1_000_000_000L;
+        int nanosPerSecond = 1_000_000_000;
         return (long) Math.ceil((double) nanos / nanosPerSecond);
     }
 
