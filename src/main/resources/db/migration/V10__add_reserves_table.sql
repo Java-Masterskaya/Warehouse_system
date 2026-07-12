@@ -12,3 +12,11 @@ CREATE TABLE reserves
     CONSTRAINT fk_reserves_user
         FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+-- Used by reservation availability calculation.
+CREATE INDEX idx_reserves_stock_status
+    ON reserves (stock_id, status);
+
+-- Used by reservation expiration scheduler.
+CREATE INDEX idx_reserves_status_expired_at
+    ON reserves (status, expired_at);
