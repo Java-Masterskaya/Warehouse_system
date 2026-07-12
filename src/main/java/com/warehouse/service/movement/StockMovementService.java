@@ -2,6 +2,7 @@ package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -47,4 +48,14 @@ public interface StockMovementService {
                                                                       int page,
                                                                       int size);
 
+    /**
+     * Выполняет инвентаризацию товара: сверяет фактический остаток
+     * с учётным и при расхождении создаёт корректирующее движение.
+     *
+     * @param request данные переучёта: ID товара и фактически подсчитанное количество
+     * @param ctx     пользователь, выполняющий операцию
+     * @return ответ о созданном движении товара; если дельта равна нулю —
+     * возвращает текущее состояние без движения
+     */
+    StockMovementResponse stocktake(StocktakeRequest request, UserContext ctx);
 }

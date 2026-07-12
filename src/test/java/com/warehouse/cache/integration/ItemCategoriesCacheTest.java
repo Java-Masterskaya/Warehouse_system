@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -90,6 +91,8 @@ class ItemCategoriesCacheTest extends AbstractIntegrationTest {
         item.setCategory(category);
         item.setMinStock(0);
         item.setActive(active);
+        item.setPrice(BigDecimal.valueOf(100.00));
+        item.setCost(BigDecimal.valueOf(50.00));
         return item;
     }
 }
