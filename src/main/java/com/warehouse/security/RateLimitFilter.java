@@ -36,45 +36,69 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String method = request.getMethod();
         String ip = getClientIp(request);
 
-        // Ссылка на запрос, которую мы сможем подменить на обёртку с кэшем
         HttpServletRequest requestToProcess = request;
 
-        // Лимитирование POST /api/auth/login (JSON Body) -> Проверяем ТОЛЬКО IP на входе
-        if ("/api/auth/login".equals(path) && "POST".equalsIgnoreCase(method)) {
-            // Лимит per IP: 5 запросов в минуту
-            RateLimitProperties.LimitConfig loginConfig = properties.login();
-
-            long waitIp = getSecondsToWait("rl:login:ip:" + ip, loginConfig.ip());
-            if (waitIp > 0) {
-                renderError(response, "Too many login attempts from this IP.", waitIp);
+        // 1. Обработка эндпоинта авторизации
+        if (isLoginRequest(path, method)) {
+            if (isLoginRateLimited(ip, response)) {
                 return;
             }
-
-            // Передаём обёртку дальше в Spring Security
             requestToProcess = new CachedBodyHttpServletRequest(request);
-        } else if (path.startsWith("/api/movements") && isWriteMethod(method)) {
-            // Лимитирование write-эндпоинтов движений (работает по Principal из SecurityContext)
-            RateLimitProperties.LimitConfig movementsConfig = properties.movements();
-
-            long waitIp = getSecondsToWait("rl:movements:ip:" + ip, movementsConfig.ip());
-            if (waitIp > 0) {
-                renderError(response, "Rate limit exceeded for actions from this IP.", waitIp);
+        }
+        // 2. Обработка эндпоинтов движений
+        else if (isMovementsWriteRequest(path, method)) {
+            if (isMovementsRateLimited(ip, response)) {
                 return;
-            }
-
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
-                String username = auth.getName();
-                long waitUser = getSecondsToWait("rl:movements:user:" + username, movementsConfig.username());
-                if (waitUser > 0) {
-                    renderError(response, "Rate limit exceeded for this user.", waitUser);
-                    return;
-                }
             }
         }
 
-        // Важно: передаём requestToProcess (он может быть обёрнут в CachedBody)
         filterChain.doFilter(requestToProcess, response);
+    }
+
+    private boolean isLoginRequest(String path, String method) {
+        return "/api/auth/login".equals(path) && "POST".equalsIgnoreCase(method);
+    }
+
+    private boolean isMovementsWriteRequest(String path, String method) {
+        return path.startsWith("/api/movements") && isWriteMethod(method);
+    }
+
+    private boolean isLoginRateLimited(String ip, HttpServletResponse response) throws IOException {
+        RateLimitProperties.LimitConfig loginConfig = properties.login();
+        long waitIp = getSecondsToWait("rl:login:ip:" + ip, loginConfig.ip());
+
+        if (waitIp > 0) {
+            renderError(response, "Too many login attempts from this IP.", waitIp);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isMovementsRateLimited(String ip, HttpServletResponse response) throws IOException {
+        RateLimitProperties.LimitConfig movementsConfig = properties.movements();
+
+        // Проверка по IP
+        long waitIp = getSecondsToWait("rl:movements:ip:" + ip, movementsConfig.ip());
+        if (waitIp > 0) {
+            renderError(response, "Rate limit exceeded for actions from this IP.", waitIp);
+            return true;
+        }
+
+        // Проверка по пользователю
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (isFullyAuthenticated(auth)) {
+            String username = auth.getName();
+            long waitUser = getSecondsToWait("rl:movements:user:" + username, movementsConfig.username());
+            if (waitUser > 0) {
+                renderError(response, "Rate limit exceeded for this user.", waitUser);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isFullyAuthenticated(Authentication auth) {
+        return auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName());
     }
 
     // Метод проверки лимита
@@ -95,7 +119,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         // Переводим наносекунды в секунды с округлением вверх
         long nanos = probe.getNanosToWaitForRefill();
-        return (long) Math.ceil((double) nanos / 1_000_000_000L);
+        long nanosPerSecond = 1_000_000_000L;
+        return (long) Math.ceil((double) nanos / nanosPerSecond);
     }
 
     // Метод проверяет, имеем ли мы дело с write-эндпоинтом

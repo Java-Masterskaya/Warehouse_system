@@ -20,6 +20,7 @@ public class LoginAttemptService {
 
     /**
      * Проверяет, заблокирован ли пользователь. Списывает 1 попытку авансом.
+     * @param username Имя пользователя для авторизации.
      * @return время ожидания в секундах, если заблокирован; -1 если доступ разрешен.
      */
     public long checkAndConsume(String username) {
@@ -31,11 +32,13 @@ public class LoginAttemptService {
         }
 
         long nanos = probe.getNanosToWaitForRefill();
-        return (long) Math.ceil((double) nanos / 1_000_000_000L);
+        long nanosPerSecond = 1_000_000_000L;
+        return (long) Math.ceil((double) nanos / nanosPerSecond);
     }
 
     /**
      * Если вход успешный, возвращаем списанный авансом токен назад.
+     * @param username Имя пользователя для авторизации.
      */
     public void registerSuccess(String username) {
         Bucket bucket = getUsernameBucket(username);

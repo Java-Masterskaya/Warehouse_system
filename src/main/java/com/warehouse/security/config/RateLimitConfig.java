@@ -12,15 +12,15 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 
+import javax.swing.*;
+
 @Slf4j
 @Configuration
 public class RateLimitConfig {
 
-    /**
-     * Создаём бин ProxyManager с использованием Lettuce (стандартного
-     * драйвера Redis в Spring). Он управляет созданием и синхронизацией
-     * корзин (buckets) прямо в Redis.
-     */
+    // Создаём бин ProxyManager с использованием Lettuce (стандартного
+    // драйвера Redis в Spring). Он управляет созданием и синхронизацией
+    // корзин (buckets) прямо в Redis.
     @Bean
     public ProxyManager<byte[]> proxyManager(RedisConnectionFactory connectionFactory) {
         // Извлекаем нативный клиент Lettuce из фабрики Spring Boot
