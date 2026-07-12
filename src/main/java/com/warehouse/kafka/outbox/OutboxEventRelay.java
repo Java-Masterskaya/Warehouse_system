@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -96,17 +95,17 @@ public class OutboxEventRelay {
 
         LocalDateTime now = LocalDateTime.now();
         
-        // Проверяем backoff ДО попытки отправки (экспоненциальный: 2^(retryCount+1) * backoffMs)
+        // Проверяем backoff ДО попытки отправки (экспоненциальный: 2^retryCount * backoffMs)
         if (event.getStatus() == OutboxStatus.FAILED && event.getLastAttemptAt() != null) {
-            // Вычисляем экспоненциальный backoff для СЛЕДУЮЩЕЙ попытки
-            long currentRetry = event.getRetryCount() + 1; // следующая попытка
+            // Вычисляем экспоненциальный backoff для текущей попытки (стандартная формула)
+            long currentRetry = event.getRetryCount(); // текущая попытка (0, 1, 2, ...)
             long exponentialBackoff = retryBackoffMs * (long) Math.pow(2, currentRetry);
             
             long timeSinceLastAttempt = Duration.between(event.getLastAttemptAt(), now).toMillis();
             if (timeSinceLastAttempt < exponentialBackoff) {
                 log.debug("Event id={} skipped due to exponential backoff ({}/{}, retry {} of {})",
                         event.getId(), timeSinceLastAttempt, exponentialBackoff, 
-                        event.getRetryCount() + 1, maxRetries);
+                        event.getRetryCount(), maxRetries);
                 return;  // Пропускаем, пока не пройдёт backoff
             }
         }
@@ -217,7 +216,7 @@ public class OutboxEventRelay {
                 event.setStatus(OutboxStatus.FAILED);
                 event.setRetryCount(newRetryCount);
                 event.setLastAttemptAt(now);
-                event.setErrorMessage(e.getMessage());  // БЫЛО: missing!
+                event.setErrorMessage(e.getMessage());
                 log.debug("Event id={} marked as FAILED for retry {} of {}",
                         event.getId(), newRetryCount, maxRetries);
             }
