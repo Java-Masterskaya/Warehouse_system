@@ -14,11 +14,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -41,10 +41,12 @@ class LowStockAlertConsumerTest {
     private static final int TEST_CURRENT_STOCK = 5;
     private static final String TEST_TRIGGERED_BY = "admin";
 
-    @Container
-    static RedpandaContainer redpanda = new RedpandaContainer(
-            DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1")
-    );
+    static final RedpandaContainer redpanda =
+            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1"));
+
+    static {
+        redpanda.start();
+    }
 
     @DynamicPropertySource
     static void kafkaProperties(DynamicPropertyRegistry registry) {
@@ -71,6 +73,8 @@ class LowStockAlertConsumerTest {
                 .category(TEST_CATEGORY)
                 .minStock(TEST_MIN_STOCK)
                 .active(true)
+                .price(BigDecimal.valueOf(100.00))
+                .cost(BigDecimal.valueOf(50.00))
                 .build();
         item = itemRepository.save(item);
         testItemId = item.getId();

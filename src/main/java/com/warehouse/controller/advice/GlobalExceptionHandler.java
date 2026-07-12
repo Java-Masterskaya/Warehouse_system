@@ -8,7 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -16,25 +18,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
 
-/**
- * GlobalExceptionHandler обрабатывает исключения, которые выбрасываются из контроллеров:
- * сущностные ошибки (Not found, Insufficient stock, Duplicate), валидацию и общие ошибки.
- *
- * <p>Обработка исключений 401 (Unauthorized) и 403 (Forbidden) происходит в
- * {@link com.warehouse.security.config.SecurityConfig SecurityConfig} через
- * {@link com.warehouse.security.config.SecurityConfig#authenticationEntryPoint() authenticationEntryPoint}
- * и {@link com.warehouse.security.config.SecurityConfig#accessDeniedHandler() accessDeniedHandler},
- * которые возвращают JSON-ответ.
- * Эти обработчики в SecurityConfig срабатывают до контроллера, так как:</p>
- *
- * <ul>
- *   <li>Проверка токена происходит на уровне фильтров (JwtAuthFilter)</li>
- *   <li>Проверка ролей происходит на уровне @PreAuthorize аннотаций</li>
- * </ul>
- *
- * <p>Обработчики 401/403 в этом классе остаются только для совместимости с тестами,
- * которые ожидают JSON-ответ через Spring MVC контроллеры.</p>
- */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -42,7 +25,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EntityNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleEntityNotFound(EntityNotFoundException ex) {
-        return new ErrorResponse("ENTITY_NOT_FOUND", ex.getMessage());
+        log.warn("Entity not found: {}", ex.getMessage());
+        String message;
+        if (isAdmin()) {
+            message = ex.getMessage();
+        } else {
+            message = "Resource not found";
+        }
+        return new ErrorResponse("ENTITY_NOT_FOUND", message);
     }
 
     @ExceptionHandler(InsufficientStockException.class)
@@ -54,13 +44,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateSkuException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDuplicateSku(DuplicateSkuException ex) {
-        return new ErrorResponse("DUPLICATE_SKU", ex.getMessage());
+        String message;
+        if (isAdmin()) {
+            message = ex.getMessage();
+        } else {
+            message = "SKU already exists";
+        }
+        return new ErrorResponse("DUPLICATE_SKU", message);
     }
 
     @ExceptionHandler(DuplicateUsernameException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDuplicateUsername(DuplicateUsernameException ex) {
-        return new ErrorResponse("DUPLICATE_USERNAME", ex.getMessage());
+        String message;
+        if (isAdmin()) {
+            message = ex.getMessage();
+        } else {
+            message = "Username already exists";
+        }
+        return new ErrorResponse("DUPLICATE_USERNAME", message);
     }
 
     @ExceptionHandler(LastAdminDeactivationException.class)
@@ -154,6 +156,21 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleGeneral(Exception ex) {
         log.error("Unhandled exception: {}", ex.getMessage(), ex);
-        return new ErrorResponse("INTERNAL_ERROR", "Internal server error");
+        String message;
+        if (isAdmin()) {
+            message = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+        } else {
+            message = "Internal server error";
+        }
+        return new ErrorResponse("INTERNAL_ERROR", message);
+    }
+
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null) {
+            return auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        }
+        return false;
     }
 }
