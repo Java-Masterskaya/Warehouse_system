@@ -8,6 +8,8 @@ import com.warehouse.repository.StockReserveRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class StockAvailabilityService {
@@ -16,14 +18,14 @@ public class StockAvailabilityService {
 
     public int getAvailable(long itemId) {
         Stock stock = getStock(itemId);
-        long reserved = reservationRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE);
+        long reserved = reservationRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now());
 
         return Math.toIntExact(stock.getQuantity() - reserved);
     }
 
     public int getReserved(long itemId){
         Stock stock = getStock(itemId);
-        return reservationRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE);
+        return reservationRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now());
     }
 
     private Stock getStock(long itemId){

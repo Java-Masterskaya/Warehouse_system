@@ -99,7 +99,7 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(0);
+        when(stockReserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now())).thenReturn(0);
 
         when(userRepository.getReferenceById(ctx.userId())).thenReturn(user);
 
@@ -154,7 +154,7 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(
+        when(stockReserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now())).thenReturn(
                 oldReservation.getQuantity());
 
         assertThrows(InsufficientStockException.class, () -> service.reserve(item.getId(), request, ctx));
@@ -175,7 +175,7 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE)).thenReturn(
+        when(stockReserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now())).thenReturn(
                 reservation.getQuantity() + reservation1.getQuantity());
 
         assertThrows(InsufficientStockException.class, () -> service.reserve(item.getId(), request, ctx));

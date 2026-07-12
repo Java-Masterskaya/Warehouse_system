@@ -16,8 +16,9 @@ public interface StockReserveRepository extends JpaRepository<Reservation, Long>
                 from Reservation r
                 where r.stock = :stock
                 and r.status = :status
+                and r.expiredAt > :now
             """)
-    Integer findSumReserveByStockAndStatus(Stock stock, ReservationStatus status);
+    Integer findActiveReserveSumByStock(Stock stock, ReservationStatus status, LocalDateTime now);
 
     @Modifying(clearAutomatically = true)
     @Query("""

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -65,7 +66,7 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
             }
         }).count();
         assertEquals(1, successfulReservations);
-        long reserved = reserveRepository.findSumReserveByStockAndStatus(stock, ReservationStatus.ACTIVE);
+        long reserved = reserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now());
         assertEquals(7, reserved);
     }
 }
