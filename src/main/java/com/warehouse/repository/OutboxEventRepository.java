@@ -39,10 +39,13 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
     /**
      * Находит FAILED события для повторной обработки (ретраи с экспоненциальной задержкой).
      * Использует параметры для настраиваемого лимита ретраев и интервала бэкоффа.
+     * Использует FOR UPDATE SKIP LOCKED для защиты от параллельных релеев.
+     * Проверяет, что maxRetries ретраев еще не исчерпан.
+     * Проверка экспоненциального бэкоффа выполняется в Java (OutboxEventRelay.processSingleEvent).
      *
      * @param limit        максимальное количество событий для выборки
      * @param maxRetries   максимальное количество попыток (из конфигурации)
-     * @param backoffMs    интервал бэкоффа в миллисекундах (из конфигурации)
+     * @param backoffMs    базовый интервал бэкоффа в миллисекундах (из конфигурации)
      * @return список FAILED событий для ретрая
      */
     @Query(value = """
@@ -50,7 +53,6 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
             FROM outbox
             WHERE status = 'FAILED'
               AND retry_count < :maxRetries
-              AND (last_attempt_at IS NULL OR last_attempt_at < NOW() - INTERVAL '1 second' * :backoffMs / 1000)
             ORDER BY created_at ASC
             LIMIT :limit
             FOR UPDATE SKIP LOCKED

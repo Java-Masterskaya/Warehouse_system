@@ -234,7 +234,6 @@ class OutboxEventRelayRetryTest {
         assertThat(event.getRetryCount()).isEqualTo(1);
     }
 
-    // ==================== DLT СЦЕНАРИЙ (max retries exceeded) ====================
 
     @Test
     @DisplayName("Should move event to DLT when max retries exceeded")

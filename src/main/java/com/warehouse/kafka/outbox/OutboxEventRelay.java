@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -39,7 +40,7 @@ public class OutboxEventRelay {
     private long retryBackoffMs;
 
     @Scheduled(fixedDelayString = "${spring.kafka.outbox.polling.interval-ms:5000}")
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void relayPendingEvents() {
         log.debug("Checking for pending outbox events, limit={}", pollingLimit);
 
@@ -80,9 +81,11 @@ public class OutboxEventRelay {
     /**
      * Обрабатывает одно событие outbox.
      * Защищенный метод для возможности тестирования.
+     * Использует REQUIRES_NEW для изоляции обновлений статуса.
      *
      * @param event событие
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     protected void processSingleEvent(OutboxEvent event) {
         // Entity уже attached в текущей транзакции
         // Обрабатываем только PENDING и FAILED события
@@ -94,12 +97,17 @@ public class OutboxEventRelay {
 
         LocalDateTime now = LocalDateTime.now();
         
-        // Проверяем backoff ДО попытки отправки
+        // Проверяем backoff ДО попытки отправки (экспоненциальный: 2^(retryCount+1) * backoffMs)
         if (event.getStatus() == OutboxStatus.FAILED && event.getLastAttemptAt() != null) {
+            // Вычисляем экспоненциальный backoff для СЛЕДУЮЩЕЙ попытки
+            long currentRetry = event.getRetryCount() + 1; // следующая попытка
+            long exponentialBackoff = retryBackoffMs * (long) Math.pow(2, currentRetry);
+            
             long timeSinceLastAttempt = Duration.between(event.getLastAttemptAt(), now).toMillis();
-            if (timeSinceLastAttempt < retryBackoffMs) {
-                log.debug("Event id={} skipped due to backoff ({}/{})",
-                        event.getId(), timeSinceLastAttempt, retryBackoffMs);
+            if (timeSinceLastAttempt < exponentialBackoff) {
+                log.debug("Event id={} skipped due to exponential backoff ({}/{}, retry {} of {})",
+                        event.getId(), timeSinceLastAttempt, exponentialBackoff, 
+                        event.getRetryCount() + 1, maxRetries);
                 return;  // Пропускаем, пока не пройдёт backoff
             }
         }
