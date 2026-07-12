@@ -116,7 +116,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("Deactivation should revoke all tokens in Redis")
-    void deactivation_shouldRevokeAllTokensInRedis() {
+    void deactivationShouldRevokeAllTokensInRedis() {
         // 1. Verify tokens are stored and valid
         assertThat(tokenService.validateRefreshToken(refreshToken))
                 .as("Refresh token should be valid before deactivation")
@@ -143,7 +143,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("All user tokens should be revoked on deactivation")
-    void deactivation_shouldRevokeAllUserTokens() {
+    void deactivationShouldRevokeAllUserTokens() {
         // 1. Generate multiple tokens for the same user using public method
         List<String> roles = List.of("ROLE_USER");
 
@@ -195,7 +195,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("Deactivation should remove refresh tokens from Redis")
-    void deactivation_shouldRemoveRefreshTokensFromRedis() {
+    void deactivationShouldRemoveRefreshTokensFromRedis() {
         // 1. Verify refresh token exists in Redis
         assertThat(tokenService.validateRefreshToken(refreshToken)).isTrue();
 
@@ -208,7 +208,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("Deactivation should not affect other users' tokens")
-    void deactivation_shouldNotAffectOtherUsersTokens() {
+    void deactivationShouldNotAffectOtherUsersTokens() {
         // 1. Create another user with tokens
         User otherUser = new User();
         otherUser.setUsername("other_user_" + System.currentTimeMillis());
@@ -248,7 +248,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("Deactivating already inactive user should still revoke tokens")
-    void deactivatingAlreadyInactiveUser_shouldStillRevokeTokens() {
+    void deactivatingAlreadyInactiveUserShouldStillRevokeTokens() {
         // 1. Deactivate user first time
         userService.deactivateUser(testUser.getId(), 999L);
 

@@ -30,7 +30,11 @@ import com.warehouse.dto.response.security.RefreshResponse;
  *
  */
 public interface AuthService {
+
     LoginResponse login(LoginRequest request);
+
     RefreshResponse refresh(RefreshRequest request);
+
     void logout(LogoutRequest request);
+
 }

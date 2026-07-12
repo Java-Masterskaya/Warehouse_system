@@ -3,7 +3,16 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
-import com.warehouse.exception.*;
+import com.warehouse.exception.DuplicateUsernameException;
+import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.InvalidTokenException;
+import com.warehouse.exception.LastAdminDeactivationException;
+import com.warehouse.exception.SelfDeactivationException;
+import com.warehouse.exception.TokenReuseException;
+import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.DuplicateSkuException;
+import com.warehouse.exception.InvalidMovementRequestException;
+import com.warehouse.exception.StockMovementInvariantException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -99,17 +108,6 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("UNAUTHORIZED", "Authentication failed");
     }
 
-    /**
-     * Обработка невалидного токена.
-     *
-     * <p>Возникает когда:
-     * <ul>
-     *   <li>Refresh токен не найден в Redis (истек или отозван)</li>
-     *   <li>Токен имеет неверный формат</li>
-     *   <li>Не удалось распарсить токен</li>
-     * </ul>
-     * </p>
-     */
     @ExceptionHandler(InvalidTokenException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleInvalidTokenException(InvalidTokenException ex) {
@@ -117,12 +115,6 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("INVALID_TOKEN", ex.getMessage());
     }
 
-    /**
-     * Обработка повторного использования refresh токена.
-     *
-     * <p>Возникает при попытке использовать уже ротированный refresh токен.
-     * В этом случае все токены пользователя отзываются в целях безопасности.</p>
-     */
     @ExceptionHandler(TokenReuseException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleTokenReuseException(TokenReuseException ex) {

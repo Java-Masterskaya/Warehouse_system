@@ -35,7 +35,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -244,8 +246,8 @@ class AuthControllerTest extends AbstractIntegrationTest {
     }
 
     // ==================== REFRESH FLOW TESTS ====================
-
-    void refreshToken_shouldReturnNewAccessToken() throws Exception {
+    @Test
+    void refreshTokenShouldReturnNewAccessToken() throws Exception {
         // 1. Сохраняем старые токены
         String oldAccessToken = userToken;
         String oldRefreshToken = userRefreshToken;
@@ -287,7 +289,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("Old refresh token should not work after rotation")
-    void oldRefreshToken_shouldNotWorkAfterRotation() throws Exception {
+    void oldRefreshTokenShouldNotWorkAfterRotation() throws Exception {
         // 1. Сохраняем старый refresh
         String oldRefresh = userRefreshToken;
         String oldAccess = userToken;
@@ -326,10 +328,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("TOKEN_REUSE"));
     }
 
-
     @Test
     @DisplayName("Refresh token reuse should revoke all tokens")
-    void refreshTokenReuse_shouldRevokeAllTokens() throws Exception {
+    void refreshTokenReuseShouldRevokeAllTokens() throws Exception {
         // 1. Получаем новые токены через refresh
         RefreshRequest firstRequest = new RefreshRequest(userToken, userRefreshToken);
         String firstResponse = mockMvc.perform(post("/api/auth/refresh")
@@ -361,7 +362,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("Logout should revoke tokens")
-    void logout_shouldRevokeTokens() throws Exception {
+    void logoutShouldRevokeTokens() throws Exception {
         // Проверяем, что токен работает
         mockMvc.perform(get("/api/items")
                         .header("Authorization", "Bearer " + userToken))
@@ -393,7 +394,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("Deactivated user loses access immediately")
-    void deactivatedUser_losesAccessImmediately() throws Exception {
+    void deactivatedUserLosesAccessImmediately() throws Exception {
         // Создаем пользователя
         String username = "deactivation_test_" + System.currentTimeMillis();
         String password = "password123";

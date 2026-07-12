@@ -32,7 +32,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @DisplayName("AuthService Unit Tests")
 @ExtendWith(MockitoExtension.class)
@@ -80,7 +83,7 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("Should return tokens on successful login")
-        void loginSuccess_shouldReturnTokens() {
+        void loginSuccessShouldReturnTokens() {
             // Arrange
             LoginRequest request = new LoginRequest(TEST_USERNAME, TEST_PASSWORD);
             Authentication authentication = mock(Authentication.class);
@@ -88,7 +91,8 @@ class AuthServiceImplTest {
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                     .thenReturn(authentication);
             when(authentication.getPrincipal()).thenReturn(userPrincipal);
-            when(authentication.getAuthorities()).thenReturn((Collection) List.of(new SimpleGrantedAuthority("ROLE_USER")));
+            when(authentication.getAuthorities())
+                    .thenReturn((Collection) List.of(new SimpleGrantedAuthority("ROLE_USER")));
             when(tokenService.generateTokenPair(TEST_USERNAME, TEST_USER_ID, TEST_ROLES))
                     .thenReturn(new TokenPair(ACCESS_TOKEN, REFRESH_TOKEN));
             when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
@@ -107,7 +111,7 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("Should throw exception when user is deactivated")
-        void login_whenUserDeactivated_shouldThrowException() {
+        void loginWhenUserDeactivatedShouldThrowException() {
             // Arrange
             LoginRequest request = new LoginRequest(TEST_USERNAME, TEST_PASSWORD);
             UserPrincipal inactiveUser = new UserPrincipal(
@@ -133,7 +137,7 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("Should throw exception on invalid credentials")
-        void login_withInvalidCredentials_shouldThrowException() {
+        void loginWithInvalidCredentialsShouldThrowException() {
             // Arrange
             LoginRequest request = new LoginRequest(TEST_USERNAME, "wrong");
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
@@ -153,7 +157,7 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("Should refresh tokens successfully")
-        void refresh_validRefreshToken_shouldReturnNewTokens() {
+        void refreshValidRefreshTokenShouldReturnNewTokens() {
             // Arrange
             String oldRefreshToken = "old-refresh-token";
             String newAccessToken = "new-access-token";
@@ -187,7 +191,7 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("Should throw InvalidTokenException when refresh token is invalid")
-        void refresh_withInvalidRefreshToken_shouldThrowException() {
+        void refreshWithInvalidRefreshTokenShouldThrowException() {
             // Arrange
             String invalidRefreshToken = "invalid-token";
             RefreshRequest request = new RefreshRequest(null, invalidRefreshToken);
@@ -202,7 +206,7 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("Should revoke all tokens when refresh reuse detected")
-        void refresh_withReusedRefreshToken_shouldRevokeAllTokens() {
+        void refreshWithReusedRefreshTokenShouldRevokeAllTokens() {
             // Arrange
             String reusedRefreshToken = "reused-refresh-token";
             RefreshRequest request = new RefreshRequest(null, reusedRefreshToken);
@@ -225,7 +229,7 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("Should handle refresh when no access token provided")
-        void refresh_withoutAccessToken_shouldStillWork() {
+        void refreshWithoutAccessTokenShouldStillWork() {
             // Arrange
             String oldRefreshToken = "old-refresh-token";
             String newAccessToken = "new-access-token";
@@ -262,7 +266,7 @@ class AuthServiceImplTest {
 
         @Test
         @DisplayName("Should revoke tokens on logout")
-        void logout_shouldRevokeTokens() {
+        void logoutShouldRevokeTokens() {
             // Arrange
             String refreshToken = "refresh-token";
             String accessToken = "access-token";

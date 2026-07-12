@@ -19,12 +19,19 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TokenService Unit Tests")
-class TokenServiceTest {
+class TokenServiceImplTest {
 
     @Mock
     private JwtUtil jwtUtil;
@@ -48,7 +55,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should generate token pair and store in Redis")
-    void generateTokenPair_shouldGenerateAndStoreTokens() {
+    void generateTokenPairShouldGenerateAndStoreTokens() {
         // Arrange
         when(jwtUtil.generateToken(USERNAME, USER_ID, ROLES)).thenReturn(ACCESS_TOKEN);
         when(jwtUtil.generateRefreshToken(USERNAME, USER_ID, ROLES)).thenReturn(REFRESH_TOKEN);
@@ -86,7 +93,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should validate refresh token when exists in Redis")
-    void validateRefreshToken_whenExists_shouldReturnTrue() {
+    void validateRefreshTokenWhenExistsShouldReturnTrue() {
         // Arrange
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
         when(jwtUtil.parseRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.of(payload));
@@ -102,7 +109,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should not validate refresh token when not exists in Redis")
-    void validateRefreshToken_whenNotExists_shouldReturnFalse() {
+    void validateRefreshTokenWhenNotExistsShouldReturnFalse() {
         // Arrange
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
         when(jwtUtil.parseRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.of(payload));
@@ -117,7 +124,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should not validate refresh token when payload is invalid")
-    void validateRefreshToken_whenInvalidPayload_shouldReturnFalse() {
+    void validateRefreshTokenWhenInvalidPayloadShouldReturnFalse() {
         // Arrange
         when(jwtUtil.parseRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.empty());
 
@@ -131,7 +138,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should detect refresh token reuse")
-    void isRefreshTokenReused_shouldDetectReuse() {
+    void isRefreshTokenReusedShouldDetectReuse() {
         // Arrange
         when(redisTemplate.hasKey("rotation:" + REFRESH_TOKEN)).thenReturn(true);
 
@@ -145,7 +152,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should not detect reuse for new refresh token")
-    void isRefreshTokenReused_forNewToken_shouldReturnFalse() {
+    void isRefreshTokenReusedForNewTokenShouldReturnFalse() {
         // Arrange
         when(redisTemplate.hasKey("rotation:" + REFRESH_TOKEN)).thenReturn(false);
 
@@ -158,7 +165,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should revoke refresh token from Redis")
-    void revokeRefreshToken_shouldDeleteFromRedis() {
+    void revokeRefreshTokenShouldDeleteFromRedis() {
         // Arrange
         String key = "refresh:" + REFRESH_TOKEN;
 
@@ -171,7 +178,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should revoke all user tokens")
-    void revokeAllUserTokens_shouldDeleteAllTokens() {
+    void revokeAllUserTokensShouldDeleteAllTokens() {
         // Arrange
         String refreshPattern = "user:tokens:" + USER_ID + ":*";
         String accessPattern = "user:access:" + USER_ID + ":*";
@@ -198,7 +205,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should revoke all user tokens when no tokens exist")
-    void revokeAllUserTokens_whenNoTokens_shouldDoNothing() {
+    void revokeAllUserTokensWhenNoTokensShouldDoNothing() {
         // Arrange
         String refreshPattern = "user:tokens:" + USER_ID + ":*";
         String accessPattern = "user:access:" + USER_ID + ":*";
@@ -217,7 +224,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should rotate refresh token correctly")
-    void rotateRefreshToken_shouldRotateCorrectly() {
+    void rotateRefreshTokenShouldRotateCorrectly() {
         // Arrange
         String oldRefresh = "old-refresh-token";
         String newRefresh = "new-refresh-token";
@@ -244,7 +251,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should check if access token is blacklisted")
-    void isAccessTokenBlacklisted_shouldCheckRedis() {
+    void isAccessTokenBlacklistedShouldCheckRedis() {
         // Arrange
         when(redisTemplate.hasKey("blacklist:" + ACCESS_TOKEN)).thenReturn(true);
 
@@ -258,7 +265,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should blacklist access token with correct TTL")
-    void blacklistAccessToken_shouldSetWithCorrectTTL() {
+    void blacklistAccessTokenShouldSetWithCorrectTTL() {
         // Arrange
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
         when(jwtUtil.parseToken(ACCESS_TOKEN)).thenReturn(Optional.of(payload));
@@ -285,7 +292,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should blacklist all user access tokens")
-    void blacklistAllUserAccessTokens_shouldBlacklistAll() {
+    void blacklistAllUserAccessTokensShouldBlacklistAll() {
         // Arrange
         String token1 = "access-token-1";
         String token2 = "access-token-2";
@@ -320,7 +327,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should generate access token")
-    void generateAccessToken_shouldCallJwtUtil() {
+    void generateAccessTokenShouldCallJwtUtil() {
         // Arrange
         when(jwtUtil.generateToken(USERNAME, USER_ID, ROLES)).thenReturn(ACCESS_TOKEN);
 
@@ -334,7 +341,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should generate refresh token")
-    void generateRefreshToken_shouldCallJwtUtil() {
+    void generateRefreshTokenShouldCallJwtUtil() {
         // Arrange
         when(jwtUtil.generateRefreshToken(USERNAME, USER_ID, ROLES)).thenReturn(REFRESH_TOKEN);
 
@@ -348,7 +355,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should not blacklist invalid access token")
-    void blacklistAccessToken_whenInvalidToken_shouldNotSetBlacklist() {
+    void blacklistAccessTokenWhenInvalidTokenShouldNotSetBlacklist() {
         // Arrange
         when(jwtUtil.parseToken(ACCESS_TOKEN)).thenReturn(Optional.empty());
 
@@ -366,7 +373,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should handle exception during blacklist")
-    void blacklistAccessToken_whenException_shouldNotThrow() {
+    void blacklistAccessTokenWhenExceptionShouldNotThrow() {
         // Arrange
         when(jwtUtil.parseToken(ACCESS_TOKEN)).thenThrow(new RuntimeException("Test exception"));
 
@@ -378,7 +385,7 @@ class TokenServiceTest {
 
     @Test
     @DisplayName("Should handle empty keys in blacklistAllUserAccessTokens")
-    void blacklistAllUserAccessTokens_whenNoKeys_shouldDoNothing() {
+    void blacklistAllUserAccessTokensWhenNoKeysShouldDoNothing() {
         // Arrange
         String pattern = "user:access:" + USER_ID + ":*";
         when(redisTemplate.keys(pattern)).thenReturn(null);

@@ -25,6 +25,8 @@ public class TokenServiceImpl implements TokenService {
     private static final String REFRESH_ROTATION_PREFIX = "rotation:";
     private static final String USER_ACCESS_PREFIX = "user:access:";
 
+    private static final int ROTATION_DETECTION_MINUTES = 5;
+
     @Override
     public TokenPair generateTokenPair(String username, Long userId, List<String> roles) {
         log.info("Generating token pair for user: username='{}', userId={}, roles={}",
@@ -125,7 +127,7 @@ public class TokenServiceImpl implements TokenService {
             // Store rotation info to detect reuse
             String rotationKey = REFRESH_ROTATION_PREFIX + oldRefreshToken;
             redisTemplate.opsForValue().set(rotationKey, "rotated",
-                    Duration.ofMinutes(5)); // Short TTL for rotation detection
+                    Duration.ofMinutes(ROTATION_DETECTION_MINUTES)); // Short TTL for rotation detection
             // Revoke old token
             revokeRefreshToken(oldRefreshToken);
             log.info("Refresh token rotated for user: {}", payload.userId());
@@ -165,8 +167,8 @@ public class TokenServiceImpl implements TokenService {
         if (keys != null && !keys.isEmpty()) {
             // Добавляем все токены в blacklist
             keys.forEach(key -> {
-                String accessToken = key.substring(USER_ACCESS_PREFIX.length() +
-                        userId.toString().length() + 1);
+                String accessToken = key.substring(USER_ACCESS_PREFIX.length()
+                        + userId.toString().length() + 1);
                 blacklistAccessToken(accessToken);
             });
             log.info("All access tokens blacklisted for user: {}", userId);
