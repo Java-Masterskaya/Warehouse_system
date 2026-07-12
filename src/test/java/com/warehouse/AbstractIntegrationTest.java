@@ -48,5 +48,18 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.data.redis.host", redis::getHost);
         registry.add("spring.data.redis.port", redis::getFirstMappedPort);
         registry.add("spring.data.redis.password", () -> "");
+
+        // Задаем тестовые лимиты: для тестов удобно использовать ультра-короткие окна (например, 1-2 секунды)
+        registry.add("rate-limiting.login.ip.capacity", () -> 2);
+        registry.add("rate-limiting.login.ip.refill-tokens", () -> 2);
+        registry.add("rate-limiting.login.ip.duration", () -> "2s");
+
+        registry.add("rate-limiting.login.username.capacity", () -> 2);
+        registry.add("rate-limiting.login.username.refill-tokens", () -> 2);
+        registry.add("rate-limiting.login.username.duration", () -> "2s");
+
+        registry.add("rate-limiting.movements.ip.capacity", () -> 3);
+        registry.add("rate-limiting.movements.ip.refill-tokens", () -> 3);
+        registry.add("rate-limiting.movements.ip.duration", () -> "2s");
     }
 }
