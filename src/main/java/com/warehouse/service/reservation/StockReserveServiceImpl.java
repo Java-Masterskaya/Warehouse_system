@@ -57,11 +57,6 @@ public class StockReserveServiceImpl implements StockReserveService {
     public ReservationResponse reserve(Long itemId, ReserveRequest request, UserContext ctx) {
         int quantity = request.quantity();
 
-        if (quantity <= 0) {
-            log.warn("Invalid quantity for reservation: itemId={}, quantity={}", itemId, quantity);
-            throw new IllegalArgumentException("Quantity must be greater than 0");
-        }
-
         Stock stock = lockStock(itemId);
 
         int available = availabilityService.getAvailable(itemId);
