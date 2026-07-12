@@ -42,7 +42,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @AutoConfigureMockMvc
-@DisplayName("Auth Integration Tests")
 @Slf4j
 class AuthControllerTest extends AbstractIntegrationTest {
 
@@ -247,15 +246,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     // ==================== REFRESH FLOW TESTS ====================
     @Test
+    @DisplayName("Refresh token should return new access token")
     void refreshTokenShouldReturnNewAccessToken() throws Exception {
-        // 1. Сохраняем старые токены
-        String oldAccessToken = userToken;
-        String oldRefreshToken = userRefreshToken;
-
-        log.info("Old access token: {}", oldAccessToken.substring(0, 20) + "...");
-        log.info("Old refresh token: {}", oldRefreshToken.substring(0, 20) + "...");
-
-        // 2. Отправляем refresh запрос
+        // 1. Отправляем refresh запрос
         RefreshRequest request = new RefreshRequest(userToken, userRefreshToken);
         String response = mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -270,16 +263,18 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         RefreshResponse refreshResponse = objectMapper.readValue(response, RefreshResponse.class);
 
-        log.info("New access token: {}", refreshResponse.accessToken().substring(0, 20) + "...");
-        log.info("New refresh token: {}", refreshResponse.refreshToken().substring(0, 20) + "...");
-
-        // 3. Проверяем, что новые токены отличаются от старых
+        // 2. Проверяем, что новые токены отличаются от старых
         assertThat(refreshResponse.accessToken())
                 .as("New access token should be different")
-                .isNotEqualTo(oldAccessToken);
+                .isNotEqualTo(userToken);
         assertThat(refreshResponse.refreshToken())
                 .as("New refresh token should be different")
-                .isNotEqualTo(oldRefreshToken);
+                .isNotEqualTo(userRefreshToken);
+
+        // 3. Проверяем, что старый access токен отозван
+        mockMvc.perform(get("/api/items")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isUnauthorized());
 
         // 4. Проверяем, что новый access токен работает
         mockMvc.perform(get("/api/items")

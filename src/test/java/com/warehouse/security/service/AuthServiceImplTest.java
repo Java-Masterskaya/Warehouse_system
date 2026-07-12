@@ -185,8 +185,9 @@ class AuthServiceImplTest {
             assertThat(response.expiresIn()).isEqualTo(EXPIRATION_MS);
 
             // Verify rotation
-            verify(tokenService).rotateRefreshToken(oldRefreshToken);
             verify(tokenService).blacklistAllUserAccessTokens(TEST_USER_ID);
+            verify(tokenService).generateTokenPair(TEST_USERNAME, TEST_USER_ID, TEST_ROLES);
+            verify(tokenService).rotateRefreshToken(oldRefreshToken);
         }
 
         @Test

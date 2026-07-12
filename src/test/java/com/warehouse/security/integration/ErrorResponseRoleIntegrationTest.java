@@ -118,6 +118,6 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
-                .getContentAsString()).get("token").asText();
+                .getContentAsString()).get("accessToken").asText();
     }
 }

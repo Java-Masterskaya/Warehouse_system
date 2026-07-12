@@ -138,6 +138,10 @@ public class AuthServiceImpl implements AuthService {
 
         var p = payload.get();
 
+        // Blacklist ALL old access tokens
+        tokenService.blacklistAllUserAccessTokens(p.userId());
+        log.info("All old access tokens blacklisted for user: {}", p.userId());
+
         // Generate new token pair
         TokenPair newTokenPair = tokenService.generateTokenPair(
                 p.username(),
@@ -148,10 +152,6 @@ public class AuthServiceImpl implements AuthService {
         // Rotate refresh token
         tokenService.rotateRefreshToken(refreshToken);
         log.info("Refresh token rotated for user: {}", p.userId());
-
-        // Blacklist ALL old access tokens
-        tokenService.blacklistAllUserAccessTokens(p.userId());
-        log.info("All old access tokens blacklisted for user: {}", p.userId());
 
         log.info("Refresh token rotated, access blacklisted for user: {}", p.userId());
 
