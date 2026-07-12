@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -278,7 +279,13 @@ public class StockReserveServiceImplTest {
 
         when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
 
+        when(stockRepository.decreaseQuantityIfEnough(item.getId(), reservation.getQuantity()))
+                .thenReturn(1);
+
         service.writeOff(item.getId(), request, ctx);
+
+        assertThat(stock.getQuantity())
+                .isEqualTo(5);
 
         assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CONSUMED);
 
@@ -351,5 +358,34 @@ public class StockReserveServiceImplTest {
                 ReservationException.class);
 
         verifyNoInteractions(movementService);
+    }
+
+    @Test
+    void writeOffShouldThrowWhenPhysicalStockLessThanReservationQuantity() {
+        ReservationActionRequest request = new ReservationActionRequest(reservation.getId());
+
+        stock.setQuantity(3);
+        reservation.setQuantity(5);
+
+        when(stockRepository.findByItemIdForUpdate(item.getId()))
+                .thenReturn(Optional.of(stock));
+
+        when(stockReserveRepository.findById(reservation.getId()))
+                .thenReturn(Optional.of(reservation));
+
+        when(stockRepository.decreaseQuantityIfEnough(
+                item.getId(),
+                reservation.getQuantity()
+        )).thenReturn(0);
+
+        assertThatThrownBy(() ->
+                service.writeOff(item.getId(), request, ctx)
+        ).isInstanceOf(InsufficientStockException.class);
+
+        assertThat(reservation.getStatus())
+                .isEqualTo(ReservationStatus.ACTIVE);
+
+        verify(movementService, never())
+                .newStockMovement(any(), anyInt(), any(), any());
     }
 }

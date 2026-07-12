@@ -101,13 +101,22 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         Reservation reservation = getActiveReservation(request.reservationId(), itemId);
         //write-off
+        int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, reservation.getQuantity());
+        if (updatedRows == 0) {
+            throw InsufficientStockException.of(
+                    itemId,
+                    reservation.getQuantity(),
+                    stock.getQuantity()
+            );
+        }
+        updateReservationStatus(reservation, ReservationStatus.CONSUMED);
+        //for alert
         stock.setQuantity(stock.getQuantity() - reservation.getQuantity());
-        stockRepository.save(stock);
+
         //make movement and alert
         stockMovementService.newStockMovement(getItem(itemId), reservation.getQuantity(), ctx, MovementType.WRITE_OFF);
         sendAlert(stock, ctx);
 
-        updateReservationStatus(reservation, ReservationStatus.CONSUMED);
         metricService.increment("warehouse.reservation.writeOff.total");
 
         return mapper.mapReservationToResponse(reservation);
