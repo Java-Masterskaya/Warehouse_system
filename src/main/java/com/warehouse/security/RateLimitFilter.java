@@ -80,7 +80,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     // Метод проверки лимита
     private long getSecondsToWait(String key, RateLimitProperties.BandwidthConfig config) {
         BucketConfiguration bucketConfig = BucketConfiguration.builder()
-                .addLimit(Bandwidth.classic(config.capacity(), Refill.greedy(config.capacity(), config.duration())))
+                .addLimit(Bandwidth.classic(
+                        config.capacity(),
+                        Refill.greedy(config.refillTokens(), config.duration())
+                ))
                 .build();
 
         Bucket bucket = proxyManager.builder().build(key.getBytes(), bucketConfig);

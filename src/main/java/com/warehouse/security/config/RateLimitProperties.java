@@ -16,6 +16,7 @@ public record RateLimitProperties(
 
     public record BandwidthConfig(
             long capacity,
+            long refillTokens,
             Duration duration
     ) {}
 }
