@@ -20,35 +20,41 @@ import java.util.List;
 public interface OutboxDltEventRepository extends JpaRepository<OutboxDltEvent, Long> {
 
     /**
-     * Вставляет запись из DLT в outbox.
-     * Использует CTE для атомарной вставки и получения ID.
+     * Вставляет запись из DLT в outbox и удаляет из DLT в одной атомарной операции.
+     * Использует CTE с FOR UPDATE для защиты от конкурентных репроцессов.
+     * Гарантирует, что событие не дублируется при краше между операциями.
+     * Возвращает null, если DLT запись не найдена или произошла ошибка.
      *
      * @param dltId ID записи в DLT
      * @return ID новой записи в outbox или null, если DLT запись не найдена
      */
     @Query(value = """
             WITH dlt_record AS (
-                SELECT id, event_type, payload, error_message, retry_count, last_attempt_at
+                SELECT id, original_outbox_id, event_type, payload, error_message, retry_count, last_attempt_at
                 FROM outbox_dlt
                 WHERE id = :dltId
                 FOR UPDATE
+            ),
+            inserted_outbox AS (
+                INSERT INTO outbox (event_type, payload, status, created_at, retry_count, last_attempt_at, error_message, sent_at)
+                SELECT event_type, payload, 'PENDING', NOW(), 0, NULL, error_message, NULL
+                FROM dlt_record
+                RETURNING id
+            ),
+            deleted_dlt AS (
+                DELETE FROM outbox_dlt
+                WHERE id = :dltId
+                RETURNING id
             )
-            INSERT INTO outbox (event_type, payload, status, created_at, retry_count, last_attempt_at, error_message, sent_at)
-            SELECT event_type, payload, 'PENDING', NOW(), 0, NULL, error_message, NULL
-            FROM dlt_record
-            RETURNING id
+            SELECT (
+                CASE 
+                    WHEN EXISTS (SELECT 1 FROM inserted_outbox) AND EXISTS (SELECT 1 FROM deleted_dlt) 
+                    THEN (SELECT id FROM inserted_outbox)
+                    ELSE NULL
+                END
+            ) AS id
             """, nativeQuery = true)
-    Long insertFromDltToOutboxReturningId(@Param("dltId") Long dltId);
-
-    /**
-     * Удаляет запись из DLT.
-     */
-    @Modifying
-    @Query(value = """
-            DELETE FROM outbox_dlt
-            WHERE id = :dltId
-            """, nativeQuery = true)
-    int deleteFromDlt(@Param("dltId") Long dltId);
+    Long insertFromDltToOutboxAndDeleteFromDlt(@Param("dltId") Long dltId);
 
     /**
      * Находит все записи в DLT, отсортированные по времени создания (новые первые).

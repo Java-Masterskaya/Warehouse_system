@@ -35,7 +35,7 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
      * Каждое событие:
      * 1. Читается из outbox_dlt
      * 2. Атомарно: вставляется в outbox как новая запись со статусом PENDING
-     *    и удаляется из outbox_dlt
+     *    и удаляется из outbox_dlt (один SQL CTE-запрос)
      *
      * После репроцессинга релей (OutboxEventRelay) найдёт эти события
      * как PENDING и попытается отправить в Kafka.
@@ -63,13 +63,11 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
 
             for (OutboxDltEvent dltEvent : dltEvents) {
                 try {
-                    // insertFromDltToOutboxReturningId: вставляет в outbox, возвращает новый ID или null
-                    Long newOutboxId = outboxDltEventRepository.insertFromDltToOutboxReturningId(dltEvent.getId());
+                    // insertFromDltToOutboxAndDeleteFromDlt: атомарная операция
+                    // вставляет в outbox и удаляет из DLT в одном CTE-запросе
+                    Long newOutboxId = outboxDltEventRepository.insertFromDltToOutboxAndDeleteFromDlt(dltEvent.getId());
 
                     if (newOutboxId != null) {
-                        // deleteFromDlt: удаляет из DLT
-                        outboxDltEventRepository.deleteFromDlt(dltEvent.getId());
-                        
                         reprocessed++;
                         details.add(OutboxDltReprocessDetail.success(
                                 dltEvent.getId(),
@@ -77,7 +75,7 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
                         log.info("Event dlt_id={} restored to outbox as id={}",
                                 dltEvent.getId(), newOutboxId);
                     } else {
-                        // Событие не было вставлено (возможно, уже есть в outbox или DLT запись не найдена)
+                        // Событие не было вставлено (DLT запись не найдена - уже восстановлено или удалено)
                         failed++;
                         details.add(OutboxDltReprocessDetail.failure(
                                 dltEvent.getId(), "Already restored or not found"));

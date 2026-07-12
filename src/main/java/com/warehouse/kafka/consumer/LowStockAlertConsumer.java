@@ -33,7 +33,6 @@ import org.springframework.transaction.annotation.Propagation;
 public class LowStockAlertConsumer {
 
     StockAlertRepository stockAlertRepository;
-    StockAlertMapper stockAlertMapper;
     ItemRepository itemRepository;
 
     /**
