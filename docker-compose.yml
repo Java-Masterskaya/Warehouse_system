@@ -166,10 +166,42 @@ services:
     networks:
       - app-network
 
+  # --- Loki ---
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    networks:
+      - app-network
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Promtail ---
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - app-network
+    depends_on:
+      - loki
+
 volumes:
   postgres_data:
   redis_data:
   consul_data:
+  loki-data:
 
 networks:
   app-network:

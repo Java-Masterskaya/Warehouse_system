@@ -41,6 +41,9 @@ dependencies {
     implementation 'io.micrometer:micrometer-tracing'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 
+    // Logs in JSON format
+    implementation 'net.logstash.logback:logstash-logback-encoder'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     testCompileOnly 'org.projectlombok:lombok'
