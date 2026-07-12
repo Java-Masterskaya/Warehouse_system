@@ -1,6 +1,6 @@
 package com.warehouse.repository;
 
-import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.valuation.CategoryValuation;
 import com.warehouse.entity.Item;
 import com.warehouse.repository.projection.LowStockProjection;
@@ -46,7 +46,7 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
             JOIN Stock s on s.item.id = i.id
             WHERE i.id = :itemId
             """)
-    Optional<ItemDetailsResponse> findWithStock(@Param("itemId") Long itemId);
+    Optional<ItemDetailsProjection> findWithStock(@Param("itemId") Long itemId);
 
     @Query("""
         SELECT

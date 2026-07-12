@@ -608,7 +608,7 @@ class StockMovementServiceImplTest {
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
                 new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null, false));
-        when(availabilityService.getReserved(stock)).thenReturn(3L);
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
 
@@ -637,7 +637,7 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getReserved(stock)).thenReturn(8L);
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(8);
 
         assertThrows(
                 StocktakeConflictException.class,
@@ -669,7 +669,7 @@ class StockMovementServiceImplTest {
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(15), eq(false))).thenReturn(
                 new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5, 15, null, false));
-        when(availabilityService.getReserved(stock)).thenReturn(3L);
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
 
@@ -700,7 +700,7 @@ class StockMovementServiceImplTest {
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(5), eq(true))).thenReturn(
                 new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5, null, true));
-        when(availabilityService.getReserved(stock)).thenReturn(3L);
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         try (MockedStatic<TransactionSynchronizationManager> tsm =
                      mockStatic(TransactionSynchronizationManager.class)) {
@@ -731,7 +731,7 @@ class StockMovementServiceImplTest {
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(mapper.toNoMovementResponse(ITEM_ID, 10)).thenReturn(
                 new StockMovementResponse(ITEM_ID, null, null, 0, 10, null, false));
-        when(availabilityService.getReserved(stock)).thenReturn(3L);
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
 

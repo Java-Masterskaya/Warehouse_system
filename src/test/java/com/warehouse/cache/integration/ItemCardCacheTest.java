@@ -1,6 +1,7 @@
 package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -67,9 +68,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         ItemDetailsResponse response = itemService.getItem(itemId);
 
         assertThat(response).isNotNull();
-        assertThat(response.id()).isEqualTo(itemId);
-        assertThat(response.name()).isEqualTo("Ноутбук");
-        assertThat(response.currentStock()).isEqualTo(10);
+        assertThat(response.getId()).isEqualTo(itemId);
+        assertThat(response.getName()).isEqualTo("Ноутбук");
+        assertThat(response.getCurrentStock()).isEqualTo(10);
     }
 
     /**
@@ -85,7 +86,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         ItemDetailsResponse secondCall = itemService.getItem(itemId);
 
         assertThat(secondCall).isEqualTo(firstCall);
-        assertThat(secondCall.name()).isEqualTo("Ноутбук");
-        assertThat(secondCall.currentStock()).isEqualTo(10);
+        assertThat(secondCall.getName()).isEqualTo("Ноутбук");
+        assertThat(secondCall.getCurrentStock()).isEqualTo(10);
     }
 }

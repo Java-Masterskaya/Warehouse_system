@@ -64,7 +64,7 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         Stock stock = lockStock(itemId);
 
-        int available = availabilityService.getAvailable(stock);
+        int available = availabilityService.getAvailable(itemId);
         if (available < quantity) {
             log.warn("Reservation quantity is more then now available: available = {}, quantity = {}", available,
                     quantity);

@@ -17,7 +17,7 @@ public interface StockReserveRepository extends JpaRepository<Reservation, Long>
                 where r.stock = :stock
                 and r.status = :status
             """)
-    Long findSumReserveByStockAndStatus(Stock stock, ReservationStatus status);
+    Integer findSumReserveByStockAndStatus(Stock stock, ReservationStatus status);
 
     @Modifying(clearAutomatically = true)
     @Query("""

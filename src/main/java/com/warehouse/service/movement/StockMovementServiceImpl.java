@@ -182,7 +182,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
 
-        int reserved = (int)availabilityService.getReserved(stock);
+        int reserved = (int)availabilityService.getReserved(itemId);
         if(counted < reserved){
             log.warn(
                     "Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. " +
