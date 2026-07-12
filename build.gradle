@@ -42,7 +42,7 @@ dependencies {
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
 
     // Logs in JSON format
-    implementation 'net.logstash.logback:logstash-logback-encoder'
+    implementation 'net.logstash.logback:logstash-logback-encoder:9.0'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
