@@ -19,4 +19,12 @@ public class KafkaTopicConfig {
                 .replicas(topicProperties.getReplicas())
                 .build();
     }
+
+    @Bean
+    public NewTopic lowStockAlertsDltTopic() {
+        return TopicBuilder.name(topicProperties.getName() + ".DLT")
+                .partitions(topicProperties.getPartitions())
+                .replicas(topicProperties.getReplicas())
+                .build();
+    }
 }

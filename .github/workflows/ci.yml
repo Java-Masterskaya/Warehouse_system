@@ -8,8 +8,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  build-test-docker:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,11 +24,17 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: gradle
 
-      - name: Setup Docker
-        uses: docker/setup-docker-action@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Build and test
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Build, test and check
         run: |
-          chmod +x gradlew
           ./gradlew clean build --no-daemon
+
+      - name: Build Docker image
+        run: docker build --tag warehouse-system:${{ github.sha }} .

@@ -27,6 +27,8 @@ import java.nio.charset.StandardCharsets;
  * Listens to the {@code low-stock-alerts} topic and persists alert records to the database.
  * Distributed tracing context is extracted from incoming Kafka headers and propagated
  * to maintain end-to-end trace visibility across the producer-consumer boundary.
+ * Uses custom container factory with errorHandler and DLT for fault tolerance.
+ * Duplicate alerts (unique index violation) are logged and skipped without retry.
  * </p>
  *
  * @see LowStockAlertEvent
@@ -37,8 +39,6 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class LowStockAlertConsumer {
-
-    private static final int TRACEPARENT_PARTS_COUNT = 3;
 
     StockAlertRepository stockAlertRepository;
     StockAlertMapper stockAlertMapper;
@@ -59,7 +59,8 @@ public class LowStockAlertConsumer {
      * <p>
      * Extracts the distributed tracing context from the incoming message headers,
      * creates a new span as a child of the producer span, and persists the alert
-     * to the database. The span is enriched with Kafka metadata and business tags.
+     * to the database. Uses {@code kafkaListenerContainerFactory} with built-in
+     * errorHandler and DLT support. Duplicate alerts are skipped gracefully.
      * </p>
      *
      * @param record the incoming Kafka consumer record containing the alert event
@@ -67,7 +68,7 @@ public class LowStockAlertConsumer {
     @KafkaListener(
             topics = "low-stock-alerts",
             groupId = "warehouse-alerts",
-            properties = {"auto.offset.reset=earliest"}
+            containerFactory = "kafkaListenerContainerFactory"
     )
     public void consume(ConsumerRecord<String, LowStockAlertEvent> record) {
         Span span = null;
@@ -152,16 +153,29 @@ public class LowStockAlertConsumer {
         span.tag("min.stock", String.valueOf(event.minStock()));
     }
 
+    /**
+     * Processes the alert event and persists it to the database.
+     * <p>
+     * Duplicate alerts (unique index violation on {@code idx_stock_alerts_unique})
+     * are logged and skipped. Other {@code DataIntegrityViolationException} types
+     * and general errors are re-thrown to the container's errorHandler, which
+     * routes them to the Dead Letter Topic after configured retries.
+     * </p>
+     *
+     * @param event the low stock alert event
+     * @param span  the current tracing span
+     */
     private void processAlert(LowStockAlertEvent event, Span span) {
-        log.info("Received low stock alert for itemId={}, currentStock={}, minStock={}",
+        log.info("Processing low stock alert for itemId={}, currentStock={}, minStock={}",
                 event.itemId(), event.currentStock(), event.minStock());
+
+        var item = itemRepository.findById(event.itemId())
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(
+                        "Item not found: " + event.itemId()));
 
         try {
             log.info("Mapping event to StockAlert entity...");
-            StockAlert alert = stockAlertMapper.toEntity(
-                    event,
-                    itemRepository.getReferenceById(event.itemId())
-            );
+            StockAlert alert = stockAlertMapper.toEntity(event, item);
             log.info("StockAlert mapped");
 
             log.info("Saving StockAlert to database...");
@@ -169,15 +183,37 @@ public class LowStockAlertConsumer {
             log.info("StockAlert saved with id={}", savedAlert.getId());
 
             span.tag("alert.id", String.valueOf(savedAlert.getId()));
-            log.info("Alert id tag added to span");
-
             log.info("=== CONSUMER PROCESSING COMPLETED SUCCESSFULLY ===");
+
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            if (isDuplicateViolation(e)) {
+                log.warn("Duplicate alert skipped (unique index violation): itemId={}, triggeredAt={}",
+                        event.itemId(), event.triggeredAt());
+                span.tag("alert.status", "duplicate_skipped");
+                // Не пробрасываем — дубликат не идёт в DLT
+            } else {
+                log.error("Data integrity violation while processing alert for itemId={}", event.itemId(), e);
+                span.error(e);
+                throw e; // Пробрасываем в errorHandler → DLT
+            }
         } catch (Exception e) {
             log.error("Error while processing low stock alert for itemId={}", event.itemId(), e);
             span.error(e);
-            log.error("=== CONSUMER PROCESSING FAILED ===");
-            throw e;
+            throw e; // Пробрасываем в errorHandler → DLT
         }
+    }
+
+    /**
+     * Checks if the exception is a unique index violation (duplicate alert).
+     * Other integrity violations (NOT NULL, FOREIGN KEY, CHECK) are re-thrown.
+     *
+     * @param e the DataIntegrityViolationException
+     * @return true if it's a duplicate key violation
+     */
+    private boolean isDuplicateViolation(org.springframework.dao.DataIntegrityViolationException e) {
+        String message = e.getMessage();
+        return message != null && (message.contains("idx_stock_alerts_unique")
+                || message.contains("duplicate key"));
     }
 
     private java.util.Optional<String> extractHeaderValue(Headers headers, String key) {
@@ -198,7 +234,7 @@ public class LowStockAlertConsumer {
 
     private String extractSpanId(String traceparent) {
         String[] parts = traceparent.split("-");
-        if (parts.length >= TRACEPARENT_PARTS_COUNT) {
+        if (parts.length >= 3) {
             return parts[2];
         }
         return null;

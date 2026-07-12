@@ -14,6 +14,7 @@ Backend-сервис учёта товарных запасов на склад�
 | Build        | Gradle                                  |
 | Code Quality | Checkstyle                              |
 | Infra        | Docker, Docker Compose                  |
+| Config       | Consul (Centralized Configuration)      |
 
 ## Быстрый старт
 
@@ -58,6 +59,7 @@ make up
 | Redis            | redis:7-alpine     | 6379 |
 | Redpanda (Kafka) | redpanda:v23.2.11  | 9092 (внутри Docker: 29092) |
 | Schema Registry  | встроен в Redpanda | 8081 |
+| Consul           | hashicorp/consul:1.16 | 8500 (UI) |
 
 ## Роли
 
@@ -68,16 +70,18 @@ make up
 
 ## Основные эндпоинты
 
-| Метод    | Путь                              | Описание                       |
-|----------|-----------------------------------|--------------------------------|
-| `GET`    | `/api/items`                      | Список товаров (фильтр, поиск) |
-| `POST`   | `/api/items`                      | Создать товар                  |
-| `PUT`    | `/api/items/{id}`                 | Редактировать товар            |
-| `DELETE` | `/api/items/{id}`                 | Удалить товар                  |
-| `GET`    | `/api/items/{id}/stock`           | Текущий остаток                |
-| `POST`   | `/api/movements/receive`          | Зарегистрировать поступление   |
-| `POST`   | `/api/movements/write-off`        | Списать товар                  |
-| `GET`    | `/api/movements/{itemId}/history` | История движения               |
+| Метод    | Путь                                 | Описание                       |
+|----------|--------------------------------------|--------------------------------|
+| `GET`    | `/api/items`                         | Список товаров (фильтр, поиск) |
+| `POST`   | `/api/items`                         | Создать товар                  |
+| `PUT`    | `/api/items/{id}`                    | Редактировать товар            |
+| `DELETE` | `/api/items/{id}`                    | Удалить товар                  |
+| `GET`    | `/api/items/{id}/stock`              | Текущий остаток                |
+| `POST`   | `/api/movements/receive`             | Зарегистрировать поступление   |
+| `POST`   | `/api/movements/write-off`           | Списать товар                  |
+| `GET`    | `/api/movements/{itemId}/history`    | История движения               |
+| `POST`   | `/api/inventory/stocktake`           | Инвентаризация                 |
+| `POST`   | `/api/admin/dlq/low-stock/reprocess` | Реобработка DLT                |
 
 Полная спецификация: `docs/warehouse_openapi.yaml`
 
@@ -98,11 +102,61 @@ Controller → Service → Repository (JPA)
          │             │
        Redis          Kafka
     (кэш карточек)  (LowStockAlertEvent)
+         │
+         ▼
+       Consul (Centralized Config)
 ```
 
 ## Kafka события
 
 - `LowStockAlertEvent` — публикуется при списании, если остаток падает ниже минимального порога
+
+## Централизованная конфигурация (Consul KV)
+
+Приложение использует Consul KV как централизованное хранилище конфигурации. Бизнес-параметры хранятся в Consul и могут быть изменены без перезапуска приложения.
+
+| Параметр              | Описание                       | Значение по умолчанию |
+|-----------------------|--------------------------------|-----------------------|
+| app.jwt.expiration-ms | Время жизни JWT токена (мс)    | 86400000 (24 часа)    |
+| redis.cache.categories-ttl-minutes | TTL кэша категорий (минуты) | 10          |
+| redis.cache.item-ttl-minutes | TTL кэша товаров (минуты)| 5                    |
+
+Запуск Consul
+Consul автоматически поднимается через docker-compose:
+```bash
+docker compose up -d consul consul-seed
+```
+При первом запуске Consul Seed автоматически загружает начальную конфигурацию из `monitoring/consul/warehouse-config.yaml`.
+
+### Как обновить настройки
+Способ 1. Через загрузку YAML-файла (рекомендуется)
+Отредактируйте файл monitoring/consul/warehouse-config.yaml:
+```yaml
+app:
+  jwt:
+    expiration-ms: 86400000
+redis:
+  cache:
+    categories-ttl-minutes: 45
+    item-ttl-minutes: 5
+```
+Загрузите его в Consul:
+```bash
+curl -X PUT --data-binary @monitoring/consul/warehouse-config.yaml \
+http://localhost:8500/v1/kv/config/warehouse-system/data
+```
+* Если находитесь в папке с файлом, то вместо "@monitoring/consul/warehouse-config.yaml" сразу пишем 
+"@warehouse-config.yaml"
+* Приложение автоматически применит изменения (в течение 1 секунды, благодаря ConfigWatch), либо:
+```bash
+  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8080/actuator/refresh
+```
+Способ 2. Через Consul UI
+Откройте http://localhost:8500
+Перейдите в Key/Value → config/warehouse-system/data  
+Нажмите Edit и измените значения  
+Нажмите Save  
+
 
 ## Разработка
 
@@ -133,9 +187,12 @@ cp .env.example .env.local
 # - SPRING_PROFILES_ACTIVE=dev (или другой профиль)
 # - Хосты баз данных и kafka: localhost вместо имен контейнеров
 # - Пароли и секреты
+# - СМ. Детали ниже - порт кафки при локальном запуске меняется на 9092
+```
+```bash
 
 # 3. Поднимите только инфраструктуру
-docker compose up postgres redis kafka -d
+docker compose up postgres redis kafka consul consul-seed -d
 ```
 ```bash
 # Или через Makefile
@@ -197,7 +254,7 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 
 ### Запуск для локальной разработки
 
-1. Поднимите инфраструктуру: `docker-compose up -d postgres redis kafka`
+1. Поднимите инфраструктуру: `docker-compose up -d postgres redis kafka consul consul-seed`
 2. Запустите приложение: `./gradlew bootRun`
 3. Приложение стартует с профилем `dev`, миграции Flyway создадут администратора по умолчанию.
 

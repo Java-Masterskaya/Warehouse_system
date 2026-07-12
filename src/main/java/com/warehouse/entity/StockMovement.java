@@ -18,6 +18,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import com.warehouse.exception.StockMovementInvariantException;
+
 import java.time.LocalDateTime;
 
 /**
@@ -59,5 +61,12 @@ public class StockMovement {
     @PrePersist
     private void prePersist() {
         createdAt = LocalDateTime.now();
+        validateQuantity();
+    }
+
+    private void validateQuantity() {
+        if (type != MovementType.ADJUSTMENT && quantity <= 0) {
+            throw new StockMovementInvariantException("Quantity must be greater than zero for type " + type);
+        }
     }
 }

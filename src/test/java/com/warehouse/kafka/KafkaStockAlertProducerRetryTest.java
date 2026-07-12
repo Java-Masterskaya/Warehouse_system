@@ -25,9 +25,27 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
-@TestPropertySource(properties = {"spring.retry.maxAttempts=3"})
+/**
+ * Unit-тест для KafkaStockAlertProducer.
+ * Тестирует повторные попытки отправки сообщений при ошибках.
+ */
+@SpringBootTest(properties = {
+    "spring.kafka.bootstrap-servers=localhost:9092",
+    "spring.kafka.consumer.group-id=test-group",
+    "app.kafka.consumer.concurrency=1",
+    "app.kafka.retry.initial-interval-ms=100",
+    "app.kafka.retry.multiplier=1.0",
+    "app.kafka.retry.max-interval-ms=1000",
+    "app.kafka.retry.max-attempts=3"
+})
 class KafkaStockAlertProducerRetryTest {
+
+    private static final Long ITEM_ID = 1L;
+    private static final String ITEM_SKU = "KEY-001";
+    private static final String ITEM_NAME = "Тестовый товар";
+    private static final int CURRENT_STOCK = 2;
+    private static final int MIN_STOCK = 5;
+    private static final String TRIGGERED_BY = "admin";
 
     @Autowired
     private KafkaStockAlertProducer producer;
@@ -48,12 +66,12 @@ class KafkaStockAlertProducerRetryTest {
     void sendLowStockAlertShouldRetryThreeTimesOnFailure() {
         // Arrange
         LowStockAlertEvent alert = new LowStockAlertEvent(
-                1L,
-                "KEY-001",
-                "Тестовый товар",
-                2,
-                5,
-                "admin",
+                ITEM_ID,
+                ITEM_SKU,
+                ITEM_NAME,
+                CURRENT_STOCK,
+                MIN_STOCK,
+                TRIGGERED_BY,
                 LocalDateTime.now());
 
         CompletableFuture<SendResult<String, Object>> failedFuture = new CompletableFuture<>();

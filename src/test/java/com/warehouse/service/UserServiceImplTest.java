@@ -1,6 +1,8 @@
 package com.warehouse.service;
 
+import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
+import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.mapper.UserMapper;
 import com.warehouse.repository.UserRepository;
@@ -17,11 +19,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit-тест для UserServiceImpl.
@@ -91,6 +94,59 @@ public class UserServiceImplTest {
         });
     }
 
+    @Test
+    void shouldThrowExceptionWhenDeactivatingLastActiveAdmin() {
+        User admin = createUser(1L);
+        admin.setRole(Role.ROLE_ADMIN);
+        admin.setActive(true);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN))
+                .thenReturn(List.of(admin));
+
+        assertThrows(LastAdminDeactivationException.class, () -> {
+            userService.deactivateUser(1L, 2L);
+        });
+
+        assertTrue(admin.isActive());
+        verify(userRepository, never()).save(admin);
+    }
+
+    @Test
+    void shouldDeactivateAdminWhenMoreThanOneActiveAdminExists() {
+        User firstAdmin = createUser(1L);
+        firstAdmin.setRole(Role.ROLE_ADMIN);
+        firstAdmin.setActive(true);
+
+        User secondAdmin = createUser(2L);
+        secondAdmin.setRole(Role.ROLE_ADMIN);
+        secondAdmin.setActive(true);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(firstAdmin));
+        when(userRepository.findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN))
+                .thenReturn(List.of(firstAdmin, secondAdmin));
+
+        userService.deactivateUser(1L, 2L);
+
+        assertFalse(firstAdmin.isActive());
+        verify(userRepository).save(firstAdmin);
+    }
+
+    @Test
+    void shouldDeactivateRegularUserWithoutCheckingActiveAdmins() {
+        User user = createUser(1L);
+        user.setRole(Role.ROLE_USER);
+        user.setActive(true);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        userService.deactivateUser(1L, 2L);
+
+        assertFalse(user.isActive());
+        verify(userRepository, never()).findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN);
+        verify(userRepository).save(user);
+    }
+    
     private User createUser(Long id) {
         User user = new User();
         user.setId(id);

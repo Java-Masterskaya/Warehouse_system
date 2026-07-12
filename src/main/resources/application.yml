@@ -19,10 +19,7 @@ spring:
         allow.auto.create.topics: false
     consumer:
       group-id: warehouse-alerts
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "com.warehouse.dto.event"
+
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -33,6 +30,17 @@ spring:
       idle-timeout: 300000
       max-lifetime: 1200000
       connection-timeout: 20000
+  config:
+    import: "optional:consul:"
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: 8500
+      config:
+        enabled: true
+        format: yaml
+        prefix: config
+        default-context: warehouse-system
   lifecycle:
     timeout-per-shutdown-phase: 20s
 
@@ -43,6 +51,14 @@ app:
         name: low-stock-alerts
         partitions: 3
         replicas: 1
+        reprocess-batch-size: 100
+    consumer:
+      concurrency: 3
+    retry:
+      initial-interval-ms: 1000
+      multiplier: 2.0
+      max-interval-ms: 10000
+      max-attempts: 3
 
 management:
   tracing:
@@ -55,7 +71,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics
+        include: health,info,prometheus,metrics,env,refresh
   endpoint:
     health:
       show-details: always
@@ -64,6 +80,8 @@ management:
       group:
         readiness:
           include: readinessState,db
+    refresh:
+      enabled: true
   health:
     livenessstate:
       enabled: true
