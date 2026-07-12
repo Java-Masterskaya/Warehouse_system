@@ -1,9 +1,13 @@
 -- Таблица для архива "битых" событий outbox (Dead Letter Table)
 -- Сюда попадают события, которые превысили maxRetries попыток отправки
 
+-- Важно: original_outbox_id имеет UNIQUE constraint для предотвращения
+-- дубликатов при повторном репроцессинге. Событие можно восстановить из DLT
+-- только один раз (для идемпотентности операции).
+
 CREATE TABLE IF NOT EXISTS outbox_dlt (
     id BIGSERIAL PRIMARY KEY,
-    original_outbox_id BIGINT NOT NULL REFERENCES outbox(id) ON DELETE CASCADE,
+    original_outbox_id BIGINT NOT NULL UNIQUE,
     event_type VARCHAR(50) NOT NULL,
     payload TEXT NOT NULL,
     error_message TEXT,

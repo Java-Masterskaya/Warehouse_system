@@ -6,7 +6,6 @@ import com.warehouse.entity.OutboxDltEvent;
 import com.warehouse.repository.OutboxDltEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,12 +35,11 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
      * Каждое событие:
      * 1. Читается из outbox_dlt
      * 2. Атомарно: вставляется в outbox как новая запись со статусом PENDING
-     *    и удаляется из outbox_dlt (через CTE в restoreToOutbox)
+     *    и удаляется из outbox_dlt
      *
      * После репроцессинга релей (OutboxEventRelay) найдёт эти события
      * как PENDING и попытается отправить в Kafka.
      */
-    @Async
     @Override
     @Transactional
     public CompletableFuture<OutboxDltReprocessResponse> reprocessAllOutboxDltMessages() {
@@ -49,7 +47,7 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
 
         try {
             // Читаем из outbox_dlt (НЕ из outbox!)
-            List<OutboxDltEvent> dltEvents = outboxDltEventRepository.findAllByOrderByDltCreatedAtDesc();
+            List<OutboxDltEvent> dltEvents = outboxDltEventRepository.findDltEventsForReprocess(100);
 
             if (dltEvents.isEmpty()) {
                 log.info("No events in outbox DLT");
@@ -65,10 +63,13 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
 
             for (OutboxDltEvent dltEvent : dltEvents) {
                 try {
-                    // restoreToOutbox: атомарно читает из DLT, вставляет в outbox, удаляет из DLT
-                    Long newOutboxId = outboxDltEventRepository.restoreToOutbox(dltEvent.getId());
+                    // insertFromDltToOutboxReturningId: вставляет в outbox, возвращает новый ID или null
+                    Long newOutboxId = outboxDltEventRepository.insertFromDltToOutboxReturningId(dltEvent.getId());
 
                     if (newOutboxId != null) {
+                        // deleteFromDlt: удаляет из DLT
+                        outboxDltEventRepository.deleteFromDlt(dltEvent.getId());
+                        
                         reprocessed++;
                         details.add(OutboxDltReprocessDetail.success(
                                 dltEvent.getId(),
@@ -76,10 +77,11 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
                         log.info("Event dlt_id={} restored to outbox as id={}",
                                 dltEvent.getId(), newOutboxId);
                     } else {
+                        // Событие не было вставлено (возможно, уже есть в outbox или DLT запись не найдена)
                         failed++;
                         details.add(OutboxDltReprocessDetail.failure(
-                                dltEvent.getId(), "Not found in DLT or already restored"));
-                        log.warn("Failed to restore dlt_id={}: not found", dltEvent.getId());
+                                dltEvent.getId(), "Already restored or not found"));
+                        log.warn("Failed to restore dlt_id={}: already restored or not found", dltEvent.getId());
                     }
                 } catch (Exception e) {
                     failed++;

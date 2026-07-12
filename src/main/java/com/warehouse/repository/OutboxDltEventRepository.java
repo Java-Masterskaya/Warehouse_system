@@ -20,43 +20,54 @@ import java.util.List;
 public interface OutboxDltEventRepository extends JpaRepository<OutboxDltEvent, Long> {
 
     /**
-     * Находит все записи в DLT, отсортированные по времени создания (новые первые).
+     * Вставляет запись из DLT в outbox.
+     * Использует CTE для атомарной вставки и получения ID.
+     *
+     * @param dltId ID записи в DLT
+     * @return ID новой записи в outbox или null, если DLT запись не найдена
      */
-    List<OutboxDltEvent> findAllByOrderByDltCreatedAtDesc();
+    @Query(value = """
+            WITH dlt_record AS (
+                SELECT id, event_type, payload, error_message, retry_count, last_attempt_at
+                FROM outbox_dlt
+                WHERE id = :dltId
+                FOR UPDATE
+            )
+            INSERT INTO outbox (event_type, payload, status, created_at, retry_count, last_attempt_at, error_message, sent_at)
+            SELECT event_type, payload, 'PENDING', NOW(), 0, NULL, error_message, NULL
+            FROM dlt_record
+            RETURNING id
+            """, nativeQuery = true)
+    Long insertFromDltToOutboxReturningId(@Param("dltId") Long dltId);
+
+    /**
+     * Удаляет запись из DLT.
+     */
+    @Modifying
+    @Query(value = """
+            DELETE FROM outbox_dlt
+            WHERE id = :dltId
+            """, nativeQuery = true)
+    int deleteFromDlt(@Param("dltId") Long dltId);
+
+    /**
+     * Находит все записи в DLT, отсортированные по времени создания (новые первые).
+     * Использует FOR UPDATE SKIP LOCKED для защиты от параллельных репроцессов.
+     *
+     * @param limit максимальное количество событий для выборки
+     * @return список событий в DLT
+     */
+    @Query(value = """
+            SELECT *
+            FROM outbox_dlt
+            ORDER BY dlt_created_at DESC
+            LIMIT :limit
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    List<OutboxDltEvent> findDltEventsForReprocess(@Param("limit") int limit);
 
     /**
      * Считает количество записей в DLT.
      */
     long count();
-
-    /**
-     * Перемещает событие из DLT обратно в outbox для повторной обработки.
-     *
-     * Атомарно (в одной транзакции):
-     * 1. Читает запись из outbox_dlt по id
-     * 2. Вставляет новую запись в outbox со статусом PENDING
-     * 3. Удаляет запись из outbox_dlt
-     * 4. Возвращает ID новой записи в outbox
-     *
-     * @param dltId ID записи в DLT
-     * @return ID новой записи в outbox, или null если DLT запись не найдена
-     */
-    @Modifying
-    @Query(value = """
-            WITH dlt_record AS (
-                SELECT original_outbox_id, event_type, payload
-                FROM outbox_dlt
-                WHERE id = :dltId
-            ),
-            inserted AS (
-                INSERT INTO outbox (event_type, payload, status, created_at, retry_count, last_attempt_at, error_message, sent_at)
-                SELECT event_type, payload, 'PENDING', NOW(), 0, NULL, NULL, NULL
-                FROM dlt_record
-                RETURNING id
-            )
-            DELETE FROM outbox_dlt
-            WHERE id = :dltId
-            RETURNING (SELECT id FROM inserted)
-            """, nativeQuery = true)
-    Long restoreToOutbox(@Param("dltId") Long dltId);
 }

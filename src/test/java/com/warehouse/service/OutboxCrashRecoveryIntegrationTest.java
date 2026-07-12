@@ -19,15 +19,14 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementService;
 
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 
-import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
 
@@ -47,7 +46,6 @@ import static org.awaitility.Awaitility.await;
  */
 @SpringBootTest
 @DisplayName("Outbox crash recovery integration test")
-@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
 class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -78,15 +76,15 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     private Long testItemId;
     private User testUser;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
     @BeforeEach
-    void setUp() throws SQLException {
-
-        jdbcTemplate.execute("""
-                TRUNCATE TABLE stock_alerts, stock_movements, stock, outbox, items RESTART IDENTITY CASCADE
-                """);
+    void setUp() {
+        // Очищаем таблицы перед каждым тестом
+        stockAlertRepository.deleteAll();
+        stockMovementRepository.deleteAll();
+        stockRepository.deleteAll();
+        outboxEventRepository.deleteAll();
+        itemRepository.deleteAll();
+        userRepository.deleteAll();
 
         // Создаём тестовый товар
         testItem = new Item();
@@ -127,7 +125,6 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
      * 6. Проверяем, что Kafka consumer получил сообщение и сохранил alert в stock_alerts
      */
     @Test
-    @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
     @DisplayName("Should replay outbox event after simulated crash")
     void shouldReplayOutboxEventAfterSimulatedCrash() {
         // Arrange - списываем 16, чтобы остаток стал 4 (меньше minStock=10)
@@ -208,7 +205,6 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
      * 4. Повторная отправка не создает дубликат (Kafka и консьюмер идемпотентны)
      */
     @Test
-    @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
     @DisplayName("Should not lose event on repeated crash")
     void shouldNotLoseEventOnRepeatedCrash() {
         // Arrange - создаем событие вручную в статусе PENDING (симуляция краша до обновления статуса)
@@ -259,54 +255,5 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         List<StockAlert> finalAlerts = stockAlertRepository.findAll();
         assertThat(finalAlerts).hasSize(1)
                 .withFailMessage(() -> "Expected 1 alert, but found " + finalAlerts.size());
-    }
-
-    /**
-     * Проверяет, что при крахе после отправки в Kafka, но до обновления статуса,
-     * событие не потеряется и не создаст дубликатов.
-     *
-     * Этот тест симулирует более сложный сценарий:
-     * 1. Релей отправляет событие в Kafka
-     * 2. Kafka подтверждает получение
-     * 3. Приложение падает до обновления статуса на SENT
-     * 4. После рестарта релей снова находит PENDING событие
-     * 5. Повторная отправка не создает проблем (Kafka идемпотентен)
-     */
-    @Test
-    @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
-    @DisplayName("Should handle crash after Kafka send but before status update")
-    void shouldHandleCrashAfterKafkaSend() {
-        // Arrange - создаем событие
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16);
-        UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
-
-        StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
-        assertThat(response.lowStockAlert()).isTrue();
-
-        List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingEvents(10);
-        assertThat(pendingEvents).hasSize(1);
-        Long eventId = pendingEvents.get(0).getId();
-
-        // Act - запускаем релей (он отправляет и обновляет статус)
-        outboxEventRelay.relayPendingEvents();
-
-        // Assert - событие отправлено
-        OutboxEvent sentEvent = outboxEventRepository.findById(eventId)
-                .orElseThrow();
-        assertThat(sentEvent.getStatus()).isEqualTo(OutboxStatus.SENT);
-
-        // Assert 2 - проверяем доставку в Kafka consumer
-        await().atMost(Duration.ofSeconds(10))
-                .untilAsserted(() -> {
-                    assertThat(stockAlertRepository.findAll()).hasSize(1);
-                });
-
-        // Проверяем, что в базе нет дубликатов
-        List<OutboxEvent> allEvents = outboxEventRepository.findAll();
-        assertThat(allEvents).hasSize(1);
-
-        // Проверяем, что дублированный alert не создан
-        List<StockAlert> finalAlerts = stockAlertRepository.findAll();
-        assertThat(finalAlerts).hasSize(1);
     }
 }

@@ -26,7 +26,7 @@ public class OutboxDltEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "original_outbox_id", nullable = false)
+    @Column(name = "original_outbox_id", nullable = false, unique = true)
     private Long originalOutboxId;
 
     @Column(name = "event_type", nullable = false, length = 50)
