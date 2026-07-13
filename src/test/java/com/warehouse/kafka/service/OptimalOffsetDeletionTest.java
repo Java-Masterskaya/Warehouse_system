@@ -11,28 +11,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Тест оптимизированного удаления оффсетов с учетом firstFailedOffsets.
- * 
- * Оптимальное решение:
- * - Храним firstFailedOffset для каждой партиции (первый неуспешный оффсет).
- * - Удаляем до min(maxProcessedOffset + 1, firstFailedOffset).
- * - Это удаляет все успешные оффсеты ДО первого неуспешного.
- * - FAILED и все после него остаются в DLT.
- * 
- * Сценарий:
- *   offset 100: SUCCESS
- *   offset 101: FAILED
- *   offset 102: SUCCESS
- *   offset 103: SUCCESS
- * 
- * Результат:
- *   maxProcessedOffsets[partition] = 104 (103 + 1)
- *   firstFailedOffsets[partition] = 101
- *   Удаляем до min(104, 101) = 101
- *   Удалены: 100
- *   Остались: 101 (FAILED), 102, 103
- * 
- * Безопасно: FAILED не удаляется!
- * Оптимально: Успешный 100 удален сразу!
  */
 @DisplayName("Optimal Offset Deletion with firstFailedOffsets")
 class OptimalOffsetDeletionTest {

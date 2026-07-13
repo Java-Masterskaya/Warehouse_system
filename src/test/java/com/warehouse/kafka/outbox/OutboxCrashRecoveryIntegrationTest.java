@@ -1,4 +1,4 @@
-package com.warehouse.service;
+package com.warehouse.kafka.outbox;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
@@ -10,7 +10,6 @@ import com.warehouse.entity.OutboxStatus;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
-import com.warehouse.kafka.outbox.OutboxEventRelay;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.OutboxEventRepository;
 import com.warehouse.repository.StockAlertRepository;
@@ -19,13 +18,11 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementService;
 
-import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
 
 import java.time.Duration;
 import java.util.List;

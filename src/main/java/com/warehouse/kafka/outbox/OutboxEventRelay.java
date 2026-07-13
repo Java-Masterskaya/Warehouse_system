@@ -80,7 +80,6 @@ public class OutboxEventRelay {
 
     /**
      * Обрабатывает одно событие outbox.
-     * Защищенный метод для возможности тестирования.
      * @param event событие
      */
 

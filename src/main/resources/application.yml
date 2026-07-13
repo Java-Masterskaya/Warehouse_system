@@ -12,8 +12,12 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      retries: 3
       properties:
         allow.auto.create.topics: false
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+        retry.backoff.ms: 500
     consumer:
       group-id: warehouse-alerts
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
