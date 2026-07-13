@@ -94,7 +94,7 @@ class StockServiceImplTest {
         when(stockRepository.findQuantityByItemId(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT);
+        when(availabilityService.getAvailable(NON_EXISTENT_ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT);
 
         // Act & Assert
         EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {

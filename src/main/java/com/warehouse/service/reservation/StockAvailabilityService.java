@@ -18,17 +18,19 @@ public class StockAvailabilityService {
 
     public int getAvailable(long itemId) {
         Stock stock = getStock(itemId);
-        long reserved = reservationRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now());
+        long reserved = reservationRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE,
+                LocalDateTime.now());
 
         return Math.toIntExact(stock.getQuantity() - reserved);
     }
 
-    public int getReserved(long itemId){
+    public int getReserved(long itemId) {
         Stock stock = getStock(itemId);
         return reservationRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now());
     }
 
-    private Stock getStock(long itemId){
-        return stockRepository.findByItemId(itemId).orElseThrow(() -> EntityNotFoundException.forId("Stock by item", itemId));
+    private Stock getStock(long itemId) {
+        return stockRepository.findByItemId(itemId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Stock by item", itemId));
     }
 }

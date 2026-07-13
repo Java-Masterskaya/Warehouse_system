@@ -1,7 +1,7 @@
 package com.warehouse.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.warehouse.dto.response.item.ItemDetailsProjection;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -61,7 +61,7 @@ public class RedisConfig {
                         RedisSerializationContext.SerializationPair.fromSerializer(
                                 new Jackson2JsonRedisSerializer<>(
                                         objectMapper,
-                                        ItemDetailsProjection.class
+                                        ItemDetailsResponse.class
                                 )
                         )
                 );

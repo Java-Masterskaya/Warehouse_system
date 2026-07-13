@@ -1,7 +1,6 @@
 package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
-import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -12,6 +11,7 @@ import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 
 import java.math.BigDecimal;
 
@@ -34,10 +34,15 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     @Autowired
     private ItemService itemService;
 
+    @Autowired
+    CacheManager cacheManager;
+
     private Long itemId;
 
     @BeforeEach
     void setUp() {
+        cacheManager.getCache("item").clear();
+
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();

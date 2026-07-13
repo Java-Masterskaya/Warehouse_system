@@ -3,7 +3,6 @@ package com.warehouse.cache.integration;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
-import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;

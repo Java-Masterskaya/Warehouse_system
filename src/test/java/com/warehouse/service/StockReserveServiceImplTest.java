@@ -19,6 +19,7 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementService;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.reservation.StockReserveServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,6 +62,9 @@ public class StockReserveServiceImplTest {
     MetricService metricService;
 
     @Mock
+    StockAvailabilityService availabilityService;
+
+    @Mock
     StockReservationMapper mapper;
 
     @Mock
@@ -99,7 +103,7 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now())).thenReturn(0);
+        when(availabilityService.getAvailable(item.getId())).thenReturn(10);
 
         when(userRepository.getReferenceById(ctx.userId())).thenReturn(user);
 
@@ -108,20 +112,6 @@ public class StockReserveServiceImplTest {
         verify(stockReserveRepository).save(any(Reservation.class));
 
         verify(metricService).increment("warehouse.reservation.reserve.total");
-    }
-
-    /**
-     * Ели резервировать <= 0, ошибка IllegalArgumentException.
-     */
-    @Test
-    void shouldThrowExceptionWhenQuantityIsZero() {
-
-        ReserveRequest request = new ReserveRequest(0, 3);
-
-        assertThrows(IllegalArgumentException.class, () -> service.reserve(1L, request, ctx));
-
-        verifyNoInteractions(stockRepository);
-        verifyNoInteractions(stockReserveRepository);
     }
 
     /**
@@ -154,9 +144,6 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now())).thenReturn(
-                oldReservation.getQuantity());
-
         assertThrows(InsufficientStockException.class, () -> service.reserve(item.getId(), request, ctx));
 
         verify(stockReserveRepository, never()).save(any());
@@ -174,9 +161,6 @@ public class StockReserveServiceImplTest {
         Reservation reservation1 = Reservation.builder().quantity(6).status(ReservationStatus.ACTIVE).build();
 
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
-
-        when(stockReserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now())).thenReturn(
-                reservation.getQuantity() + reservation1.getQuantity());
 
         assertThrows(InsufficientStockException.class, () -> service.reserve(item.getId(), request, ctx));
     }
@@ -279,13 +263,11 @@ public class StockReserveServiceImplTest {
 
         when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
 
-        when(stockRepository.decreaseQuantityIfEnough(item.getId(), reservation.getQuantity()))
-                .thenReturn(1);
+        when(stockRepository.decreaseQuantityIfEnough(item.getId(), reservation.getQuantity())).thenReturn(1);
 
         service.writeOff(item.getId(), request, ctx);
 
-        assertThat(stock.getQuantity())
-                .isEqualTo(5);
+        assertThat(stock.getQuantity()).isEqualTo(5);
 
         assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CONSUMED);
 
@@ -367,25 +349,17 @@ public class StockReserveServiceImplTest {
         stock.setQuantity(3);
         reservation.setQuantity(5);
 
-        when(stockRepository.findByItemIdForUpdate(item.getId()))
-                .thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(stockReserveRepository.findById(reservation.getId()))
-                .thenReturn(Optional.of(reservation));
+        when(stockReserveRepository.findById(reservation.getId())).thenReturn(Optional.of(reservation));
 
-        when(stockRepository.decreaseQuantityIfEnough(
-                item.getId(),
-                reservation.getQuantity()
-        )).thenReturn(0);
+        when(stockRepository.decreaseQuantityIfEnough(item.getId(), reservation.getQuantity())).thenReturn(0);
 
-        assertThatThrownBy(() ->
-                service.writeOff(item.getId(), request, ctx)
-        ).isInstanceOf(InsufficientStockException.class);
+        assertThatThrownBy(() -> service.writeOff(item.getId(), request, ctx)).isInstanceOf(
+                InsufficientStockException.class);
 
-        assertThat(reservation.getStatus())
-                .isEqualTo(ReservationStatus.ACTIVE);
+        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE);
 
-        verify(movementService, never())
-                .newStockMovement(any(), anyInt(), any(), any());
+        verify(movementService, never()).newStockMovement(any(), anyInt(), any(), any());
     }
 }

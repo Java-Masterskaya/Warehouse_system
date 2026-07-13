@@ -5,7 +5,6 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
-import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.User;

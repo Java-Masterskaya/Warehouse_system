@@ -29,7 +29,7 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
     List<String> findDistinctCategories();
 
     @Query("""
-            SELECT new com.warehouse.dto.response.item.ItemDetailsResponse(
+            SELECT new com.warehouse.dto.response.item.ItemDetailsProjection(
                 i.id,
                 i.sku,
                 i.name,

@@ -66,7 +66,8 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
             }
         }).count();
         assertEquals(1, successfulReservations);
-        long reserved = reserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now());
+        long reserved = reserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE,
+                LocalDateTime.now());
         assertEquals(7, reserved);
     }
 }

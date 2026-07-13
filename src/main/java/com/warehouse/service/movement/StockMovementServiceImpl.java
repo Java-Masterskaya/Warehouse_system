@@ -24,7 +24,6 @@ import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.reservation.StockAvailabilityService;
-import com.warehouse.service.reservation.StockReserveService;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -182,15 +181,10 @@ public class StockMovementServiceImpl implements StockMovementService {
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
 
-        int reserved = (int)availabilityService.getReserved(itemId);
-        if(counted < reserved){
-            log.warn(
-                    "Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. " +
-                            "Physical quantity is lower than active reservations",
-                    itemId,
-                    counted,
-                    reserved
-            );
+        int reserved = availabilityService.getReserved(itemId);
+        if (counted < reserved) {
+            log.warn("Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. "
+                    + "Physical quantity is lower than active reservations", itemId, counted, reserved);
             throw StocktakeConflictException.of(counted, reserved);
         }
 
