@@ -81,7 +81,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         stockRepository.deleteAll();
         outboxEventRepository.deleteAll();
         itemRepository.deleteAll();
-        userRepository.deleteAll();
+
 
         // Создаём тестовый товар
         testItem = new Item();
