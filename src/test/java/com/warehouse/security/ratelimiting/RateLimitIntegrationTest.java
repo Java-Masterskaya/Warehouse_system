@@ -48,7 +48,6 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
-
     @BeforeEach
     void cleanRedis() {
         // Перед каждым тестом желательно очищать Redis-ключи бакетов, если необходимо
@@ -60,7 +59,7 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
 
     // --- КРИТЕРИЙ 1 и 4: Тест лимитов логина (N+1 попытка, Retry-After, обычный юзер) ---
     @Test
-    void shouldAllowLoginWithinLimits_AndReturn429WithRetryAfterOnExceeded() throws Exception {
+    void shouldAllowLoginWithinLimitsAndReturn429WithRetryAfterOnExceeded() throws Exception {
         LoginRequest request = new LoginRequest("test_user", "password123");
         String jsonBody = objectMapper.writeValueAsString(request);
 
@@ -108,13 +107,13 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
     // --- КРИТЕРИЙ 3: Превышение на write-эндпоинте -> Бизнес-операция не выполняется ---
     @Test
     @WithMockUser(username = "movement_user") // Имитируем авторизованного пользователя
-    void shouldBlockWriteMovementEndpoint_AndNotExecuteBusinessLogic() throws Exception {
+    void shouldBlockWriteMovementEndpointAndNotExecuteBusinessLogic() throws Exception {
         String movementJson = """
-        {
-            "itemId": 1,
-            "quantity": 5
-        }
-        """;
+            {
+                "itemId": 1,
+                "quantity": 5
+            }
+            """;
 
         // 1. Выполняем 3 разрешенных запроса на ваш эндпоинт
         for (int i = 0; i < 3; i++) {
