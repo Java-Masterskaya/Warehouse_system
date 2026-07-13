@@ -1,5 +1,6 @@
 package com.warehouse.security;
 
+import com.warehouse.security.model.TokenType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -54,14 +55,14 @@ public class JwtUtil {
     }
 
     public String generateToken(String username, Long userId, List<String> roles) {
-        return generateToken(username, userId, roles, expirationMs);
+        return generateToken(username, userId, roles, expirationMs, TokenType.ACCESS);
     }
 
     public String generateRefreshToken(String username, Long userId, List<String> roles) {
-        return generateToken(username, userId, roles, refreshExpirationMs);
+        return generateToken(username, userId, roles, refreshExpirationMs, TokenType.REFRESH);
     }
 
-    private String generateToken(String username, Long userId, List<String> roles, long expiration) {
+    private String generateToken(String username, Long userId, List<String> roles, long expiration, TokenType tokenType) {
         log.debug("Generating token for user: {}", username);
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(expiration);
@@ -72,27 +73,34 @@ public class JwtUtil {
                 .subject(username)
                 .claim("userId", userId)
                 .claim("roles", roles)
+                .claim("tokenType", tokenType.name())
                 .id(jti)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(key)
                 .compact();
 
-        log.debug("Token generated successfully for user: {} with jti: {} expires in {} ms", username, jti, expiration);
+        log.debug("Token generated successfully for user: {} expires in {} ms", username, expiration);
         return token;
     }
 
-    public Optional<JwtPayload> parseToken(String token) {
-        return parseTokenInternal(token);
+    public Optional<JwtPayload> parseAccessToken(String token) {
+        return parseTokenInternal(token, TokenType.ACCESS);
     }
 
     public Optional<JwtPayload> parseRefreshToken(String token) {
-        return parseTokenInternal(token);
+        return parseTokenInternal(token, TokenType.REFRESH);
     }
 
-    private Optional<JwtPayload> parseTokenInternal(String token) {
+    private Optional<JwtPayload> parseTokenInternal(String token, TokenType expectedType) {
         try {
             Claims claims = parseClaims(token);
+            // Проверяем тип токена
+            String tokenType = claims.get("tokenType", String.class);
+            if (!expectedType.name().equals(tokenType)) {
+                log.warn("Invalid token type: expected {}, got {}", expectedType, tokenType);
+                return Optional.empty();
+            }
             String username = claims.getSubject();
             Long userId = claims.get("userId", Long.class);
             Object rolesObj = claims.get("roles");

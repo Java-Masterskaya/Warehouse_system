@@ -65,9 +65,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        var payloadOpt = jwtUtil.parseToken(token);
+        var payloadOpt = jwtUtil.parseAccessToken(token);
         if (payloadOpt.isEmpty()) {
-            log.warn("Invalid JWT token");
+            log.warn("Invalid or non-access JWT token");
             sendUnauthorized(response, "Invalid token");
             return;
         }

@@ -227,10 +227,11 @@ class TokenServiceImplTest {
     void rotateRefreshTokenShouldRotateCorrectly() {
         // Arrange
         String oldRefresh = "old-refresh-token";
-        String newRefresh = "new-refresh-token";
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
+        long remainingTtl = 604800000L;
 
         when(jwtUtil.parseRefreshToken(oldRefresh)).thenReturn(Optional.of(payload));
+        when(jwtUtil.getTokenRemainingTime(oldRefresh)).thenReturn(remainingTtl);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         // Act
@@ -240,8 +241,9 @@ class TokenServiceImplTest {
         // 1. Старый refresh помечается как использованный
         verify(valueOperations).set(
                 eq("rotation:" + oldRefresh),
-                eq("rotated"),
-                eq(Duration.ofMinutes(5))
+                eq(USER_ID.toString()),
+                eq(remainingTtl),
+                eq(TimeUnit.MILLISECONDS)
         );
 
         // 2. Старый refresh удаляется
@@ -268,7 +270,7 @@ class TokenServiceImplTest {
     void blacklistAccessTokenShouldSetWithCorrectTTL() {
         // Arrange
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
-        when(jwtUtil.parseToken(ACCESS_TOKEN)).thenReturn(Optional.of(payload));
+        when(jwtUtil.parseAccessToken(ACCESS_TOKEN)).thenReturn(Optional.of(payload));
         when(jwtUtil.getTokenRemainingTime(ACCESS_TOKEN)).thenReturn(EXPIRATION_MS);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
@@ -306,7 +308,7 @@ class TokenServiceImplTest {
 
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
 
-        when(jwtUtil.parseToken(anyString())).thenReturn(Optional.of(payload));
+        when(jwtUtil.parseAccessToken(anyString())).thenReturn(Optional.of(payload));
         when(jwtUtil.getTokenRemainingTime(anyString())).thenReturn(EXPIRATION_MS);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
@@ -315,7 +317,7 @@ class TokenServiceImplTest {
 
         // Assert
         verify(redisTemplate).keys(pattern);
-        verify(jwtUtil, times(2)).parseToken(anyString());
+        verify(jwtUtil, times(2)).parseAccessToken(anyString());
         verify(jwtUtil, times(2)).getTokenRemainingTime(anyString());
         verify(valueOperations, times(4)).set(
                 anyString(),
@@ -357,7 +359,7 @@ class TokenServiceImplTest {
     @DisplayName("Should not blacklist invalid access token")
     void blacklistAccessTokenWhenInvalidTokenShouldNotSetBlacklist() {
         // Arrange
-        when(jwtUtil.parseToken(ACCESS_TOKEN)).thenReturn(Optional.empty());
+        when(jwtUtil.parseAccessToken(ACCESS_TOKEN)).thenReturn(Optional.empty());
 
         // Act
         tokenService.blacklistAccessToken(ACCESS_TOKEN);
@@ -375,7 +377,7 @@ class TokenServiceImplTest {
     @DisplayName("Should handle exception during blacklist")
     void blacklistAccessTokenWhenExceptionShouldNotThrow() {
         // Arrange
-        when(jwtUtil.parseToken(ACCESS_TOKEN)).thenThrow(new RuntimeException("Test exception"));
+        when(jwtUtil.parseAccessToken(ACCESS_TOKEN)).thenThrow(new RuntimeException("Test exception"));
 
         // Act & Assert - should not throw
         tokenService.blacklistAccessToken(ACCESS_TOKEN);

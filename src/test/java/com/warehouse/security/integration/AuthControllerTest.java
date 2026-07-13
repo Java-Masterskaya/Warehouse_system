@@ -353,6 +353,39 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("Refresh token should NOT work as access token")
+    void refreshTokenShouldNotWorkAsAccessToken() throws Exception {
+        // 1. Проверяем, что обычный access токен работает
+        mockMvc.perform(get("/api/items")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        // 2. Проверяем, что refresh токен НЕ работает как access
+        mockMvc.perform(get("/api/items")
+                        .header("Authorization", "Bearer " + adminRefreshToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("Refresh token should work only for refresh endpoint")
+    void refreshTokenShouldWorkOnlyForRefreshEndpoint() throws Exception {
+        // 1. Проверяем, что refresh токен работает на /api/auth/refresh
+        RefreshRequest refreshRequest = new RefreshRequest(adminToken, adminRefreshToken);
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(refreshRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+
+        // 2. Проверяем, что refresh токен НЕ работает на защищенном эндпоинте
+        mockMvc.perform(get("/api/items")
+                        .header("Authorization", "Bearer " + adminRefreshToken))
+                .andExpect(status().isUnauthorized());
+    }
+
     // ==================== LOGOUT TESTS ====================
 
     @Test

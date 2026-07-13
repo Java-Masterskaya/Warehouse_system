@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -24,8 +23,6 @@ public class TokenServiceImpl implements TokenService {
     private static final String USER_TOKENS_PREFIX = "user:tokens:";
     private static final String REFRESH_ROTATION_PREFIX = "rotation:";
     private static final String USER_ACCESS_PREFIX = "user:access:";
-
-    private static final int ROTATION_DETECTION_MINUTES = 5;
 
     @Override
     public TokenPair generateTokenPair(String username, Long userId, List<String> roles) {
@@ -86,7 +83,7 @@ public class TokenServiceImpl implements TokenService {
         log.info("Start the revoke of the refresh token");
         String key = REFRESH_PREFIX + refreshToken;
         redisTemplate.delete(key);
-        log.info("Refresh token revoked: {}", refreshToken);
+        log.info("Refresh token revoked");
     }
 
     @Override
@@ -102,7 +99,7 @@ public class TokenServiceImpl implements TokenService {
                 );
                 String refreshKey = REFRESH_PREFIX + refreshToken;
                 redisTemplate.delete(refreshKey);
-                log.debug("Removed refresh key: {}", refreshKey);
+                log.debug("Removed refresh key");
             });
             // Удаляем связи user:tokens:userId:*
             redisTemplate.delete(refreshKeys);
@@ -124,10 +121,19 @@ public class TokenServiceImpl implements TokenService {
         // Get user info from old token
         var oldPayload = jwtUtil.parseRefreshToken(oldRefreshToken);
         oldPayload.ifPresent(payload -> {
-            // Store rotation info to detect reuse
-            String rotationKey = REFRESH_ROTATION_PREFIX + oldRefreshToken;
-            redisTemplate.opsForValue().set(rotationKey, "rotated",
-                    Duration.ofMinutes(ROTATION_DETECTION_MINUTES)); // Short TTL for rotation detection
+            // Получаем оставшееся время жизни старого refresh токена
+            long remainingTtl = jwtUtil.getTokenRemainingTime(oldRefreshToken);
+            if (remainingTtl > 0) {
+                // Сохраняем rotation ключ на ВЕСЬ оставшийся срок жизни токена
+                String rotationKey = REFRESH_ROTATION_PREFIX + oldRefreshToken;
+                redisTemplate.opsForValue().set(rotationKey,
+                        payload.userId().toString(),
+                        remainingTtl,
+                        TimeUnit.MILLISECONDS);
+                log.info("Rotation key set for {} ms for user: {}", remainingTtl, payload.userId());
+            } else {
+                log.warn("Old refresh token already expired, skipping rotation key");
+            }
             // Revoke old token
             revokeRefreshToken(oldRefreshToken);
             log.info("Refresh token rotated for user: {}", payload.userId());
@@ -145,7 +151,7 @@ public class TokenServiceImpl implements TokenService {
     public void blacklistAccessToken(String accessToken) {
         log.info("Adding token to blacklist");
         try {
-            var payload = jwtUtil.parseToken(accessToken);
+            var payload = jwtUtil.parseAccessToken(accessToken);
             payload.ifPresent(p -> {
                 long ttl = jwtUtil.getTokenRemainingTime(accessToken);
                 String key = BLACKLIST_PREFIX + accessToken;
@@ -188,6 +194,7 @@ public class TokenServiceImpl implements TokenService {
     }
 
     private void storeAccessToken(String accessToken, Long userId) {
+        log.debug("Storing access token in Redis: userId={}", userId);
         long ttl = jwtUtil.getExpirationMs();
         String userKey = USER_ACCESS_PREFIX + userId + ":" + accessToken;
         redisTemplate.opsForValue().set(userKey, "active", ttl, TimeUnit.MILLISECONDS);
