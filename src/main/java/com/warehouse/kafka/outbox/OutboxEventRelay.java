@@ -42,7 +42,6 @@ public class OutboxEventRelay {
     public void relayPendingEvents() {
         log.debug("Checking for pending outbox events, limit={}", pollingLimit);
 
-        // Сначала обрабатываем PENDING события
         List<OutboxEvent> pendingEvents = outboxEventRepository.findPendingEvents(pollingLimit);
         List<OutboxEvent> failedEvents = outboxEventRepository.findFailedEventsForRetry(
                 pollingLimit - pendingEvents.size(), maxRetries, retryBackoffMs);
@@ -78,12 +77,10 @@ public class OutboxEventRelay {
 
     /**
      * Обрабатывает одно событие outbox.
+     *
      * @param event событие
      */
-
     protected void processSingleEvent(OutboxEvent event) {
-        // Entity уже attached в текущей транзакции
-        // Обрабатываем только PENDING и FAILED события
         if (event.getStatus() != OutboxStatus.PENDING && event.getStatus() != OutboxStatus.FAILED) {
             log.debug("Event id={} already processed (status={}), skipping",
                     event.getId(), event.getStatus());
@@ -91,22 +88,12 @@ public class OutboxEventRelay {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        
-        // Проверяем backoff ДО попытки отправки (экспоненциальный: 2^retryCount * backoffMs)
-        if (event.getStatus() == OutboxStatus.FAILED && event.getLastAttemptAt() != null) {
-            // Вычисляем экспоненциальный backoff для текущей попытки (стандартная формула)
-            long currentRetry = event.getRetryCount(); // текущая попытка (0, 1, 2, ...)
-            long exponentialBackoff = retryBackoffMs * (long) Math.pow(2, currentRetry);
-            
-            long timeSinceLastAttempt = Duration.between(event.getLastAttemptAt(), now).toMillis();
-            if (timeSinceLastAttempt < exponentialBackoff) {
-                log.debug("Event id={} skipped due to exponential backoff ({}/{}, retry {} of {})",
-                        event.getId(), timeSinceLastAttempt, exponentialBackoff, 
-                        event.getRetryCount(), maxRetries);
-                return;  // Пропускаем, пока не пройдёт backoff
-            }
+
+        if (event.getStatus() == OutboxStatus.FAILED && event.getLastAttemptAt() != null
+                && shouldSkipDueToBackoff(event, now)) {
+            return;
         }
-        
+
         try {
             LowStockAlertEvent alertEvent = objectMapper.readValue(
                     event.getPayload(),
@@ -115,110 +102,101 @@ public class OutboxEventRelay {
 
             kafkaProducer.sendLowStockAlert(alertEvent);
 
-            // Успешная отправка - помечаем как SENT
             outboxEventRepository.updateToSent(event.getId(), LocalDateTime.now());
             event.setStatus(OutboxStatus.SENT);
             event.setSentAt(LocalDateTime.now());
 
             log.debug("Successfully sent event id={} to Kafka", event.getId());
         } catch (JsonProcessingException e) {
-            // Deserialization errors (битый JSON) - немедленно в DLT без ретраев
-            log.warn("Deserialization error for event id={}: {}", event.getId(), e.getMessage());
-            
-            // Для deserialization errors retry_count НЕ увеличиваем (оставляем как есть)
-            // Считаем это permanent failure
+            handleDeserializationError(event, e, now);
+        } catch (Exception e) {
+            handleProcessingError(event, e, now);
+        }
+    }
+
+    private boolean shouldSkipDueToBackoff(OutboxEvent event, LocalDateTime now) {
+        long currentRetry = event.getRetryCount();
+        long exponentialBackoff = retryBackoffMs * (long) Math.pow(2, currentRetry);
+        long timeSinceLastAttempt = Duration.between(event.getLastAttemptAt(), now).toMillis();
+
+        if (timeSinceLastAttempt < exponentialBackoff) {
+            log.debug("Event id={} skipped due to exponential backoff ({}/{}, retry {} of {})",
+                    event.getId(), timeSinceLastAttempt, exponentialBackoff,
+                    event.getRetryCount(), maxRetries);
+            return true;
+        }
+        return false;
+    }
+
+    private void handleDeserializationError(OutboxEvent event, JsonProcessingException e, LocalDateTime now) {
+        log.warn("Deserialization error for event id={}: {}", event.getId(), e.getMessage());
+
+        Long dltId = outboxEventRepository.insertIntoDlt(
+                event.getId(),
+                "Deserialization error: " + e.getMessage(),
+                event.getRetryCount(),
+                now
+        );
+
+        if (dltId != null) {
+            moveEventToDlt(event, dltId);
+        } else {
+            log.error("Failed to insert event id={} into DLT", event.getId());
+        }
+    }
+
+    private void handleProcessingError(OutboxEvent event, Exception e, LocalDateTime now) {
+        log.error("Error processing outbox event id={}: {}", event.getId(), e.getMessage(), e);
+
+        int newRetryCount = event.getRetryCount() + 1;
+
+        if (newRetryCount >= maxRetries) {
             Long dltId = outboxEventRepository.insertIntoDlt(
                     event.getId(),
-                    "Deserialization error: " + e.getMessage(),
-                    event.getRetryCount(), // не увеличиваем!
+                    "Max retries exceeded (" + maxRetries + " attempts). Last error: " + e.getMessage(),
+                    newRetryCount,
                     now
             );
-            
             if (dltId != null) {
-                int deleted = outboxEventRepository.deleteFromOutbox(event.getId());
-                event.setStatus(OutboxStatus.PERMANENT_FAILURE);
-                if (deleted > 0) {
-                    log.warn("Event id={} moved to DLT due to deserialization error (dlt_id={}), outbox row deleted", 
-                            event.getId(), dltId);
-                } else {
-                    // deleteFromOutbox вернул 0, строка не удалена - устанавливаем статус PERMANENT_FAILURE в БД
-                    int updated = outboxEventRepository.updateToPermanentFailure(event.getId());
-                    if (updated > 0) {
-                        log.warn("Event id={} moved to DLT due to deserialization error (dlt_id={}), "
-                                        + "status updated to PERMANENT_FAILURE in outbox",
-                                event.getId(), dltId);
-                    } else {
-                        // Критическая ошибка: строка не удалена и не обновлена
-                        log.error("CRITICAL: Event id={} moved to DLT but failed to delete"
-                                        + " from outbox (deleted=0) and failed to update "
-                                        + "status to PERMANENT_FAILURE (updated=0). Event may be lost or duplicated!",
-                                event.getId());
-                        // Бросаем исключение, чтобы релей не пытался обработать событие снова
-                        throw new OutboxException("Failed to move event to DLT:"
-                               + " deleteFromOutbox=0, updateToPermanentFailure=0", null);
-                    }
-                }
+                moveEventToDlt(event, dltId);
             } else {
                 log.error("Failed to insert event id={} into DLT", event.getId());
             }
-        } catch (Exception e) {
-            log.error("Error processing outbox event id={}: {}", event.getId(), e.getMessage(), e);
-            
-            int newRetryCount = event.getRetryCount() + 1;
-            
-            // Проверяем, достигнут ли лимит ретраев
-            if (newRetryCount >= maxRetries) {
-                // Превышен лимит ретраев - перемещаем в DLT
-                Long dltId = outboxEventRepository.insertIntoDlt(
-                        event.getId(),
-                        "Max retries exceeded (" + maxRetries + " attempts). Last error: " + e.getMessage(),
-                        newRetryCount,
-                        now
-                );
-                
-                if (dltId != null) {
-                    int deleted = outboxEventRepository.deleteFromOutbox(event.getId());
-                    event.setStatus(OutboxStatus.PERMANENT_FAILURE);
-                    if (deleted > 0) {
-                        log.warn("Event id={} moved to DLT after {} retries (dlt_id={}), outbox row deleted", 
-                                event.getId(), maxRetries, dltId);
-                    } else {
-                        // deleteFromOutbox вернул 0, строка не удалена - устанавливаем статус PERMANENT_FAILURE в БД
-                        int updated = outboxEventRepository.updateToPermanentFailure(event.getId());
-                        if (updated > 0) {
-                            log.warn("Event id={} moved to DLT after {} retries (dlt_id={}),"
-                                           + " status updated to PERMANENT_FAILURE in outbox",
-                                    event.getId(), maxRetries, dltId);
-                        } else {
-                            // Критическая ошибка: строка не удалена и не обновлена
-                            log.error("CRITICAL: Event id={} moved to DLT but failed"
-                                            + "to delete from outbox (deleted=0) and failed "
-                                            + "to update status to PERMANENT_FAILURE (updated=0). "
-                                            + "Event may be lost or duplicated!",
-                                    event.getId());
-                            // Бросаем исключение, чтобы релей не пытался обработать событие снова
-                            throw new OutboxException("Failed to move event to DLT:"
-                                   + " deleteFromOutbox=0, updateToPermanentFailure=0", null);
-                        }
-                    }
-                } else {
-                    log.error("Failed to insert event id={} into DLT", event.getId());
-                }
-            } else {
+        } else {
+            outboxEventRepository.updateToFailed(
+                    event.getId(),
+                    e.getMessage(),
+                    newRetryCount,
+                    now
+            );
+            event.setStatus(OutboxStatus.FAILED);
+            event.setRetryCount(newRetryCount);
+            event.setLastAttemptAt(now);
+            event.setErrorMessage(e.getMessage());
+            log.debug("Event id={} marked as FAILED for retry {} of {}",
+                    event.getId(), newRetryCount, maxRetries);
+        }
+    }
 
-                // Ещё есть попытки - помечаем как FAILED для ретрая
-                outboxEventRepository.updateToFailed(
-                        event.getId(),
-                        e.getMessage(),
-                        newRetryCount,
-                        now
-                );
-                event.setStatus(OutboxStatus.FAILED);
-                event.setRetryCount(newRetryCount);
-                event.setLastAttemptAt(now);
-                event.setErrorMessage(e.getMessage());
-                log.debug("Event id={} marked as FAILED for retry {} of {}",
-                        event.getId(), newRetryCount, maxRetries);
+    private void moveEventToDlt(OutboxEvent event, Long dltId) {
+        int deleted = outboxEventRepository.deleteFromOutbox(event.getId());
+        event.setStatus(OutboxStatus.PERMANENT_FAILURE);
+
+        if (deleted > 0) {
+            log.warn("Event id={} moved to DLT (dlt_id={}), outbox row deleted",
+                    event.getId(), dltId);
+        } else {
+            int updated = outboxEventRepository.updateToPermanentFailure(event.getId());
+            if (updated > 0) {
+                log.warn("Event id={} moved to DLT (dlt_id={}), status updated to PERMANENT_FAILURE in outbox",
+                        event.getId(), dltId);
+            } else {
+                log.error("CRITICAL: Event id={} moved to DLT but failed to delete from outbox (deleted=0) "
+                                + "and failed to update status to PERMANENT_FAILURE (updated=0). "
+                                + "Event may be lost or duplicated!",
+                        event.getId());
+                throw new OutboxException("Failed to move event to DLT: "
+                        + "deleteFromOutbox=0, updateToPermanentFailure=0", null);
             }
         }
     }

@@ -102,4 +102,4 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
-    com.warehouse.service.outbox: DEBUG
+    com.warehouse.service.outbox: INFO
