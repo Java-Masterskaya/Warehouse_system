@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS outbox (
 );
 
 -- Индекс для быстрого поиска неотправленных событий
-CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status);
+CREATE INDEX IF NOT EXISTS idx_outbox_status_created_at ON outbox(status, created_at);
 
 -- Индекс для сортировки по времени создания (порядок отправки)
 CREATE INDEX IF NOT EXISTS idx_outbox_created_at ON outbox(created_at);
