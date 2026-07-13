@@ -1,8 +1,6 @@
 package com.warehouse.kafka.outbox;
 
 import com.warehouse.dto.response.OutboxDltReprocessResponse;
-import com.warehouse.entity.OutboxStatus;
-import com.warehouse.repository.OutboxEventRepository;
 
 import java.util.concurrent.CompletableFuture;
 

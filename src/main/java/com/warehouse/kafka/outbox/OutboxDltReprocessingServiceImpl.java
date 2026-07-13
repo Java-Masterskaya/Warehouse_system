@@ -29,6 +29,8 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
 
     private final OutboxDltEventRepository outboxDltEventRepository;
 
+    private static final int POLLING_LIMIT = 100;
+
     /**
      * Перемещает ВСЕ события из DLT обратно в outbox для повторной обработки.
      *
@@ -47,7 +49,8 @@ public class OutboxDltReprocessingServiceImpl implements OutboxDltReprocessingSe
 
         try {
             // Читаем из outbox_dlt (НЕ из outbox!)
-            List<OutboxDltEvent> dltEvents = outboxDltEventRepository.findDltEventsForReprocess(100);
+            List<OutboxDltEvent> dltEvents = outboxDltEventRepository
+                    .findDltEventsForReprocess(POLLING_LIMIT);
 
             if (dltEvents.isEmpty()) {
                 log.info("No events in outbox DLT");

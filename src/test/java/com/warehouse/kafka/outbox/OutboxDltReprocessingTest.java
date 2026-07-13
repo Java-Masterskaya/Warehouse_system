@@ -61,7 +61,9 @@ class OutboxDltReprocessingTest {
     @DisplayName("Should process event restored from DLT to PENDING")
     void shouldProcessEventRestoredFromDlt() {
         String validPayload = """
-            {"itemId":50,"sku":"SKU-RESTORE","itemName":"Test Item","currentStock":5,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            {"itemId":50,"sku":"SKU-RESTORE","itemName":"Test Item",
+            "currentStock":5,"minStock":10,"triggeredBy":"admin",
+            "triggeredAt":"2026-07-10T18:00:00"}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -109,7 +111,8 @@ class OutboxDltReprocessingTest {
     @DisplayName("Should not re-process event with broken JSON already in DLT")
     void shouldNotReprocessBrokenJsonAlreadyInDlt() {
         String validPayload = """
-            {"itemId":55,"sku":"SKU-BROKEN-DLT","itemName":"Test","currentStock":5,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            {"itemId":55,"sku":"SKU-BROKEN-DLT","itemName":"Test","currentStock":5,
+            "minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -134,7 +137,8 @@ class OutboxDltReprocessingTest {
     @DisplayName("Should move broken JSON event to DLT without increasing retryCount")
     void shouldMoveBrokenJsonToDltWithoutRetries() {
         String brokenJson = """
-            {"itemId":53,"sku":"SKU-BROKEN-RETRY","itemName":"Test","currentStock":1,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00",}
+            {"itemId":53,"sku":"SKU-BROKEN-RETRY","itemName":"Test",
+            "currentStock":1,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00",}
             """;
 
         OutboxEvent event = OutboxEvent.builder()

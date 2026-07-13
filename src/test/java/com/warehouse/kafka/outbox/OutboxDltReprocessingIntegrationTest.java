@@ -12,10 +12,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,7 +52,8 @@ class OutboxDltReprocessingIntegrationTest extends AbstractIntegrationTest {
         OutboxDltEvent dltEvent = OutboxDltEvent.builder()
                 .originalOutboxId(100L)
                 .eventType("LowStockAlert")
-                .payload("{\"itemId\":50,\"sku\":\"SKU-DLT\",\"itemName\":\"Test\",\"currentStock\":5,\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"2026-07-10T18:00:00\"}")
+                .payload("{\"itemId\":50,\"sku\":\"SKU-DLT\",\"itemName\":\"Test\",\"currentStock\":5,"
+                        + "\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"2026-07-10T18:00:00\"}")
                 .errorMessage("Max retries exceeded")
                 .retryCount(3)
                 .lastAttemptAt(LocalDateTime.now().minusDays(1))

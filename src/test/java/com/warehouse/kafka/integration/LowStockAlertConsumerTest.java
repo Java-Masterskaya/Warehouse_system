@@ -3,7 +3,6 @@ package com.warehouse.kafka.integration;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.Item;
-import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;

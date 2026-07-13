@@ -2,8 +2,6 @@ package com.warehouse.kafka.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
@@ -146,14 +144,18 @@ public class OutboxEventRelay {
                     // deleteFromOutbox вернул 0, строка не удалена - устанавливаем статус PERMANENT_FAILURE в БД
                     int updated = outboxEventRepository.updateToPermanentFailure(event.getId());
                     if (updated > 0) {
-                        log.warn("Event id={} moved to DLT due to deserialization error (dlt_id={}), status updated to PERMANENT_FAILURE in outbox", 
+                        log.warn("Event id={} moved to DLT due to deserialization error (dlt_id={}), "
+                                        + "status updated to PERMANENT_FAILURE in outbox",
                                 event.getId(), dltId);
                     } else {
                         // Критическая ошибка: строка не удалена и не обновлена
-                        log.error("CRITICAL: Event id={} moved to DLT but failed to delete from outbox (deleted=0) and failed to update status to PERMANENT_FAILURE (updated=0). Event may be lost or duplicated!", 
+                        log.error("CRITICAL: Event id={} moved to DLT but failed to delete"
+                                        + " from outbox (deleted=0) and failed to update "
+                                        + "status to PERMANENT_FAILURE (updated=0). Event may be lost or duplicated!",
                                 event.getId());
                         // Бросаем исключение, чтобы релей не пытался обработать событие снова
-                        throw new OutboxException("Failed to move event to DLT: deleteFromOutbox=0, updateToPermanentFailure=0", null);
+                        throw new OutboxException("Failed to move event to DLT:"
+                               + " deleteFromOutbox=0, updateToPermanentFailure=0", null);
                     }
                 }
             } else {
@@ -184,14 +186,19 @@ public class OutboxEventRelay {
                         // deleteFromOutbox вернул 0, строка не удалена - устанавливаем статус PERMANENT_FAILURE в БД
                         int updated = outboxEventRepository.updateToPermanentFailure(event.getId());
                         if (updated > 0) {
-                            log.warn("Event id={} moved to DLT after {} retries (dlt_id={}), status updated to PERMANENT_FAILURE in outbox", 
+                            log.warn("Event id={} moved to DLT after {} retries (dlt_id={}),"
+                                           + " status updated to PERMANENT_FAILURE in outbox",
                                     event.getId(), maxRetries, dltId);
                         } else {
                             // Критическая ошибка: строка не удалена и не обновлена
-                            log.error("CRITICAL: Event id={} moved to DLT but failed to delete from outbox (deleted=0) and failed to update status to PERMANENT_FAILURE (updated=0). Event may be lost or duplicated!", 
+                            log.error("CRITICAL: Event id={} moved to DLT but failed"
+                                            + "to delete from outbox (deleted=0) and failed "
+                                            + "to update status to PERMANENT_FAILURE (updated=0). "
+                                            + "Event may be lost or duplicated!",
                                     event.getId());
                             // Бросаем исключение, чтобы релей не пытался обработать событие снова
-                            throw new OutboxException("Failed to move event to DLT: deleteFromOutbox=0, updateToPermanentFailure=0", null);
+                            throw new OutboxException("Failed to move event to DLT:"
+                                   + " deleteFromOutbox=0, updateToPermanentFailure=0", null);
                         }
                     }
                 } else {

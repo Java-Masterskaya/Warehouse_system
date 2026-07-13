@@ -1,9 +1,7 @@
 package com.warehouse.kafka.consumer;
 
 import com.warehouse.dto.event.LowStockAlertEvent;
-import com.warehouse.entity.StockAlert;
 import com.warehouse.exception.EntityNotFoundException;
-import com.warehouse.mapper.StockAlertMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import lombok.AccessLevel;
@@ -13,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
 
 /**
  * Потребитель событий о низком остатке товара.
@@ -21,10 +18,6 @@ import org.springframework.transaction.annotation.Propagation;
  * Использует кастомный container factory с errorHandler и DLT.
  * Дубликаты (уникальный индекс) пропускаются, другие ошибки - в errorHandler.
  *
- * Важно: propagation = REQUIRES_NEW предотвращает проблему с rollback-only транзакцией.
- * Когда дубликат обнаружен (DataIntegrityViolationException), Spring помечает транзакцию как rollback-only.
- * Если не указать propagation = REQUIRES_NEW, транзакция внешнего вызова также станет rollback-only,
- * что приведёт к UnexpectedRollbackException и повторной доставке сообщения.
  */
 @Slf4j
 @Component

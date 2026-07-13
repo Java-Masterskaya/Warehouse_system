@@ -64,7 +64,8 @@ class OutboxEventRelayRetryTest {
     @DisplayName("Should mark event as SENT on successful Kafka send")
     void shouldMarkAsSentOnSuccess() {
         String validPayload = """
-            {"itemId":1,"sku":"SKU-001","itemName":"Test Item","currentStock":4,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            {"itemId":1,"sku":"SKU-001","itemName":"Test Item","currentStock":4,
+            "minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -97,7 +98,8 @@ class OutboxEventRelayRetryTest {
     @DisplayName("Should mark as FAILED with incremented retry count on transient error")
     void shouldMarkAsFailedOnTransientError() {
         String validPayload = """
-            {"itemId":2,"sku":"SKU-002","itemName":"Test","currentStock":3,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            {"itemId":2,"sku":"SKU-002","itemName":"Test","currentStock":3,"minStock":10,
+            "triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -139,7 +141,8 @@ class OutboxEventRelayRetryTest {
     @DisplayName("Should retry FAILED event when backoff has elapsed")
     void shouldRetryFailedEventWhenBackoffElapsed() {
         String validPayload = """
-            {"itemId":3,"sku":"SKU-003","itemName":"Test","currentStock":2,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            {"itemId":3,"sku":"SKU-003","itemName":"Test","currentStock":2,"minStock":10,
+            "triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -176,7 +179,8 @@ class OutboxEventRelayRetryTest {
     @DisplayName("Should skip FAILED event when backoff has not elapsed (before Kafka call)")
     void shouldSkipFailedEventWhenBackoffNotElapsed() {
         String validPayload = """
-            {"itemId":4,"sku":"SKU-004","itemName":"Test","currentStock":2,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            {"itemId":4,"sku":"SKU-004","itemName":"Test","currentStock":2,"minStock":10,
+            "triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -211,7 +215,8 @@ class OutboxEventRelayRetryTest {
     @DisplayName("Should check backoff BEFORE Kafka call for FAILED events")
     void shouldCheckBackoffBeforeKafkaCall() {
         String validPayload = """
-            {"itemId":100,"sku":"SKU-BACKOFF-BEFORE","itemName":"Test","currentStock":2,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            {"itemId":100,"sku":"SKU-BACKOFF-BEFORE","itemName":"Test","currentStock":2,
+            "minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -234,12 +239,12 @@ class OutboxEventRelayRetryTest {
         assertThat(event.getRetryCount()).isEqualTo(1);
     }
 
-
     @Test
     @DisplayName("Should move event to DLT when max retries exceeded")
     void shouldMoveToDltWhenMaxRetriesExceeded() {
         String validPayload = """
-            {"itemId":5,"sku":"SKU-005","itemName":"Test","currentStock":1,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
+            {"itemId":5,"sku":"SKU-005","itemName":"Test","currentStock":1,"minStock":10,
+            "triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00"}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -332,7 +337,9 @@ class OutboxEventRelayRetryTest {
         OutboxEvent event = OutboxEvent.builder()
                 .id(100L)
                 .status(OutboxStatus.PERMANENT_FAILURE)
-                .payload("{\"itemId\":100,\"sku\":\"SKU-DLT-SKIP\",\"itemName\":\"Test\",\"currentStock\":5,\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"2026-07-10T18:00:00\"}")
+                .payload("{\"itemId\":100,\"sku\":\"SKU-DLT-SKIP\",\"itemName\":\"Test\","
+                        + "\"currentStock\":5,\"minStock\":10,\"triggeredBy\":\"admin\","
+                        + "\"triggeredAt\":\"2026-07-10T18:00:00\"}")
                 .retryCount(3)
                 .lastAttemptAt(LocalDateTime.now().minusMinutes(10))
                 .createdAt(LocalDateTime.now())
@@ -360,7 +367,8 @@ class OutboxEventRelayRetryTest {
     @Test
     @DisplayName("Should not re-process SENT event - already successfully sent")
     void shouldNotReprocessSentEvent() {
-        String validPayload = "{\"itemId\":200,\"sku\":\"SKU-SENT\",\"itemName\":\"Test\",\"currentStock\":5,\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"2026-07-10T18:00:00\"}";
+        String validPayload = "{\"itemId\":200,\"sku\":\"SKU-SENT\",\"itemName\":\"Test\",\"currentStock\":5,"
+                + "\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"2026-07-10T18:00:00\"}";
 
         OutboxEvent event = OutboxEvent.builder()
                 .id(200L)

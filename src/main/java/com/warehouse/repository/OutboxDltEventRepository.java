@@ -2,7 +2,6 @@ package com.warehouse.repository;
 
 import com.warehouse.entity.OutboxDltEvent;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -36,7 +35,8 @@ public interface OutboxDltEventRepository extends JpaRepository<OutboxDltEvent, 
                 FOR UPDATE
             ),
             inserted_outbox AS (
-                INSERT INTO outbox (event_type, payload, status, created_at, retry_count, last_attempt_at, error_message, sent_at)
+                INSERT INTO outbox (event_type, payload, status, created_at, retry_count, 
+                            last_attempt_at, error_message, sent_at)
                 SELECT event_type, payload, 'PENDING', NOW(), 0, NULL, error_message, NULL
                 FROM dlt_record
                 RETURNING id
@@ -48,7 +48,8 @@ public interface OutboxDltEventRepository extends JpaRepository<OutboxDltEvent, 
             )
             SELECT (
                 CASE 
-                    WHEN EXISTS (SELECT 1 FROM inserted_outbox) AND EXISTS (SELECT 1 FROM deleted_dlt) 
+                    WHEN EXISTS (SELECT 1 FROM inserted_outbox)
+                         AND EXISTS (SELECT 1 FROM deleted_dlt)
                     THEN (SELECT id FROM inserted_outbox)
                     ELSE NULL
                 END
@@ -74,6 +75,8 @@ public interface OutboxDltEventRepository extends JpaRepository<OutboxDltEvent, 
 
     /**
      * Считает количество записей в DLT.
+     *
+     * @return количество записей в DLT
      */
     long count();
 }

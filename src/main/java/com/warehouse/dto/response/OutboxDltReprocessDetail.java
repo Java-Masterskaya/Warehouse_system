@@ -7,10 +7,6 @@ import lombok.NoArgsConstructor;
 
 /**
  * Детали обработки одного сообщения из outbox DLT.
- *
- * @param outboxId     ID события в outbox
- * @param success      успешна ли операция
- * @param message      сообщение (успех или ошибка)
  */
 @Data
 @Builder

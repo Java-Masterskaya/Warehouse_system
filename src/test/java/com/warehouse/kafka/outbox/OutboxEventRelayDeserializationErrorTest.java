@@ -49,7 +49,8 @@ class OutboxEventRelayDeserializationErrorTest {
     @DisplayName("Should move event to DLT immediately on deserialization error without retry")
     void shouldMoveToDltOnDeserializationError() {
         String brokenJson = """
-            {"itemId":1,"sku":"SKU-001","itemName":"Test","currentStock":4,"minStock":10,"triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00",}
+            {"itemId":1,"sku":"SKU-001","itemName":"Test","currentStock":4,"minStock":10,
+            "triggeredBy":"admin","triggeredAt":"2026-07-10T18:00:00",}
             """;
 
         OutboxEvent event = OutboxEvent.builder()
@@ -122,7 +123,9 @@ class OutboxEventRelayDeserializationErrorTest {
     @Test
     @DisplayName("Should not process event with broken JSON that is already in DLT")
     void shouldNotProcessBrokenJsonAlreadyInDlt() {
-        String brokenJson = "{\"itemId\":1,\"sku\":\"SKU-BROKEN\",\"itemName\":\"Test\",\"currentStock\":5,\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"2026-07-10T18:00:00\",}  // trailing comma - broken JSON";
+        String brokenJson = "{\"itemId\":1,\"sku\":\"SKU-BROKEN\",\"itemName\":\"Test\",\"currentStock\":5,"
+                + "\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"2026-07-10T18:00:00\",} "
+                + " // trailing comma - broken JSON";
 
         // Событие уже было перемещено в DLT, затем восстановлено в PENDING для повторной попытки
         OutboxEvent event = OutboxEvent.builder()
@@ -173,7 +176,9 @@ class OutboxEventRelayDeserializationErrorTest {
         OutboxEvent event = OutboxEvent.builder()
                 .id(4L)
                 .status(OutboxStatus.PERMANENT_FAILURE)  // Уже перемещено в DLT
-                .payload("{\"itemId\":4,\"sku\":\"SKU-BROKEN-REPROCESS\",\"itemName\":\"Test\",\"currentStock\":5,\"minStock\":10,\"triggeredBy\":\"admin\",\"triggeredAt\":\"2026-07-10T18:00:00\"}")
+                .payload("{\"itemId\":4,\"sku\":\"SKU-BROKEN-REPROCESS\",\"itemName\":\"Test\","
+                        + "\"currentStock\":5,\"minStock\":10,\"triggeredBy\":\"admin\","
+                        + "\"triggeredAt\":\"2026-07-10T18:00:00\"}")
                 .retryCount(0)  // Для deserialization errors retryCount не увеличивается
                 .createdAt(LocalDateTime.now())
                 .build();

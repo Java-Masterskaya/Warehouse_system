@@ -82,7 +82,6 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         outboxEventRepository.deleteAll();
         itemRepository.deleteAll();
 
-
         // Создаём тестовый товар
         testItem = new Item();
         testItem.setSku("SKU-CRASH-" + System.currentTimeMillis());

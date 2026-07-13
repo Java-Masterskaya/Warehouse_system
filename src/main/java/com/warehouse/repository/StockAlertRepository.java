@@ -6,8 +6,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,14 +20,17 @@ public interface StockAlertRepository extends JpaRepository<StockAlert, Long> {
      * Проверяет, существует ли алерт для данного itemId и createdAt.
      * Используется для idempotent consumer.
      *
-     * @param itemId       ID товара
-     * @param createdAt    время создания алерта (из события)
+     * @param itemId    ID товара
+     * @param createdAt время создания алерта (из события)
      * @return true, если алерт уже существует
      */
     boolean existsByItemIdAndCreatedAt(Long itemId, LocalDateTime createdAt);
 
     /**
      * Находит алерты по itemId.
+     *
+     * @param itemId ID товара
+     * @return список алертов для товара
      */
     List<StockAlert> findByItemId(Long itemId);
 
@@ -38,6 +39,13 @@ public interface StockAlertRepository extends JpaRepository<StockAlert, Long> {
      * Возвращает 1 если вставлено, 0 если дубликат.
      *
      * Уникальный индекс: (item_id, triggered_at)
+     *
+     * @param itemId      ID товара
+     * @param currentStock текущий остаток
+     * @param minStock минимальный порог
+     * @param triggeredBy источник алерта
+     * @param triggeredAt время срабатывания
+     * @return 1 если вставлено, 0 если дубликат
      */
     @Modifying
     @Query(value = """
