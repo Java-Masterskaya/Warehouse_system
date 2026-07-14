@@ -1,4 +1,4 @@
-package com.warehouse.security;
+package com.warehouse.security.util;
 
 import com.warehouse.security.model.TokenType;
 import io.jsonwebtoken.Claims;

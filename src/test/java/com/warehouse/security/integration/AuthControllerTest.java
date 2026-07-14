@@ -11,7 +11,7 @@ import com.warehouse.dto.response.security.RefreshResponse;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.security.JwtUtil;
+import com.warehouse.security.util.JwtUtil;
 import com.warehouse.security.service.TokenService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;

@@ -1,6 +1,6 @@
 package com.warehouse.security.service;
 
-import com.warehouse.security.JwtUtil;
+import com.warehouse.security.util.JwtUtil;
 import com.warehouse.security.model.TokenPair;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -19,10 +18,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -72,19 +68,19 @@ class TokenServiceImplTest {
         assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
 
         verify(valueOperations).set(
-                eq("refresh:" + REFRESH_TOKEN),
+                argThat(key -> key.startsWith("refresh:")),
                 eq(USER_ID.toString()),
                 eq(REFRESH_EXPIRATION_MS),
                 eq(TimeUnit.MILLISECONDS)
         );
         verify(valueOperations).set(
-                eq("user:tokens:" + USER_ID + ":" + REFRESH_TOKEN),
+                argThat(key -> key.startsWith("user:tokens:" + USER_ID + ":")),
                 eq("active"),
                 eq(REFRESH_EXPIRATION_MS),
                 eq(TimeUnit.MILLISECONDS)
         );
         verify(valueOperations).set(
-                eq("user:access:" + USER_ID + ":" + ACCESS_TOKEN),
+                argThat(key -> key.startsWith("user:access:" + USER_ID + ":")),
                 eq("active"),
                 eq(EXPIRATION_MS),
                 eq(TimeUnit.MILLISECONDS)
@@ -97,14 +93,14 @@ class TokenServiceImplTest {
         // Arrange
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
         when(jwtUtil.parseRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.of(payload));
-        when(redisTemplate.hasKey("refresh:" + REFRESH_TOKEN)).thenReturn(true);
+        when(redisTemplate.hasKey(argThat(key -> key.startsWith("refresh:")))).thenReturn(true);
 
         // Act
         boolean result = tokenService.validateRefreshToken(REFRESH_TOKEN);
 
         // Assert
         assertThat(result).isTrue();
-        verify(redisTemplate).hasKey("refresh:" + REFRESH_TOKEN);
+        verify(redisTemplate).hasKey(argThat((String key) -> key.startsWith("refresh:")));
     }
 
     @Test
@@ -113,7 +109,7 @@ class TokenServiceImplTest {
         // Arrange
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
         when(jwtUtil.parseRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.of(payload));
-        when(redisTemplate.hasKey("refresh:" + REFRESH_TOKEN)).thenReturn(false);
+        when(redisTemplate.hasKey(argThat(key -> key.startsWith("refresh:")))).thenReturn(false);
 
         // Act
         boolean result = tokenService.validateRefreshToken(REFRESH_TOKEN);
@@ -140,21 +136,21 @@ class TokenServiceImplTest {
     @DisplayName("Should detect refresh token reuse")
     void isRefreshTokenReusedShouldDetectReuse() {
         // Arrange
-        when(redisTemplate.hasKey("rotation:" + REFRESH_TOKEN)).thenReturn(true);
+        when(redisTemplate.hasKey(argThat(key -> key.startsWith("rotation:")))).thenReturn(true);
 
         // Act
         boolean result = tokenService.isRefreshTokenReused(REFRESH_TOKEN);
 
         // Assert
         assertThat(result).isTrue();
-        verify(redisTemplate).hasKey("rotation:" + REFRESH_TOKEN);
+        verify(redisTemplate).hasKey(argThat((String key) -> key.startsWith("rotation:")));
     }
 
     @Test
     @DisplayName("Should not detect reuse for new refresh token")
     void isRefreshTokenReusedForNewTokenShouldReturnFalse() {
         // Arrange
-        when(redisTemplate.hasKey("rotation:" + REFRESH_TOKEN)).thenReturn(false);
+        when(redisTemplate.hasKey(argThat(key -> key.startsWith("rotation:")))).thenReturn(false);
 
         // Act
         boolean result = tokenService.isRefreshTokenReused(REFRESH_TOKEN);
@@ -166,14 +162,11 @@ class TokenServiceImplTest {
     @Test
     @DisplayName("Should revoke refresh token from Redis")
     void revokeRefreshTokenShouldDeleteFromRedis() {
-        // Arrange
-        String key = "refresh:" + REFRESH_TOKEN;
-
         // Act
         tokenService.revokeRefreshToken(REFRESH_TOKEN);
 
         // Assert
-        verify(redisTemplate).delete(key);
+        verify(redisTemplate).delete(argThat((String k) -> k.startsWith("refresh:")));
     }
 
     @Test
@@ -240,14 +233,14 @@ class TokenServiceImplTest {
         // Assert
         // 1. Старый refresh помечается как использованный
         verify(valueOperations).set(
-                eq("rotation:" + oldRefresh),
+                argThat(key -> key.startsWith("rotation:")),
                 eq(USER_ID.toString()),
                 eq(remainingTtl),
                 eq(TimeUnit.MILLISECONDS)
         );
 
         // 2. Старый refresh удаляется
-        verify(redisTemplate).delete("refresh:" + oldRefresh);
+        verify(redisTemplate).delete(argThat((String k) -> k.startsWith("refresh:")));
 
     }
 
@@ -255,14 +248,14 @@ class TokenServiceImplTest {
     @DisplayName("Should check if access token is blacklisted")
     void isAccessTokenBlacklistedShouldCheckRedis() {
         // Arrange
-        when(redisTemplate.hasKey("blacklist:" + ACCESS_TOKEN)).thenReturn(true);
+        when(redisTemplate.hasKey(argThat(key -> key.startsWith("blacklist:")))).thenReturn(true);
 
         // Act
         boolean result = tokenService.isAccessTokenBlacklisted(ACCESS_TOKEN);
 
         // Assert
         assertThat(result).isTrue();
-        verify(redisTemplate).hasKey("blacklist:" + ACCESS_TOKEN);
+        verify(redisTemplate).hasKey(argThat((String key) -> key.startsWith("blacklist:")));
     }
 
     @Test
@@ -279,13 +272,13 @@ class TokenServiceImplTest {
 
         // Assert
         verify(valueOperations).set(
-                eq("blacklist:" + ACCESS_TOKEN),
+                argThat(key -> key.startsWith("blacklist:")),
                 eq("blacklisted"),
                 eq(EXPIRATION_MS),
                 eq(TimeUnit.MILLISECONDS)
         );
         verify(valueOperations).set(
-                eq("user:access:" + USER_ID + ":" + ACCESS_TOKEN),
+                argThat(key -> key.startsWith("user:access:" + USER_ID + ":")),
                 eq("blacklisted"),
                 eq(EXPIRATION_MS),
                 eq(TimeUnit.MILLISECONDS)
@@ -306,10 +299,7 @@ class TokenServiceImplTest {
 
         when(redisTemplate.keys(pattern)).thenReturn(keys);
 
-        JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
-
-        when(jwtUtil.parseAccessToken(anyString())).thenReturn(Optional.of(payload));
-        when(jwtUtil.getTokenRemainingTime(anyString())).thenReturn(EXPIRATION_MS);
+        when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         // Act
@@ -317,14 +307,15 @@ class TokenServiceImplTest {
 
         // Assert
         verify(redisTemplate).keys(pattern);
-        verify(jwtUtil, times(2)).parseAccessToken(anyString());
-        verify(jwtUtil, times(2)).getTokenRemainingTime(anyString());
-        verify(valueOperations, times(4)).set(
-                anyString(),
+
+        // Проверяем, что set был вызван с ключами, начинающимися с "blacklist:"
+        verify(valueOperations, times(2)).set(
+                argThat((String key) -> key.startsWith("blacklist:")),
                 eq("blacklisted"),
                 eq(EXPIRATION_MS),
                 eq(TimeUnit.MILLISECONDS)
         );
+        verify(jwtUtil, times(2)).getExpirationMs();
     }
 
     @Test

@@ -8,7 +8,7 @@ import com.warehouse.dto.response.security.RefreshResponse;
 import com.warehouse.exception.InvalidTokenException;
 import com.warehouse.exception.TokenReuseException;
 import com.warehouse.metric.MetricService;
-import com.warehouse.security.JwtUtil;
+import com.warehouse.security.util.JwtUtil;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.security.model.TokenPair;
 import org.junit.jupiter.api.BeforeEach;

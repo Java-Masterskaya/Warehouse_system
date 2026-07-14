@@ -4,7 +4,7 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.security.JwtUtil;
+import com.warehouse.security.util.JwtUtil;
 import com.warehouse.security.service.TokenService;
 import com.warehouse.service.user.UserService;
 import org.junit.jupiter.api.BeforeEach;
