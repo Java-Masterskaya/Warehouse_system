@@ -7,6 +7,7 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.service.item.ItemService;
@@ -28,6 +29,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
+    private StockAlertRepository stockAlertRepository;
+
+    @Autowired
     private ItemRepository itemRepository;
 
     @Autowired
@@ -46,6 +50,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Очищаем данные в правильном порядке из-за внешних ключей:
+        // stock_alerts -> stock -> items
+        stockAlertRepository.deleteAllInBatch();
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();

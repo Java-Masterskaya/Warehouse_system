@@ -1,5 +1,6 @@
 package com.warehouse.kafka;
 
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,7 @@ import static org.mockito.Mockito.when;
     "app.kafka.retry.max-interval-ms=1000",
     "app.kafka.retry.max-attempts=3"
 })
-class KafkaStockAlertProducerRetryTest {
+class KafkaStockAlertProducerRetryTest extends AbstractIntegrationTest {
 
     private static final Long ITEM_ID = 1L;
     private static final String ITEM_SKU = "KEY-001";

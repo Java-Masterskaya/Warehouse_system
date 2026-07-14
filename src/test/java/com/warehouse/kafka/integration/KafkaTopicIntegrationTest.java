@@ -1,5 +1,6 @@
 package com.warehouse.kafka.integration;
 
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.config.KafkaTopicProperties;
@@ -34,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 @Testcontainers
 @DirtiesContext
 @SpringBootTest(classes = WarehouseApp.class)
-class KafkaTopicIntegrationTest {
+class KafkaTopicIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private KafkaTopicProperties topicProperties;
@@ -49,19 +50,7 @@ class KafkaTopicIntegrationTest {
     private static final int MIN_STOCK = 5;
     private static final String TRIGGERED_BY = "admin";
 
-    @Container
-    static RedpandaContainer redpanda = new RedpandaContainer(
-            DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1")
-    );
 
-    @DynamicPropertySource
-    static void kafkaProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.kafka.bootstrap-servers", redpanda::getBootstrapServers);
-        registry.add("spring.kafka.producer.key-serializer",
-                () -> "org.apache.kafka.common.serialization.StringSerializer");
-        registry.add("spring.kafka.producer.value-serializer",
-                () -> "org.springframework.kafka.support.serializer.JsonSerializer");
-    }
 
     /**
      * Топик создается с тремя партициями при старте приложения.
@@ -74,7 +63,7 @@ class KafkaTopicIntegrationTest {
 
         // Arrange
         Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers());
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getRedpanda().getBootstrapServers());
 
         try (AdminClient adminClient = AdminClient.create(props)) {
             // Act & Assert

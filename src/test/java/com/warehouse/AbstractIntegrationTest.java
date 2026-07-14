@@ -1,7 +1,10 @@
 package com.warehouse;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -38,6 +41,9 @@ public abstract class AbstractIntegrationTest {
         redis.start();
     }
 
+    @Autowired
+    protected StringRedisTemplate redisTemplate;
+
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
@@ -50,8 +56,8 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.data.redis.password", () -> "");
 
         // Задаем тестовые лимиты: для тестов удобно использовать ультра-короткие окна (например, 1-2 секунды)
-        registry.add("rate-limiting.login.ip.capacity", () -> 2);
-        registry.add("rate-limiting.login.ip.refill-tokens", () -> 2);
+        registry.add("rate-limiting.login.ip.capacity", () -> 10);
+        registry.add("rate-limiting.login.ip.refill-tokens", () -> 10);
         registry.add("rate-limiting.login.ip.duration", () -> "2s");
 
         registry.add("rate-limiting.login.username.capacity", () -> 2);
@@ -61,5 +67,21 @@ public abstract class AbstractIntegrationTest {
         registry.add("rate-limiting.movements.ip.capacity", () -> 3);
         registry.add("rate-limiting.movements.ip.refill-tokens", () -> 3);
         registry.add("rate-limiting.movements.ip.duration", () -> "2s");
+    }
+
+    protected static RedpandaContainer getRedpanda() {
+        return redpanda;
+    }
+
+
+
+    @BeforeEach
+    void clearRateLimitKeys() {
+        // Очищаем Redis ключи rate limiting перед каждым тестом
+        // Используем keys() для получения всех ключей с префиксом rl: и удаляем их
+        java.util.Set<String> keys = redisTemplate.keys("rl:*");
+        if (keys != null) {
+            redisTemplate.delete(keys);
+        }
     }
 }

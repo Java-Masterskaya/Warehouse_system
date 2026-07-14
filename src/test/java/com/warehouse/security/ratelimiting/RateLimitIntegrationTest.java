@@ -80,7 +80,7 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
                         .content(jsonBody))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
-                .andExpect(jsonPath("$.error", containsString("Too many login attempts")));
+                .andExpect(jsonPath("$.error").value("SECURITY_LOCKOUT_ERROR"));
     }
 
     // --- КРИТЕРИЙ 2: Горизонтальное масштабирование (Общий счетчик в Redis) ---
@@ -106,7 +106,6 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
 
     // --- КРИТЕРИЙ 3: Превышение на write-эндпоинте -> Бизнес-операция не выполняется ---
     @Test
-    @WithMockUser(username = "movement_user") // Имитируем авторизованного пользователя
     void shouldBlockWriteMovementEndpointAndNotExecuteBusinessLogic() throws Exception {
         String movementJson = """
             {
@@ -115,9 +114,13 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
             }
             """;
 
+        // Получаем admin токен для доступа к защищённым эндпоинтам
+        String adminToken = obtainToken("admin", "secret");
+
         // 1. Выполняем 3 разрешенных запроса на ваш эндпоинт
         for (int i = 0; i < 3; i++) {
             mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(movementJson))
                     .andExpect(status().isOk());
@@ -128,12 +131,25 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
 
         // 3. 4-й запрос превышает лимит
         mockMvc.perform(post("/api/movements/receive")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(movementJson))
                 .andExpect(status().isTooManyRequests());
 
         // 4. Гарантируем, что после 429 ошибки бизнес-логика больше НЕ вызывалась
         verifyNoMoreInteractions(movementService);
+    }
+
+    private String obtainToken(String username, String password) throws Exception {
+        LoginRequest request = new LoginRequest(username, password);
+        String response = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(response).get("token").asText();
     }
 
     // --- КРИТЕРИЙ 5: Конфигурируемость, срабатывание и СБРОС окна ---
