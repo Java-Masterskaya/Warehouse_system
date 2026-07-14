@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -24,6 +25,9 @@ public class TokenServiceImpl implements TokenService {
     private static final String USER_TOKENS_PREFIX = "user:tokens:";
     private static final String REFRESH_ROTATION_PREFIX = "rotation:";
     private static final String USER_ACCESS_PREFIX = "user:access:";
+
+    private static final String USER_REFRESH_SET_PREFIX = "user:refresh:set:";
+    private static final String USER_ACCESS_SET_PREFIX = "user:access:set:";
 
     @Override
     public TokenPair generateTokenPair(String username, Long userId, List<String> roles) {
@@ -91,26 +95,50 @@ public class TokenServiceImpl implements TokenService {
     @Override
     public void revokeAllUserTokens(Long userId) {
         log.info("Revoking all tokens for user: userId={}", userId);
-        String refreshPattern = USER_TOKENS_PREFIX + userId + ":*";
-        var refreshKeys = redisTemplate.keys(refreshPattern);
-        if (refreshKeys != null && !refreshKeys.isEmpty()) {
-            // Для каждого refresh токена удаляем соответствующий ключ refresh:token
-            refreshKeys.forEach(key -> {
-                String tokenHash = key.substring(
-                        USER_TOKENS_PREFIX.length() + userId.toString().length() + 1
-                );
-                String refreshKey = REFRESH_PREFIX + tokenHash;
-                redisTemplate.delete(refreshKey);
-                log.debug("Removed refresh key");
-            });
-            // Удаляем связи user:tokens:userId:*
-            redisTemplate.delete(refreshKeys);
+
+        // 1. Отзываем refresh токены через SET-индекс
+        String refreshSetKey = USER_REFRESH_SET_PREFIX + userId;
+        Set<String> refreshTokenHashes = redisTemplate.opsForSet().members(refreshSetKey);
+        if (refreshTokenHashes != null && !refreshTokenHashes.isEmpty()) {
+            List<String> refreshKeysToDelete = refreshTokenHashes.stream()
+                    .map(tokenHash -> REFRESH_PREFIX + tokenHash)
+                    .toList();
+            List<String> userKeysToDelete = refreshTokenHashes.stream()
+                    .map(tokenHash -> USER_TOKENS_PREFIX + userId + ":" + tokenHash)
+                    .toList();
+
+            redisTemplate.delete(refreshKeysToDelete);
+            redisTemplate.delete(userKeysToDelete);
+
+            redisTemplate.delete(refreshSetKey);
             log.info("All refresh tokens revoked for user: {}", userId);
         }
-        String accessPattern = USER_ACCESS_PREFIX + userId + ":*";
-        var accessKeys = redisTemplate.keys(accessPattern);
-        if (accessKeys != null && !accessKeys.isEmpty()) {
-            redisTemplate.delete(accessKeys);
+
+        // 2. Отзываем access токены через SET-индекс
+        String accessSetKey = USER_ACCESS_SET_PREFIX + userId;
+        Set<String> accessTokenHashes = redisTemplate.opsForSet().members(accessSetKey);
+        if (accessTokenHashes != null && !accessTokenHashes.isEmpty()) {
+            List<String> accessKeysToDelete = accessTokenHashes.stream()
+                    .map(tokenHash -> USER_ACCESS_PREFIX + userId + ":" + tokenHash)
+                    .toList();
+
+            redisTemplate.delete(accessKeysToDelete);
+
+            // Добавляем в blacklist
+            List<String> blacklistKeys = accessTokenHashes.stream()
+                    .map(tokenHash -> BLACKLIST_PREFIX + tokenHash)
+                    .toList();
+
+            for (String blacklistKey : blacklistKeys) {
+                redisTemplate.opsForValue().set(
+                        blacklistKey,
+                        "blacklisted",
+                        jwtUtil.getExpirationMs(),
+                        TimeUnit.MILLISECONDS
+                );
+            }
+            // Удаляем SET-индекс
+            redisTemplate.delete(accessSetKey);
             log.info("All access tokens revoked for user: {}", userId);
         }
 
@@ -174,24 +202,28 @@ public class TokenServiceImpl implements TokenService {
     @Override
     public void blacklistAllUserAccessTokens(Long userId) {
         log.info("Blacklisting all access tokens for user: userId={}", userId);
-        String pattern = USER_ACCESS_PREFIX + userId + ":*";
-        var keys = redisTemplate.keys(pattern);
-        if (keys != null && !keys.isEmpty()) {
-            // Добавляем все токены в blacklist
-            keys.forEach(key -> {
-                String tokenHash = key.substring(USER_ACCESS_PREFIX.length()
-                        + userId.toString().length() + 1);
-                String blacklistKey = BLACKLIST_PREFIX + tokenHash;
-                long ttl = jwtUtil.getExpirationMs();
+
+        String accessSetKey = USER_ACCESS_SET_PREFIX + userId;
+        Set<String> accessTokenHashes = redisTemplate.opsForSet().members(accessSetKey);
+
+        if (accessTokenHashes != null && !accessTokenHashes.isEmpty()) {
+            long ttl = jwtUtil.getExpirationMs();
+
+            List<String> blacklistKeys = accessTokenHashes.stream()
+                    .map(tokenHash -> BLACKLIST_PREFIX + tokenHash)
+                    .toList();
+
+            for (String blacklistKey : blacklistKeys) {
                 redisTemplate.opsForValue().set(
                         blacklistKey,
                         "blacklisted",
                         ttl,
                         TimeUnit.MILLISECONDS
                 );
-                log.debug("Access token blacklisted for user: {}", userId);
-            });
+            }
             log.info("All access tokens blacklisted for user: {}", userId);
+        } else {
+            log.debug("No access tokens to blacklist for user: {}", userId);
         }
     }
 
@@ -199,13 +231,18 @@ public class TokenServiceImpl implements TokenService {
         log.debug("Storing refresh token in Redis: userId={}", userId);
         // Store hash of refresh token
         String tokenHash = hashToken(refreshToken);
-        String key = REFRESH_PREFIX + tokenHash;
         long ttl = jwtUtil.getRefreshExpirationMs();
+        // Сохраняем сам токен
+        String key = REFRESH_PREFIX + tokenHash;
         redisTemplate.opsForValue().set(key, userId.toString(), ttl, TimeUnit.MILLISECONDS);
-
         // Link token to user for easy revocation
         String userKey = USER_TOKENS_PREFIX + userId + ":" + tokenHash;
         redisTemplate.opsForValue().set(userKey, "active", ttl, TimeUnit.MILLISECONDS);
+
+        // Добавляем в SET-индекс для быстрого отзыва
+        String setKey = USER_REFRESH_SET_PREFIX + userId;
+        redisTemplate.opsForSet().add(setKey, tokenHash);
+        redisTemplate.expire(setKey, ttl, TimeUnit.MILLISECONDS);
     }
 
     private void storeAccessToken(String accessToken, Long userId) {
@@ -214,6 +251,10 @@ public class TokenServiceImpl implements TokenService {
         long ttl = jwtUtil.getExpirationMs();
         String userKey = USER_ACCESS_PREFIX + userId + ":" + tokenHash;
         redisTemplate.opsForValue().set(userKey, "active", ttl, TimeUnit.MILLISECONDS);
+
+        String setKey = USER_ACCESS_SET_PREFIX + userId;
+        redisTemplate.opsForSet().add(setKey, tokenHash);
+        redisTemplate.expire(setKey, ttl, TimeUnit.MILLISECONDS);
     }
 
     private String hashToken(String token) {

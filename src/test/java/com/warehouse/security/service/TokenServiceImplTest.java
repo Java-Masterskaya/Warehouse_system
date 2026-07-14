@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.util.HashSet;
@@ -38,6 +39,9 @@ class TokenServiceImplTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private SetOperations<String, String> setOperations;
+
     @InjectMocks
     private TokenServiceImpl tokenService;
 
@@ -57,7 +61,12 @@ class TokenServiceImplTest {
         when(jwtUtil.generateRefreshToken(USERNAME, USER_ID, ROLES)).thenReturn(REFRESH_TOKEN);
         when(jwtUtil.getRefreshExpirationMs()).thenReturn(REFRESH_EXPIRATION_MS);
         when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
+
+        // Мокаем opsForValue
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        // Мокаем opsForSet
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
 
         // Act
         TokenPair result = tokenService.generateTokenPair(USERNAME, USER_ID, ROLES);
@@ -67,6 +76,7 @@ class TokenServiceImplTest {
         assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
         assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
 
+        // Проверяем сохранение refresh
         verify(valueOperations).set(
                 argThat(key -> key.startsWith("refresh:")),
                 eq(USER_ID.toString()),
@@ -84,6 +94,16 @@ class TokenServiceImplTest {
                 eq("active"),
                 eq(EXPIRATION_MS),
                 eq(TimeUnit.MILLISECONDS)
+        );
+
+        // Проверяем добавление в SET-индексы
+        verify(setOperations).add(
+                eq("user:refresh:set:" + USER_ID),
+                anyString()
+        );
+        verify(setOperations).add(
+                eq("user:access:set:" + USER_ID),
+                anyString()
         );
     }
 
@@ -173,46 +193,67 @@ class TokenServiceImplTest {
     @DisplayName("Should revoke all user tokens")
     void revokeAllUserTokensShouldDeleteAllTokens() {
         // Arrange
-        String refreshPattern = "user:tokens:" + USER_ID + ":*";
-        String accessPattern = "user:access:" + USER_ID + ":*";
+        Set<String> refreshHashes = new HashSet<>();
+        refreshHashes.add("hash1");
+        refreshHashes.add("hash2");
 
-        @SuppressWarnings("unchecked")
-        Set<String> refreshKeys = mock(Set.class);
-        @SuppressWarnings("unchecked")
-        Set<String> accessKeys = mock(Set.class);
+        Set<String> accessHashes = new HashSet<>();
+        accessHashes.add("hash3");
+        accessHashes.add("hash4");
 
-        when(redisTemplate.keys(refreshPattern)).thenReturn(refreshKeys);
-        when(redisTemplate.keys(accessPattern)).thenReturn(accessKeys);
-        when(refreshKeys.isEmpty()).thenReturn(false);
-        when(accessKeys.isEmpty()).thenReturn(false);
+        // Мокаем opsForSet
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members("user:refresh:set:" + USER_ID))
+                .thenReturn(refreshHashes);
+        when(setOperations.members("user:access:set:" + USER_ID))
+                .thenReturn(accessHashes);
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
 
         // Act
         tokenService.revokeAllUserTokens(USER_ID);
 
         // Assert
-        verify(redisTemplate).keys(refreshPattern);
-        verify(redisTemplate).keys(accessPattern);
-        verify(redisTemplate).delete(refreshKeys);
-        verify(redisTemplate).delete(accessKeys);
+        // Проверяем удаление refresh токенов
+        verify(redisTemplate).delete(argThat((List<String> keys) ->
+                keys.stream().allMatch(k -> k.startsWith("refresh:"))));
+        verify(redisTemplate).delete(argThat((List<String> keys) ->
+                keys.stream().allMatch(k -> k.startsWith("user:tokens:" + USER_ID + ":"))));
+        verify(redisTemplate).delete("user:refresh:set:" + USER_ID);
+
+        // Проверяем удаление access токенов
+        verify(redisTemplate).delete(argThat((List<String> keys) ->
+                keys.stream().allMatch(k -> k.startsWith("user:access:" + USER_ID + ":"))));
+        verify(valueOperations, times(2)).set(
+                argThat(key -> key.startsWith("blacklist:")),
+                eq("blacklisted"),
+                eq(EXPIRATION_MS),
+                eq(TimeUnit.MILLISECONDS)
+        );
+        verify(redisTemplate).delete("user:access:set:" + USER_ID);
     }
 
     @Test
     @DisplayName("Should revoke all user tokens when no tokens exist")
     void revokeAllUserTokensWhenNoTokensShouldDoNothing() {
         // Arrange
-        String refreshPattern = "user:tokens:" + USER_ID + ":*";
-        String accessPattern = "user:access:" + USER_ID + ":*";
+        // Мокаем opsForSet
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
 
-        when(redisTemplate.keys(refreshPattern)).thenReturn(null);
-        when(redisTemplate.keys(accessPattern)).thenReturn(null);
+        // Мокаем members чтобы возвращал null
+        when(setOperations.members("user:refresh:set:" + USER_ID))
+                .thenReturn(null);
+        when(setOperations.members("user:access:set:" + USER_ID))
+                .thenReturn(null);
 
         // Act
         tokenService.revokeAllUserTokens(USER_ID);
 
         // Assert
-        verify(redisTemplate).keys(refreshPattern);
-        verify(redisTemplate).keys(accessPattern);
         verify(redisTemplate, never()).delete(anyString());
+        verify(redisTemplate, never()).delete(any(List.class));
+        verify(valueOperations, never()).set(anyString(), anyString(), anyLong(), any(TimeUnit.class));
     }
 
     @Test
@@ -289,15 +330,14 @@ class TokenServiceImplTest {
     @DisplayName("Should blacklist all user access tokens")
     void blacklistAllUserAccessTokensShouldBlacklistAll() {
         // Arrange
-        String token1 = "access-token-1";
-        String token2 = "access-token-2";
-        String pattern = "user:access:" + USER_ID + ":*";
+        Set<String> accessHashes = new HashSet<>();
+        accessHashes.add("hash1");
+        accessHashes.add("hash2");
 
-        Set<String> keys = new HashSet<>();
-        keys.add("user:access:" + USER_ID + ":" + token1);
-        keys.add("user:access:" + USER_ID + ":" + token2);
-
-        when(redisTemplate.keys(pattern)).thenReturn(keys);
+        // Мокаем opsForSet
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members("user:access:set:" + USER_ID))
+                .thenReturn(accessHashes);
 
         when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -306,16 +346,13 @@ class TokenServiceImplTest {
         tokenService.blacklistAllUserAccessTokens(USER_ID);
 
         // Assert
-        verify(redisTemplate).keys(pattern);
-
-        // Проверяем, что set был вызван с ключами, начинающимися с "blacklist:"
         verify(valueOperations, times(2)).set(
                 argThat((String key) -> key.startsWith("blacklist:")),
                 eq("blacklisted"),
                 eq(EXPIRATION_MS),
                 eq(TimeUnit.MILLISECONDS)
         );
-        verify(jwtUtil, times(2)).getExpirationMs();
+        verify(jwtUtil, times(1)).getExpirationMs();
     }
 
     @Test
@@ -380,14 +417,16 @@ class TokenServiceImplTest {
     @DisplayName("Should handle empty keys in blacklistAllUserAccessTokens")
     void blacklistAllUserAccessTokensWhenNoKeysShouldDoNothing() {
         // Arrange
-        String pattern = "user:access:" + USER_ID + ":*";
-        when(redisTemplate.keys(pattern)).thenReturn(null);
+        // Мокаем opsForSet
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.members("user:access:set:" + USER_ID))
+                .thenReturn(null);
 
         // Act
         tokenService.blacklistAllUserAccessTokens(USER_ID);
 
         // Assert
-        verify(redisTemplate).keys(pattern);
+        verify(setOperations).members("user:access:set:" + USER_ID);
         verify(redisTemplate, never()).opsForValue();
     }
 }
