@@ -5,7 +5,7 @@ CREATE TABLE audit_log
     user_id     bigint,
     username    varchar(100),
 
-    action      varchar(30)              NOT NULL,
+    audit_action      varchar(30)              NOT NULL,
 
     entity_type varchar(100)             NOT NULL,
     entity_id   bigint                   NOT NULL,
