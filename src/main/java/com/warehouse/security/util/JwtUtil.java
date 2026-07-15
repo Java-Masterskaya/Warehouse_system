@@ -62,7 +62,8 @@ public class JwtUtil {
         return generateToken(username, userId, roles, refreshExpirationMs, TokenType.REFRESH);
     }
 
-    private String generateToken(String username, Long userId, List<String> roles, long expiration, TokenType tokenType) {
+    private String generateToken(String username, Long userId,
+                                 List<String> roles, long expiration, TokenType tokenType) {
         log.debug("Generating token for user: {}", username);
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(expiration);

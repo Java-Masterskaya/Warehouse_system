@@ -6,7 +6,9 @@ import java.util.Base64;
 
 public class TokenHashUtil {
 
-    private TokenHashUtil() {}
+    private TokenHashUtil() {
+
+    }
 
     public static String hashToken(String token) {
         try {
