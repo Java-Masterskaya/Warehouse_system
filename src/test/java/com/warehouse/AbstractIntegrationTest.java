@@ -73,8 +73,6 @@ public abstract class AbstractIntegrationTest {
         return redpanda;
     }
 
-
-
     @BeforeEach
     void clearRateLimitKeys() {
         // Очищаем Redis ключи rate limiting перед каждым тестом

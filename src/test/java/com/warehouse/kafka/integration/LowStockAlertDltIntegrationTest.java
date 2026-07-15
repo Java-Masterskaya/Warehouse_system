@@ -4,13 +4,15 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.StockAlert;
-import com.warehouse.entity.StockMovement;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.admin.*;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -24,11 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.redpanda.RedpandaContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -47,7 +45,6 @@ import static org.awaitility.Awaitility.await;
 @Testcontainers
 @SpringBootTest(classes = WarehouseApp.class)
 class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
-
 
     @Autowired
     private KafkaTemplate<String, Object> kafkaTemplate;
