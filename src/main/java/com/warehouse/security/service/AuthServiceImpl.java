@@ -21,6 +21,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -110,7 +111,18 @@ public class AuthServiceImpl implements AuthService {
         log.debug("Processing refresh token request");
 
         String refreshToken = request.refreshToken();
-        String accessToken = request.accessToken();
+
+        // 1. СНАЧАЛА проверяем retry-cache
+        Optional<TokenPair> cachedResult = tokenService.getRefreshRetryResult(refreshToken);
+        if (cachedResult.isPresent()) {
+            TokenPair cachedPair = cachedResult.get();
+            log.info("Refresh retry detected, returning cached tokens");
+            return new RefreshResponse(
+                    cachedPair.accessToken(),
+                    cachedPair.refreshToken(),
+                    jwtUtil.getExpirationMs()
+            );
+        }
 
         // Check for token reuse
         if (tokenService.isRefreshTokenReused(refreshToken)) {
@@ -149,6 +161,9 @@ public class AuthServiceImpl implements AuthService {
                 p.userId(),
                 p.roles()
         );
+
+        // Сохраняем результат в retry-cache (до ротации)
+        tokenService.saveRefreshRetryResult(refreshToken, newTokenPair);
 
         // Rotate refresh token
         tokenService.rotateRefreshToken(refreshToken);

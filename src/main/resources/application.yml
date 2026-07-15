@@ -56,6 +56,8 @@ app:
       multiplier: 2.0
       max-interval-ms: 10000
       max-attempts: 3
+  jwt:
+    refresh-retry-ttl-seconds: 60
 
 management:
   endpoints:

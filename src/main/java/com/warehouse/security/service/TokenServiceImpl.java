@@ -5,10 +5,12 @@ import com.warehouse.security.model.TokenPair;
 import com.warehouse.security.util.TokenHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -28,6 +30,11 @@ public class TokenServiceImpl implements TokenService {
 
     private static final String USER_REFRESH_SET_PREFIX = "user:refresh:set:";
     private static final String USER_ACCESS_SET_PREFIX = "user:access:set:";
+
+    private static final String REFRESH_RETRY_PREFIX = "refresh:retry:";
+
+    @Value("${app.jwt.refresh-retry-ttl-seconds}")
+    private long refreshRetryTtlSeconds;
 
     @Override
     public TokenPair generateTokenPair(String username, Long userId, List<String> roles) {
@@ -259,5 +266,44 @@ public class TokenServiceImpl implements TokenService {
 
     private String hashToken(String token) {
         return TokenHashUtil.hashToken(token);
+    }
+
+    @Override
+    public void saveRefreshRetryResult(String oldRefreshToken, TokenPair tokenPair) {
+        log.debug("Saving refresh retry result for token");
+        String tokenHash = hashToken(oldRefreshToken);
+        String key = REFRESH_RETRY_PREFIX + tokenHash;
+
+        // Сохраняем accessToken + refreshToken через разделитель
+        String value = tokenPair.accessToken() + "|" + tokenPair.refreshToken();
+        redisTemplate.opsForValue().set(
+                key,
+                value,
+                refreshRetryTtlSeconds,
+                TimeUnit.SECONDS
+        );
+        log.debug("Refresh retry result saved with TTL: {} seconds", refreshRetryTtlSeconds);
+    }
+
+    @Override
+    public Optional<TokenPair> getRefreshRetryResult(String oldRefreshToken) {
+        log.debug("Checking refresh retry cache");
+        String tokenHash = hashToken(oldRefreshToken);
+        String key = REFRESH_RETRY_PREFIX + tokenHash;
+        String value = redisTemplate.opsForValue().get(key);
+
+        if (value == null) {
+            return Optional.empty();
+        }
+
+        // Разделяем accessToken и refreshToken
+        String[] parts = value.split("\\|", 2);
+        if (parts.length != 2) {
+            log.warn("Invalid retry cache value format");
+            return Optional.empty();
+        }
+
+        log.debug("Refresh retry cache hit");
+        return Optional.of(new TokenPair(parts[0], parts[1]));
     }
 }

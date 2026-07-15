@@ -32,6 +32,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -163,7 +164,7 @@ class AuthServiceImplTest {
             String newAccessToken = "new-access-token";
             String newRefreshToken = "new-refresh-token";
 
-            RefreshRequest request = new RefreshRequest(ACCESS_TOKEN, oldRefreshToken);
+            RefreshRequest request = new RefreshRequest(oldRefreshToken);
             JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(
                     TEST_USER_ID, TEST_USERNAME, TEST_ROLES
             );
@@ -195,7 +196,7 @@ class AuthServiceImplTest {
         void refreshWithInvalidRefreshTokenShouldThrowException() {
             // Arrange
             String invalidRefreshToken = "invalid-token";
-            RefreshRequest request = new RefreshRequest(null, invalidRefreshToken);
+            RefreshRequest request = new RefreshRequest(invalidRefreshToken);
 
             when(tokenService.validateRefreshToken(invalidRefreshToken)).thenReturn(false);
 
@@ -210,7 +211,7 @@ class AuthServiceImplTest {
         void refreshWithReusedRefreshTokenShouldRevokeAllTokens() {
             // Arrange
             String reusedRefreshToken = "reused-refresh-token";
-            RefreshRequest request = new RefreshRequest(null, reusedRefreshToken);
+            RefreshRequest request = new RefreshRequest(reusedRefreshToken);
             JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(
                     TEST_USER_ID, TEST_USERNAME, TEST_ROLES
             );
@@ -229,35 +230,30 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should handle refresh when no access token provided")
-        void refreshWithoutAccessTokenShouldStillWork() {
+        @DisplayName("Should return cached tokens on retry")
+        void refreshRetryShouldReturnCachedTokens() {
             // Arrange
-            String oldRefreshToken = "old-refresh-token";
-            String newAccessToken = "new-access-token";
+            String refreshToken = "refresh-token";
+            String accessToken = "new-access-token";
             String newRefreshToken = "new-refresh-token";
+            TokenPair cachedPair = new TokenPair(accessToken, newRefreshToken);
 
-            RefreshRequest request = new RefreshRequest(null, oldRefreshToken);
-            JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(
-                    TEST_USER_ID, TEST_USERNAME, TEST_ROLES
-            );
+            RefreshRequest request = new RefreshRequest(refreshToken);
 
-            when(tokenService.validateRefreshToken(oldRefreshToken)).thenReturn(true);
-            when(tokenService.isRefreshTokenReused(oldRefreshToken)).thenReturn(false);
-            when(jwtUtil.parseRefreshToken(oldRefreshToken)).thenReturn(Optional.of(payload));
-            when(tokenService.generateTokenPair(TEST_USERNAME, TEST_USER_ID, TEST_ROLES))
-                    .thenReturn(new TokenPair(newAccessToken, newRefreshToken));
+            when(tokenService.getRefreshRetryResult(refreshToken))
+                    .thenReturn(Optional.of(cachedPair));
             when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
 
             // Act
             RefreshResponse response = authService.refresh(request);
 
             // Assert
-            assertThat(response).isNotNull();
-            assertThat(response.accessToken()).isEqualTo(newAccessToken);
+            assertThat(response.accessToken()).isEqualTo(accessToken);
+            assertThat(response.refreshToken()).isEqualTo(newRefreshToken);
 
-            // Verify blacklist NOT called for access token
-            verify(tokenService, never()).blacklistAccessToken(any());
-            verify(tokenService).rotateRefreshToken(oldRefreshToken);
+            // Проверяем, что reuse НЕ проверялся
+            verify(tokenService, never()).isRefreshTokenReused(anyString());
+            verify(tokenService, never()).validateRefreshToken(anyString());
         }
     }
 

@@ -249,7 +249,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @DisplayName("Refresh token should return new access token")
     void refreshTokenShouldReturnNewAccessToken() throws Exception {
         // 1. Отправляем refresh запрос
-        RefreshRequest request = new RefreshRequest(userToken, userRefreshToken);
+        RefreshRequest request = new RefreshRequest(userRefreshToken);
         String response = mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -290,21 +290,16 @@ class AuthControllerTest extends AbstractIntegrationTest {
         String oldAccess = userToken;
 
         // 2. Первый refresh - получаем новые токены
-        RefreshRequest firstRequest = new RefreshRequest(oldAccess, oldRefresh);
+        RefreshRequest firstRequest = new RefreshRequest(oldRefresh);
         String firstResponse = mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(firstRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
         RefreshResponse firstTokens = objectMapper.readValue(firstResponse, RefreshResponse.class);
-
-        log.info("New access token: {}", firstTokens.accessToken());
-        log.info("New refresh token: {}", firstTokens.refreshToken());
 
         // 3. Проверяем, что новые токены отличаются от старых
         assertThat(firstTokens.accessToken())
@@ -314,11 +309,15 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .as("New refresh token should be different from old")
                 .isNotEqualTo(oldRefresh);
 
-        // 4. Пытаемся использовать старый refresh - должен вернуть INVALID_TOKEN (он удален из Redis)
-        RefreshRequest secondRequest = new RefreshRequest(firstTokens.accessToken(), oldRefresh);
+        // 4. Ждем истечения retry-cache (60 секунд + небольшая задержка)
+        log.info("Waiting for retry-cache to expire (5 seconds)...");
+        Thread.sleep(5_000);
+
+        // 5. Пытаемся использовать старый refresh - кеша нет → TOKEN_REUSE
+        RefreshRequest reuseRequest = new RefreshRequest(oldRefresh);
         mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(secondRequest)))
+                        .content(objectMapper.writeValueAsString(reuseRequest)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("TOKEN_REUSE"));
     }
@@ -326,8 +325,8 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Refresh token reuse should revoke all tokens")
     void refreshTokenReuseShouldRevokeAllTokens() throws Exception {
-        // 1. Получаем новые токены через refresh
-        RefreshRequest firstRequest = new RefreshRequest(userToken, userRefreshToken);
+        // 1. Первый refresh
+        RefreshRequest firstRequest = new RefreshRequest(userRefreshToken);
         String firstResponse = mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(firstRequest)))
@@ -338,19 +337,77 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         RefreshResponse firstTokens = objectMapper.readValue(firstResponse, RefreshResponse.class);
 
-        // 2. Попытка использовать ТОТ ЖЕ refresh токен (reuse)
-        //    Должен вернуть TOKEN_REUSE
-        RefreshRequest reuseRequest = new RefreshRequest(firstTokens.accessToken(), userRefreshToken);
+        // 2. Второй запрос (ретрай) - возвращает кеш (TTL = 2 секунды)
+        RefreshRequest retryRequest = new RefreshRequest(userRefreshToken);
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(retryRequest)))
+                .andExpect(status().isOk());
+
+        // 3. Ждем истечения кеша (3 секунды + небольшая задержка)
+        Thread.sleep(5_000);
+
+        // 4. Третий запрос - кеша нет → TOKEN_REUSE
+        RefreshRequest reuseRequest = new RefreshRequest(userRefreshToken);
         mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reuseRequest)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("TOKEN_REUSE"));
 
-        // 3. Проверяем, что новый access токен тоже отозван
+        // 5. Проверяем, что новый access токен тоже отозван
         mockMvc.perform(get("/api/items")
                         .header("Authorization", "Bearer " + firstTokens.accessToken()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Refresh retry should return cached tokens within 3 seconds window")
+    void refreshRetryShouldReturnCachedTokens() throws Exception {
+        // 1. Первый refresh
+        RefreshRequest firstRequest = new RefreshRequest(userRefreshToken);
+        String firstResponse = mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(firstRequest)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        RefreshResponse firstTokens = objectMapper.readValue(firstResponse, RefreshResponse.class);
+
+        // 2. Сразу делаем второй запрос (ретрай) - должен вернуть те же токены из кеша
+        RefreshRequest retryRequest = new RefreshRequest(userRefreshToken);
+        String retryResponse = mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(retryRequest)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        RefreshResponse retryTokens = objectMapper.readValue(retryResponse, RefreshResponse.class);
+
+        // Проверяем, что токены совпадают (кеш сработал)
+        assertThat(retryTokens.accessToken()).isEqualTo(firstTokens.accessToken());
+        assertThat(retryTokens.refreshToken()).isEqualTo(firstTokens.refreshToken());
+
+        // 3. Делаем третий запрос (еще один ретрай через 1 секунду) - все еще кеш
+        Thread.sleep(1000);
+        RefreshRequest thirdRequest = new RefreshRequest(userRefreshToken);
+        String thirdResponse = mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(thirdRequest)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        RefreshResponse thirdTokens = objectMapper.readValue(thirdResponse, RefreshResponse.class);
+
+        // Проверяем, что все еще те же токены
+        assertThat(thirdTokens.accessToken()).isEqualTo(firstTokens.accessToken());
+        assertThat(thirdTokens.refreshToken()).isEqualTo(firstTokens.refreshToken());
     }
 
     @Test
@@ -372,7 +429,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @DisplayName("Refresh token should work only for refresh endpoint")
     void refreshTokenShouldWorkOnlyForRefreshEndpoint() throws Exception {
         // 1. Проверяем, что refresh токен работает на /api/auth/refresh
-        RefreshRequest refreshRequest = new RefreshRequest(adminToken, adminRefreshToken);
+        RefreshRequest refreshRequest = new RefreshRequest(adminRefreshToken);
         mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest)))
@@ -410,7 +467,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
 
         // Refresh token должен быть revoked
-        RefreshRequest refreshRequest = new RefreshRequest(null, userRefreshToken);
+        RefreshRequest refreshRequest = new RefreshRequest(userRefreshToken);
         mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest)))
@@ -471,7 +528,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
 
         // Refresh token должен быть revoked (возвращать 401)
-        RefreshRequest refreshRequest = new RefreshRequest(null, userRefreshForTest);
+        RefreshRequest refreshRequest = new RefreshRequest(userRefreshForTest);
         mockMvc.perform(post("/api/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest)))

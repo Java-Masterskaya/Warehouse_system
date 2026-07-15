@@ -3,6 +3,7 @@ package com.warehouse.security.service;
 import com.warehouse.security.model.TokenPair;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Сервис для управления JWT токенами.
@@ -41,5 +42,9 @@ public interface TokenService {
     void blacklistAccessToken(String accessToken);
 
     void blacklistAllUserAccessTokens(Long userId);
+
+    void saveRefreshRetryResult(String oldRefreshToken, TokenPair tokenPair);
+
+    Optional<TokenPair> getRefreshRetryResult(String oldRefreshToken);
 
 }
