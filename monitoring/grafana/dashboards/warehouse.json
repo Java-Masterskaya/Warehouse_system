@@ -1,0 +1,139 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Поступления (rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(warehouse_movements_receive_total[1m])",
+          "legendFormat": "receipts",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps"
+        }
+      }
+    },
+    {
+      "title": "Активные товары",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "warehouse_items_active",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "title": "Логины success",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "warehouse_auth_login_success_total",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "title": "JVM Heap Used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{area=\"heap\"}",
+          "legendFormat": "heap used",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "title": "JVM GC Pause",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum[1m])",
+          "legendFormat": "GC pause",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "JVM Threads",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "jvm_threads_live_threads",
+          "legendFormat": "live threads",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "title": "HTTP Requests (rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "rate(http_server_requests_seconds_count[1m])",
+          "legendFormat": "requests",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cps"
+        }
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["warehouse"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Warehouse System",
+  "uid": "warehouse-system",
+  "version": 0
+}
