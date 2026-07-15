@@ -27,10 +27,12 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -99,6 +101,8 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                 .category("Test")
                 .minStock(0)
                 .active(true)
+                .price(new BigDecimal("1500.00"))
+                .cost(new BigDecimal("1100.00"))
                 .build();
         item = itemRepository.save(item);
 
@@ -125,7 +129,9 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status").value("DRAFT"))
                 .andExpect(jsonPath("$.items[0].itemId").value(item.getId()))
                 .andExpect(jsonPath("$.items[0].orderedQty").value(10))
-                .andExpect(jsonPath("$.items[0].receivedQty").value(0));
+                .andExpect(jsonPath("$.items[0].receivedQty").value(0))
+                .andExpect(jsonPath("$.items[0].unitPrice").value(1500.00))
+                .andExpect(jsonPath("$.items[0].unitCost").value(1100.00));
     }
 
     @Test
@@ -271,6 +277,27 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                 .orElseThrow()
                 .getQuantity())
                 .isZero();
+    }
+
+    @Test
+    void getPurchaseOrdersReturnsPagedResponse() throws Exception {
+        createPurchaseOrder(10);
+        createPurchaseOrder(20);
+
+        mockMvc.perform(get(BASE_URL)
+                        .param("page", "0")
+                        .param("size", "1")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").isNumber())
+                .andExpect(jsonPath("$.totalPages").isNumber())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.content[0].id").exists())
+                .andExpect(jsonPath("$.content[0].supplierId").exists())
+                .andExpect(jsonPath("$.content[0].items").isArray());
     }
 
     private JsonNode createPurchaseOrder(int orderedQty) throws Exception {

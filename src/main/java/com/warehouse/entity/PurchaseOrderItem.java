@@ -15,6 +15,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "purchase_order_items")
 @Getter
@@ -45,4 +47,10 @@ public class PurchaseOrderItem {
     /** Количество товара, которое уже приняли на склад. */
     @Column(name = "received_qty", nullable = false)
     private int receivedQty;
+
+    @Column(name = "unit_price", precision = 19, scale = 2)
+    private BigDecimal unitPrice;
+
+    @Column(name = "unit_cost", precision = 19, scale = 2)
+    private BigDecimal unitCost;
 }

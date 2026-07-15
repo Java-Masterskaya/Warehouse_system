@@ -20,6 +20,8 @@ CREATE TABLE purchase_order_items (
     item_id           BIGINT  NOT NULL REFERENCES items (id),
     ordered_qty       INTEGER NOT NULL CHECK (ordered_qty > 0),
     received_qty      INTEGER NOT NULL DEFAULT 0 CHECK (received_qty >= 0),
+    unit_price        DECIMAL(19,2),
+    unit_cost         DECIMAL(19,2),
     CONSTRAINT chk_purchase_order_items_received_not_more_than_ordered
         CHECK (received_qty <= ordered_qty)
 );

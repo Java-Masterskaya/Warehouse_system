@@ -6,6 +6,7 @@ import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderItemRequest;
 import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderItemRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderRequest;
+import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.purchaseorder.PurchaseOrderResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.PurchaseOrder;
@@ -23,10 +24,16 @@ import com.warehouse.repository.SupplierRepository;
 import com.warehouse.service.movement.StockMovementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -92,7 +99,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
         log.debug("Receiving purchase order with id={}", purchaseOrderId);
 
-        PurchaseOrder purchaseOrder = getPurchaseOrderOrThrow(purchaseOrderId);
+        PurchaseOrder purchaseOrder =
+                getPurchaseOrderForReceiveOrThrow(purchaseOrderId);
 
         validatePurchaseOrderCanBeReceived(purchaseOrder);
 
@@ -120,16 +128,54 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PurchaseOrderResponse> getPurchaseOrders() {
-        log.debug("Getting purchase orders");
+    public PageResponse<PurchaseOrderResponse> getPurchaseOrders(int page, int size) {
 
-        List<PurchaseOrderResponse> purchaseOrders = purchaseOrderRepository.findAll().stream()
-                .map(purchaseOrderMapper::toResponse)
-                .toList();
+        log.debug("Getting purchase orders: page={}, size={}", page, size);
 
-        log.info("Found {} purchase orders", purchaseOrders.size());
+        PageRequest pageable = PageRequest.of(page, size);
 
-        return purchaseOrders;
+        Page<Long> idPage =
+                purchaseOrderRepository.findPageIds(pageable);
+
+        if (idPage.isEmpty()) {
+            return PageResponse.from(
+                    new PageImpl<>(
+                            List.of(),
+                            pageable,
+                            idPage.getTotalElements()
+                    )
+            );
+        }
+
+        List<PurchaseOrder> purchaseOrders =
+                purchaseOrderRepository.findAllByIdIn(
+                        idPage.getContent()
+                );
+
+        Map<Long, PurchaseOrder> ordersById =
+                purchaseOrders.stream()
+                        .collect(Collectors.toMap(
+                                PurchaseOrder::getId,
+                                Function.identity()
+                        ));
+
+        List<PurchaseOrderResponse> content =
+                idPage.getContent().stream()
+                        .map(ordersById::get)
+                        .map(purchaseOrderMapper::toResponse)
+                        .toList();
+
+        Page<PurchaseOrderResponse> responsePage =
+                new PageImpl<>(
+                        content,
+                        pageable,
+                        idPage.getTotalElements()
+                );
+
+        log.info("Found {} purchase orders",
+                idPage.getTotalElements());
+
+        return PageResponse.from(responsePage);
     }
 
     private PurchaseOrderItem createPurchaseOrderItem(
@@ -152,6 +198,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .item(item)
                 .orderedQty(request.orderedQty())
                 .receivedQty(0)
+                .unitPrice(item.getPrice())
+                .unitCost(item.getCost())
                 .build();
     }
 
@@ -253,6 +301,16 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .orElseThrow(() -> {
                     log.warn("Purchase order with id={} not found", purchaseOrderId);
                     return EntityNotFoundException.forId("PurchaseOrder", purchaseOrderId);
+                });
+    }
+
+    private PurchaseOrder getPurchaseOrderForReceiveOrThrow(Long purchaseOrderId) {
+        return purchaseOrderRepository.findByIdForReceive(purchaseOrderId)
+                .orElseThrow(() -> {
+                    log.warn("Purchase order with id={} not found",
+                            purchaseOrderId);
+                    return EntityNotFoundException.forId(
+                            "PurchaseOrder", purchaseOrderId);
                 });
     }
 }

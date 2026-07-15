@@ -28,6 +28,7 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -85,6 +86,8 @@ class PurchaseOrderServiceImplTest {
                 .id(10L)
                 .name("Monitor")
                 .active(true)
+                .price(new BigDecimal("1500.00"))
+                .cost(new BigDecimal("1100.00"))
                 .build();
 
         CreatePurchaseOrderRequest request = new CreatePurchaseOrderRequest(
@@ -119,6 +122,10 @@ class PurchaseOrderServiceImplTest {
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().get(0).orderedQty()).isEqualTo(5);
         assertThat(result.items().get(0).receivedQty()).isZero();
+        assertThat(result.items().get(0).unitPrice())
+                .isEqualByComparingTo("1500.00");
+        assertThat(result.items().get(0).unitCost())
+                .isEqualByComparingTo("1100.00");
     }
 
     @Test
@@ -164,7 +171,7 @@ class PurchaseOrderServiceImplTest {
                 .items(List.of())
                 .build();
 
-        when(purchaseOrderRepository.findById(100L))
+        when(purchaseOrderRepository.findByIdForReceive(100L))
                 .thenReturn(Optional.of(purchaseOrder));
 
         ReceivePurchaseOrderRequest request =
@@ -212,7 +219,7 @@ class PurchaseOrderServiceImplTest {
 
         purchaseOrder.setItems(List.of(orderItem));
 
-        when(purchaseOrderRepository.findById(100L))
+        when(purchaseOrderRepository.findByIdForReceive(100L))
                 .thenReturn(Optional.of(purchaseOrder));
 
         ReceivePurchaseOrderRequest request =
@@ -264,7 +271,7 @@ class PurchaseOrderServiceImplTest {
 
         purchaseOrder.setItems(List.of(orderItem));
 
-        when(purchaseOrderRepository.findById(100L))
+        when(purchaseOrderRepository.findByIdForReceive(100L))
                 .thenReturn(Optional.of(purchaseOrder));
 
         ReceivePurchaseOrderRequest request =
@@ -316,7 +323,7 @@ class PurchaseOrderServiceImplTest {
 
         purchaseOrder.setItems(List.of(orderItem));
 
-        when(purchaseOrderRepository.findById(100L))
+        when(purchaseOrderRepository.findByIdForReceive(100L))
                 .thenReturn(Optional.of(purchaseOrder));
 
         ReceivePurchaseOrderRequest request =

@@ -3,9 +3,8 @@ package com.warehouse.service.purchaseorder;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderRequest;
+import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.purchaseorder.PurchaseOrderResponse;
-
-import java.util.List;
 
 public interface PurchaseOrderService {
 
@@ -21,5 +20,5 @@ public interface PurchaseOrderService {
 
     PurchaseOrderResponse getPurchaseOrder(Long purchaseOrderId);
 
-    List<PurchaseOrderResponse> getPurchaseOrders();
+    PageResponse<PurchaseOrderResponse> getPurchaseOrders(int page, int size);
 }
