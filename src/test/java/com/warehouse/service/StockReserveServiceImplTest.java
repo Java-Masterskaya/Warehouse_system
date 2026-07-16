@@ -264,6 +264,7 @@ public class StockReserveServiceImplTest {
         when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
 
         when(stockRepository.decreaseQuantityIfEnough(item.getId(), reservation.getQuantity())).thenReturn(1);
+        when(stockRepository.findQuantityByItemId(item.getId())).thenReturn(Optional.of(5));
 
         service.writeOff(item.getId(), request, ctx);
 

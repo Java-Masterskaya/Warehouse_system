@@ -107,7 +107,7 @@ public class StockReserveServiceImpl implements StockReserveService {
         }
         updateReservationStatus(reservation, ReservationStatus.CONSUMED);
         //for alert
-        stock.setQuantity(stock.getQuantity() - reservation.getQuantity());
+        stock.setQuantity(stockRepository.findQuantityByItemId(itemId).get());
 
         //make movement and alert
         stockMovementService.newStockMovement(getItem(itemId), reservation.getQuantity(), ctx, MovementType.WRITE_OFF);
