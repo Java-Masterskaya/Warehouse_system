@@ -15,3 +15,16 @@ CREATE TABLE audit_log
 
     created_at  timestamp with time zone NOT NULL DEFAULT NOW()
 );
+
+CREATE FUNCTION prevent_audit_changes()
+    RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'Audit log is immutable';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER audit_log_no_update_delete
+    BEFORE UPDATE OR DELETE
+    ON audit_log
+    FOR EACH ROW
+EXECUTE FUNCTION prevent_audit_changes();
