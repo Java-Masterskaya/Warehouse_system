@@ -10,8 +10,10 @@ services:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -t 10 || exit 1"]
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -t 10 || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,8 +28,10 @@ services:
       - .env
     volumes:
       - redis_data:/data
+    networks:
+      - app-network
     healthcheck:
-      test: ["CMD", "sh", "-c", "redis-cli -a $$REDIS_PASSWORD ping | grep -q PONG"]
+      test: [ "CMD", "sh", "-c", "redis-cli -a $$REDIS_PASSWORD ping | grep -q PONG" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,6 +53,8 @@ services:
       --advertise-kafka-addr PLAINTEXT://kafka:29092,OUTSIDE://localhost:9092
       --schema-registry-addr 0.0.0.0:8081
       --mode dev-container
+    networks:
+      - app-network
     healthcheck:
       test: [ "CMD", "rpk", "cluster", "info" ]
       interval: 15s
@@ -114,6 +120,8 @@ services:
         condition: service_healthy
       consul-seed:
         condition: service_completed_successfully
+      networks:
+        - app-network
 
 
     healthcheck:
@@ -122,7 +130,39 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # -- Prometheus --
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - app-network
+
+  # -- Grafana --
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./monitoring/grafana/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml
+      - ./monitoring/grafana/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - ./monitoring/grafana/dashboards/warehouse.json:/etc/grafana/provisioning/dashboards/warehouse.json
+    networks:
+      - app-network
+
 volumes:
   postgres_data:
   redis_data:
   consul_data:
+
+networks:
+  app-network:
+    driver: bridge
