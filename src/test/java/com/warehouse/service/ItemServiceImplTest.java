@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
@@ -62,13 +63,16 @@ class ItemServiceImplTest {
     @Mock
     private StockRepository stockRepository;
 
+    @Mock
+    private AuditContext auditContext;
+
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 
     private ItemService itemService;
 
     @BeforeEach
     void setUp() {
-        itemService = new ItemServiceImpl(itemRepository, stockRepository, itemMapper);
+        itemService = new ItemServiceImpl(itemRepository, stockRepository, itemMapper, auditContext);
     }
 
     /**

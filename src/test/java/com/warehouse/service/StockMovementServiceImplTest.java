@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
@@ -89,6 +90,8 @@ class StockMovementServiceImplTest {
     private KafkaStockAlertProducer kafkaProducer;
     @Mock
     private MetricService metricService;
+    @Mock
+    private AuditContext auditContext;
     @InjectMocks
     private StockMovementServiceImpl stockMovementService;
     @Captor
