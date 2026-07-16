@@ -1,0 +1,16 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'webhook-default'
+
+receivers:
+  - name: 'webhook-default'
+    webhook_configs:
+      - url: 'http://webhook-server:8082/webhook'
+        send_resolved: true
+        max_alerts: 10
