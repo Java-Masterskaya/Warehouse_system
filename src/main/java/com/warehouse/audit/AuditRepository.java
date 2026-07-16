@@ -1,7 +1,8 @@
-package com.warehouse.repository;
+package com.warehouse.audit;
 
-import com.warehouse.entity.AuditLogEntity;
+import com.warehouse.audit.entity.AuditLogEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AuditRepository extends JpaRepository<AuditLogEntity, Long> {
+    AuditLogEntity findTopByOrderByIdDesc();
 }

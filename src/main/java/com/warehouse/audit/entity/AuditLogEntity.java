@@ -1,4 +1,4 @@
-package com.warehouse.entity;
+package com.warehouse.audit.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,16 +12,18 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
 @Entity
+@Immutable
 @Table(name = "audit_log")
 @Getter
-@Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -50,11 +52,11 @@ public class AuditLogEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "old_value")
-    private String oldValue;
+    private JsonNode oldValue;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "new_value")
-    private String newValue;
+    private JsonNode newValue;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

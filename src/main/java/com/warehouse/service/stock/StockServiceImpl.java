@@ -24,8 +24,7 @@ public class StockServiceImpl implements StockService {
         }
 
         int newQuantity = getCurrentQuantity(itemId);
-        log.info("Stock receipt completed: itemId={}, quantity={}, new stock={}",
-                itemId, quantity, newQuantity);
+        log.info("Stock receipt completed: itemId={}, quantity={}, new stock={}", itemId, quantity, newQuantity);
         return newQuantity;
     }
 
@@ -35,22 +34,18 @@ public class StockServiceImpl implements StockService {
 
         int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, quantity);
         if (updatedRows == 0) {
-            int current = stockRepository.findQuantityByItemId(itemId)
-                    .orElseThrow(() -> stockNotFound(itemId));
-            log.warn("Insufficient stock for itemId={}: requested {}, available {}",
-                    itemId, quantity, current);
+            int current = stockRepository.findQuantityByItemId(itemId).orElseThrow(() -> stockNotFound(itemId));
+            log.warn("Insufficient stock for itemId={}: requested {}, available {}", itemId, quantity, current);
             throw InsufficientStockException.of(itemId, quantity, current);
         }
 
         int newQuantity = getCurrentQuantity(itemId);
-        log.info("Write-off completed: itemId={}, quantity={}, new stock={}",
-                itemId, quantity, newQuantity);
+        log.info("Write-off completed: itemId={}, quantity={}, new stock={}", itemId, quantity, newQuantity);
         return newQuantity;
     }
 
     private int getCurrentQuantity(Long itemId) {
-        return stockRepository.findQuantityByItemId(itemId)
-                .orElseThrow(() -> stockNotFound(itemId));
+        return stockRepository.findQuantityByItemId(itemId).orElseThrow(() -> stockNotFound(itemId));
     }
 
     private EntityNotFoundException stockNotFound(Long itemId) {
