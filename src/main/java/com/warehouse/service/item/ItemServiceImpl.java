@@ -42,7 +42,6 @@ public class ItemServiceImpl implements ItemService {
     private final ItemMapper itemMapper;
     private final AuditContext auditContext;
 
-    //todo record mutation create item
     @Transactional
     @Override
     @CacheEvict(value = "categories", allEntries = true)
@@ -71,7 +70,6 @@ public class ItemServiceImpl implements ItemService {
         return itemMapper.toResponse(item);
     }
 
-    //todo record mutation update item
     @Transactional
     @Override
     @Caching(evict = {
@@ -161,7 +159,6 @@ public class ItemServiceImpl implements ItemService {
         return item;
     }
 
-    //todo record mutation delete item
     @Transactional
     @Override
     @CacheEvict(value = "item", key = "#itemId")

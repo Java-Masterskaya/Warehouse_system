@@ -56,7 +56,6 @@ public class UserServiceImpl implements UserService {
                 .toList();
     }
 
-    //todo record mutation delete user
     @Override
     @Transactional
     @Auditable(action = AuditAction.DEACTIVATE, entityType = EntityType.USER)
