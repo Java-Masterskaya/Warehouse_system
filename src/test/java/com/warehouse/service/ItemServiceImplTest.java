@@ -1,12 +1,11 @@
 package com.warehouse.service;
 
-import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
-import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
@@ -40,16 +39,16 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -87,8 +86,8 @@ class ItemServiceImplTest {
      */
     @Test
     void createItemSuccess() {
-        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5,
-                BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
+        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
 
         Item item = new Item();
         item.setId(1L);
@@ -104,7 +103,8 @@ class ItemServiceImplTest {
             savedItem.setCreatedAt(LocalDateTime.now());
             return savedItem;
         });
-        when(stockRepository.save(any(Stock.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(stockRepository.save(any(Stock.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.createItem(request);
 
@@ -124,13 +124,14 @@ class ItemServiceImplTest {
      */
     @Test
     void createItemDuplicateSkuThrowsDuplicateSkuException() {
-        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника", 5,
-                BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
+        CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(true);
 
-        assertThatThrownBy(() -> itemService.createItem(request)).isInstanceOf(DuplicateSkuException.class)
-                                                                 .hasMessageContaining("SKU-001");
+        assertThatThrownBy(() -> itemService.createItem(request))
+                .isInstanceOf(DuplicateSkuException.class)
+                .hasMessageContaining("SKU-001");
 
         verify(itemRepository, never()).save(any());
         verify(stockRepository, never()).save(any());
@@ -151,11 +152,12 @@ class ItemServiceImplTest {
         existingItem.setPrice(BigDecimal.valueOf(100.50));
         existingItem.setCost(BigDecimal.valueOf(75.25));
 
-        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория", 10,
-                BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
+        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -185,11 +187,12 @@ class ItemServiceImplTest {
         existingItem.setPrice(BigDecimal.valueOf(100.00));
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория", 10,
-                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+        UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория",
+                10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -215,11 +218,12 @@ class ItemServiceImplTest {
         existingItem.setPrice(BigDecimal.valueOf(100.00));
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Товар с нулевой ценой", "Категория", 5, BigDecimal.ZERO,
-                BigDecimal.ZERO);
+        UpdateItemRequest request = new UpdateItemRequest("Товар с нулевой ценой",
+                "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -243,11 +247,12 @@ class ItemServiceImplTest {
         existingItem.setPrice(BigDecimal.valueOf(100.00));
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Товар", "Категория", 5, BigDecimal.valueOf(100.00),
-                BigDecimal.valueOf(50.00));
+        UpdateItemRequest request = new UpdateItemRequest("Товар", "Категория",
+                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(itemRepository.save(any(Item.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         ItemResponse result = itemService.updateItem(itemId, request);
 
@@ -262,8 +267,8 @@ class ItemServiceImplTest {
     @Test
     void updateItemItemNotFoundThrowsException() {
         Long itemId = 3L;
-        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10, BigDecimal.valueOf(50.00),
-                BigDecimal.valueOf(30.00));
+        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
@@ -287,8 +292,8 @@ class ItemServiceImplTest {
         inactiveItem.setPrice(BigDecimal.valueOf(50.00));
         inactiveItem.setCost(BigDecimal.valueOf(30.00));
 
-        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория", 10, BigDecimal.valueOf(50.00),
-                BigDecimal.valueOf(30.00));
+        UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
@@ -363,9 +368,11 @@ class ItemServiceImplTest {
      */
     @Test
     void shouldReturnItemWhenItemExistsAndActive() {
-        ItemDetailsProjection projection = new ItemDetailsProjection(1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника",
-                5, 23, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00), true, LocalDateTime.now(),
-                LocalDateTime.now());
+        ItemDetailsProjection projection = new ItemDetailsProjection(
+                1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
+                true, LocalDateTime.now(), LocalDateTime.now()
+        );
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(projection));
         when(availabilityService.getAvailable(1L)).thenReturn(10);
@@ -412,9 +419,11 @@ class ItemServiceImplTest {
      */
     @Test
     void shouldThrowEntityNotFoundExceptionWhenItemNotActive() {
-        ItemDetailsProjection response = new ItemDetailsProjection(1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника",
-                5, 23, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00), false, LocalDateTime.now(),
-                LocalDateTime.now());
+        ItemDetailsProjection response = new ItemDetailsProjection(
+                1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
+                false, LocalDateTime.now(), LocalDateTime.now()
+        );
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(response));
 
@@ -439,10 +448,11 @@ class ItemServiceImplTest {
         item.setActive(true);
 
         PageRequest pageable = PageRequest.of(0, 20);
-        when(itemRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(
-                new PageImpl<>(List.of(item), pageable, 1));
+        when(itemRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(item), pageable, 1));
 
-        PageResponse<ItemResponse> result = itemService.getItems("name", "asc", null, null, 0, 20);
+        PageResponse<ItemResponse> result = itemService.getItems("name", "asc",
+                null, null, 0, 20);
 
         assertThat(result.content()).hasSize(1);
         assertThat(result.totalElements()).isEqualTo(1);
@@ -455,8 +465,8 @@ class ItemServiceImplTest {
      */
     @Test
     void getItemsSortBySkuDescPassesCorrectPageable() {
-        when(itemRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(
-                new PageImpl<>(List.of()));
+        when(itemRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         itemService.getItems("sku", "desc", null, null, 0, 20);
 
@@ -475,8 +485,8 @@ class ItemServiceImplTest {
      */
     @Test
     void getItemsUnknownSortFieldFallsBackToName() {
-        when(itemRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(
-                new PageImpl<>(List.of()));
+        when(itemRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         itemService.getItems("invalid", "asc", null, null, 0, 20);
 
@@ -492,8 +502,8 @@ class ItemServiceImplTest {
      */
     @Test
     void getItemsPaginationPassesCorrectPageNumber() {
-        when(itemRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(
-                new PageImpl<>(List.of()));
+        when(itemRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         itemService.getItems("name", "asc", null, null, 2, 10);
 
@@ -509,7 +519,8 @@ class ItemServiceImplTest {
      */
     @Test
     void getCategoriesShouldReturnDistinctList() {
-        when(itemRepository.findDistinctCategories()).thenReturn(List.of("Электроника", "Мебель", "Инструменты"));
+        when(itemRepository.findDistinctCategories())
+                .thenReturn(List.of("Электроника", "Мебель", "Инструменты"));
 
         List<String> categories = itemService.getCategories();
 
@@ -528,7 +539,8 @@ class ItemServiceImplTest {
      */
     @Test
     void getCategoriesShouldReturnEmptyListWhenNoActiveItems() {
-        when(itemRepository.findDistinctCategories()).thenReturn(Collections.emptyList());
+        when(itemRepository.findDistinctCategories())
+                .thenReturn(Collections.emptyList());
 
         List<String> categories = itemService.getCategories();
 
@@ -543,9 +555,11 @@ class ItemServiceImplTest {
      */
     @Test
     void priceAndCostDisplayedInItemDetails() {
-        ItemDetailsProjection response = new ItemDetailsProjection(1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника",
-                5, 23, BigDecimal.valueOf(1500.99), BigDecimal.valueOf(1000.49), true, LocalDateTime.now(),
-                LocalDateTime.now());
+        ItemDetailsProjection response = new ItemDetailsProjection(
+                1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
+                BigDecimal.valueOf(1500.99), BigDecimal.valueOf(1000.49),
+                true, LocalDateTime.now(), LocalDateTime.now()
+        );
 
         assertThat(response.price()).isEqualTo(BigDecimal.valueOf(1500.99));
         assertThat(response.cost()).isEqualTo(BigDecimal.valueOf(1000.49));
