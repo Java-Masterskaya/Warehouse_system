@@ -132,7 +132,7 @@ public class StockMovementServiceImpl implements StockMovementService {
             int stockAfter = stockService.writeOffStock(itemId, quantity);
 
             StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.WRITE_OFF);
-            auditContext.setEntityId(saved.getId());
+            auditContext.setEntityId(stockMovement.getId());
 
             boolean lowStock = stockAfter < item.getMinStock();
             if (lowStock) {
@@ -212,7 +212,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         Item item = itemCheckForExist(itemId);
         itemCheckForActive(item);
 
-        Stock stock = stockRepository.findByItemId(itemId)
+        Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
 
         int reserved = availabilityService.getReserved(itemId);
@@ -277,7 +277,6 @@ public class StockMovementServiceImpl implements StockMovementService {
         return mapper.toResponse(stockMovement, counted, lowStock);
     }
 
-    @Override
     public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type) {
         User userRef = userRepository.getReferenceById(ctx.userId());
 

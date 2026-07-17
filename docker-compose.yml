@@ -113,8 +113,8 @@ services:
         condition: service_healthy
       consul:
         condition: service_healthy
-#      consul-seed:
-#        condition: service_completed_successfully
+      consul-seed:
+        condition: service_completed_successfully
     networks:
       - app-network
 
