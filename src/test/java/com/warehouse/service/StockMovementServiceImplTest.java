@@ -16,6 +16,7 @@ import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
+import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
@@ -24,6 +25,7 @@ import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementServiceImpl;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.stock.StockService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -78,6 +80,8 @@ class StockMovementServiceImplTest {
     private StockMovementMapper mapper;
     @Mock
     private StockService stockService;
+    @Mock
+    private StockAvailabilityService availabilityService;
     @Mock
     private ItemRepository itemRepository;
     @Mock
@@ -602,11 +606,12 @@ class StockMovementServiceImplTest {
         User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
                 new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null, false));
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
 
@@ -616,6 +621,35 @@ class StockMovementServiceImplTest {
         assertEquals(7, stock.getQuantity());
         verify(stockMovementRepository).save(any());
         verify(metricService).increment("warehouse.movements.adjustment.total");
+    }
+
+    /**
+     * Инвентаризация: фактический остаток меньше активных резервов.
+     * Выбрасывается StocktakeConflictException.
+     */
+    @Test
+    void stocktakeShouldThrowExceptionWhenReservedOverCounted() {
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 7);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setQuantity(10);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(8);
+
+        assertThrows(
+                StocktakeConflictException.class,
+                () -> stockMovementService.stocktake(request, userContext)
+        );
+
+        verify(stockRepository, never()).save(any());
+        verify(stockMovementRepository, never()).save(any());
+        verify(kafkaProducer, never()).sendLowStockAlert(any());
     }
 
     /**
@@ -633,11 +667,12 @@ class StockMovementServiceImplTest {
         User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(15), eq(false))).thenReturn(
                 new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5, 15, null, false));
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
 
@@ -663,11 +698,12 @@ class StockMovementServiceImplTest {
         User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(5), eq(true))).thenReturn(
                 new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5, null, true));
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         try (MockedStatic<TransactionSynchronizationManager> tsm =
                      mockStatic(TransactionSynchronizationManager.class)) {
@@ -695,9 +731,10 @@ class StockMovementServiceImplTest {
         stock.setQuantity(10);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-        when(stockRepository.findByItemId(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(mapper.toNoMovementResponse(ITEM_ID, 10)).thenReturn(
                 new StockMovementResponse(ITEM_ID, null, null, 0, 10, null, false));
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
 

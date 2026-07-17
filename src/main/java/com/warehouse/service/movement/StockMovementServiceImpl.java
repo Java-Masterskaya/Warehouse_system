@@ -20,6 +20,7 @@ import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
+import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
@@ -27,6 +28,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +60,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     StockMovementMapper mapper;
     StockService stockService;
+    StockAvailabilityService availabilityService;
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
@@ -95,10 +98,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         int stockAfter = stockService.receiveStock(itemId, quantity);
 
-        User userRef = userRepository.getReferenceById(ctx.userId());
-
-        StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.RECEIVE)
-                                                   .quantity(quantity).build();
+        StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.RECEIVE);
         StockMovement saved = stockMovementRepository.save(stockMovement);
         auditContext.setEntityId(saved.getId());
         auditContext.setOldValue(new StockAuditDto(itemId, stockAfter - quantity));
@@ -171,10 +171,8 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(
-            Long itemId, MovementType type, int page,
-            int size
-    ) {
+    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId, MovementType type, int page,
+            int size) {
         if (!itemRepository.existsById(itemId)) {
             log.warn("Item с id={} не найден", itemId);
             throw EntityNotFoundException.forId("Item", itemId);
@@ -202,6 +200,13 @@ public class StockMovementServiceImpl implements StockMovementService {
         Stock stock = stockRepository.findByItemId(itemId).orElseThrow(
                 () -> EntityNotFoundException.forId("Stock not found for item", itemId));
 
+        int reserved = availabilityService.getReserved(itemId);
+        if (counted < reserved) {
+            log.warn("Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. "
+                    + "Physical quantity is lower than active reservations", itemId, counted, reserved);
+            throw StocktakeConflictException.of(counted, reserved);
+        }
+
         int current = stock.getQuantity();
         int delta = counted - current;
 
@@ -216,7 +221,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         User userRef = userRepository.getReferenceById(ctx.userId());
 
         StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.ADJUSTMENT)
-                                                   .quantity(delta).build();
+                .quantity(delta).build();
         stockMovementRepository.save(stockMovement);
 
         boolean lowStock = counted < item.getMinStock();
@@ -244,6 +249,15 @@ public class StockMovementServiceImpl implements StockMovementService {
         metricService.increment("warehouse.movements.adjustment.total");
 
         return mapper.toResponse(stockMovement, counted, lowStock);
+    }
+
+    @Override
+    public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type) {
+        User userRef = userRepository.getReferenceById(ctx.userId());
+
+        StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(type).quantity(quantity)
+                .build();
+        return stockMovementRepository.save(stockMovement);
     }
 
     private void itemCheckForActive(Item item) {

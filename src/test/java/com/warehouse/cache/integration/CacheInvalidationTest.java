@@ -93,8 +93,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         itemService.updateItem(itemId, updateRequest);
 
         ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.name()).isEqualTo("Ноутбук Pro");
-        assertThat(response.minStock()).isEqualTo(10);
+        assertThat(response.getName()).isEqualTo("Ноутбук Pro");
+        assertThat(response.getMinStock()).isEqualTo(10);
     }
 
     /**
@@ -103,7 +103,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void softDeleteItemShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.active()).isTrue();
+        assertThat(firstCall.isActive()).isTrue();
 
         itemService.softDeleteItem(itemId);
 
@@ -120,14 +120,14 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void receiveMovementShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.currentStock()).isEqualTo(10);
+        assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
         ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5);
         stockMovementService.registerReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
         ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.currentStock()).isEqualTo(15);
+        assertThat(response.getCurrentStock()).isEqualTo(15);
     }
 
     /**
@@ -136,14 +136,14 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void writeOffMovementShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.currentStock()).isEqualTo(10);
+        assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
         ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 3);
         stockMovementService.writeOffReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
         ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.currentStock()).isEqualTo(7);
+        assertThat(response.getCurrentStock()).isEqualTo(7);
     }
 
     /**
