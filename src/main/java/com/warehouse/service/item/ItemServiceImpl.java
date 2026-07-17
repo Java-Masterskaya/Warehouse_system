@@ -3,6 +3,7 @@ package com.warehouse.service.item;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.Item;
@@ -12,6 +13,7 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Slf4j
@@ -34,6 +38,7 @@ public class ItemServiceImpl implements ItemService {
     private final ItemRepository itemRepository;
     private final StockRepository stockRepository;
     private final ItemMapper itemMapper;
+    private final StockAvailabilityService availabilityService;
 
     @Transactional
     @Override
@@ -47,6 +52,8 @@ public class ItemServiceImpl implements ItemService {
         }
 
         Item item = itemMapper.toEntity(request);
+        item.setPrice(confirmPrice(request.price()));
+        item.setCost(confirmCost(request.cost()));
         itemRepository.save(item);
 
         Stock stock = new Stock();
@@ -81,6 +88,8 @@ public class ItemServiceImpl implements ItemService {
         item.setName(request.name());
         item.setCategory(request.category());
         item.setMinStock(request.minStock());
+        item.setPrice(confirmPrice(request.price()));
+        item.setCost(confirmCost(request.cost()));
 
         Item savedItem = itemRepository.save(item);
         log.info("Item updated: id={}, SKU='{}'", savedItem.getId(), savedItem.getSku());
@@ -128,18 +137,19 @@ public class ItemServiceImpl implements ItemService {
     @Cacheable(value = "item", key = "#itemId")
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
-        ItemDetailsResponse item = itemRepository.findWithStock(itemId)
+        ItemDetailsProjection item = itemRepository.findWithStock(itemId)
                 .orElseThrow(() -> {
                     log.warn("Item not found: id={}", itemId);
                     return new EntityNotFoundException("Товар не найден");
                 });
-
         if (!item.active()) {
             log.warn("Item inactive: id={}", itemId);
             throw new EntityNotFoundException("Товар неактивен");
         }
+        int available = availabilityService.getAvailable(itemId);
+        int reserved = availabilityService.getReserved(itemId);
 
-        return item;
+        return itemMapper.mapProjectionToDetailsResponse(item, available, reserved);
     }
 
     @Transactional
@@ -168,5 +178,21 @@ public class ItemServiceImpl implements ItemService {
         List<String> categories = itemRepository.findDistinctCategories();
         log.info("Found {} categories: {}", categories.size(), categories);
         return categories;
+    }
+
+    @Override
+    public BigDecimal confirmPrice(BigDecimal price) {
+        if (price == null) {
+            return BigDecimal.ZERO;
+        }
+        return price.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    @Override
+    public BigDecimal confirmCost(BigDecimal cost) {
+        if (cost == null) {
+            return BigDecimal.ZERO;
+        }
+        return cost.setScale(2, RoundingMode.HALF_UP);
     }
 }

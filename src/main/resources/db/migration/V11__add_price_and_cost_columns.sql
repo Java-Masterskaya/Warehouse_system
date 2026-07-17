@@ -1,0 +1,3 @@
+ALTER TABLE items
+    ADD COLUMN price DECIMAL(19,2),
+    ADD COLUMN cost  DECIMAL(19,2);

@@ -11,6 +11,9 @@ import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
+
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,10 +34,15 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     @Autowired
     private ItemService itemService;
 
+    @Autowired
+    CacheManager cacheManager;
+
     private Long itemId;
 
     @BeforeEach
     void setUp() {
+        cacheManager.getCache("item").clear();
+
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
@@ -45,6 +53,8 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         item.setCategory("Электроника");
         item.setMinStock(5);
         item.setActive(true);
+        item.setPrice(BigDecimal.valueOf(1500.00));
+        item.setCost(BigDecimal.valueOf(1000.00));
         itemRepository.save(item);
 
         Stock stock = new Stock();
@@ -63,9 +73,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         ItemDetailsResponse response = itemService.getItem(itemId);
 
         assertThat(response).isNotNull();
-        assertThat(response.id()).isEqualTo(itemId);
-        assertThat(response.name()).isEqualTo("Ноутбук");
-        assertThat(response.currentStock()).isEqualTo(10);
+        assertThat(response.getId()).isEqualTo(itemId);
+        assertThat(response.getName()).isEqualTo("Ноутбук");
+        assertThat(response.getCurrentStock()).isEqualTo(10);
     }
 
     /**
@@ -81,7 +91,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         ItemDetailsResponse secondCall = itemService.getItem(itemId);
 
         assertThat(secondCall).isEqualTo(firstCall);
-        assertThat(secondCall.name()).isEqualTo("Ноутбук");
-        assertThat(secondCall.currentStock()).isEqualTo(10);
+        assertThat(secondCall.getName()).isEqualTo("Ноутбук");
+        assertThat(secondCall.getCurrentStock()).isEqualTo(10);
     }
 }
