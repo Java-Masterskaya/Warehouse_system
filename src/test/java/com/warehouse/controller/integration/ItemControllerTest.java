@@ -506,8 +506,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
         ItemDetailsResponse response = itemService.getItem(
                 itemRepository.findBySku(sku).get().getId());
 
-        assertThat(response.price().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
-        assertThat(response.cost().compareTo(BigDecimal.valueOf(1000.50))).isEqualTo(0);
+        assertThat(response.getPrice().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(response.getCost().compareTo(BigDecimal.valueOf(1000.50))).isEqualTo(0);
     }
 
     /**
@@ -639,8 +639,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
         assertThat(item.getCost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
 
         ItemDetailsResponse response = itemService.getItem(item.getId());
-        assertThat(response.price().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
-        assertThat(response.cost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
+        assertThat(response.getPrice().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(response.getCost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
     }
 
     private void createItem(String sku, String name, String category) throws Exception {

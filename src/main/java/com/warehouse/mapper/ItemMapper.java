@@ -2,6 +2,8 @@ package com.warehouse.mapper;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
+import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.Item;
 import org.mapstruct.Mapper;
@@ -24,4 +26,8 @@ public interface ItemMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     void updateItemFromRequest(UpdateItemRequest request, @MappingTarget Item item);
+
+    @Mapping(target = "available", source = "available")
+    @Mapping(target = "reserved", source = "reserved")
+    ItemDetailsResponse mapProjectionToDetailsResponse(ItemDetailsProjection projection, int available, int reserved);
 }
