@@ -7,6 +7,7 @@ import com.warehouse.audit.entity.EntityType;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.entity.Item;
@@ -16,6 +17,7 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ public class ItemServiceImpl implements ItemService {
     private final StockRepository stockRepository;
     private final ItemMapper itemMapper;
     private final AuditContext auditContext;
+    private final StockAvailabilityService availabilityService;
 
     @Transactional
     @Override
@@ -53,10 +56,11 @@ public class ItemServiceImpl implements ItemService {
             log.warn("Duplicate SKU '{}' — item already exists", request.sku());
             throw DuplicateSkuException.forSku(request.sku());
         }
+
         Item item = itemMapper.toEntity(request);
         item.setPrice(confirmPrice(request.price()));
         item.setCost(confirmCost(request.cost()));
-        Item saved = itemRepository.save(item);
+        itemRepository.save(item);
 
         Stock stock = new Stock();
         stock.setItem(item);
@@ -145,7 +149,7 @@ public class ItemServiceImpl implements ItemService {
     @Cacheable(value = "item", key = "#itemId")
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
-        ItemDetailsResponse item = itemRepository.findWithStock(itemId)
+        ItemDetailsProjection item = itemRepository.findWithStock(itemId)
                 .orElseThrow(() -> {
                     log.warn("Item not found: id={}", itemId);
                     return new EntityNotFoundException("Товар не найден");
@@ -155,8 +159,10 @@ public class ItemServiceImpl implements ItemService {
             log.warn("Item inactive: id={}", itemId);
             throw new EntityNotFoundException("Товар неактивен");
         }
+        int available = availabilityService.getAvailable(itemId);
+        int reserved = availabilityService.getReserved(itemId);
 
-        return item;
+        return itemMapper.mapProjectionToDetailsResponse(item, available, reserved);
     }
 
     @Transactional
