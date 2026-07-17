@@ -99,8 +99,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         int stockAfter = stockService.receiveStock(itemId, quantity);
 
         StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.RECEIVE);
-        StockMovement saved = stockMovementRepository.save(stockMovement);
-        auditContext.setEntityId(saved.getId());
+        auditContext.setEntityId(stockMovement.getId());
         auditContext.setOldValue(new StockAuditDto(itemId, stockAfter - quantity));
         auditContext.setNewValue(new StockAuditDto(itemId, stockAfter));
 
@@ -217,9 +216,8 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         User userRef = userRepository.getReferenceById(ctx.userId());
 
-        StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.ADJUSTMENT)
-                .quantity(delta).build();
-        stockMovementRepository.save(stockMovement);
+        StockMovement stockMovement = newStockMovement(item, delta, new UserContext(userRef.getId(),
+                userRef.getUsername()), MovementType.ADJUSTMENT);
 
         boolean lowStock = counted < item.getMinStock();
         if (lowStock) {
@@ -248,7 +246,6 @@ public class StockMovementServiceImpl implements StockMovementService {
         return mapper.toResponse(stockMovement, counted, lowStock);
     }
 
-    @Override
     public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type) {
         User userRef = userRepository.getReferenceById(ctx.userId());
 
