@@ -6,12 +6,16 @@
 ## Предусловия
 - Установлены Docker и Docker Compose
 - В корне проекта есть файл `.env` с актуальными credentials
+- Контейнер `postgres-backup` запущен и healthy (`make backup-status`)
 
 ## Формат бэкапа
 - Custom format (`-Fc`)
 - Создаётся ежедневно в 02:00 по расписанию через `postgres-backup` контейнер
 - Хранится в named volume `postgres_backups`
+- **Шифрование:** если задан `BACKUP_ENCRYPT_KEY` в `.env`, дампы шифруются через GPG (`*.dump.gpg`)
+- **Offsite:** если задан `S3_BUCKET`, успешные дампы дублируются в S3
 - Ротация: не более `BACKUP_RETENTION_COUNT` последних копий
+- Безопасность: пароль передаётся через `~/.pgpass` (`PGPASSFILE`), **никогда** не виден в `ps` или `/proc`
 
 ---
 
@@ -27,8 +31,9 @@ make backup-restore
 1. Остановит приложение
 2. Удалит старый том БД
 3. Создаст чистый Postgres
-4. Восстановит данные из последнего дампа
-5. Запустит приложение
+4. Автоматически дешифрует дамп, если нужно (`restore.sh`)
+5. Восстановит данные из последнего дампа
+6. Запустит приложение
 
 ---
 
@@ -40,11 +45,21 @@ docker compose stop warehouse-app
 ```
 
 ### Шаг 2. Удалить старый том БД (⚠️ необратимо!)
+
+**Важно:** имя volume нужно узнать **до** удаления контейнера — иначе `docker compose ps -q postgres` вернёт пустоту.
+
 ```bash
+# 1. Узнать имя volume (пока контейнер ещё существует)
+VOLUME_NAME=$(docker compose ps -q postgres | xargs -I {} docker inspect --format='{{ range .Mounts }}{{ if eq .Destination "/var/lib/postgresql/data" }}{{ .Name }}{{ end }}{{ end }}' {} | head -1)
+if [ -z "$VOLUME_NAME" ]; then echo "FAIL: не удалось определить volume"; exit 1; fi
+echo "Volume to destroy: $VOLUME_NAME"
+
+# 2. Остановить и удалить контейнер
 docker compose stop postgres
 docker compose rm -f postgres
-# Узнать имя volume и удалить
-docker volume rm $(docker compose ps -q postgres | xargs -I {} docker inspect --format='{{ range .Mounts }}{{ if eq .Destination "/var/lib/postgresql/data" }}{{ .Name }}{{ end }}{{ end }}' {})
+
+# 3. Удалить volume
+docker volume rm "$VOLUME_NAME"
 ```
 
 > Если `xargs` недоступен — посмотри список volumes: `docker volume ls` и удали нужный вручную.
@@ -62,25 +77,23 @@ sleep 10
 docker compose exec postgres-backup sh -c 'ls -lt /backups/'
 ```
 
+Если включено шифрование — файлы будут с расширением `.gpg`.
+
 ### Шаг 5. Восстановить данные
 
 **Способ А — автоматически из последнего дампа (рекомендуется):**
 ```bash
-docker compose exec postgres-backup sh -c 'LATEST=$(ls -1t /backups/*.dump | head -n1); echo "Restoring from: $LATEST"; pg_restore \
-  --clean --if-exists --no-owner --no-acl \
-  -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  "$LATEST"'
+docker compose exec postgres-backup sh -c 'LATEST=$(ls -1t /backups/*.dump* | head -n1); echo "Restoring from: $LATEST"; /restore.sh "$LATEST"'
 ```
+
+> `restore.sh` автоматически дешифрует `.gpg`, если `BACKUP_ENCRYPT_KEY` задан.
 
 **Способ Б — указать имя файла вручную:**
 ```bash
-docker compose exec postgres-backup sh -c 'pg_restore \
-  --clean --if-exists --no-owner --no-acl \
-  -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  "/backups/wh-YYYY-MM-DD-HHMMSS.dump"'
+docker compose exec postgres-backup sh -c '/restore.sh "/backups/wh-YYYY-MM-DD-HHMMSS.dump"'
 ```
 
-> **Важно:** замени `wh-YYYY-MM-DD-HHMMSS.dump` на реальное имя файла из шага 4. Переменные `$POSTGRES_USER` и `$POSTGRES_DB` подставляются автоматически из окружения контейнера.
+> **Важно:** замени `wh-YYYY-MM-DD-HHMMSS.dump` на реальное имя файла из шага 4.
 
 **Почему эти флаги:**
 | Флаг | Назначение |
@@ -89,6 +102,7 @@ docker compose exec postgres-backup sh -c 'pg_restore \
 | `--if-exists` | Не падает, если удалять нечего |
 | `--no-owner` | Сбрасывает OWNER из дампа |
 | `--no-acl` | Сбрасывает GRANT/REVOKE из дампа |
+| `-w` | Не запрашивать пароль интерактивно (берёт из `~/.pgpass`) |
 
 ### Шаг 6. Проверить flyway_schema_history
 ```bash
@@ -133,12 +147,23 @@ Successfully validated all migrations
 
 ```bash
 docker compose stop warehouse-app
-docker compose exec postgres-backup sh -c 'LATEST=$(ls -1t /backups/*.dump | head -n1); pg_restore \
-  --clean --if-exists --no-owner --no-acl \
-  -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  "$LATEST"'
+docker compose exec postgres-backup sh -c 'LATEST=$(ls -1t /backups/*.dump* | head -n1); /restore.sh "$LATEST"'
 docker compose start warehouse-app
 ```
+
+---
+
+## Monitoring: проверка статуса бэкапа
+
+```bash
+make backup-status
+```
+
+Выведет:
+- Время последнего успешного бэкапа
+- Возраст в часах
+- ✅/❌ — свеж ли бэкап (< 25 часов)
+- Статус Docker healthcheck контейнера `postgres-backup`
 
 ---
 
@@ -155,7 +180,6 @@ docker compose start warehouse-app
 - Если таблицы нет — значит дамп делался с `--data-only` (не тот случай, но проверь).
 - Если миграции есть, но validate падает — возможно, checksum mismatch. Это означает, что файлы миграций в `src/main/resources/db/migration/` изменились после создания дампа. **Никогда не редактируй уже применённые миграции.**
 
-
 ### Нет свободного места в volume
 ```bash
 docker system df -v
@@ -169,4 +193,10 @@ docker inspect postgres-backup --format='{{ range .Mounts }}{{ .Type }}: {{ .Des
 
 # Создать дамп вручную
 docker compose exec postgres-backup sh -c '/backup.sh'
+```
+
+### Шифрованный дамп, но restore.sh не дешифрует
+Убедись, что `BACKUP_ENCRYPT_KEY` в `.env` совпадает с ключом, использованным при создании дампа. Контейнер `postgres-backup` должен быть пересоздан после изменения `.env`:
+```bash
+docker compose up -d --force-recreate postgres-backup
 ```

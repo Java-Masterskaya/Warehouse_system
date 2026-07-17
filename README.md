@@ -67,11 +67,16 @@ make up
 |---------|----------|
 | `make backup-now` | Создать дамп немедленно |
 | `make backup-list` | Показать список дампов |
+| `make backup-status` | Проверить статус и свежесть последнего бэкапа |
 | `make backup-restore` | Восстановить из последнего дампа (⚠️ разрушительно) |
 | `make backup-test` | E2E-тест цикла backup → restore |
 
 Расписание: ежедневно в 02:00 (настраивается через TZ в .env, по умолчанию Europe/Moscow)
 через `postgres-backup` контейнер.
+
+**Шифрование:** если задан `BACKUP_ENCRYPT_KEY` в `.env`, дампы шифруются GPG (AES-256).  
+**Offsite:** если задан `S3_BUCKET`, успешные дампы дублируются в S3.  
+**Безопасность:** пароль передаётся через `~/.pgpass` (`PGPASSFILE`), не виден в `ps` или `/proc`.
 
 Подробный рунбук: [`docs/POSTGRES_RESTORE_RUNBOOK.md`](docs/POSTGRES_RESTORE_RUNBOOK.md)
 
