@@ -3,8 +3,9 @@ package com.warehouse.service;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
-import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.DuplicateSkuException;
@@ -14,6 +15,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.item.ItemServiceImpl;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -62,13 +64,16 @@ class ItemServiceImplTest {
     @Mock
     private StockRepository stockRepository;
 
+    @Mock
+    private StockAvailabilityService availabilityService;
+
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 
     private ItemService itemService;
 
     @BeforeEach
     void setUp() {
-        itemService = new ItemServiceImpl(itemRepository, stockRepository, itemMapper);
+        itemService = new ItemServiceImpl(itemRepository, stockRepository, itemMapper, availabilityService);
     }
 
     /**
@@ -359,18 +364,36 @@ class ItemServiceImplTest {
      */
     @Test
     void shouldReturnItemWhenItemExistsAndActive() {
-        ItemDetailsResponse response = new ItemDetailsResponse(
+        ItemDetailsProjection projection = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
                 true, LocalDateTime.now(), LocalDateTime.now()
         );
 
-        when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(response));
+        when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(projection));
+        when(availabilityService.getAvailable(1L)).thenReturn(10);
+        when(availabilityService.getReserved(1L)).thenReturn(3);
 
         ItemDetailsResponse result = itemService.getItem(1L);
 
-        assertEquals(response, result);
+        assertEquals(projection.id(), result.getId());
+        assertEquals(projection.sku(), result.getSku());
+        assertEquals(projection.name(), result.getName());
+        assertEquals(projection.category(), result.getCategory());
+        assertEquals(projection.minStock(), result.getMinStock());
+        assertEquals(projection.currentStock(), result.getCurrentStock());
+        assertEquals(projection.price(), result.getPrice());
+        assertEquals(projection.cost(), result.getCost());
+        assertEquals(projection.active(), result.isActive());
+        assertEquals(projection.createdAt(), result.getCreatedAt());
+        assertEquals(projection.updatedAt(), result.getUpdatedAt());
+
+        assertEquals(10, result.getAvailable());
+        assertEquals(3, result.getReserved());
+
         verify(itemRepository).findWithStock(1L);
+        verify(availabilityService).getAvailable(1L);
+        verify(availabilityService).getReserved(1L);
     }
 
     /**
@@ -392,7 +415,7 @@ class ItemServiceImplTest {
      */
     @Test
     void shouldThrowEntityNotFoundExceptionWhenItemNotActive() {
-        ItemDetailsResponse response = new ItemDetailsResponse(
+        ItemDetailsProjection response = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
                 false, LocalDateTime.now(), LocalDateTime.now()
@@ -528,7 +551,7 @@ class ItemServiceImplTest {
      */
     @Test
     void priceAndCostDisplayedInItemDetails() {
-        ItemDetailsResponse response = new ItemDetailsResponse(
+        ItemDetailsProjection response = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.99), BigDecimal.valueOf(1000.49),
                 true, LocalDateTime.now(), LocalDateTime.now()

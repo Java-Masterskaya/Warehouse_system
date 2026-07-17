@@ -15,13 +15,15 @@ import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
+import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
-import com.warehouse.metric.MetricService;
 import com.warehouse.mapper.StockMovementMapper;
+import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +55,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     StockMovementMapper mapper;
     StockService stockService;
+    StockAvailabilityService availabilityService;
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
@@ -84,23 +87,14 @@ public class StockMovementServiceImpl implements StockMovementService {
         Item item = itemCheckForExist(itemId);
         itemCheckForActive(item);
 
-        log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}",
-                itemId, quantity, ctx.userId());
+        log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}", itemId, quantity, ctx.userId());
 
         int stockAfter = stockService.receiveStock(itemId, quantity);
 
-        User userRef = userRepository.getReferenceById(ctx.userId());
+        StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.RECEIVE);
 
-        StockMovement stockMovement = StockMovement.builder()
-                .item(item)
-                .user(userRef)
-                .type(MovementType.RECEIVE)
-                .quantity(quantity)
-                .build();
-        stockMovementRepository.save(stockMovement);
-
-        log.info("Stock receipt registered: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
-                itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
+        log.info("Stock receipt registered: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}", itemId,
+                quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
         metricService.increment("warehouse.movements.receive.total");
 
@@ -118,40 +112,24 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         itemCheckForActive(item);
 
-        log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}",
-                itemId, quantity, ctx.userId());
+        log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}", itemId, quantity, ctx.userId());
 
         try {
             int stockAfter = stockService.writeOffStock(itemId, quantity);
 
-            User userRef = userRepository.getReferenceById(ctx.userId());
-
-            StockMovement stockMovement = StockMovement.builder()
-                    .item(item)
-                    .user(userRef)
-                    .type(MovementType.WRITE_OFF)
-                    .quantity(quantity)
-                    .build();
-            stockMovementRepository.save(stockMovement);
+            StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.WRITE_OFF);
 
             boolean lowStock = stockAfter < item.getMinStock();
             if (lowStock) {
-                LowStockAlertEvent event = new LowStockAlertEvent(
-                        item.getId(),
-                        item.getSku(),
-                        item.getName(),
-                        stockAfter,
-                        item.getMinStock(),
-                        ctx.username(),
-                        LocalDateTime.now()
-                );
+                LowStockAlertEvent event = new LowStockAlertEvent(item.getId(), item.getSku(), item.getName(),
+                        stockAfter, item.getMinStock(), ctx.username(), LocalDateTime.now());
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
                         try {
                             kafkaProducer.sendLowStockAlert(event);
-                            log.info("LowStockAlert sent: itemId={}, stockAfter={}, minStock={}",
-                                    item.getId(), stockAfter, item.getMinStock());
+                            log.info("LowStockAlert sent: itemId={}, stockAfter={}, minStock={}", item.getId(),
+                                    stockAfter, item.getMinStock());
                         } catch (Exception e) {
                             log.error("Failed to send LowStockAlert for itemId={}: {}", item.getId(), e.getMessage());
                         }
@@ -159,8 +137,8 @@ public class StockMovementServiceImpl implements StockMovementService {
                 });
             }
 
-            log.info("Write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
-                    itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
+            log.info("Write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}", itemId,
+                    quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
             metricService.increment("warehouse.movements.writeoff.total");
 
@@ -173,10 +151,8 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId,
-                                                                             MovementType type,
-                                                                             int page,
-                                                                             int size) {
+    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId, MovementType type, int page,
+            int size) {
         if (!itemRepository.existsById(itemId)) {
             log.warn("Item с id={} не найден", itemId);
             throw EntityNotFoundException.forId("Item", itemId);
@@ -184,22 +160,14 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        Page<StockMovementHistoryResponse> history =
-                stockMovementRepository.findHistoryByItemId(
-                        itemId,
-                        type,
-                        pageable
-                );
+        Page<StockMovementHistoryResponse> history = stockMovementRepository.findHistoryByItemId(itemId, type,
+                pageable);
 
         return PageResponse.from(history);
     }
 
     @Override
-    @Retryable(
-            retryFor = OptimisticLockingFailureException.class,
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 100)
-    )
+    @Retryable(retryFor = OptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 100))
     @Transactional
     @CacheEvict(value = "item", key = "#request.itemId")
     public StockMovementResponse stocktake(StocktakeRequest request, UserContext ctx) {
@@ -209,8 +177,16 @@ public class StockMovementServiceImpl implements StockMovementService {
         Item item = itemCheckForExist(itemId);
         itemCheckForActive(item);
 
-        Stock stock = stockRepository.findByItemId(itemId)
+        //with lock
+        Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
+
+        int reserved = availabilityService.getReserved(itemId);
+        if (counted < reserved) {
+            log.warn("Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. "
+                    + "Physical quantity is lower than active reservations", itemId, counted, reserved);
+            throw StocktakeConflictException.of(counted, reserved);
+        }
 
         int current = stock.getQuantity();
         int delta = counted - current;
@@ -225,46 +201,44 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         User userRef = userRepository.getReferenceById(ctx.userId());
 
-        StockMovement stockMovement = StockMovement.builder()
-                .item(item)
-                .user(userRef)
-                .type(MovementType.ADJUSTMENT)
-                .quantity(delta)
-                .build();
+        StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.ADJUSTMENT)
+                .quantity(delta).build();
         stockMovementRepository.save(stockMovement);
 
         boolean lowStock = counted < item.getMinStock();
         if (lowStock) {
-            LowStockAlertEvent event = new LowStockAlertEvent(
-                    item.getId(),
-                    item.getSku(),
-                    item.getName(),
-                    counted,
-                    item.getMinStock(),
-                    ctx.username(),
-                    LocalDateTime.now()
-            );
+            LowStockAlertEvent event = new LowStockAlertEvent(item.getId(), item.getSku(), item.getName(), counted,
+                    item.getMinStock(), ctx.username(), LocalDateTime.now());
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
                     try {
                         kafkaProducer.sendLowStockAlert(event);
-                        log.info("LowStockAlert sent from stocktake: itemId={}, counted={}, minStock={}",
-                                item.getId(), counted, item.getMinStock());
+                        log.info("LowStockAlert sent from stocktake: itemId={}, counted={}, minStock={}", item.getId(),
+                                counted, item.getMinStock());
                     } catch (Exception e) {
-                        log.error("Failed to send LowStockAlert from stocktake for itemId={}: {}",
-                                item.getId(), e.getMessage());
+                        log.error("Failed to send LowStockAlert from stocktake for itemId={}: {}", item.getId(),
+                                e.getMessage());
                     }
                 }
             });
         }
 
-        log.info("Stocktake: itemId={}, current={}, counted={}, delta={}, userId={}",
-                itemId, current, counted, delta, ctx.userId());
+        log.info("Stocktake: itemId={}, current={}, counted={}, delta={}, userId={}", itemId, current, counted, delta,
+                ctx.userId());
 
         metricService.increment("warehouse.movements.adjustment.total");
 
         return mapper.toResponse(stockMovement, counted, lowStock);
+    }
+
+    @Override
+    public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type) {
+        User userRef = userRepository.getReferenceById(ctx.userId());
+
+        StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(type).quantity(quantity)
+                .build();
+        return stockMovementRepository.save(stockMovement);
     }
 
     private void itemCheckForActive(Item item) {
@@ -275,10 +249,9 @@ public class StockMovementServiceImpl implements StockMovementService {
     }
 
     private Item itemCheckForExist(Long itemId) {
-        return itemRepository.findById(itemId)
-                .orElseThrow(() -> {
-                    log.warn("Item not found: itemId={}", itemId);
-                    return EntityNotFoundException.forId("Item", itemId);
-                });
+        return itemRepository.findById(itemId).orElseThrow(() -> {
+            log.warn("Item not found: itemId={}", itemId);
+            return EntityNotFoundException.forId("Item", itemId);
+        });
     }
 }
