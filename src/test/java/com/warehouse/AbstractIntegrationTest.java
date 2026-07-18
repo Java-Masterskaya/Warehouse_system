@@ -38,6 +38,10 @@ public abstract class AbstractIntegrationTest {
         redis.start();
     }
 
+    protected static RedpandaContainer getRedpanda() {
+        return redpanda;
+    }
+
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);

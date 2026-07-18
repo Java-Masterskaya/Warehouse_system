@@ -47,7 +47,7 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
                 Item.builder().sku("12345676").name("name").category("category").minStock(0).active(true).build());
         Stock stock = stockRepository.save(Stock.builder().item(item).quantity(10).build());
         User user = userRepository.save(
-                User.builder().id(1L).username("name").password("sOme1@@@").role(Role.ROLE_ADMIN).build());
+                User.builder().username("name").password("sOme1@@@").role(Role.ROLE_ADMIN).build());
         ReserveRequest request = new ReserveRequest(7, 1);
         UserContext ctx = new UserContext(user.getId(), user.getUsername());
         ExecutorService executor = Executors.newFixedThreadPool(2);
