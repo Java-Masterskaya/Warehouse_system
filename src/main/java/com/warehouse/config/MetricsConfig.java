@@ -27,7 +27,9 @@ public class MetricsConfig {
                         if (tracer.currentSpan() != null) {
                             traceId = tracer.currentSpan().context().traceId();
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+
+                    }
                 }
 
                 context.addLowCardinalityKeyValue(KeyValue.of("trace_id", traceId));
