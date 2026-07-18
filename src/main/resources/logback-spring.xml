@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <springProperty scope="context" name="application" source="spring.application.name" defaultValue="warehouse-system"/>
+    <springProperty scope="context" name="application" source="spring.application.name"
+                    defaultValue="warehouse-system"/>
 
     <!-- Человекочитаемый формат для dev-профиля (локальная разработка) -->
     <springProfile name="dev | default">
@@ -16,7 +17,7 @@
 
     <!-- JSON-формат для stg/prod профилей -->
     <springProfile name="stg | prod">
-        <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <customFields>{"application":"${application}"}</customFields>
                 <includeMdcKeyName>traceId</includeMdcKeyName>
@@ -30,8 +31,16 @@
                 </fieldNames>
             </encoder>
         </appender>
+
+        <appender name="ASYNC_JSON" class="ch.qos.logback.classic.AsyncAppender">
+            <appender-ref ref="JSON_CONSOLE"/>
+            <queueSize>512</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <includeCallerData>false</includeCallerData>
+        </appender>
+
         <root level="INFO">
-            <appender-ref ref="CONSOLE_JSON"/>
+            <appender-ref ref="ASYNC_JSON"/>
         </root>
     </springProfile>
 </configuration>

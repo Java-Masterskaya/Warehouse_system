@@ -98,5 +98,6 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
+    com.warehouse.consumer: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId}] [spanId=%X{spanId}] %logger{36} - %msg%n"
