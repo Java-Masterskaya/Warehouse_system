@@ -70,18 +70,21 @@ make up
 
 ## Основные эндпоинты
 
-| Метод    | Путь                                 | Описание                       |
-|----------|--------------------------------------|--------------------------------|
+| Метод    | Путь                                 | Описание                      |
+|----------|--------------------------------------|-------------------------------|
 | `GET`    | `/api/items`                         | Список товаров (фильтр, поиск) |
-| `POST`   | `/api/items`                         | Создать товар                  |
-| `PUT`    | `/api/items/{id}`                    | Редактировать товар            |
-| `DELETE` | `/api/items/{id}`                    | Удалить товар                  |
-| `GET`    | `/api/items/{id}/stock`              | Текущий остаток                |
-| `POST`   | `/api/movements/receive`             | Зарегистрировать поступление   |
-| `POST`   | `/api/movements/write-off`           | Списать товар                  |
-| `GET`    | `/api/movements/{itemId}/history`    | История движения               |
-| `POST`   | `/api/inventory/stocktake`           | Инвентаризация                 |
-| `POST`   | `/api/admin/dlq/low-stock/reprocess` | Реобработка DLT                |
+| `POST`   | `/api/items`                         | Создать товар                 |
+| `PUT`    | `/api/items/{id}`                    | Редактировать товар           |
+| `DELETE` | `/api/items/{id}`                    | Удалить товар                 |
+| `GET`    | `/api/items/{id}/stock`              | Текущий остаток               |
+| `POST`   | `/api/movements/receive`             | Зарегистрировать поступление  |
+| `POST`   | `/api/movements/write-off`           | Списать товар                 |
+| `GET`    | `/api/movements/{itemId}/history`    | История движения              |
+| `POST`   | `/api/inventory/stocktake`           | Инвентаризация                |
+| `POST`   | `/api/admin/dlq/low-stock/reprocess` | Реобработка DLT               |
+| `POST`   | `/api/stock/{itemId}/reserve`        | Резервирование остатков       |
+| `POST`   | `/api/stock/{itemId}/release`        | Отмена резервирования         |
+| `POST`   | `/api/stock/{itemId}/write-off`      | Выкуп резерва                 |
 
 Полная спецификация: `docs/warehouse_openapi.yaml`
 

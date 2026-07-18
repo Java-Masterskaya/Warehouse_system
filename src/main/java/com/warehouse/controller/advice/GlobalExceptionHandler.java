@@ -7,12 +7,14 @@ import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InvalidTokenException;
 import com.warehouse.exception.LastAdminDeactivationException;
+import com.warehouse.exception.ReservationException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.exception.TokenReuseException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.StockMovementInvariantException;
+import com.warehouse.exception.StocktakeConflictException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -80,6 +82,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("LAST_ADMIN", ex.getMessage());
     }
 
+    @ExceptionHandler(StocktakeConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleStocktakeConflict(StocktakeConflictException ex) {
+        return new ErrorResponse("INVENTORY_RESULT_LESS_THAN_RESERVED", ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ValidationErrorResponse handleValidation(MethodArgumentNotValidException ex) {
@@ -94,6 +102,12 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleSelfDeactivation(SelfDeactivationException ex) {
         return new ErrorResponse("SELF_DEACTIVATION", ex.getMessage());
+    }
+
+    @ExceptionHandler(ReservationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleUnexpectedReservationStatus(ReservationException ex) {
+        return new  ErrorResponse("UNEXPECTED_RESERVATION_STATUS", ex.getMessage());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
