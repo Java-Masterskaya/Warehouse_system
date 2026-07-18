@@ -1,5 +1,5 @@
 # Makefile для управления стеком приложения Warehouse System
-.PHONY: up down app-up app-down infra-up infra-down consul-up consul-down health test build checkstyle help
+.PHONY: up down app-up app-down infra-up infra-down consul-up consul-down monitor-up monitor-down health test build checkstyle help
 
 ## --- Управление всем стеком ---
 up: ## Запуск всего стека (инфраструктура, приложение)
@@ -21,6 +21,13 @@ consul-up: ## Запуск только Consul и Seed
 
 consul-down: ## Остановка Consul
 	docker-compose down consul consul-seed
+
+## --- Управление мониторингом ---
+monitor-up: ## Запуск мониторинга (Prometheus, Alertmanager, Grafana, Webhook)
+	docker-compose up -d prometheus alertmanager grafana webhook-server
+
+monitor-down: ## Остановка мониторинга
+	docker-compose down prometheus alertmanager grafana webhook-server --remove-orphans
 
 ## --- Управление приложением ---
 app-up: ## Запуск приложения в терминале (инфраструктура должна быть запущена через docker-compose)

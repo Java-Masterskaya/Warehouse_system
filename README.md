@@ -15,6 +15,8 @@ Backend-сервис учёта товарных запасов на склад�
 | Code Quality | Checkstyle                              |
 | Infra        | Docker, Docker Compose                  |
 | Config       | Consul (Centralized Configuration)      |
+| Monitoring   | Prometheus, Alertmanager, Grafana       |
+| Webhook      | Custom webhook-server for alerts        |
 
 ## Быстрый старт
 
@@ -230,6 +232,77 @@ make checkstyle
 - `./gradlew build`
 - `./gradlew check`
 - CI/CD (GitHub Actions)
+
+## Алертинг и мониторинг
+
+Проект использует стек Prometheus + Alertmanager + Grafana для мониторинга и алертинга.
+
+### Alertmanager
+
+**Что делает:** получает алерты от Prometheus и отправляет их на webhook-сервер.
+
+**Настроенные алерты:**
+
+| Алерт | Уровень | Описание |
+|-------|---------|----------|
+| `Brute-force login` | warning | Высокая частота неудачных попыток входа (>5/мин) |
+| `Rejected write-off rate high` | warning | Высокая частота отклонённых списаний (>2 за 5мин) |
+| `Low-stock alert spike` | info | Пики алертов о низких остатках (>3 за 5мин) |
+| `App down` | critical | Приложение недоступно (>1 минута) |
+| `JVM heap > 90%` | warning | Использование heap памяти >90% |
+
+### Webhook Server
+
+**Что делает:** простой сервер для приёма алертов в dev-среде. При получении алерта выводит его в консоль.
+
+**Зачем нужен:** позволяет тестировать алертинг без настройки внешних интеграций (Telegram, Slack и т.д.).
+
+**Пример вывода:**
+```
+============================================================
+WEBHOOK ALERT RECEIVED
+============================================================
+Headers: {...}
+Body: {...}
+============================================================
+```
+
+### Grafana
+
+**Что делает:** визуализация метрик приложения.
+
+**Предустановленные дашборды:** метрики приложения, JVM, Kafka и т.д.
+
+**Доступ:**
+- URL: `http://localhost:3000`
+- Username: `admin`
+- Password: `admin`
+
+**Порты мониторинга:**
+
+| Сервис | Порт |
+|--------|------|
+| Prometheus | 9090 |
+| Alertmanager | 9093 |
+| Grafana | 3000 |
+| Webhook Server | 8082 |
+
+**Настройка мониторинга:**
+
+```bash
+# Запуск мониторинга
+make monitor-up
+```
+
+```bash
+# Остановка мониторинга
+make monitor-down
+```
+
+**Конфигурационные файлы:**
+- `monitoring/prometheus.yml` — настройки Prometheus
+- `monitoring/alertmanager/alertmanager.yml` — настройки Alertmanager
+- `monitoring/grafana/` — дашборды и дата-источники
 
 ## Аутентификация и авторизация (JWT)
 
