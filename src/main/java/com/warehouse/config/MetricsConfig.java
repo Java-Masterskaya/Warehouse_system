@@ -17,12 +17,10 @@ public class MetricsConfig {
             public Observation.Context map(Observation.Context context) {
                 String traceId = "unknown";
 
-                // Пытаемся взять trace_id из контекста
                 Object traceIdFromContext = context.get("traceId");
                 if (traceIdFromContext != null) {
                     traceId = traceIdFromContext.toString();
                 } else {
-                    // Если нет — пробуем через Tracer
                     try {
                         if (tracer.currentSpan() != null) {
                             traceId = tracer.currentSpan().context().traceId();

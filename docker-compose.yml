@@ -136,7 +136,7 @@ services:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - app-network
-    command: # ← ДОБАВИТЬ ЭТУ СЕКЦИЮ
+    command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--enable-feature=exemplar-storage'
 
@@ -186,7 +186,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s    # ← добавить задержку перед первой проверкой
+      start_period: 10s
 
   # --- Promtail ---
   promtail:
