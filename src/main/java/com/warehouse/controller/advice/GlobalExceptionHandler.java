@@ -3,13 +3,15 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
-import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.EntityNotFoundException;
-import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.InvalidTokenException;
 import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.ReservationException;
 import com.warehouse.exception.SelfDeactivationException;
+import com.warehouse.exception.TokenReuseException;
+import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.StockMovementInvariantException;
 import com.warehouse.exception.StocktakeConflictException;
@@ -118,6 +120,20 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleAuthentication(AuthenticationException ex) {
         return new ErrorResponse("UNAUTHORIZED", "Authentication failed");
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleInvalidTokenException(InvalidTokenException ex) {
+        log.warn("Invalid token: {}", ex.getMessage());
+        return new ErrorResponse("INVALID_TOKEN", ex.getMessage());
+    }
+
+    @ExceptionHandler(TokenReuseException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleTokenReuseException(TokenReuseException ex) {
+        log.warn("Token reuse detected: {}", ex.getMessage());
+        return new ErrorResponse("TOKEN_REUSE", ex.getMessage());
     }
 
     @ExceptionHandler(InvalidMovementRequestException.class)

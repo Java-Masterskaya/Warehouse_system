@@ -33,3 +33,5 @@ app:
   jwt:
     secret: test-secret-key-that-is-at-least-256-bits-long
     expiration-ms: 86400000
+    refresh-expiration-ms: 604800000
+    refresh-retry-ttl-seconds: 3
