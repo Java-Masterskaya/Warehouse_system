@@ -3,18 +3,7 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
-import com.warehouse.exception.DuplicateUsernameException;
-import com.warehouse.exception.EntityNotFoundException;
-import com.warehouse.exception.InvalidTokenException;
-import com.warehouse.exception.LastAdminDeactivationException;
-import com.warehouse.exception.ReservationException;
-import com.warehouse.exception.SelfDeactivationException;
-import com.warehouse.exception.TokenReuseException;
-import com.warehouse.exception.InsufficientStockException;
-import com.warehouse.exception.DuplicateSkuException;
-import com.warehouse.exception.InvalidMovementRequestException;
-import com.warehouse.exception.StockMovementInvariantException;
-import com.warehouse.exception.StocktakeConflictException;
+import com.warehouse.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -169,6 +158,28 @@ public class GlobalExceptionHandler {
             message = "Internal server error";
         }
         return new ErrorResponse("INTERNAL_ERROR", message);
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleIdempotencyConflict(IdempotencyConflictException ex) {
+        log.warn("Idempotency conflict: {}", ex.getMessage());
+        return new ErrorResponse("IDEMPOTENCY_CONFLICT", ex.getMessage());
+    }
+
+    @ExceptionHandler(IdempotencyKeyRequiredException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIdempotencyKeyRequired(IdempotencyKeyRequiredException ex) {
+        log.warn("Idempotency key required: {}", ex.getMessage());
+        return new ErrorResponse("IDEMPOTENCY_KEY_REQUIRED", ex.getMessage());
+    }
+
+    @ExceptionHandler(IdempotencyStorageException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleIdempotencyStorage(IdempotencyStorageException ex) {
+        log.error("Idempotency storage error: {}", ex.getMessage(), ex);
+        return new ErrorResponse("IDEMPOTENCY_STORAGE_ERROR",
+                "Internal error processing idempotent request. Please retry with a new key.");
     }
 
     private boolean isAdmin() {

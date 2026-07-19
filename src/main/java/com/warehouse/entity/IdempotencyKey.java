@@ -32,8 +32,11 @@ public class IdempotencyKey {
     @JoinColumn(name = "movement_id")
     private StockMovement movement;
 
+    @Column(name = "request_body_hash", nullable = false, length = 64)
+    private String requestBodyHash;  // Хеш для проверки конфликтов
+
     @Column(name = "response_body", nullable = false, columnDefinition = "TEXT")
-    private String responseBody;
+    private String responseBody; // Полный JSON ответа для возврата
 
     @Column(name = "status_code", nullable = false)
     private Integer statusCode;
