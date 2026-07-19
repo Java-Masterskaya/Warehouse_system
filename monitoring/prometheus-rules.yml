@@ -2,8 +2,8 @@ groups:
   - name: warehouse-alerts
     rules:
       - alert: Brute-force login
-        expr: rate(warehouse_auth_login_failure_total[1m]) > 5
-        for: 1m
+        expr: rate(warehouse_auth_login_failure_total[1m]) > 0.1
+        for: 30s
         labels:
           severity: warning
         annotations:
@@ -12,7 +12,7 @@ groups:
 
       - alert: Rejected write-off rate high
         expr: rate(warehouse_movements_writeoff_rejected_total[5m]) > 2
-        for: 5m
+        for: 2m
         labels:
           severity: warning
         annotations:

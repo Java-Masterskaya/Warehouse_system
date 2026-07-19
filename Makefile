@@ -31,6 +31,8 @@ monitor-down: ## Остановка мониторинга
 
 ## --- Управление приложением ---
 app-up: ## Запуск приложения в терминале (инфраструктура должна быть запущена через docker-compose)
+	@echo "Запуск приложения Warehouse System..."
+	@echo "Убедитесь, что инфраструктура (postgres, redis, kafka, consul) запущена: make infra-up"
 	./gradlew bootRun
 
 app-down: ## Остановка приложения (SIGTERM)
@@ -51,10 +53,12 @@ readiness: ## Проверка readiness-пробы
 
 ## --- Тестирование ---
 test: ## Запуск тестов
+	@echo "Запуск тестов..."
 	./gradlew clean test
 
 ## --- Сборка проекта ---
 build: ## Сборка проекта с тестами и проверкой стиля
+	@echo "Сборка проекта Warehouse System..."
 	./gradlew clean build
 
 ## --- Проверка стиля ---
