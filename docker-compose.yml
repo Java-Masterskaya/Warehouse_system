@@ -136,9 +136,6 @@ services:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - app-network
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--enable-feature=exemplar-storage'
 
   # -- Grafana --
   grafana:
@@ -154,7 +151,6 @@ services:
       - ./monitoring/grafana/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
       - ./monitoring/grafana/dashboards/warehouse.json:/etc/grafana/provisioning/dashboards/warehouse.json
       - ./monitoring/grafana/datasources/tempo.yaml:/etc/grafana/provisioning/datasources/tempo.yaml
-      - ./monitoring/grafana/datasources/loki.yml:/etc/grafana/provisioning/datasources/loki.yml
     networks:
       - app-network
 
@@ -170,43 +166,10 @@ services:
     networks:
       - app-network
 
-  # --- Loki ---
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    ports:
-      - "3100:3100"
-    networks:
-      - app-network
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - loki-data:/loki
-    healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  # --- Promtail ---
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
-    volumes:
-      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: -config.file=/etc/promtail/config.yml
-    networks:
-      - app-network
-    depends_on:
-      - loki
-
 volumes:
   postgres_data:
   redis_data:
   consul_data:
-  loki-data:
 
 networks:
   app-network:
