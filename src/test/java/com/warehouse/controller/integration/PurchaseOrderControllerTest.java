@@ -345,7 +345,7 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                 .getContentAsString();
 
         return objectMapper.readTree(response)
-                .get("token")
+                .get("accessToken")
                 .asText();
     }
 }
