@@ -2,8 +2,7 @@ groups:
   - name: warehouse-alerts
     rules:
       - alert: Brute-force login
-        expr: rate(warehouse_auth_login_failure_total[1m]) > 0.1
-        for: 30s
+        expr: rate(warehouse_auth_login_failure_total[1m]) > 0.2
         labels:
           severity: warning
         annotations:
@@ -11,7 +10,7 @@ groups:
           description: "High rate of login failures: {{ $value | humanize }} failures/s"
 
       - alert: Rejected write-off rate high
-        expr: rate(warehouse_movements_writeoff_rejected_total[5m]) > 2
+        expr: increase(warehouse_movements_writeoff_rejected_total[5m]) > 2
         for: 2m
         labels:
           severity: warning
@@ -20,8 +19,7 @@ groups:
           description: "Rejected write-off rate is {{ $value | humanize }} per 5 minutes"
 
       - alert: Low-stock alert spike
-        expr: rate(warehouse_stock_low_alert_total[5m]) > 3
-        for: 5m
+        expr: increase(warehouse_stock_low_alert_total[5m]) > 3
         labels:
           severity: info
         annotations:
@@ -44,4 +42,4 @@ groups:
           severity: warning
         annotations:
           summary: "JVM heap usage > 90%"
-          description: "JVM heap usage is {{ $value | humanize }}%"
+          description: "JVM heap usage is {{ $value | mul 100 | humanize }}%"

@@ -3,9 +3,9 @@ global:
 
 route:
   group_by: ['alertname', 'severity']
-  group_wait: 5s
-  group_interval: 10s
-  repeat_interval: 30s
+  group_wait: 10s
+  group_interval: 15s
+  repeat_interval: 5m
   receiver: 'webhook-default'
 
 receivers:
