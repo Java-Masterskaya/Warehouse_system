@@ -90,7 +90,12 @@ services:
       - ./monitoring/consul/warehouse-config.yaml:/warehouse-config.yaml:ro
     environment:
       - CONSUL_HOST=consul
-    command: sh /scripts/seed.sh
+    command: >
+      sh -c "
+        # Конвертируем скрипт в LF прямо в контейнере
+        sed -i 's/\r$//' /scripts/seed.sh &&
+        sh /scripts/seed.sh
+      "
     depends_on:
       consul:
         condition: service_healthy
@@ -115,8 +120,8 @@ services:
         condition: service_healthy
       consul-seed:
         condition: service_completed_successfully
-      networks:
-        - app-network
+    networks:
+      - app-network
 
 
     healthcheck:
