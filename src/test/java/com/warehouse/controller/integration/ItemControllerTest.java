@@ -10,7 +10,7 @@ import com.warehouse.entity.Item;
 import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.security.JwtUtil;
+import com.warehouse.security.util.JwtUtil;
 import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -506,8 +506,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
         ItemDetailsResponse response = itemService.getItem(
                 itemRepository.findBySku(sku).get().getId());
 
-        assertThat(response.price().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
-        assertThat(response.cost().compareTo(BigDecimal.valueOf(1000.50))).isEqualTo(0);
+        assertThat(response.getPrice().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(response.getCost().compareTo(BigDecimal.valueOf(1000.50))).isEqualTo(0);
     }
 
     /**
@@ -639,8 +639,8 @@ class ItemControllerTest extends AbstractIntegrationTest {
         assertThat(item.getCost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
 
         ItemDetailsResponse response = itemService.getItem(item.getId());
-        assertThat(response.price().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
-        assertThat(response.cost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
+        assertThat(response.getPrice().compareTo(BigDecimal.valueOf(1501.00))).isEqualTo(0);
+        assertThat(response.getCost().compareTo(BigDecimal.valueOf(1000.44))).isEqualTo(0);
     }
 
     private void createItem(String sku, String name, String category) throws Exception {
@@ -662,6 +662,6 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return objectMapper.readTree(response).get("token").asText();
+        return objectMapper.readTree(response).get("accessToken").asText();
     }
 }

@@ -1,6 +1,7 @@
 package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.security.LoginRequest;
@@ -40,8 +41,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.redpanda.RedpandaContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -68,18 +67,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(classes = WarehouseApp.class)
 @ActiveProfiles("test")
 @Testcontainers
-class DltReprocessingControllerTest {
-
-    static final RedpandaContainer redpanda =
-            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1"));
-
-    static {
-        redpanda.start();
-    }
+class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
     @DynamicPropertySource
     static void kafkaProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.kafka.bootstrap-servers", redpanda::getBootstrapServers);
         registry.add("app.kafka.topics.low-stock.reprocess-batch-size", () -> "5");
     }
 
@@ -170,7 +161,7 @@ class DltReprocessingControllerTest {
 
     private AdminClient createAdminClient() {
         Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers());
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getRedpanda().getBootstrapServers());
         return AdminClient.create(props);
     }
 
@@ -274,7 +265,7 @@ class DltReprocessingControllerTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return objectMapper.readTree(response).get("token").asText();
+        return objectMapper.readTree(response).get("accessToken").asText();
     }
 
     // ==================== DLT Reading ====================
@@ -288,7 +279,7 @@ class DltReprocessingControllerTest {
         List<ConsumerRecord<String, String>> allRecords = new ArrayList<>();
 
         Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers());
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getRedpanda().getBootstrapServers());
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "dlt-test-reader-" + UUID.randomUUID());
