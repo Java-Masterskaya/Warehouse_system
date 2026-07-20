@@ -40,3 +40,12 @@ app:
     expiration-ms: 86400000
     refresh-expiration-ms: 604800000
     refresh-retry-ttl-seconds: 3
+
+management:
+  server:
+    port: 0 # Позволяет Spring Boot выделить случайный порт для менеджмента в тестах
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
