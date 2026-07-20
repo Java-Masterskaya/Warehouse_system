@@ -1,5 +1,6 @@
 package com.warehouse.security.actuator;
 
+import com.warehouse.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,9 +15,12 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = { "management.server.port=0" }
+)
 @ActiveProfiles("test")
-class ActuatorSecurityTest {
+class ActuatorSecurityTest extends AbstractIntegrationTest {
 
     // Spring Boot автоматически подставит рандомный порт основного приложения
     @LocalServerPort

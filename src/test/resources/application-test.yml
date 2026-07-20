@@ -40,12 +40,3 @@ app:
     expiration-ms: 86400000
     refresh-expiration-ms: 604800000
     refresh-retry-ttl-seconds: 3
-
-management:
-  server:
-    port: 0 # Позволяет тестам корректно инициализировать @LocalManagementPort
-  endpoint:
-    health:
-      show-details: when_authorized
-      probes:
-        enabled: true
