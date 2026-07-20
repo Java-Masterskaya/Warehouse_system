@@ -78,8 +78,7 @@ app:
 
 management:
   server:
-    port: 8081          # Выделенный порт для Actuator (будет закрыт от внешних пользователей)
-    address: localhost  # Слушать только локально (docker-сеть сможет ходить напрямую)
+    port: 8081 # Выделенный порт для Actuator (будет закрыт от внешних пользователей)
   endpoints:
     web:
       exposure:
