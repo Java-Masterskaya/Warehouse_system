@@ -5,16 +5,26 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.OutboxDltEvent;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
+import com.warehouse.entity.PurchaseOrder;
+import com.warehouse.entity.PurchaseOrderItem;
+import com.warehouse.entity.Reservation;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
+import com.warehouse.entity.Supplier;
 import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.OutboxDltEventRepository;
 import com.warehouse.repository.OutboxEventRepository;
+import com.warehouse.repository.PurchaseOrderItemRepository;
+import com.warehouse.repository.PurchaseOrderRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
+import com.warehouse.repository.SupplierRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementService;
 
@@ -58,10 +68,25 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     private OutboxEventRepository outboxEventRepository;
 
     @Autowired
+    private OutboxDltEventRepository outboxDltEventRepository;
+
+    @Autowired
     private StockMovementRepository stockMovementRepository;
 
     @Autowired
     private StockAlertRepository stockAlertRepository;
+
+    @Autowired
+    private StockReserveRepository reserveRepository;
+
+    @Autowired
+    private PurchaseOrderItemRepository purchaseOrderItemRepository;
+
+    @Autowired
+    private PurchaseOrderRepository purchaseOrderRepository;
+
+    @Autowired
+    private SupplierRepository supplierRepository;
 
     @Autowired
     private StockMovementService stockMovementService;
@@ -75,12 +100,18 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Очищаем таблицы перед каждым тестом
+        // Очищаем таблицы в правильном порядке, учитывая внешние ключи
+        outboxDltEventRepository.deleteAll();
+        reserveRepository.deleteAll();
         stockAlertRepository.deleteAll();
         stockMovementRepository.deleteAll();
+        purchaseOrderItemRepository.deleteAll();
+        purchaseOrderRepository.deleteAll();
         stockRepository.deleteAll();
         outboxEventRepository.deleteAll();
         itemRepository.deleteAll();
+        supplierRepository.deleteAll();
+
 
         // Создаём тестовый товар
         testItem = new Item();

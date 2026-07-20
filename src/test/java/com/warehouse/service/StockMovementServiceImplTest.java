@@ -16,7 +16,6 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.StocktakeConflictException;
-import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
@@ -617,7 +616,7 @@ class StockMovementServiceImplTest {
 
         verify(stockRepository, never()).save(any());
         verify(stockMovementRepository, never()).save(any());
-        verify(kafkaProducer, never()).sendLowStockAlert(any());
+
     }
 
     /**
