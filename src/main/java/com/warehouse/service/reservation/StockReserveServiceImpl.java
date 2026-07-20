@@ -120,11 +120,11 @@ public class StockReserveServiceImpl implements StockReserveService {
     }
 
     @Override
-    @Scheduled(cron = "0 */5 * * * *")
+    @Scheduled(cron = "0 */1 * * * *")
     @SchedulerLock(
             name = "expireReservationsLock",
-            lockAtLeastFor = "PT1M",
-            lockAtMostFor = "PT4M"
+            lockAtLeastFor = "PT10S",
+            lockAtMostFor = "PT50S"
     )
     @Transactional
     public void expireReservations() {
