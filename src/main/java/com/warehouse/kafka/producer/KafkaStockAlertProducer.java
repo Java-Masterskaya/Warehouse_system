@@ -5,13 +5,12 @@ import com.warehouse.metric.MetricService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 @Service
 @Slf4j
 public class KafkaStockAlertProducer implements KafkaProducerService {
+
     private static final String TOPIC_NAME = "low-stock-alerts";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -22,10 +21,6 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
         this.metricService = metricService;
     }
 
-    @Retryable(
-            retryFor = {Exception.class},
-            backoff = @Backoff(delay = 1000, multiplier = 2)
-    )
     public void sendLowStockAlert(LowStockAlertEvent alert) {
         log.debug("Received low stock alert: {}", alert);
         try {

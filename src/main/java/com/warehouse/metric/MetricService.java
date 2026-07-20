@@ -31,14 +31,4 @@ public class MetricService {
     public void increment(String name) {
         counters.computeIfAbsent(name, n -> Counter.builder(n).register(registry)).increment();
     }
-
-    /**
-     * Инкрементирует метрику с указанным количеством.
-     *
-     * @param name имя метрики
-     * @param amount количество для инкремента
-     */
-    public void increment(String name, int amount) {
-        counters.computeIfAbsent(name, n -> Counter.builder(n).register(registry)).increment(amount);
-    }
 }
