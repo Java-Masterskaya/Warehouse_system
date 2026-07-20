@@ -43,9 +43,9 @@ app:
 
 management:
   server:
-    port: 0 # Позволяет Spring Boot выделить случайный порт для менеджмента в тестах
+    port: 0 # Позволяет тестам корректно инициализировать @LocalManagementPort
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: when_authorized
       probes:
         enabled: true
