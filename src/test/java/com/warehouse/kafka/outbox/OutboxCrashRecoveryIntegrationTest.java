@@ -5,15 +5,11 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Item;
-import com.warehouse.entity.OutboxDltEvent;
+
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
-import com.warehouse.entity.PurchaseOrder;
-import com.warehouse.entity.PurchaseOrderItem;
-import com.warehouse.entity.Reservation;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
-import com.warehouse.entity.Supplier;
 import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.OutboxDltEventRepository;
@@ -111,7 +107,6 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         outboxEventRepository.deleteAll();
         itemRepository.deleteAll();
         supplierRepository.deleteAll();
-
 
         // Создаём тестовый товар
         testItem = new Item();
