@@ -77,13 +77,17 @@ app:
     refresh-retry-ttl-seconds: 60
 
 management:
+  server:
+    port: 8081          # Выделенный порт для Actuator (будет закрыт от внешних пользователей)
+    address: localhost  # Слушать только локально (docker-сеть сможет ходить напрямую)
   endpoints:
     web:
       exposure:
         include: health,info,prometheus,metrics,env,refresh
+      base-path: /actuator
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized # Детали видны только авторизованным пользователям
       probes:
         enabled: true
       group:
