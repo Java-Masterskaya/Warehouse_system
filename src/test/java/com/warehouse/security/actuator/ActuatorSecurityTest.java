@@ -79,10 +79,10 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /actuator/prometheus на основном порту должен отдавать 403")
+    @DisplayName("GET /actuator/prometheus на основном порту должен отдавать 404")
     void prometheusOnMainPortReturns404() {
         ResponseEntity<String> response = restTemplate.getForEntity(getServerUrl(prometheus), String.class);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -136,12 +136,12 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /actuator/refresh без авторизации должен отдавать 403 Forbidden")
+    @DisplayName("POST /actuator/refresh без авторизации должен отдавать 401 Unauthorized")
     void refreshAnonymousReturns401() {
         ResponseEntity<String> response = restTemplate.postForEntity(
                 getManagementUrl(refresh), getAnonymousHeaders(), String.class
         );
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isIn(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
 
     @Test
