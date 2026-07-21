@@ -32,7 +32,7 @@ services:
       - ./scripts/backup.sh:/backup.sh:ro
       - ./scripts/restore.sh:/restore.sh:ro
       - ./scripts/backup-entrypoint.sh:/backup-entrypoint.sh:ro
-    entrypoint: ["/backup-entrypoint.sh"]
+    entrypoint: ["sh", "/backup-entrypoint.sh"]
     networks:
       - app-network
     healthcheck:
