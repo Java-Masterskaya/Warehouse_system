@@ -70,7 +70,7 @@ public class UserServiceImpl implements UserService {
             log.warn("User with id '{}' not found", userId);
             return EntityNotFoundException.forId("User", userId);
         });
-        auditContext.setOldValue(user);
+        auditContext.setOldValue(userMapper.toAuditDto(user));
 
         if (user.getRole() == Role.ROLE_ADMIN) {
             List<User> activeAdmins = userRepository.findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN);
@@ -83,7 +83,7 @@ public class UserServiceImpl implements UserService {
 
         user.setActive(false);
         User saved = userRepository.save(user);
-        auditContext.setNewValue(saved);
+        auditContext.setNewValue(userMapper.toAuditDto(saved));
         auditContext.setEntityId(saved.getId());
     }
 }
