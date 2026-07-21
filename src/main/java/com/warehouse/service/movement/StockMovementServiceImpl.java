@@ -185,17 +185,17 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Retryable(retryFor = OptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 100))
     @Transactional
     @CacheEvict(value = "item", key = "#request.itemId")
+    @Auditable(action = AuditAction.ADJUSTMENT, entityType = EntityType.STOCK_MOVEMENT)
     public StockMovementResponse stocktake(StocktakeRequest request, UserContext ctx) {
         Long itemId = request.itemId();
         int counted = request.countedQuantity();
 
         Item item = itemCheckForExist(itemId);
         itemCheckForActive(item);
-
+        auditContext.setEntityId(itemId);
         //with lock
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
-
         int reserved = availabilityService.getReserved(itemId);
         if (counted < reserved) {
             log.warn("Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. "
@@ -204,6 +204,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         }
 
         int current = stock.getQuantity();
+        auditContext.setOldValue(new StockAuditDto(itemId, current));
         int delta = counted - current;
 
         if (delta == 0) {
@@ -213,6 +214,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         stock.setQuantity(counted);
         stockRepository.save(stock);
+        auditContext.setNewValue(new StockAuditDto(itemId, counted));
 
         User userRef = userRepository.getReferenceById(ctx.userId());
 
