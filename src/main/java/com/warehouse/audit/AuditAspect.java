@@ -19,22 +19,15 @@ public class AuditAspect {
     private final AuditContext auditContext;
 
     @Around("@annotation(auditable)")
-    public Object audit(
-            ProceedingJoinPoint joinPoint,
-            Auditable auditable
-    ) throws Throwable {
+    public Object audit(ProceedingJoinPoint joinPoint, Auditable auditable) throws Throwable {
 
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
+        UserContext userContext = null;
 
-        UserPrincipal principal =
-                (UserPrincipal) authentication.getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        UserContext userContext =
-                new UserContext(
-                        principal.getId(),
-                        principal.getUsername()
-                );
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal) {
+            userContext = new UserContext(principal.getId(), principal.getUsername());
+        }
 
         try {
             Object result = joinPoint.proceed();
