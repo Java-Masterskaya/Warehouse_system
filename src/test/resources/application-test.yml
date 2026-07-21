@@ -7,6 +7,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
   kafka:
     consumer:
       group-id: warehouse-alerts-test
@@ -22,7 +27,7 @@ spring:
       enabled: false
 
   cache:
-    type: redis
+    type: none
 
 redis:
   cache:

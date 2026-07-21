@@ -26,6 +26,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -119,13 +120,20 @@ public class StockReserveServiceImpl implements StockReserveService {
     }
 
     @Override
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(cron = "0 */1 * * * *")
+    @SchedulerLock(
+            name = "expireReservationsLock",
+            lockAtLeastFor = "PT10S",
+            lockAtMostFor = "PT50S"
+    )
     @Transactional
     public void expireReservations() {
+        log.info("Запуск джобы снятия резервов. Замок 'expireReservationsLock' захвачен.");
+
         int updated = stockReserveRepository.expireReservations(LocalDateTime.now());
 
         if (updated > 0) {
-            log.info("Expired {} reservations", updated);
+            log.info("Успешно переведено в статус EXPIRED резервов: {}", updated);
         }
     }
 
