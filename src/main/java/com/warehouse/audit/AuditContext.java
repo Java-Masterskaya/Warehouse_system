@@ -42,5 +42,6 @@ public class AuditContext {
     public void clear() {
         oldValue.remove();
         newValue.remove();
+        entityId.remove();
     }
 }
