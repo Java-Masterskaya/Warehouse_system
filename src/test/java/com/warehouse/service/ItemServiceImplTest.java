@@ -8,11 +8,13 @@ import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.item.ItemServiceImpl;
 import com.warehouse.service.reservation.StockAvailabilityService;
@@ -65,6 +67,9 @@ class ItemServiceImplTest {
     private StockRepository stockRepository;
 
     @Mock
+    private WarehouseRepository warehouseRepository;
+
+    @Mock
     private StockAvailabilityService availabilityService;
 
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
@@ -73,7 +78,13 @@ class ItemServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        itemService = new ItemServiceImpl(itemRepository, stockRepository, itemMapper, availabilityService);
+        itemService = new ItemServiceImpl(
+                itemRepository,
+                stockRepository,
+                warehouseRepository,
+                itemMapper,
+                availabilityService
+        );
     }
 
     /**
@@ -93,6 +104,9 @@ class ItemServiceImplTest {
         item.setCost(BigDecimal.valueOf(75.25));
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(false);
+        when(warehouseRepository.findByDefaultWarehouseTrue()).thenReturn(Optional.of(
+                Warehouse.builder().id(1L).name("Default Warehouse").defaultWarehouse(true).build()
+        ));
         when(itemRepository.save(any(Item.class))).thenAnswer(invocation -> {
             Item savedItem = invocation.getArgument(0);
             savedItem.setId(1L);
@@ -371,8 +385,8 @@ class ItemServiceImplTest {
         );
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(projection));
-        when(availabilityService.getAvailable(1L)).thenReturn(10);
-        when(availabilityService.getReserved(1L)).thenReturn(3);
+        when(availabilityService.getTotalReserved(1L)).thenReturn(3L);
+        when(stockRepository.findAllByItemIdWithWarehouse(1L)).thenReturn(List.of());
 
         ItemDetailsResponse result = itemService.getItem(1L);
 
@@ -388,12 +402,12 @@ class ItemServiceImplTest {
         assertEquals(projection.createdAt(), result.getCreatedAt());
         assertEquals(projection.updatedAt(), result.getUpdatedAt());
 
-        assertEquals(10, result.getAvailable());
+        assertEquals(20, result.getAvailable());
         assertEquals(3, result.getReserved());
 
         verify(itemRepository).findWithStock(1L);
-        verify(availabilityService).getAvailable(1L);
-        verify(availabilityService).getReserved(1L);
+        verify(availabilityService).getTotalReserved(1L);
+        verify(stockRepository).findAllByItemIdWithWarehouse(1L);
     }
 
     /**

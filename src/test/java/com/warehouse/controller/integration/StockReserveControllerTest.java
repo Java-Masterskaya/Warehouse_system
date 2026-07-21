@@ -74,6 +74,7 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(10);
 
         stockRepository.save(stock);

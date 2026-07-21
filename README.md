@@ -97,9 +97,12 @@ make up
 | `POST`   | `/api/items`                                     | Создать товар                       |
 | `PUT`    | `/api/items/{id}`                                | Редактировать товар                 |
 | `DELETE` | `/api/items/{id}`                                | Удалить товар                       |
-| `GET`    | `/api/items/{id}/stock`                          | Текущий остаток                     |
+| `GET`    | `/api/items/{itemId}`                            | Карточка и остатки по складам       |
+| `GET`    | `/api/warehouses`                               | Список складов                      |
+| `POST`   | `/api/warehouses`                               | Создать склад                       |
 | `POST`   | `/api/movements/receive`                         | Зарегистрировать поступление        |
 | `POST`   | `/api/movements/write-off`                       | Списать товар                       |
+| `POST`   | `/api/movements/transfer`                        | Перевести товар между складами      |
 | `GET`    | `/api/movements/{itemId}/history`                | История движения                    |
 | `POST`   | `/api/inventory/stocktake`                       | Инвентаризация                      |
 | `POST`   | `/api/purchase-orders`                           | Создать заказ поставщику            |
@@ -111,7 +114,40 @@ make up
 | `POST`   | `/api/stock/{itemId}/reserve`                    | Резервирование остатков             |
 | `POST`   | `/api/stock/{itemId}/release`                    | Отмена резервирования               |
 | `POST`   | `/api/stock/{itemId}/write-off`                  | Выкуп резерва                       |
+| `GET`    | `/api/reports/low-stock`                         | Товары ниже общего минимума         |
+| `GET`    | `/api/reports/stock-valuation`                   | Общая стоимость остатков            |
 
+## Несколько складов
+
+Миграция V19 создает склад `Default Warehouse` и связывает с ним все старые остатки и движения.
+Идентификаторы строк, количества, история и ссылки резервов при этом сохраняются.
+
+- Остаток хранится отдельно для каждой пары `item + warehouse`.
+- Старые операции receive, write-off, stocktake, reserve и приемка заказа работают со складом по умолчанию.
+- Карточка товара возвращает общий остаток и массив `warehouseStocks` с разбивкой по складам.
+- Low-stock и valuation отчеты считают сумму по всем складам.
+- История движения содержит склад и `transferId` для двух частей перевода.
+
+Пример перевода, доступного только роли `ADMIN`:
+
+```http
+POST /api/movements/transfer
+Authorization: Bearer <access-token>
+Content-Type: application/json
+```
+
+```json
+{
+  "itemId": 42,
+  "fromWarehouseId": 1,
+  "toWarehouseId": 2,
+  "quantity": 7
+}
+```
+
+Операция блокирует оба остатка в стабильном порядке, проверяет доступное количество на складе-источнике,
+уменьшает источник, увеличивает приемник и сохраняет две записи движения с общим `transferId`.
+При нехватке возвращается `422 INSUFFICIENT_STOCK`, а вся транзакция откатывается.
 
 Полная спецификация: `docs/warehouse_openapi.yaml`
 
@@ -482,4 +518,4 @@ Authorization: Bearer ваш_access_token
 
 - Хранение в Redis — все токены хранятся в Redis для быстрой проверки и отзыва.
 
-- Автоматическое обновление — клиент должен автоматически обновлять access токен при получении 401 Unauthorized, используя refresh токен.
+- Автоматическое обновление - клиент должен автоматически обновлять access токен при получении 401 Unauthorized, используя refresh токен.

@@ -108,6 +108,7 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
 
         Stock stock = Stock.builder()
                 .item(item)
+                .warehouse(defaultWarehouse())
                 .quantity(0)
                 .build();
         stockRepository.save(stock);

@@ -25,6 +25,8 @@ public interface StockMovementMapper {
     @Mappings({
         @Mapping(target = "itemId", source = "entity", qualifiedByName = "getItemId"),
         @Mapping(target = "movementId", source = "entity.id"),
+        @Mapping(target = "warehouseId", source = "entity.warehouse.id"),
+        @Mapping(target = "warehouseName", source = "entity.warehouse.name"),
         @Mapping(target = "lowStockAlert", source = "lowStockAlert")
     })
     StockMovementResponse toResponse(StockMovement entity, int stockAfter, boolean lowStockAlert);
@@ -60,7 +62,10 @@ public interface StockMovementMapper {
                 0,         // quantity
                 stockAfter,
                 null,      // createdAt
-                false      // lowStockAlert
+                false,     // lowStockAlert
+                null,      // warehouseId
+                null,      // warehouseName
+                null       // transferId
         );
     }
 }

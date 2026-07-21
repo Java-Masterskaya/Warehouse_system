@@ -6,6 +6,7 @@ import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.entity.Warehouse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,8 @@ class ReservationExpirationRepositoryTest {
     private ItemRepository itemRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private WarehouseRepository warehouseRepository;
 
     @Autowired
     private TestEntityManager entityManager;
@@ -40,9 +43,12 @@ class ReservationExpirationRepositoryTest {
     private Stock stock1;
     private Stock stock2;
     private Stock stock3;
+    private Warehouse defaultWarehouse;
 
     @BeforeEach
     void setUp() {
+        defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
+                .orElseThrow(() -> new IllegalStateException("Default warehouse is not configured"));
         user = userRepository.save(
                 User.builder().username("name").password("passW@23d").role(Role.ROLE_ADMIN).active(true)
                         .createdAt(LocalDateTime.now()).build());
@@ -95,6 +101,10 @@ class ReservationExpirationRepositoryTest {
     }
 
     private Stock addStock(Item item) {
-        return stockRepository.save(Stock.builder().item(item).quantity(10).build());
+        return stockRepository.save(Stock.builder()
+                .item(item)
+                .warehouse(defaultWarehouse)
+                .quantity(10)
+                .build());
     }
 }
