@@ -41,19 +41,20 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login").permitAll()
-                        .requestMatchers("/api/auth/refresh").permitAll()
-                        .requestMatchers("/api/auth/logout").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers("/actuator/health/liveness").permitAll()
-                        .requestMatchers("/actuator/health/readiness").permitAll()
-                        .requestMatchers("/actuator/prometheus").permitAll()
+                        .requestMatchers(
+                                "/api/auth/login",
+                                "/api/auth/refresh",
+                                "/api/auth/logout"
+                        ).permitAll()
+                        .requestMatchers(
+                                "/actuator/prometheus",
+                                "/actuator/health",
+                                "/actuator/health/liveness",
+                                "/actuator/health/readiness"
+                        ).permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/actuator/env").hasRole("ADMIN")
-                        .requestMatchers("/actuator/env/**").hasRole("ADMIN")
-                        .requestMatchers("/actuator/metrics").hasRole("ADMIN")
-                        .requestMatchers("/actuator/info").hasRole("ADMIN")
                         .requestMatchers("/actuator/refresh").hasRole("ADMIN")
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions

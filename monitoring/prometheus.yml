@@ -5,4 +5,4 @@ scrape_configs:
   - job_name: warehouse-app
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ['warehouse-app:8080']
+      - targets: ['warehouse-app:8081']

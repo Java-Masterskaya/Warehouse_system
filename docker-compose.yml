@@ -125,7 +125,7 @@ services:
 
 
     healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness" ]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8081/actuator/health/readiness" ]
       interval: 10s
       timeout: 5s
       retries: 5
