@@ -16,6 +16,15 @@ CREATE TABLE audit_log
     created_at  timestamp with time zone NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX idx_audit_entity
+    ON audit_log(entity_type, entity_id);
+
+CREATE INDEX idx_audit_user
+    ON audit_log(user_id);
+
+CREATE INDEX idx_audit_created_at
+    ON audit_log(created_at);
+
 CREATE FUNCTION prevent_audit_changes()
     RETURNS trigger AS $$
 BEGIN
