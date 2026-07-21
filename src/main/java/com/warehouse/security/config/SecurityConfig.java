@@ -6,7 +6,6 @@ import com.warehouse.security.JwtAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -44,7 +43,7 @@ public class SecurityConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain managementFilterChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher(EndpointRequest.toAnyEndpoint()) // Работает только для портов/путей актуатора
+                .securityMatcher("/actuator/**") // Работает только для портов/путей актуатора
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -65,9 +64,12 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // Эта цепочка обрабатывает всю остальную бизнес-логику приложения
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // исключаем актуатор из основной цепочки, чтобы не было конфликта
+                .securityMatcher(request -> !request.getRequestURI().startsWith("/actuator"))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
