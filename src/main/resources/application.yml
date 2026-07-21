@@ -64,7 +64,7 @@ management:
   tracing:
     enabled: true
     sampling:
-      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.5}
   otlp:
     tracing:
       endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
@@ -106,6 +106,6 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
-    com.warehouse.consumer: WARN
+    com.warehouse.kafka.consumer: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId}] [spanId=%X{spanId}] %logger{36} - %msg%n"
