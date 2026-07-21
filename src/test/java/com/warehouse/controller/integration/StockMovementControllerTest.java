@@ -8,20 +8,25 @@ import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.IdempotencyKeyRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -52,6 +57,9 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private IdempotencyKeyRepository idempotencyKeyRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -104,120 +112,555 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         userToken = jwtUtil.generateToken(testUser.getUsername(), testUser.getId(), List.of("ROLE_USER"));
     }
 
-    /**
-     * ADMIN может зарегистрировать приход товара,
-     * остаток на складе увеличивается на указанное количество.
-     */
-    @Test
-    void adminTokenCanRegisterStockReceiptAndStockQuantityIncreases() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    @Nested
+    @DisplayName("Тесты бизнес-логики")
+    class BusinessLogicTest {
 
-        mockMvc.perform(post("/api/movements/receive")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.itemId").value(testItemId))
-                .andExpect(jsonPath("$.quantity").value(5))
-                .andExpect(jsonPath("$.type").value("RECEIVE"))
-                .andExpect(jsonPath("$.stockAfter").value(15));
+        /**
+         * ADMIN может зарегистрировать приход товара,
+         * остаток на складе увеличивается на указанное количество.
+         */
+        @Test
+        void adminTokenCanRegisterStockReceiptAndStockQuantityIncreases() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
 
-        Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
-        assertThat(updatedStock.getQuantity()).isEqualTo(15);
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.itemId").value(testItemId))
+                    .andExpect(jsonPath("$.quantity").value(5))
+                    .andExpect(jsonPath("$.type").value("RECEIVE"))
+                    .andExpect(jsonPath("$.stockAfter").value(15));
+
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(15);
+        }
+
+        /**
+         * USER токен не может зарегистрировать приход товара,
+         * возвращает статус 403 Forbidden.
+         */
+        @Test
+        void userTokenCannotRegisterStockReceiptReturns403() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + userToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+        }
+
+        /**
+         * Запрос без токена не может зарегистрировать приход товара,
+         * возвращает статус 401 Unauthorized.
+         */
+        @Test
+        void noTokenCannotRegisterStockReceiptReturns401() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+        }
+
+        /**
+         * Приход товара для несуществующего item_id возвращает статус 404 Not Found.
+         */
+        @Test
+        void nonExistentItemReturns404() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(999L, 5);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+        }
+
+        /**
+         * Приход товара для неактивного товара возвращает статус 404 Not Found.
+         */
+        @Test
+        void inactiveItemReturns404() throws Exception {
+            testItem.setActive(false);
+            itemRepository.save(testItem);
+
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+        }
+
+        /**
+         * Валидация: количество = 0 возвращает статус 400 Bad Request.
+         */
+        @Test
+        void zeroQuantityValidationErrorReturns400() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 0);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+        }
+
+        /**
+         * Валидация: отрицательное количество возвращает статус 400 Bad Request.
+         */
+        @Test
+        void negativeQuantityValidationErrorReturns400() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, -1);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+        }
+
+        /**
+         * ADMIN может списать товар со склада,
+         * остаток на складе уменьшается на указанное количество.
+         */
+        @Test
+        void adminTokenCanWriteOffStockAndStockQuantityDecreases() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.itemId").value(testItemId))
+                    .andExpect(jsonPath("$.quantity").value(5))
+                    .andExpect(jsonPath("$.type").value("WRITE_OFF"))
+                    .andExpect(jsonPath("$.stockAfter").value(5));
+
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(5);
+        }
+
+        /**
+         * USER токен не может списать товар,
+         * возвращает статус 403 Forbidden.
+         */
+        @Test
+        void userTokenCannotWriteOffStockReturns403() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + userToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+        }
+
+        /**
+         * Запрос без токена не может списать товар,
+         * возвращает статус 401 Unauthorized.
+         */
+        @Test
+        void noTokenCannotWriteOffStockReturns401() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+        }
+
+        /**
+         * Списание товара для несуществующего item_id возвращает статус 404 Not Found.
+         */
+        @Test
+        void writeOffNonExistentItemReturns404() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(999L, 5);
+
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+        }
+
+        /**
+         * Списание товара для неактивного товара возвращает статус 404 Not Found.
+         */
+        @Test
+        void writeOffInactiveItemReturns404() throws Exception {
+            testItem.setActive(false);
+            itemRepository.save(testItem);
+
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+        }
+
+        /**
+         * Списание товара при недостаточном остатке возвращает статус 422 Unprocessable Entity.
+         */
+        @Test
+        void writeOffInsufficientStockReturns422() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 15);
+
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.error").value("INSUFFICIENT_STOCK"));
+        }
+
+        /**
+         * ADMIN проводит инвентаризацию: фактический остаток (7) меньше учётного (10).
+         * Создаётся движение ADJUSTMENT на -3, остаток обновляется до 7.
+         */
+        @Test
+        void adminStocktakeDecreasesStock() throws Exception {
+            StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+
+            mockMvc.perform(post("/api/inventory/stocktake")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.type").value("ADJUSTMENT"))
+                    .andExpect(jsonPath("$.quantity").value(-3))
+                    .andExpect(jsonPath("$.stockAfter").value(7));
+
+            assertThat(stockRepository.findByItemId(testItemId).orElseThrow().getQuantity()).isEqualTo(7);
+        }
+
+        /**
+         * USER токен не может проводить инвентаризацию,
+         * возвращает статус 403 Forbidden.
+         */
+
+        @Test
+        void userCannotStocktakeReturns403() throws Exception {
+            StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+
+            mockMvc.perform(post("/api/inventory/stocktake")
+                            .header("Authorization", "Bearer " + userToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+        }
+
+        /**
+         * Запрос без токена не может проводить инвентаризацию,
+         * возвращает статус 401 Unauthorized.
+         */
+        @Test
+        void noTokenCannotStocktakeReturns401() throws Exception {
+            StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+
+            mockMvc.perform(post("/api/inventory/stocktake")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+        }
+
+        /**
+         * Валидация: количество = 0 возвращает статус 400 Bad Request.
+         */
+        @Test
+        void writeOffZeroQuantityValidationErrorReturns400() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 0);
+
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+        }
+
+        /**
+         * Валидация: отрицательное количество возвращает статус 400 Bad Request.
+         */
+        @Test
+        void writeOffNegativeQuantityValidationErrorReturns400() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, -1);
+
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+        }
     }
 
-    /**
-     * USER токен не может зарегистрировать приход товара,
-     * возвращает статус 403 Forbidden.
-     */
-    @Test
-    void userTokenCannotRegisterStockReceiptReturns403() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    @Nested
+    @DisplayName("Идемпотентность POST /api/movements/receive")
+    class IdempotencyReceiveTests {
 
-        mockMvc.perform(post("/api/movements/receive")
-                        .header("Authorization", "Bearer " + userToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+        private String idempotencyKey;
+
+        @BeforeEach
+        void setUp() {
+            idempotencyKey = UUID.randomUUID().toString();
+            idempotencyKeyRepository.deleteAll();
+        }
+
+        @Test
+        @DisplayName("Первый запрос с ключом - создает движение и возвращает 200")
+        void firstRequestWithKeyCreatesMovement() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            MvcResult result = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.itemId").value(testItemId))
+                    .andExpect(jsonPath("$.quantity").value(5))
+                    .andExpect(jsonPath("$.type").value("RECEIVE"))
+                    .andExpect(jsonPath("$.stockAfter").value(15))
+                    .andReturn();
+
+            String responseBody = result.getResponse().getContentAsString();
+
+            // Проверяем, что ключ сохранился
+            long keyCount = idempotencyKeyRepository.count();
+            assertThat(keyCount).isEqualTo(1);
+
+            // Проверяем остаток
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(15);
+        }
+
+        @Test
+        @DisplayName("Повторный запрос с тем же ключом и телом - возвращает кешированный ответ, движение не создается")
+        void duplicateRequestWithSameKeyReturnsCachedResponse() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            // Первый запрос
+            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String firstResponse = firstResult.getResponse().getContentAsString();
+
+            // Второй запрос с тем же ключом
+            MvcResult secondResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String secondResponse = secondResult.getResponse().getContentAsString();
+
+            // Ответы должны быть идентичны
+            assertThat(secondResponse).isEqualTo(firstResponse);
+
+            // Проверяем, что остаток увеличился только на 5 (было 10 -> стало 15)
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(15);
+
+            // В БД только одна запись идемпотентного ключа
+            long keyCount = idempotencyKeyRepository.count();
+            assertThat(keyCount).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("Тот же ключ, но измененное тело - возвращает 409 Conflict")
+        void sameKeyDifferentBodyReturnsConflict() throws Exception {
+            // Первый запрос с quantity=5
+            ChangeQuantityMovementRequest firstRequest = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(firstRequest)))
+                    .andExpect(status().isOk());
+
+            // Второй запрос с тем же ключом, но quantity=10
+            ChangeQuantityMovementRequest secondRequest = new ChangeQuantityMovementRequest(testItemId, 10);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(secondRequest)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error").value("IDEMPOTENCY_CONFLICT"));
+
+            // Проверяем, что остаток остался 15 (изменился только один раз)
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(15);
+        }
+
+        @Test
+        @DisplayName("Два разных ключа - создаются два разных движения")
+        void differentKeysCreateDifferentMovements() throws Exception {
+            String key1 = UUID.randomUUID().toString();
+            String key2 = UUID.randomUUID().toString();
+
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+
+            // Первый запрос с key1
+            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", key1)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            // Второй запрос с key2
+            MvcResult secondResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", key2)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            // movementId должны быть разные
+            String firstMovementId = objectMapper.readTree(firstResult.getResponse().getContentAsString())
+                    .get("movementId").asText();
+            String secondMovementId = objectMapper.readTree(secondResult.getResponse().getContentAsString())
+                    .get("movementId").asText();
+
+            assertThat(firstMovementId).isNotEqualTo(secondMovementId);
+
+            // Остаток увеличился на 6 (3+3)
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(16);
+
+            // В БД две записи идемпотентных ключей
+            long keyCount = idempotencyKeyRepository.count();
+            assertThat(keyCount).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Запрос без Idempotency-Key (если ключ обязателен) - возвращает 400")
+        void requestWithoutKeyReturnsBadRequest() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("IDEMPOTENCY_KEY_REQUIRED"));
+        }
     }
 
-    /**
-     * Запрос без токена не может зарегистрировать приход товара,
-     * возвращает статус 401 Unauthorized.
-     */
-    @Test
-    void noTokenCannotRegisterStockReceiptReturns401() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    @Nested
+    @DisplayName("Идемпотентность POST /api/movements/write-off")
+    class IdempotencyWriteOffTests {
 
-        mockMvc.perform(post("/api/movements/receive")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
-    }
+        private String idempotencyKey;
 
-    /**
-     * Приход товара для несуществующего item_id возвращает статус 404 Not Found.
-     */
-    @Test
-    void nonExistentItemReturns404() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(999L, 5);
+        @BeforeEach
+        void setUp() {
+            idempotencyKey = UUID.randomUUID().toString();
+        }
 
-        mockMvc.perform(post("/api/movements/receive")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
-    }
+        @Test
+        @DisplayName("Первый запрос с ключом - создает движение списания")
+        void firstWriteOffRequestWithKeyCreatesMovement() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
 
-    /**
-     * Приход товара для неактивного товара возвращает статус 404 Not Found.
-     */
-    @Test
-    void inactiveItemReturns404() throws Exception {
-        testItem.setActive(false);
-        itemRepository.save(testItem);
+            mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.itemId").value(testItemId))
+                    .andExpect(jsonPath("$.quantity").value(3))
+                    .andExpect(jsonPath("$.type").value("WRITE_OFF"))
+                    .andExpect(jsonPath("$.stockAfter").value(7));
 
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(7);
+        }
 
-        mockMvc.perform(post("/api/movements/receive")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
-    }
+        @Test
+        @DisplayName("Повторный запрос с тем же ключом - возвращает кеш, остаток не меняется")
+        void duplicateWriteOffRequestReturnsCachedResponse() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
 
-    /**
-     * Валидация: количество = 0 возвращает статус 400 Bad Request.
-     */
-    @Test
-    void zeroQuantityValidationErrorReturns400() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 0);
+            // Первый запрос
+            MvcResult firstResult = mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
 
-        mockMvc.perform(post("/api/movements/receive")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
-    }
+            String firstResponse = firstResult.getResponse().getContentAsString();
 
-    /**
-     * Валидация: отрицательное количество возвращает статус 400 Bad Request.
-     */
-    @Test
-    void negativeQuantityValidationErrorReturns400() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, -1);
+            // Второй запрос
+            MvcResult secondResult = mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", idempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
 
-        mockMvc.perform(post("/api/movements/receive")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+            String secondResponse = secondResult.getResponse().getContentAsString();
+
+            // Ответы должны быть одинаковыми
+            assertThat(secondResponse).isEqualTo(firstResponse);
+
+            // Остаток изменился только на 3 (было 10 -> стало 7)
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(7);
+        }
     }
 
     private String obtainToken(String username, String password) throws Exception {
@@ -232,186 +675,4 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         return objectMapper.readTree(response).get("accessToken").asText();
     }
 
-    /**
-     * ADMIN может списать товар со склада,
-     * остаток на складе уменьшается на указанное количество.
-     */
-    @Test
-    void adminTokenCanWriteOffStockAndStockQuantityDecreases() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
-
-        mockMvc.perform(post("/api/movements/write-off")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.itemId").value(testItemId))
-                .andExpect(jsonPath("$.quantity").value(5))
-                .andExpect(jsonPath("$.type").value("WRITE_OFF"))
-                .andExpect(jsonPath("$.stockAfter").value(5));
-
-        Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
-        assertThat(updatedStock.getQuantity()).isEqualTo(5);
-    }
-
-    /**
-     * USER токен не может списать товар,
-     * возвращает статус 403 Forbidden.
-     */
-    @Test
-    void userTokenCannotWriteOffStockReturns403() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
-
-        mockMvc.perform(post("/api/movements/write-off")
-                        .header("Authorization", "Bearer " + userToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
-    }
-
-    /**
-     * Запрос без токена не может списать товар,
-     * возвращает статус 401 Unauthorized.
-     */
-    @Test
-    void noTokenCannotWriteOffStockReturns401() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
-
-        mockMvc.perform(post("/api/movements/write-off")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
-    }
-
-    /**
-     * Списание товара для несуществующего item_id возвращает статус 404 Not Found.
-     */
-    @Test
-    void writeOffNonExistentItemReturns404() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(999L, 5);
-
-        mockMvc.perform(post("/api/movements/write-off")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
-    }
-
-    /**
-     * Списание товара для неактивного товара возвращает статус 404 Not Found.
-     */
-    @Test
-    void writeOffInactiveItemReturns404() throws Exception {
-        testItem.setActive(false);
-        itemRepository.save(testItem);
-
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
-
-        mockMvc.perform(post("/api/movements/write-off")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
-    }
-
-    /**
-     * Списание товара при недостаточном остатке возвращает статус 422 Unprocessable Entity.
-     */
-    @Test
-    void writeOffInsufficientStockReturns422() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 15);
-
-        mockMvc.perform(post("/api/movements/write-off")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.error").value("INSUFFICIENT_STOCK"));
-    }
-
-    /**
-     * ADMIN проводит инвентаризацию: фактический остаток (7) меньше учётного (10).
-     * Создаётся движение ADJUSTMENT на -3, остаток обновляется до 7.
-     */
-    @Test
-    void adminStocktakeDecreasesStock() throws Exception {
-        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
-
-        mockMvc.perform(post("/api/inventory/stocktake")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.type").value("ADJUSTMENT"))
-                .andExpect(jsonPath("$.quantity").value(-3))
-                .andExpect(jsonPath("$.stockAfter").value(7));
-
-        assertThat(stockRepository.findByItemId(testItemId).orElseThrow().getQuantity()).isEqualTo(7);
-    }
-
-    /**
-     * USER токен не может проводить инвентаризацию,
-     * возвращает статус 403 Forbidden.
-     */
-
-    @Test
-    void userCannotStocktakeReturns403() throws Exception {
-        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
-
-        mockMvc.perform(post("/api/inventory/stocktake")
-                        .header("Authorization", "Bearer " + userToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
-    }
-
-    /**
-     * Запрос без токена не может проводить инвентаризацию,
-     * возвращает статус 401 Unauthorized.
-     */
-    @Test
-    void noTokenCannotStocktakeReturns401() throws Exception {
-        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
-
-        mockMvc.perform(post("/api/inventory/stocktake")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
-    }
-
-    /**
-     * Валидация: количество = 0 возвращает статус 400 Bad Request.
-     */
-    @Test
-    void writeOffZeroQuantityValidationErrorReturns400() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 0);
-
-        mockMvc.perform(post("/api/movements/write-off")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
-    }
-
-    /**
-     * Валидация: отрицательное количество возвращает статус 400 Bad Request.
-     */
-    @Test
-    void writeOffNegativeQuantityValidationErrorReturns400() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, -1);
-
-        mockMvc.perform(post("/api/movements/write-off")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
-    }
 }

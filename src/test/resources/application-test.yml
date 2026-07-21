@@ -35,3 +35,7 @@ app:
     expiration-ms: 86400000
     refresh-expiration-ms: 604800000
     refresh-retry-ttl-seconds: 3
+  idempotency:
+    ttl-hours: 1
+    required: true
+    cleanup-cron: "0 0/1 * * * *"
