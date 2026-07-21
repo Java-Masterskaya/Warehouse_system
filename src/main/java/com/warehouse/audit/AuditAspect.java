@@ -32,7 +32,10 @@ public class AuditAspect {
         try {
             Object result = joinPoint.proceed();
 
-            auditService.saveAudit(auditable, userContext);
+            if (auditContext.getOldValue() != null &&
+                    auditContext.getNewValue() != null) {
+                auditService.saveAudit(auditable, userContext);
+            }
 
             return result;
         } finally {

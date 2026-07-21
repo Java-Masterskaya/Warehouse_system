@@ -208,6 +208,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         int delta = counted - current;
 
         if (delta == 0) {
+            auditContext.clear();
             log.info("Stocktake: no change for itemId={}", itemId);
             return mapper.toNoMovementResponse(itemId, counted);
         }
