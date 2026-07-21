@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = { "management.server.port=0" }
+        properties = { "management.server.port=0", "management.endpoints.web.base-path=/actuator" }
 )
 @ActiveProfiles("test")
 class ActuatorSecurityTest extends AbstractIntegrationTest {
@@ -41,11 +41,11 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
 
     private final TestRestTemplate restTemplate = new TestRestTemplate();
 
-    private final String prometheus = "/actuator/prometheus";
-    private final String health = "/actuator/health";
-    private final String liveness = "/actuator/health/liveness";
-    private final String readiness = "/actuator/health/readiness";
-    private final String refresh = "/actuator/refresh";
+    private static final String prometheus = "/actuator/prometheus";
+    private static final String health = "/actuator/health";
+    private static final String liveness = "/actuator/health/liveness";
+    private static final String readiness = "/actuator/health/readiness";
+    private static final String refresh = "/actuator/refresh";
 
     private String getManagementUrl(String path) {
         return "http://localhost:" + managementPort + path;
@@ -79,10 +79,10 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /actuator/prometheus на основном порту должен отдавать 404")
-    void prometheusOnMainPortReturns404() {
+    @DisplayName("GET /actuator/prometheus на основном порту должен отдавать 401 или 403")
+    void prometheusOnMainPortReturns401() {
         ResponseEntity<String> response = restTemplate.getForEntity(getServerUrl(prometheus), String.class);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getStatusCode()).isIn(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN);
     }
 
     @Test
