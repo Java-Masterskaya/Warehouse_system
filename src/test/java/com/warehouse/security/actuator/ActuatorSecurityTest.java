@@ -1,19 +1,28 @@
 package com.warehouse.security.actuator;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.dto.request.security.LoginRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -46,6 +55,29 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
         return "http://localhost:" + serverPort + path;
     }
 
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private String adminToken;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        this.adminToken = obtainAdminToken("admin", "secret");
+    }
+
+    private HttpEntity<Void> getHeadersWithAdminToken() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        return new HttpEntity<>(headers);
+    }
+
+    private HttpEntity<Void> getAnonymousHeaders() {
+        return new HttpEntity<>(new HttpHeaders());
+    }
+
     @Test
     @DisplayName("GET /actuator/prometheus на основном порту должен отдавать 403")
     void prometheusOnMainPortReturns404() {
@@ -73,16 +105,17 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /actuator/health с ролью ADMIN отдает 200 OK и показывает детали")
+    @DisplayName("GET /actuator/health с токеном для ADMIN отдает 200 OK и показывает детали")
     void healthAdminReturns200WithDetails() {
-        // Замените "admin" и "password" на ваши тестовые креды администратора
-        TestRestTemplate adminTemplate = restTemplate.withBasicAuth("admin", "secret");
-
-        ResponseEntity<String> response = adminTemplate.getForEntity(getManagementUrl(health), String.class);
+        ResponseEntity<String> response = restTemplate.exchange(
+                getManagementUrl(health),
+                HttpMethod.GET,
+                getHeadersWithAdminToken(),
+                String.class
+        );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).contains("\"status\":\"UP\"");
-        // Actuator при show-details: when_authorized возвращает детали авторизованному ADMIN
         assertThat(response.getBody()).containsAnyOf("\"components\"", "\"details\"");
     }
 
@@ -105,23 +138,32 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("POST /actuator/refresh без авторизации должен отдавать 403 Forbidden")
     void refreshAnonymousReturns401() {
-        HttpHeaders headers = new HttpHeaders();
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<String> response = restTemplate.postForEntity(getManagementUrl(refresh), entity, String.class);
-
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                getManagementUrl(refresh), getAnonymousHeaders(), String.class
+        );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
-    @DisplayName("POST /actuator/refresh с ролью ADMIN должен отдавать 200 OK")
+    @DisplayName("POST /actuator/refresh с токеном для ADMIN должен отдавать 200 OK")
     void refreshAdminReturns200() {
-        TestRestTemplate adminTemplate = restTemplate.withBasicAuth("admin", "secret");
-        HttpHeaders headers = new HttpHeaders();
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<String> response = adminTemplate.postForEntity(getManagementUrl(refresh), entity, String.class);
+        ResponseEntity<String> response = restTemplate.exchange(
+                getManagementUrl(refresh),
+                HttpMethod.POST,
+                getHeadersWithAdminToken(),
+                String.class
+        );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    private String obtainAdminToken(String username, String password) throws Exception {
+        return objectMapper.readTree(mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new LoginRequest(username, password))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()).get("accessToken").asText();
     }
 }
