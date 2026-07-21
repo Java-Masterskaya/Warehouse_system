@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalManagementPort;
@@ -28,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = { "management.server.port=0", "management.endpoints.web.base-path=/actuator" }
 )
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ActuatorSecurityTest extends AbstractIntegrationTest {
 
@@ -39,7 +41,8 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     @LocalManagementPort
     private int managementPort;
 
-    private final TestRestTemplate restTemplate = new TestRestTemplate();
+    @Autowired
+    private TestRestTemplate restTemplate;
 
     private static final String prometheus = "/actuator/prometheus";
     private static final String health = "/actuator/health";
@@ -79,10 +82,10 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /actuator/prometheus на основном порту должен отдавать 401 или 403")
-    void prometheusOnMainPortReturns401() {
+    @DisplayName("GET /actuator/prometheus на основном порту должен отдавать 404")
+    void prometheusOnMainPortReturns404() {
         ResponseEntity<String> response = restTemplate.getForEntity(getServerUrl(prometheus), String.class);
-        assertThat(response.getStatusCode()).isIn(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
