@@ -1,0 +1,4 @@
+# Shell-скрипты монтируются в Linux-контейнеры (postgres-backup, consul-seed)
+# и обязаны хранить LF-окончания строк даже на Windows (core.autocrlf=true).
+# CRLF ломает shebang и set -o pipefail внутри контейнера.
+*.sh text eol=lf
