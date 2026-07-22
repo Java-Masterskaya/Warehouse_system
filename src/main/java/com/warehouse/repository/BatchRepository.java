@@ -85,4 +85,23 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
             """)
     List<Batch> findAllWithItemByItemId(@Param("itemId") Long itemId);
 
+    /**
+     * Найти партии, срок годности которых истекает в ближайшие N дней.
+     * FEFO: сортировка по expiryDate ASC (ближайшие первыми).
+     * Исключает просроченные и пустые партии.
+     *
+     * @param now текущее время
+     * @param maxDate максимальная дата (now + days)
+     * @return список партий с количеством > 0
+     */
+    @Query("""
+            SELECT b
+            FROM Batch b
+            WHERE b.expiryDate > :now
+            AND b.expiryDate <= :maxDate
+            AND b.quantity > 0
+            ORDER BY b.expiryDate ASC
+            """)
+    List<Batch> findExpiringByDays(@Param("now") LocalDateTime now, @Param("maxDate") LocalDateTime maxDate);
+
 }
