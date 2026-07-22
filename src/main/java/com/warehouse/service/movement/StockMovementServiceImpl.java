@@ -81,7 +81,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Override
     @Transactional
     @CacheEvict(value = "item", key = "#request.itemId")
-    @Auditable(action = AuditAction.RECEIVE, entityType = EntityType.STOCK_MOVEMENT)
+    @Auditable(action = AuditAction.RECEIVE, entityType = EntityType.STOCK)
     public StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -99,7 +99,8 @@ public class StockMovementServiceImpl implements StockMovementService {
         int stockAfter = stockService.receiveStock(itemId, quantity);
 
         StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.RECEIVE);
-        auditContext.setEntityId(stockMovement.getId());
+
+        auditContext.setEntityId(itemId);
         auditContext.setOldValue(new StockAuditDto(itemId, stockAfter - quantity));
         auditContext.setNewValue(new StockAuditDto(itemId, stockAfter));
 
@@ -114,7 +115,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Override
     @Transactional
     @CacheEvict(value = "item", key = "#request.itemId")
-    @Auditable(action = AuditAction.WRITE_OFF, entityType = EntityType.STOCK_MOVEMENT)
+    @Auditable(action = AuditAction.WRITE_OFF, entityType = EntityType.STOCK)
     public StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -129,7 +130,6 @@ public class StockMovementServiceImpl implements StockMovementService {
             int stockAfter = stockService.writeOffStock(itemId, quantity);
 
             StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.WRITE_OFF);
-            auditContext.setEntityId(stockMovement.getId());
 
             boolean lowStock = stockAfter < item.getMinStock();
             if (lowStock) {
@@ -149,6 +149,7 @@ public class StockMovementServiceImpl implements StockMovementService {
                 });
             }
 
+            auditContext.setEntityId(itemId);
             auditContext.setOldValue(new StockAuditDto(itemId, stockAfter + quantity));
             auditContext.setNewValue(new StockAuditDto(itemId, stockAfter));
 
@@ -185,17 +186,17 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Retryable(retryFor = OptimisticLockingFailureException.class, maxAttempts = 3, backoff = @Backoff(delay = 100))
     @Transactional
     @CacheEvict(value = "item", key = "#request.itemId")
-    @Auditable(action = AuditAction.ADJUSTMENT, entityType = EntityType.STOCK_MOVEMENT)
+    @Auditable(action = AuditAction.ADJUSTMENT, entityType = EntityType.STOCK)
     public StockMovementResponse stocktake(StocktakeRequest request, UserContext ctx) {
         Long itemId = request.itemId();
         int counted = request.countedQuantity();
 
         Item item = itemCheckForExist(itemId);
         itemCheckForActive(item);
-        auditContext.setEntityId(itemId);
         //with lock
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
+        auditContext.setEntityId(itemId);
         int reserved = availabilityService.getReserved(itemId);
         if (counted < reserved) {
             log.warn("Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. "
