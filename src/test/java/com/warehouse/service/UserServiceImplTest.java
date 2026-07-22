@@ -56,7 +56,7 @@ public class UserServiceImplTest {
     void setUp() {
         UserMapper userMapper = Mappers.getMapper(UserMapper.class);
 
-        userService = new UserServiceImpl(userRepository, userMapper, passwordEncoder, auditContext);
+        userService = new UserServiceImpl(userRepository, userMapper, passwordEncoder, auditContext, tokenService);
     }
 
     /**

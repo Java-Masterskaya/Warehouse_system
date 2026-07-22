@@ -34,6 +34,10 @@ public class AuditAspect {
             userContext = new UserContext(principal.getId(), principal.getUsername());
         }
 
+        // Безопасное извлечение данных пользователя
+        Long userId = getSafeUserId(userContext);
+        String username = getSafeUsername(userContext);
+
         try {
             Object result = joinPoint.proceed();
 
@@ -42,9 +46,7 @@ public class AuditAspect {
             }
 
             AuditEvent event = new AuditEvent(auditable.action(), auditable.entityType(), auditContext.getEntityId(),
-                    userContext.userId(),
-                    userContext.username(), auditContext.getOldValue(),
-                    auditContext.getNewValue());
+                    userId, username, auditContext.getOldValue(), auditContext.getNewValue());
 
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -70,6 +72,22 @@ public class AuditAspect {
         } catch (Exception e) {
             log.error("Failed to save audit log: action={}, entityType={}, entityId={}", event.action(),
                     event.entityType(), event.entityId(), e);
+        }
+    }
+
+    private Long getSafeUserId(UserContext userContext) {
+        if (userContext == null) {
+            return -1L;
+        } else {
+            return userContext.userId();
+        }
+    }
+
+    private String getSafeUsername(UserContext userContext) {
+        if (userContext == null) {
+            return "SYSTEM";
+        } else {
+            return userContext.username();
         }
     }
 }

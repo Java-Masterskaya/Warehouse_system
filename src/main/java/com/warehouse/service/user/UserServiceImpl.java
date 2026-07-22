@@ -86,7 +86,7 @@ public class UserServiceImpl implements UserService {
         user.setActive(false);
         User saved = userRepository.save(user);
         auditContext.setNewValue(userMapper.toAuditDto(saved));
-        auditContext.setEntityId(saved.getId());
+        auditContext.setEntityId(user.getId());
 
         tokenService.blacklistAllUserAccessTokens(userId);
         // Revoke all tokens for this user

@@ -2,7 +2,6 @@ package com.warehouse.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.audit.AuditRepository;
 import com.warehouse.audit.entity.AuditAction;
@@ -27,7 +26,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,9 +46,6 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private AuditRepository auditRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     @Autowired
     private TokenService tokenService;
