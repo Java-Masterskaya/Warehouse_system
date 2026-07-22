@@ -96,9 +96,9 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             } catch (JsonProcessingException e) {
                 // Критическая ошибка - не можем десериализовать сохраненный ответ
                 // Это указывает на повреждение данных в БД или изменение структуры DTO
-                log.error("CRITICAL: Failed to deserialize cached response for key={}, endpoint={}. " +
-                        "This indicates data corruption or incompatible DTO changes. " +
-                        "Error: {}", key, endpoint, e.getMessage());
+                log.error("CRITICAL: Failed to deserialize cached response for key={}, endpoint={}. "
+                        + "This indicates data corruption or incompatible DTO changes. "
+                        + "Error: {}", key, endpoint, e.getMessage());
                 throw new IdempotencyStorageException(
                         "Failed to retrieve cached response for idempotency key: " + key, e
                 );

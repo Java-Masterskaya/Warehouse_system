@@ -12,10 +12,10 @@ import java.util.Optional;
 
 public interface IdempotencyKeyRepository extends JpaRepository<IdempotencyKey, Long> {
 
-    @Query("SELECT ik FROM IdempotencyKey ik " +
-            "JOIN FETCH ik.user " +
-            "LEFT JOIN FETCH ik.movement " +
-            "WHERE ik.keyHash = :keyHash AND ik.user.id = :userId AND ik.endpoint = :endpoint")
+    @Query("SELECT ik FROM IdempotencyKey ik "
+            + "JOIN FETCH ik.user "
+            + "LEFT JOIN FETCH ik.movement "
+            + "WHERE ik.keyHash = :keyHash AND ik.user.id = :userId AND ik.endpoint = :endpoint")
     Optional<IdempotencyKey> findByKeyHashAndUserIdAndEndpoint(
             @Param("keyHash") String keyHash,
             @Param("userId") Long userId,

@@ -40,7 +40,10 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class IdempotencyServiceImplTest {
@@ -104,7 +107,8 @@ class IdempotencyServiceImplTest {
                     idempotencyService.processIdempotentRequest(contextWithoutKey, requestBody, operation)
             )
                     .isInstanceOf(IdempotencyKeyRequiredException.class)
-                    .hasMessageContaining("Idempotency-Key header is required for "+ ENDPOINT + " endpoint" );
+                    .hasMessageContaining("Idempotency-Key header is required for "
+                            + ENDPOINT + " endpoint");
         }
 
         @Test
@@ -210,7 +214,8 @@ class IdempotencyServiceImplTest {
                     .user(user)
                     .endpoint(ENDPOINT)
                     .requestBodyHash(bodyHash)
-                    .responseBody("{\"itemId\":1,\"movementId\":100,\"type\":\"RECEIVE\",\"quantity\":5,\"stockAfter\":10,\"lowStockAlert\":false}")
+                    .responseBody("{\"itemId\":1,\"movementId\":100,\"type\":\"RECEIVE\","
+                            + "\"quantity\":5,\"stockAfter\":10,\"lowStockAlert\":false}")
                     .statusCode(200)
                     .expiresAt(LocalDateTime.now().plusHours(24))
                     .build();

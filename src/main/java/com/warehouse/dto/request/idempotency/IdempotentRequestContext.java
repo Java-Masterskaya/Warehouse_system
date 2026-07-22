@@ -5,6 +5,10 @@ import com.warehouse.dto.UserContext;
 /**
  * DTO для группировки параметров идемпотентного запроса.
  * Используется для передачи данных в сервис идемпотентности.
+ *
+ * @param idempotencyKey идемпотентный ключ из заголовка Idempotency-Key
+ * @param endpoint       эндпоинт, на который был отправлен запрос
+ * @param userContext    контекст пользователя, выполняющего операцию
  */
 public record IdempotentRequestContext(
         String idempotencyKey,
