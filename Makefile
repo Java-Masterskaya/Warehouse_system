@@ -1,5 +1,5 @@
 # Makefile для управления стеком приложения Warehouse System
-.PHONY: up down app-up app-down infra-up infra-down consul-up consul-down health liveness readiness test build checkstyle clean help backup-now backup-list backup-restore backup-test backup-status
+.PHONY: up down app-up app-down infra-up infra-down consul-up consul-down monitor-up monitor-down health liveness readiness test build checkstyle clean help backup-now backup-list backup-restore backup-test backup-status
 
 ## --- Управление всем стеком ---
 up: ## Запуск всего стека (инфраструктура, приложение)
@@ -22,8 +22,17 @@ consul-up: ## Запуск только Consul и Seed
 consul-down: ## Остановка Consul
 	docker-compose down consul consul-seed
 
+## --- Управление мониторингом ---
+monitor-up: ## Запуск мониторинга (Prometheus, Alertmanager, Grafana, Webhook)
+	docker-compose up -d prometheus alertmanager grafana webhook-server
+
+monitor-down: ## Остановка мониторинга
+	docker-compose down prometheus alertmanager grafana webhook-server --remove-orphans
+
 ## --- Управление приложением ---
 app-up: ## Запуск приложения в терминале (инфраструктура должна быть запущена через docker-compose)
+	@echo "Запуск приложения Warehouse System..."
+	@echo "Убедитесь, что инфраструктура (postgres, redis, kafka, consul) запущена: make infra-up"
 	./gradlew bootRun
 
 app-down: ## Остановка приложения (SIGTERM)
@@ -44,10 +53,12 @@ readiness: ## Проверка readiness-пробы
 
 ## --- Тестирование ---
 test: ## Запуск тестов
+	@echo "Запуск тестов..."
 	./gradlew clean test
 
 ## --- Сборка проекта ---
 build: ## Сборка проекта с тестами и проверкой стиля
+	@echo "Сборка проекта Warehouse System..."
 	./gradlew clean build
 
 ## --- Проверка стиля ---
@@ -62,7 +73,6 @@ help: ## Показать эту справку
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 ## --- Backup & Restore ---
-
 backup-now: ## Создать бэкап немедленно
 	@docker compose exec postgres-backup sh /backup.sh
 

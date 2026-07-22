@@ -1,0 +1,43 @@
+groups:
+  - name: warehouse-alerts
+    rules:
+      - alert: Brute-force login
+        expr: increase(warehouse_auth_login_failure_total[1m]) > 5
+        labels:
+          severity: warning
+        annotations:
+          summary: "Brute-force login detected"
+          description: "Login failures: {{ $value | humanize }} in the last minute"
+
+      - alert: Rejected write-off rate high
+        expr: increase(warehouse_movements_writeoff_rejected_total[5m]) > 2
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rejected write-off rate"
+          description: "Rejected write-offs: {{ $value | humanize }} in the last 5 minutes"
+
+      - alert: Low-stock alert spike
+        expr: increase(warehouse_stock_low_alert_total[5m]) > 2
+        labels:
+          severity: info
+        annotations:
+          summary: "Low-stock alert spike"
+          description: "Low-stock alerts: {{ $value | humanize }} in the last 5 minutes"
+
+      - alert: App down
+        expr: up{job="warehouse-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Warehouse app is down"
+          description: "App warehouse-app has been down for more than 1 minute"
+
+      - alert: JVM heap > 90%
+        expr: sum by (job) (jvm_memory_used_bytes{area="heap", id!="G1 Eden Space", id!="G1 Survivor Space"}) / sum by (job) (jvm_memory_max_bytes{area="heap", id!="G1 Eden Space", id!="G1 Survivor Space"}) > 0.9
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM heap usage > 90%"
+          description: "JVM heap usage is {{ $value | humanizePercentage }}"
