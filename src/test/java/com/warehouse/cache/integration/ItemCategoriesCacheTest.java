@@ -2,6 +2,7 @@ package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.entity.Item;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
@@ -32,9 +33,13 @@ class ItemCategoriesCacheTest extends AbstractIntegrationTest {
     @Autowired
     private ItemService itemService;
 
+    @Autowired
+    private BatchRepository batchRepository;
+
     @BeforeEach
     void setUp() {
         stockMovementRepository.deleteAllInBatch();
+        batchRepository.deleteAll();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
 

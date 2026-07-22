@@ -12,6 +12,7 @@ import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
 import com.warehouse.repository.*;
+import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.movement.StockMovementService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -83,6 +84,9 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private BatchRepository batchRepository;
 
+    @Autowired
+    private BatchService batchService;
+
     private Item testItem;
     private Long testItemId;
     private User testUser;
@@ -111,15 +115,22 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         testItem.setActive(true);
         testItem = itemRepository.save(testItem);
 
-        // Создаём остаток
+        // Создаём остаток и партию вручную (чтобы FEFO могла работать)
         Stock stock = new Stock();
         stock.setItem(testItem);
         stock.setQuantity(20);
         stockRepository.save(stock);
 
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
+        batch.setItem(testItem);
+        batch.setQuantity(20);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
+        batchRepository.save(batch);
+
         testItemId = testItem.getId();
 
-        // Создаём пользователя
+        // Создаём пользователя для write-off операций
         testUser = new User();
         testUser.setUsername("crash-test-" + System.currentTimeMillis());
         testUser.setPassword("password");

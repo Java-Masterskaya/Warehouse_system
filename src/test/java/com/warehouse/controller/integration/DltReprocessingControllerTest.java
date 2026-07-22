@@ -115,6 +115,8 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Test setup...");
 
         jdbcTemplate.update("DELETE FROM stock_alerts");
+        jdbcTemplate.update("DELETE FROM batches");
+
         jdbcTemplate.update("DELETE FROM stock");
         jdbcTemplate.update("DELETE FROM items");
         jdbcTemplate.update("DELETE FROM users");

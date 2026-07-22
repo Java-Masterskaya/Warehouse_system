@@ -4,6 +4,7 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
@@ -36,6 +37,8 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
 
     @Autowired
     CacheManager cacheManager;
+    @Autowired
+    private BatchRepository batchRepository;
 
     private Long itemId;
 
@@ -44,6 +47,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         cacheManager.getCache("item").clear();
 
         stockMovementRepository.deleteAllInBatch();
+        batchRepository.deleteAll();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
 
