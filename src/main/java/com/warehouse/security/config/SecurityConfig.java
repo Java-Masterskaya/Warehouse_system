@@ -24,6 +24,8 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 
 import java.io.IOException;
 
@@ -69,7 +71,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 // исключаем актуатор из основной цепочки, чтобы не было конфликта
-                .securityMatcher(request -> !request.getRequestURI().startsWith("/actuator"))
+                .securityMatcher(new NegatedRequestMatcher(AntPathRequestMatcher.antMatcher("/actuator/**")))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
