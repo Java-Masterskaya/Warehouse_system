@@ -1,12 +1,14 @@
 package com.warehouse.audit;
 
+import com.warehouse.audit.dto.AuditEvent;
 import com.warehouse.audit.entity.AuditLogEntity;
-import com.warehouse.dto.UserContext;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -17,15 +19,14 @@ import java.time.LocalDateTime;
 public class AuditService {
 
     AuditRepository auditRepository;
-    AuditContext auditContext;
 
-    public void saveAudit(Auditable auditable, UserContext ctx) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveAudit(AuditEvent event) {
 
-        AuditLogEntity entity = AuditLogEntity.builder().auditAction(auditable.action())
-                                              .entityType(auditable.entityType()).entityId(auditContext.getEntityId())
-                                              .userId(ctx.userId()).username(ctx.username())
-                                              .oldValue(auditContext.getOldValue()).newValue(auditContext.getNewValue())
-                                              .createdAt(LocalDateTime.now()).build();
+        AuditLogEntity entity = AuditLogEntity.builder().auditAction(event.action()).entityType(event.entityType())
+                                              .entityId(event.entityId()).userId(event.userId())
+                                              .username(event.username()).oldValue(event.oldValue())
+                                              .newValue(event.newValue()).createdAt(LocalDateTime.now()).build();
 
         auditRepository.save(entity);
     }
