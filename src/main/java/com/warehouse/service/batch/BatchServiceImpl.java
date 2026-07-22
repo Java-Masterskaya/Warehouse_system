@@ -93,30 +93,32 @@ public class BatchServiceImpl implements BatchService {
                 break;
             }
 
-            if (batch.getQuantity() <= remaining) {
+            int batchQty = batch.getQuantity();
+            if (batchQty <= remaining) {
                 // Списываем всю партию
                 log.debug("Writing off entire batch: id={}, quantity={}, remaining={}",
-                        batch.getId(), batch.getQuantity(), remaining);
-                remaining -= batch.getQuantity();
+                        batch.getId(), batchQty, remaining);
+                remaining -= batchQty;
                 batch.setQuantity(0);
             } else {
                 // Списываем часть партии
                 log.debug("Writing off partial batch: id={}, batchQty={}, writeOff={}, remaining={}",
-                        batch.getId(), batch.getQuantity(), remaining, 0);
-                batch.setQuantity(batch.getQuantity() - remaining);
+                        batch.getId(), batchQty, remaining, 0);
+                batch.setQuantity(batchQty - remaining);
                 remaining = 0;
             }
             batchRepository.save(batch); // @Version гарантирует атомарность для каждой партии
         }
 
-        // Пересчитываем total quantity из партий
-        int totalQuantity = batches.stream().mapToInt(Batch::getQuantity).sum();
-        stock.setQuantity(totalQuantity);
+        // Уменьшаем общий остаток на фактически списанное количество
+        int actuallyWrittenOff = quantity - remaining;
+        int newStockQuantity = stock.getQuantity() - actuallyWrittenOff;
+        stock.setQuantity(newStockQuantity);
         stockRepository.save(stock); // @Version гарантирует атомарность
 
-        log.info("FEFO write-off completed: itemId={}, requested={}, remaining={}, totalStock={}",
-                itemId, quantity, remaining, totalQuantity);
+        log.info("FEFO write-off completed: itemId={}, requested={}, actuallyWrittenOff={}, newStockQuantity={}",
+                itemId, quantity, actuallyWrittenOff, newStockQuantity);
 
-        return quantity - remaining; // Возвращаем actual списанное количество
+        return newStockQuantity; // Возвращаем остаток после списания
     }
 }

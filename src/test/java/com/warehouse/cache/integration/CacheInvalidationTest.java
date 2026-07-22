@@ -132,15 +132,22 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
      */
     @Test
     void writeOffMovementShouldEvictItemCache() {
-        ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.getCurrentStock()).isEqualTo(10);
-
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 3, LocalDateTime.now());
-        stockMovementService.writeOffReceipt(movementRequest,
+        // Сначала создаем партию через приход
+        ChangeQuantityMovementRequest receiptRequest = new ChangeQuantityMovementRequest(itemId, 10, LocalDateTime.now().plusDays(1));
+        stockMovementService.registerReceipt(receiptRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
-        ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.getCurrentStock()).isEqualTo(7);
+        // Проверяем, что приход сработал
+        ItemDetailsResponse response1 = itemService.getItem(itemId);
+        assertThat(response1.getCurrentStock()).isEqualTo(20);
+
+        // Теперь списываем
+        ChangeQuantityMovementRequest writeOffRequest = new ChangeQuantityMovementRequest(itemId, 3, LocalDateTime.now());
+        stockMovementService.writeOffReceipt(writeOffRequest,
+                new com.warehouse.dto.UserContext(1L, "admin"));
+
+        ItemDetailsResponse response2 = itemService.getItem(itemId);
+        assertThat(response2.getCurrentStock()).isEqualTo(17);
     }
 
     /**
