@@ -42,8 +42,8 @@ public class AuditAspect {
             }
 
             AuditEvent event = new AuditEvent(auditable.action(), auditable.entityType(), auditContext.getEntityId(),
-                    userContext != null ? userContext.userId() : null,
-                    userContext != null ? userContext.username() : null, auditContext.getOldValue(),
+                    userContext.userId(),
+                    userContext.username(), auditContext.getOldValue(),
                     auditContext.getNewValue());
 
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -64,7 +64,7 @@ public class AuditAspect {
 
     }
 
-    private void saveAudit(AuditEvent event){
+    private void saveAudit(AuditEvent event) {
         try {
             auditService.saveAudit(event);
         } catch (Exception e) {

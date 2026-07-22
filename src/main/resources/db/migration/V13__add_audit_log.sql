@@ -37,3 +37,29 @@ CREATE TRIGGER audit_log_no_update_delete
     ON audit_log
     FOR EACH ROW
 EXECUTE FUNCTION prevent_audit_changes();
+
+-- Функция для очистки записей старше retention_days дней
+CREATE OR REPLACE FUNCTION purge_old_audit_logs(retention_days INT, batch_size INT)
+    RETURNS INT AS $$
+DECLARE
+    deleted_count INT := 0;
+    rows_in_batch INT;
+BEGIN
+    LOOP
+        DELETE FROM audit_log
+        WHERE id IN (
+            SELECT id FROM audit_log
+            WHERE created_at < NOW() - (retention_days || ' days')::INTERVAL
+            LIMIT batch_size
+        );
+
+        GET DIAGNOSTICS rows_in_batch = ROW_COUNT;
+        deleted_count := deleted_count + rows_in_batch;
+
+        -- Если удалили меньше размера батча, значит, больше старых данных нет
+        EXIT WHEN rows_in_batch < batch_size;
+    END LOOP;
+
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;

@@ -42,6 +42,11 @@ spring:
     timeout-per-shutdown-phase: 20s
 
 app:
+  audit:
+    retention:
+      # 1.5 года (18 месяцев) для покрытия закрытия фин. года и проверок в Q1
+      days: 547
+      batch-size: 5000
   kafka:
     topics:
       low-stock:

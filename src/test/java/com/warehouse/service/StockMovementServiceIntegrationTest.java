@@ -80,7 +80,7 @@ public class StockMovementServiceIntegrationTest extends AbstractIntegrationTest
 
             assertThat(audit.getAuditAction()).isEqualTo(AuditAction.RECEIVE);
 
-            assertThat(audit.getEntityType()).isEqualTo(EntityType.STOCK_MOVEMENT);
+            assertThat(audit.getEntityType()).isEqualTo(EntityType.STOCK);
 
             assertThat(audit.getUsername()).isEqualTo(admin.getUsername());
 
@@ -133,7 +133,7 @@ public class StockMovementServiceIntegrationTest extends AbstractIntegrationTest
 
             assertThat(audit.getAuditAction()).isEqualTo(AuditAction.WRITE_OFF);
 
-            assertThat(audit.getEntityType()).isEqualTo(EntityType.STOCK_MOVEMENT);
+            assertThat(audit.getEntityType()).isEqualTo(EntityType.STOCK);
 
             JsonNode oldNode = audit.getOldValue();
             JsonNode newNode = audit.getNewValue();

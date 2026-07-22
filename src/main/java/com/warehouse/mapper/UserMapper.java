@@ -15,5 +15,6 @@ public interface UserMapper {
     User toEntity(UserCreateRequest request);
 
     UserResponse toResponse(User user);
+
     UserAuditDto toAuditDto(User user);
 }
