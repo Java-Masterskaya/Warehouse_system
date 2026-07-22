@@ -5,10 +5,12 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.OutboxEventRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -52,6 +54,9 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     private StockMovementRepository stockMovementRepository;
 
     @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
     private StockMovementService stockMovementService;
 
     @Autowired
@@ -75,11 +80,18 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         testItem.setActive(true);
         testItem = itemRepository.save(testItem);
 
-        // Создаём остаток
+        // Создаём остаток и партию
         Stock stock = new Stock();
         stock.setItem(testItem);
         stock.setQuantity(20);
         stockRepository.save(stock);
+
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        Batch batch = new Batch();
+        batch.setItem(testItem);
+        batch.setQuantity(20);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365));
+        batchRepository.save(batch);
 
         testItemId = testItem.getId();
 

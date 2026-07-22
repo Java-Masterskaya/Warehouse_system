@@ -8,6 +8,7 @@ import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
@@ -52,6 +53,9 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -79,6 +83,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         stock.setItem(testItem);
         stock.setQuantity(10);
         stockRepository.save(stock);
+
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
+        batch.setItem(testItem);
+        batch.setQuantity(10);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
+        batchRepository.save(batch);
 
         testItemId = testItem.getId();
 

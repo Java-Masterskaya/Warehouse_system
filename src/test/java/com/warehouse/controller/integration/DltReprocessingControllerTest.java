@@ -10,10 +10,7 @@ import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
-import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockAlertRepository;
-import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.UserRepository;
+import com.warehouse.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -38,6 +35,10 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
+import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -105,6 +106,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private BatchRepository batchRepository;
+
     private String adminToken;
     private String userToken;
     private Item testItem;
@@ -114,7 +118,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         log.info("Test setup...");
 
+        // Удаляем в правильном порядке, чтобы избежать ошибок внешних ключей
         jdbcTemplate.update("DELETE FROM stock_alerts");
+        jdbcTemplate.update("DELETE FROM stock_movements");
         jdbcTemplate.update("DELETE FROM batches");
 
         jdbcTemplate.update("DELETE FROM stock");
@@ -152,6 +158,13 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .quantity(5)
                 .build();
         stockRepository.save(stock);
+
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
+        batch.setItem(testItem);
+        batch.setQuantity(5);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
+        batchRepository.save(batch);
 
         adminToken = obtainToken("admin", "secret");
         userToken = obtainToken("testuser", "password");
