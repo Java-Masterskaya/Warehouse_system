@@ -1,8 +1,7 @@
 package com.warehouse.kafka.consumer;
 
 import com.warehouse.dto.event.LowStockAlertEvent;
-import com.warehouse.entity.StockAlert;
-import com.warehouse.mapper.StockAlertMapper;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import lombok.AccessLevel;
@@ -11,11 +10,14 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Потребитель событий о низком остатке товара.
  * Сохраняет каждый полученный алерт в базу данных.
  * Использует кастомный container factory с errorHandler и DLT.
+ * Дубликаты (уникальный индекс) пропускаются, другие ошибки - в errorHandler.
+ *
  */
 @Slf4j
 @Component
@@ -24,7 +26,6 @@ import org.springframework.stereotype.Component;
 public class LowStockAlertConsumer {
 
     StockAlertRepository stockAlertRepository;
-    StockAlertMapper stockAlertMapper;
     ItemRepository itemRepository;
 
     /**
@@ -37,38 +38,26 @@ public class LowStockAlertConsumer {
      */
     @KafkaListener(topics = "low-stock-alerts", groupId = "warehouse-alerts",
             containerFactory = "kafkaListenerContainerFactory")
+    @Transactional
     public void consume(LowStockAlertEvent event) {
         log.info("Received low stock alert for itemId={}", event.itemId());
 
         var item = itemRepository.findById(event.itemId())
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(
-                        "Item not found: " + event.itemId()));
+                .orElseThrow(() -> new EntityNotFoundException("Item not found: " + event.itemId()));
 
-        try {
-            StockAlert alert = stockAlertMapper.toEntity(event, item);
-            stockAlertRepository.save(alert);
-            log.info("StockAlert saved with id={}", alert.getId());
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            if (isDuplicateViolation(e)) {
-                log.warn("Duplicate alert skipped (unique index violation): itemId={}, triggeredAt={}",
-                        event.itemId(), event.triggeredAt());
-            } else {
-                // Пробрасываем другие DataIntegrityViolationException в errorHandler
-                throw e;
-            }
+        int inserted = stockAlertRepository.insertIgnore(
+                event.itemId(),
+                event.currentStock(),
+                event.minStock(),
+                event.triggeredBy(),
+                event.triggeredAt()
+        );
+
+        if (inserted == 1) {
+            log.info("StockAlert saved for itemId={}", event.itemId());
+        } else {
+            log.debug("Duplicate alert skipped: itemId={}, triggeredAt={}",
+                    event.itemId(), event.triggeredAt());
         }
-    }
-
-    /**
-     * Проверяет, является ли исключение нарушением уникального индекса (дубликат).
-     * Другие нарушения целостности (NOT NULL, FOREIGN KEY, CHECK) пробрасываются.
-     *
-     * @param e исключение DataIntegrityViolationException
-     * @return true, если это дубликат по уникальному индексу
-     */
-    private boolean isDuplicateViolation(org.springframework.dao.DataIntegrityViolationException e) {
-        String message = e.getMessage();
-        return message != null && (message.contains("idx_stock_alerts_unique")
-                || message.contains("duplicate key"));
     }
 }

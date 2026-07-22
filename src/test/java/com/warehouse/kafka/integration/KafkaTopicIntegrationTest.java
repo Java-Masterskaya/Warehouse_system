@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -29,10 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /**
  * Интеграционный тест для проверки создания топика Kafka при старте.
+ *
+ * <p>Использует свой Redpanda контейнер (не shared), т.к. проверяет создание топика
+ * при старте приложения. Для shared контейнера топик уже может существовать.
  */
 @Tag("integration")
 @Testcontainers
-@DirtiesContext
 @SpringBootTest(classes = WarehouseApp.class)
 class KafkaTopicIntegrationTest {
 
@@ -63,28 +64,21 @@ class KafkaTopicIntegrationTest {
                 () -> "org.springframework.kafka.support.serializer.JsonSerializer");
     }
 
-    /**
-     * Топик создается с тремя партициями при старте приложения.
-     */
     @Test
     void topicShouldBeCreatedWithThreePartitionsOnStartup() throws Exception {
         final String topicName = topicProperties.getName();
         final int partitions = topicProperties.getPartitions();
         final short replicas = topicProperties.getReplicas();
 
-        // Arrange
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers());
 
         try (AdminClient adminClient = AdminClient.create(props)) {
-            // Act & Assert
-            // Ждем пока топик будет создан (максимум 10 секунд)
             await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
                 Set<String> topics = adminClient.listTopics().names().get(5, TimeUnit.SECONDS);
                 assertThat(topics).contains(topicName);
             });
 
-            // Проверяем конфигурацию топика
             var topicDescriptions = adminClient.describeTopics(Set.of(topicName))
                     .allTopicNames()
                     .get(5, TimeUnit.SECONDS);
@@ -97,12 +91,8 @@ class KafkaTopicIntegrationTest {
         }
     }
 
-    /**
-     * Отправка сообщения через KafkaTemplate не выбрасывает исключений.
-     */
     @Test
     void kafkaTemplateSendShouldNotThrowException() {
-        // Arrange
         LowStockAlertEvent alert = new LowStockAlertEvent(
                 ITEM_ID,
                 ITEM_SKU,
@@ -112,7 +102,6 @@ class KafkaTopicIntegrationTest {
                 TRIGGERED_BY,
                 LocalDateTime.now());
 
-        // Act & Assert
         assertDoesNotThrow(() -> kafkaStockAlertProducer.sendLowStockAlert(alert));
     }
 }
