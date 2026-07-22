@@ -15,6 +15,7 @@ import com.warehouse.repository.UserRepository;
 import com.warehouse.service.reservation.StockReserveService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDateTime;
@@ -26,6 +27,7 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@SpringBootTest
 @Testcontainers
 class StockReserveConcurrencyTest extends AbstractIntegrationTest {
     @Autowired

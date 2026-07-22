@@ -9,6 +9,7 @@ import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Интеграционный тест для проверки кэширования категорий товаров.
  */
+@SpringBootTest
 class ItemCategoriesCacheTest extends AbstractIntegrationTest {
 
     @Autowired

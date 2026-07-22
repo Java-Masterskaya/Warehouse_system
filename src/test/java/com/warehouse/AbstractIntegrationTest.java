@@ -1,7 +1,6 @@
 package com.warehouse;
 
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -18,7 +17,6 @@ import org.testcontainers.utility.DockerImageName;
  * Порты не меняются между тест-классами, поэтому кэшированный Spring-контекст
  * всегда имеет актуальные адреса.
  */
-@SpringBootTest
 @AutoConfigureMockMvc
 public abstract class AbstractIntegrationTest {
 
