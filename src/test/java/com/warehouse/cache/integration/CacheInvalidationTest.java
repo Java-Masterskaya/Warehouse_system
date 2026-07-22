@@ -13,6 +13,8 @@ import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.UserPrincipal;
+import com.warehouse.repository.StockReserveRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,10 +45,15 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     private StockMovementRepository stockMovementRepository;
 
     @Autowired
+    private StockReserveRepository reserveRepository;
+
+    @Autowired
     private ItemService itemService;
 
     @Autowired
     private StockMovementService stockMovementService;
+    @Autowired
+    private StockAlertRepository stockAlertRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -59,6 +66,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         setAuthentification();
+        // Очищаем таблицы в правильном порядке, учитывая внешние ключи
+        stockAlertRepository.deleteAll();
+        reserveRepository.deleteAll();
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();

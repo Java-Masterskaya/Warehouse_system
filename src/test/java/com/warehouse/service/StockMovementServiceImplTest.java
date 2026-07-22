@@ -17,7 +17,6 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.StocktakeConflictException;
-import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
@@ -25,6 +24,7 @@ import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementServiceImpl;
+import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.stock.StockService;
 import org.junit.jupiter.api.Test;
@@ -33,14 +33,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -56,14 +53,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * Unit-тест для StockMovementServiceImpl.
- * Тестирует операции регистрации прихода и списания товаров, а также Kafka low stock alert.
+ * Тестирует операции регистрации прихода и списания товаров, а также outbox low stock alert.
  */
 @ExtendWith(MockitoExtension.class)
 class StockMovementServiceImplTest {
@@ -91,7 +87,7 @@ class StockMovementServiceImplTest {
     @Mock
     private UserRepository userRepository;
     @Mock
-    private KafkaStockAlertProducer kafkaProducer;
+    private OutboxService outboxService;
     @Mock
     private MetricService metricService;
     @Mock
@@ -100,6 +96,8 @@ class StockMovementServiceImplTest {
     private StockMovementServiceImpl stockMovementService;
     @Captor
     private ArgumentCaptor<StockMovement> stockMovementCaptor;
+    @Captor
+    private ArgumentCaptor<LowStockAlertEvent> eventCaptor;
 
     /**
      * Регистрация прихода товара.
@@ -452,13 +450,10 @@ class StockMovementServiceImplTest {
     }
 
     /**
-     * Тесты для Kafka low stock alert.
-     */
-    /**
-     * При списании ниже minStock устанавливается lowStockAlert=true.
+     * При списании ниже minStock событие сохраняется в outbox.
      */
     @Test
-    void writeOffReceiptBelowMinStockSetsLowStockAlertTrue() {
+    void writeOffReceiptBelowMinStockSavesToOutbox() {
         int minStock = 10;
         int stockAfterWriteOff = 3;
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
@@ -475,22 +470,21 @@ class StockMovementServiceImplTest {
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, true));
 
-        try (MockedStatic<TransactionSynchronizationManager> tsm =
-                     mockStatic(TransactionSynchronizationManager.class)) {
+        StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
-            StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
-
-            assertTrue(response.lowStockAlert());
-            tsm.verify(() -> TransactionSynchronizationManager
-                    .registerSynchronization(any(TransactionSynchronization.class)));
-        }
+        assertTrue(response.lowStockAlert());
+        verify(outboxService).saveLowStockAlertEvent(eventCaptor.capture());
+        LowStockAlertEvent savedEvent = eventCaptor.getValue();
+        assertEquals(ITEM_ID, savedEvent.itemId());
+        assertEquals(stockAfterWriteOff, savedEvent.currentStock());
+        assertEquals(minStock, savedEvent.minStock());
     }
 
     /**
-     * При списании выше minStock устанавливается lowStockAlert=false.
+     * При списании выше minStock событие не сохраняется в outbox.
      */
     @Test
-    void writeOffReceiptAboveMinStockSetsLowStockAlertFalse() {
+    void writeOffReceiptAboveMinStockDoesNotSaveToOutbox() {
         int minStock = 5;
         int stockAfterWriteOff = 10;
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
@@ -507,15 +501,10 @@ class StockMovementServiceImplTest {
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, false));
 
-        try (MockedStatic<TransactionSynchronizationManager> tsm =
-                     mockStatic(TransactionSynchronizationManager.class)) {
+        StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
-            StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
-
-            assertFalse(response.lowStockAlert());
-            tsm.verify(() -> TransactionSynchronizationManager
-                    .registerSynchronization(any(TransactionSynchronization.class)), never());
-        }
+        assertFalse(response.lowStockAlert());
+        verify(outboxService, never()).saveLowStockAlertEvent(any());
     }
 
     /**
@@ -539,24 +528,19 @@ class StockMovementServiceImplTest {
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, false));
 
-        try (MockedStatic<TransactionSynchronizationManager> tsm =
-                     mockStatic(TransactionSynchronizationManager.class)) {
+        StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
-            StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
-
-            assertFalse(response.lowStockAlert());
-            tsm.verify(() -> TransactionSynchronizationManager
-                    .registerSynchronization(any(TransactionSynchronization.class)), never());
-        }
+        assertFalse(response.lowStockAlert());
+        verify(outboxService, never()).saveLowStockAlertEvent(any());
     }
 
     /**
-     * Ошибка Kafka в afterCommit не пробрасывается (исключение перехватывается).
+     * При списании равном minStock событие не сохраняется в outbox (граничный случай).
      */
     @Test
-    void writeOffReceiptKafkaErrorInAfterCommitIsCaught() {
-        int minStock = 10;
-        int stockAfterWriteOff = 2;
+    void writeOffReceiptEqualToMinStockDoesNotSaveToOutbox() {
+        int minStock = 5;
+        int stockAfterWriteOff = 5;
         ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
@@ -567,28 +551,14 @@ class StockMovementServiceImplTest {
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(true)))
+        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
                 .thenReturn(new StockMovementResponse(
-                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, true));
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, false));
 
-        ArgumentCaptor<TransactionSynchronization> syncCaptor =
-                ArgumentCaptor.forClass(TransactionSynchronization.class);
+        StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
-        try (MockedStatic<TransactionSynchronizationManager> tsm =
-                     mockStatic(TransactionSynchronizationManager.class)) {
-
-            stockMovementService.writeOffReceipt(request, userContext);
-
-            tsm.verify(() -> TransactionSynchronizationManager
-                    .registerSynchronization(syncCaptor.capture()));
-
-            // Имитируем ошибку Kafka при afterCommit — исключение не должно пробрасываться
-            org.mockito.Mockito.doThrow(new RuntimeException("Kafka down"))
-                    .when(kafkaProducer).sendLowStockAlert(any(LowStockAlertEvent.class));
-
-            org.junit.jupiter.api.Assertions.assertDoesNotThrow(
-                    () -> syncCaptor.getValue().afterCommit());
-        }
+        assertFalse(response.lowStockAlert());
+        verify(outboxService, never()).saveLowStockAlertEvent(any());
     }
 
     /**
@@ -649,7 +619,7 @@ class StockMovementServiceImplTest {
 
         verify(stockRepository, never()).save(any());
         verify(stockMovementRepository, never()).save(any());
-        verify(kafkaProducer, never()).sendLowStockAlert(any());
+
     }
 
     /**
@@ -684,10 +654,10 @@ class StockMovementServiceImplTest {
 
     /**
      * Инвентаризация: фактический остаток ниже minStock.
-     * Устанавливается lowStockAlert=true и отправляется Kafka-событие.
+     * Устанавливается lowStockAlert=true и событие сохраняется в outbox.
      */
     @Test
-    void stocktakeBelowMinStockSetsLowStockAlertTrue() {
+    void stocktakeBelowMinStockSavesToOutbox() {
         int minStock = 10;
         StocktakeRequest request = new StocktakeRequest(ITEM_ID, 5);
         UserContext userContext = new UserContext(USER_ID, USERNAME);
@@ -705,15 +675,12 @@ class StockMovementServiceImplTest {
                 new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5, null, true));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
-        try (MockedStatic<TransactionSynchronizationManager> tsm =
-                     mockStatic(TransactionSynchronizationManager.class)) {
+        StockMovementResponse response = stockMovementService.stocktake(request, userContext);
 
-            StockMovementResponse response = stockMovementService.stocktake(request, userContext);
-
-            assertTrue(response.lowStockAlert());
-            tsm.verify(() -> TransactionSynchronizationManager
-                    .registerSynchronization(any(TransactionSynchronization.class)));
-        }
+        assertTrue(response.lowStockAlert());
+        verify(outboxService).saveLowStockAlertEvent(eventCaptor.capture());
+        LowStockAlertEvent savedEvent = eventCaptor.getValue();
+        assertEquals(ITEM_ID, savedEvent.itemId());
         verify(metricService).increment("warehouse.movements.adjustment.total");
     }
 

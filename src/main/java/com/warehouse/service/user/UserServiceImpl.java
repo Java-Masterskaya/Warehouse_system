@@ -14,6 +14,7 @@ import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.mapper.UserMapper;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.security.service.TokenService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuditContext auditContext;
+    private final TokenService tokenService;
 
     @Transactional
     @Override
@@ -85,5 +87,11 @@ public class UserServiceImpl implements UserService {
         User saved = userRepository.save(user);
         auditContext.setNewValue(userMapper.toAuditDto(saved));
         auditContext.setEntityId(saved.getId());
+
+        tokenService.blacklistAllUserAccessTokens(userId);
+        // Revoke all tokens for this user
+        tokenService.revokeAllUserTokens(userId);
+
+        log.info("User deactivated and all tokens revoked: {}", userId);
     }
 }

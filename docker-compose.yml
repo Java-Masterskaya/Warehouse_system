@@ -18,6 +18,34 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: postgres-backup
+    env_file:
+      - .env
+    environment:
+      - TZ=${TZ}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - HEALTHCHECK_URL=${HEALTHCHECK_URL:-}
+    volumes:
+      - postgres_backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+      - ./scripts/restore.sh:/restore.sh:ro
+      - ./scripts/backup-entrypoint.sh:/backup-entrypoint.sh:ro
+    entrypoint: ["sh", "/backup-entrypoint.sh"]
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /backups/.last_success && test $(($(date +%s) - $(cat /backups/.last_success))) -lt 90000 || exit 1"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -74,6 +102,8 @@ services:
       - CONSUL_BIND_INTERFACE=eth0
     volumes:
       - consul_data:/consul/data
+    networks:
+      - app-network
     healthcheck:
       test: [ "CMD", "consul", "members", "-detailed" ]
       interval: 10s
@@ -90,11 +120,27 @@ services:
       - ./monitoring/consul/warehouse-config.yaml:/warehouse-config.yaml:ro
     environment:
       - CONSUL_HOST=consul
-    command: sh /scripts/seed.sh
+    command: >
+      sh -c "
+        # Конвертируем скрипт в LF прямо в контейнере
+        sed -i 's/\r$//' /scripts/seed.sh &&
+        sh /scripts/seed.sh
+      "
+    networks:
+      - app-network
     depends_on:
       consul:
         condition: service_healthy
     restart: "no"  # Запускается один раз и завершается
+
+  # -- Webhook server (для алертов в dev) --
+  webhook-server:
+    build: ./monitoring/webhook-server
+    container_name: webhook-server
+    ports:
+      - "8082:8082"
+    networks:
+      - app-network
 
   # -- Приложение --
   warehouse-app:
@@ -117,8 +163,6 @@ services:
         condition: service_completed_successfully
     networks:
       - app-network
-
-
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness" ]
       interval: 10s
@@ -128,18 +172,30 @@ services:
 
   # -- Prometheus --
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.0.0
     container_name: prometheus
     ports:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml
+    networks:
+      - app-network
+
+  # -- Alertmanager --
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager
     networks:
       - app-network
 
   # -- Grafana --
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.1.0
     container_name: grafana
     ports:
       - "3000:3000"
@@ -157,6 +213,7 @@ volumes:
   postgres_data:
   redis_data:
   consul_data:
+  postgres_backups:
 
 networks:
   app-network:

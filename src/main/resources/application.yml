@@ -12,11 +12,28 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      retries: 3
       properties:
         allow.auto.create.topics: false
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+        retry.backoff.ms: 500
     consumer:
       group-id: warehouse-alerts
-
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.warehouse.dto.event"
+    # Настройки для outbox pattern
+    outbox:
+      polling:
+        # Максимальное количество событий для обработки за один вызов
+        limit: 100
+        # Интервал между опросами в миллисекундах
+        interval-ms: 5000
+      # Настройки ретраев
+      max-retries: 3
+      retry-backoff-ms: 5000
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -61,6 +78,8 @@ app:
       multiplier: 2.0
       max-interval-ms: 10000
       max-attempts: 3
+  jwt:
+    refresh-retry-ttl-seconds: 60
 
 management:
   endpoints:
@@ -93,3 +112,4 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
+    com.warehouse.service.outbox: INFO

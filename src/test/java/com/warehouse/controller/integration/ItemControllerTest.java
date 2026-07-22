@@ -11,7 +11,7 @@ import com.warehouse.entity.Item;
 import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.security.JwtUtil;
+import com.warehouse.security.util.JwtUtil;
 import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -666,6 +666,6 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return objectMapper.readTree(response).get("token").asText();
+        return objectMapper.readTree(response).get("accessToken").asText();
     }
 }

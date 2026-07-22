@@ -3,10 +3,12 @@ package com.warehouse.service;
 import com.warehouse.audit.AuditContext;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.mapper.UserMapper;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.security.service.TokenService;
 import com.warehouse.service.user.UserService;
 import com.warehouse.service.user.UserServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +46,9 @@ public class UserServiceImplTest {
 
     @Mock
     private AuditContext auditContext;
+
+    @Mock
+    private TokenService tokenService;
 
     private UserService userService;
 
@@ -85,6 +91,8 @@ public class UserServiceImplTest {
         userService.deactivateUser(userId, 2L);
 
         verify(userRepository).findById(userId);
+        verify(tokenService).blacklistAllUserAccessTokens(userId);
+        verify(tokenService).revokeAllUserTokens(userId);
         assertFalse(user.isActive());
     }
 
@@ -98,6 +106,10 @@ public class UserServiceImplTest {
         assertThrows(SelfDeactivationException.class, () -> {
             userService.deactivateUser(user.getId(), 1L);
         });
+
+        // Verify TokenService was NOT called
+        verify(tokenService, never()).blacklistAllUserAccessTokens(any());
+        verify(tokenService, never()).revokeAllUserTokens(any());
     }
 
     @Test
@@ -116,6 +128,8 @@ public class UserServiceImplTest {
 
         assertTrue(admin.isActive());
         verify(userRepository, never()).save(admin);
+        verify(tokenService, never()).blacklistAllUserAccessTokens(any());
+        verify(tokenService, never()).revokeAllUserTokens(any());
     }
 
     @Test
@@ -139,6 +153,8 @@ public class UserServiceImplTest {
 
         assertFalse(firstAdmin.isActive());
         verify(userRepository).save(firstAdmin);
+        verify(tokenService).blacklistAllUserAccessTokens(1L);
+        verify(tokenService).revokeAllUserTokens(1L);
     }
 
     @Test
@@ -157,6 +173,67 @@ public class UserServiceImplTest {
         assertFalse(user.isActive());
         verify(userRepository, never()).findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN);
         verify(userRepository).save(user);
+        verify(tokenService).blacklistAllUserAccessTokens(1L);
+        verify(tokenService).revokeAllUserTokens(1L);
+    }
+
+    /**
+     * Тест: при деактивации пользователя все его токены отзываются.
+     */
+    @Test
+    void deactivationShouldRevokeAllTokens() {
+        // Arrange
+        User user = createUser(1L);
+        user.setActive(true);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        // Act
+        userService.deactivateUser(1L, 2L);
+
+        // Assert
+        verify(tokenService).blacklistAllUserAccessTokens(1L);
+        verify(tokenService).revokeAllUserTokens(1L);
+        assertFalse(user.isActive());
+    }
+
+    /**
+     * Тест: при деактивации пользователя с существующими токенами,
+     * токены отзываются даже если пользователь не активен.
+     */
+    @Test
+    void deactivationShouldRevokeTokensEvenIfUserAlreadyInactive() {
+        // Arrange
+        User user = createUser(1L);
+        user.setActive(false); // Уже неактивен
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        // Act
+        userService.deactivateUser(1L, 2L);
+
+        // Assert
+        verify(tokenService).blacklistAllUserAccessTokens(1L);
+        verify(tokenService).revokeAllUserTokens(1L);
+        // Проверяем, что метод save вызван (обновление в БД)
+        verify(userRepository).save(user);
+    }
+
+    /**
+     * Тест: при деактивации пользователя с неизвестным ID выбрасывается исключение.
+     */
+    @Test
+    void deactivationWithUnknownUserIdShouldThrowException() {
+        // Arrange
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(EntityNotFoundException.class, () -> {
+            userService.deactivateUser(999L, 1L);
+        });
+
+        verify(tokenService, never()).blacklistAllUserAccessTokens(any());
+        verify(tokenService, never()).revokeAllUserTokens(any());
     }
     
     private User createUser(Long id) {

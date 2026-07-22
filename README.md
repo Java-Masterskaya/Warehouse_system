@@ -15,6 +15,8 @@ Backend-сервис учёта товарных запасов на склад�
 | Code Quality | Checkstyle                              |
 | Infra        | Docker, Docker Compose                  |
 | Config       | Consul (Centralized Configuration)      |
+| Monitoring   | Prometheus, Alertmanager, Grafana       |
+| Webhook      | Custom webhook-server for alerts        |
 
 ## Быстрый старт
 
@@ -61,6 +63,25 @@ make up
 | Schema Registry  | встроен в Redpanda | 8081 |
 | Consul           | hashicorp/consul:1.16 | 8500 (UI) |
 
+## Бэкап и восстановление БД
+
+| Команда | Описание |
+|---------|----------|
+| `make backup-now` | Создать дамп немедленно |
+| `make backup-list` | Показать список дампов |
+| `make backup-status` | Проверить статус и свежесть последнего бэкапа |
+| `make backup-restore` | Восстановить из последнего дампа (⚠️ разрушительно) |
+| `make backup-test` | E2E-тест цикла backup → restore |
+
+Расписание: ежедневно в 02:00 (настраивается через TZ в .env, по умолчанию Europe/Moscow)
+через `postgres-backup` контейнер.
+
+**Шифрование:** если задан `BACKUP_ENCRYPT_KEY` в `.env`, дампы шифруются GPG (AES-256).  
+**Offsite:** если задан `S3_BUCKET`, успешные дампы дублируются в S3.  
+**Безопасность:** пароль передаётся через `~/.pgpass` (`PGPASSFILE`), не виден в `ps` или `/proc`.
+
+Подробный рунбук: [`docs/POSTGRES_RESTORE_RUNBOOK.md`](docs/POSTGRES_RESTORE_RUNBOOK.md)
+
 ## Роли
 
 | Роль    | Права                                |
@@ -70,21 +91,27 @@ make up
 
 ## Основные эндпоинты
 
-| Метод    | Путь                                 | Описание                      |
-|----------|--------------------------------------|-------------------------------|
-| `GET`    | `/api/items`                         | Список товаров (фильтр, поиск) |
-| `POST`   | `/api/items`                         | Создать товар                 |
-| `PUT`    | `/api/items/{id}`                    | Редактировать товар           |
-| `DELETE` | `/api/items/{id}`                    | Удалить товар                 |
-| `GET`    | `/api/items/{id}/stock`              | Текущий остаток               |
-| `POST`   | `/api/movements/receive`             | Зарегистрировать поступление  |
-| `POST`   | `/api/movements/write-off`           | Списать товар                 |
-| `GET`    | `/api/movements/{itemId}/history`    | История движения              |
-| `POST`   | `/api/inventory/stocktake`           | Инвентаризация                |
-| `POST`   | `/api/admin/dlq/low-stock/reprocess` | Реобработка DLT               |
-| `POST`   | `/api/stock/{itemId}/reserve`        | Резервирование остатков       |
-| `POST`   | `/api/stock/{itemId}/release`        | Отмена резервирования         |
-| `POST`   | `/api/stock/{itemId}/write-off`      | Выкуп резерва                 |
+| Метод    | Путь                                             | Описание                            |
+|----------|--------------------------------------------------|-------------------------------------|
+| `GET`    | `/api/items`                                     | Список товаров (фильтр, поиск)      |
+| `POST`   | `/api/items`                                     | Создать товар                       |
+| `PUT`    | `/api/items/{id}`                                | Редактировать товар                 |
+| `DELETE` | `/api/items/{id}`                                | Удалить товар                       |
+| `GET`    | `/api/items/{id}/stock`                          | Текущий остаток                     |
+| `POST`   | `/api/movements/receive`                         | Зарегистрировать поступление        |
+| `POST`   | `/api/movements/write-off`                       | Списать товар                       |
+| `GET`    | `/api/movements/{itemId}/history`                | История движения                    |
+| `POST`   | `/api/inventory/stocktake`                       | Инвентаризация                      |
+| `POST`   | `/api/purchase-orders`                           | Создать заказ поставщику            |
+| `GET`    | `/api/purchase-orders`                           | Получить список заказов поставщикам |
+| `GET`    | `/api/purchase-orders/{purchaseOrderId}`         | Получить заказ поставщику по ID     |
+| `POST`   | `/api/purchase-orders/{purchaseOrderId}/place`   | Разместить заказ у поставщика       |
+| `POST`   | `/api/purchase-orders/{purchaseOrderId}/receive` | Принять товар по заказу поставки    |
+| `POST`   | `/api/admin/dlq/low-stock/reprocess`             | Реобработка DLT                     |
+| `POST`   | `/api/stock/{itemId}/reserve`                    | Резервирование остатков             |
+| `POST`   | `/api/stock/{itemId}/release`                    | Отмена резервирования               |
+| `POST`   | `/api/stock/{itemId}/write-off`                  | Выкуп резерва                       |
+
 
 Полная спецификация: `docs/warehouse_openapi.yaml`
 
@@ -234,6 +261,92 @@ make checkstyle
 - `./gradlew check`
 - CI/CD (GitHub Actions)
 
+## Алертинг и мониторинг
+
+Проект использует стек Prometheus + Alertmanager + Grafana для мониторинга и алертинга.
+
+### Prometheus
+
+**Что делает:** сбор метрик приложения и оценка правил алертинга.
+
+**Конфигурация:**
+- `scrape_interval: 10s` - сбор метрик каждые 10 секунд
+- `evaluation_interval: 10s` - проверка правил алертинга каждые 10 секунд
+- Подключается к Alertmanager на `alertmanager:9093` для отправки алертов
+
+**Важно:** Для запуска через `docker-compose up` или `make up` **обязательно** должен быть запущен контейнер `warehouse-app`, так как Prometheus собирает метрики с приложения через `/actuator/prometheus`. Если приложение не запущено - алерты не будут работать.
+
+**Настройка цели (target):**
+- В Docker-сети: `['warehouse-app:8080']`
+- При локальном запуске: `['host.docker.internal:8080']`
+
+### Alertmanager
+
+**Что делает:** получает алерты от Prometheus и отправляет их на webhook-сервер.
+
+**Настроенные алерты:**
+
+| Алерт | Уровень | Описание |
+|-------|---------|----------|
+| `Brute-force login` | warning | Высокая частота неудачных попыток входа (>5/мин) |
+| `Rejected write-off rate high` | warning | Высокая частота отклонённых списаний (>2 за 5мин) |
+| `Low-stock alert spike` | info | Пики алертов о низких остатках (>3 за 5мин) |
+| `App down` | critical | Приложение недоступно (>1 минута) |
+| `JVM heap > 90%` | warning | Использование heap памяти >90% |
+
+### Webhook Server
+
+**Что делает:** простой сервер для приёма алертов в dev-среде. При получении алерта выводит его в консоль.
+
+**Зачем нужен:** позволяет тестировать алертинг без настройки внешних интеграций (Telegram, Slack и т.д.).
+
+**Пример вывода:**
+```
+============================================================
+WEBHOOK ALERT RECEIVED
+============================================================
+Headers: {...}
+Body: {...}
+============================================================
+```
+
+### Grafana
+
+**Что делает:** визуализация метрик приложения.
+
+**Предустановленные дашборды:** метрики приложения, JVM, Kafka и т.д.
+
+**Доступ:**
+- URL: `http://localhost:3000`
+- Username: `admin`
+- Password: `admin`
+
+**Порты мониторинга:**
+
+| Сервис | Порт |
+|--------|------|
+| Prometheus | 9090 |
+| Alertmanager | 9093 |
+| Grafana | 3000 |
+| Webhook Server | 8082 |
+
+**Настройка мониторинга:**
+
+```bash
+# Запуск мониторинга
+make monitor-up
+```
+
+```bash
+# Остановка мониторинга
+make monitor-down
+```
+
+**Конфигурационные файлы:**
+- `monitoring/prometheus.yml` — настройки Prometheus
+- `monitoring/alertmanager/alertmanager.yml` — настройки Alertmanager
+- `monitoring/grafana/` — дашборды и дата-источники
+
 ## Аутентификация и авторизация (JWT)
 
 ### Переменные окружения для локальной разработки
@@ -290,17 +403,54 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiJ9...",
   "expiresIn": 86400000
 }
 ```
+
+| Поле         | Описание                                                                                                    |
+|--------------|-------------------------------------------------------------------------------------------------------------|
+| accessToken  | JWT токен для доступа к API. Время жизни по умолчанию — 1 сутки (настраивается через консул).               |
+| refreshToken | Refresh токен для обновления access токена. Время жизни по умолчанию — 7 дней (настраивается через консул). |
+| expiresIn | Время жизни access токена в миллисекундах.                                                                  |
+
+### Обновление access токена
+`POST /api/auth/refresh`  
+Тело:
+```json
+{
+"refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+Ответ (200):
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "expiresIn": 86400000
+}
+```
+Примечание: При каждом обновлении создаётся новая пара токенов. Старый refresh токен становится недействительным (ротация). Все старые access токены пользователя автоматически добавляются в blacklist.
+
+### Выход из системы
+`POST /api/auth/logout`  
+Тело:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
+Ответ (200) OK.  
+Примечание: После выхода access токен добавляется в blacklist, refresh токен удаляется из Redis.
 
 ### Использование токена
 
 Добавляйте заголовок к каждому защищённому запросу:
 
 ```
-Authorization: Bearer ваш_токен
+Authorization: Bearer ваш_access_token
 ```
 
 ### Роли и доступ
@@ -318,3 +468,18 @@ Authorization: Bearer ваш_токен
 
 - 401 `UNAUTHORIZED` – токен отсутствует, невалиден или просрочен.
 - 403 `ACCESS_DENIED` – недостаточно прав (роль не соответствует требуемой).
+
+### Особенности работы с токенами
+- Access токен — короткоживущий (по умолчанию 1 сутки). Используется для доступа к API.
+
+- Refresh токен — долгоживущий (по умолчанию 7 дней). Используется только для получения нового access токена.
+
+- Ротация refresh токена — при каждом обновлении старый refresh токен становится недействительным.
+
+- Защита от повторного использования — если кто-то попытается использовать уже ротированный refresh токен, все токены пользователя будут мгновенно отозваны.
+
+- Мгновенный отзыв доступа — при деактивации пользователя или выходе из системы access токен добавляется в blacklist и перестаёт работать немедленно (не дожидаясь истечения TTL).
+
+- Хранение в Redis — все токены хранятся в Redis для быстрой проверки и отзыва.
+
+- Автоматическое обновление — клиент должен автоматически обновлять access токен при получении 401 Unauthorized, используя refresh токен.
