@@ -53,7 +53,8 @@ public class StockServiceImpl implements StockService {
             throw InsufficientStockException.of(itemId, quantity, current);
         }
 
-        int newQuantity = stock.getQuantity(); // Получаем текущее значение после UPDATE
+        // After @Modifying query with flushAutomatically=true, get the updated quantity from DB
+        int newQuantity = stockRepository.findQuantityByItemId(itemId).orElseThrow(() -> stockNotFound(itemId));
         log.info("Write-off completed: itemId={}, quantity={}, new stock={}", itemId, quantity, newQuantity);
         return newQuantity;
     }

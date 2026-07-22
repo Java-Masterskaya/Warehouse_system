@@ -70,21 +70,26 @@ public class BatchServiceImpl implements BatchService {
     public int writeOffByFEFO(Long itemId, int quantity, LocalDateTime now) {
         log.debug("FEFO write-off: itemId={}, quantity={}, now={}", itemId, quantity, now);
 
-        // Сначала блокируем Stock, чтобы избежать deadlock
-        Stock stock = stockRepository.findByItemIdForUpdate(itemId)
-                .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
-
-        // Получаем неистекшие партии, отсортированные по expiryDate ASC
-        List<Batch> batches = batchRepository.findNonExpiredByItemIdOrderByExpiryDateAsc(itemId, now);
-
-        // Проверяем доступное количество
-        int available = batches.stream().mapToInt(Batch::getQuantity).sum();
+        // Получаем доступный остаток (без резервов) с блокировкой
+        Optional<Integer> availableOpt = stockRepository.findAvailableQuantityForUpdate(itemId, now);
+        if (availableOpt.isEmpty()) {
+            throw EntityNotFoundException.forId("Stock", itemId);
+        }
+        
+        int available = availableOpt.get();
         if (available < quantity) {
             log.warn("Insufficient stock for FEFO write-off: itemId={}, requested={}, available={}",
                     itemId, quantity, available);
             throw new com.warehouse.exception.InsufficientStockException(
                     "Insufficient stock for FEFO write-off: requested " + quantity + ", available " + available);
         }
+
+        // Сначала блокируем Stock, чтобы избежать deadlock
+        Stock stock = stockRepository.findByItemIdForUpdate(itemId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
+
+        // Получаем неистекшие партии, отсортированные по expiryDate ASC
+        List<Batch> batches = batchRepository.findNonExpiredByItemIdOrderByExpiryDateAsc(itemId, now);
 
         // Списываем по очереди из каждой партии
         int remaining = quantity;

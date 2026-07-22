@@ -34,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -52,6 +53,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -73,7 +76,7 @@ class StockMovementServiceImplTest {
     private static final String USERNAME = "admin";
     private static final String PASSWORD = "password";
 
-    @Mock
+    @Spy
     private StockMovementMapper mapper;
     @Mock
     private StockService stockService;
@@ -81,6 +84,8 @@ class StockMovementServiceImplTest {
     private StockAvailabilityService availabilityService;
     @Mock
     private BatchService batchService;
+    @Mock
+    private com.warehouse.repository.BatchRepository batchRepository;
     @Mock
     private ItemRepository itemRepository;
     @Mock
@@ -122,7 +127,7 @@ class StockMovementServiceImplTest {
                 });
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), eq(STOCK_AFTER_RECEIPT), eq(false)))
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenAnswer(invocation -> {
                     StockMovement movement = invocation.getArgument(0);
                     int stockAfter = invocation.getArgument(1);
@@ -258,10 +263,10 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(batchService.writeOffByFEFO(eq(ITEM_ID), eq(QUANTITY), any(LocalDateTime.class))).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenAnswer(invocation -> {
                     StockMovement movement = invocation.getArgument(0);
                     int stockAfter = invocation.getArgument(1);
@@ -327,7 +332,7 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-        when(stockService.writeOffStock(ITEM_ID, 20))
+        when(batchService.writeOffByFEFO(eq(ITEM_ID), eq(20), any(LocalDateTime.class)))
                 .thenThrow(new InsufficientStockException("Insufficient stock"));
 
         InsufficientStockException ex = assertThrows(InsufficientStockException.class,
@@ -349,7 +354,7 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(batchService.writeOffByFEFO(eq(ITEM_ID), eq(QUANTITY), any(LocalDateTime.class))).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -478,10 +483,10 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(batchService.writeOffByFEFO(eq(ITEM_ID), eq(QUANTITY), any(LocalDateTime.class))).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(true)))
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, null, null, true));
 
@@ -509,10 +514,10 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(batchService.writeOffByFEFO(eq(ITEM_ID), eq(QUANTITY), any(LocalDateTime.class))).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, null, null, false));
 
@@ -536,10 +541,10 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(batchService.writeOffByFEFO(eq(ITEM_ID), eq(QUANTITY), any(LocalDateTime.class))).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, null, null, false));
 
@@ -563,10 +568,10 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(batchService.writeOffByFEFO(eq(ITEM_ID), eq(QUANTITY), any(LocalDateTime.class))).thenReturn(stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, null, null, false));
 
@@ -590,12 +595,17 @@ class StockMovementServiceImplTest {
         stock.setQuantity(10);
         User userRef = createUserReference(USER_ID, USERNAME);
 
+        // Создаем фейковую партию для инвентаризации
+        Batch batch = Batch.builder().id(1L).item(item).quantity(10).expiryDate(LocalDateTime.now().plusDays(365)).build();
+
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(batchService.findByItemIdOrderByExpiryDate(ITEM_ID)).thenReturn(List.of(batch));
+        when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
-        when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
-                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null, null, null, false));
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
+                .thenReturn(new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, 1L, LocalDateTime.now().plusDays(365), null, false));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -606,6 +616,8 @@ class StockMovementServiceImplTest {
         assertEquals(7, stock.getQuantity());
         verify(stockMovementRepository).save(any());
         verify(metricService).increment("warehouse.movements.adjustment.total");
+        // Проверяем, что партия была обновлена (списание 3 единицы из партии)
+        assertEquals(7, batch.getQuantity());
     }
 
     /**
@@ -634,7 +646,7 @@ class StockMovementServiceImplTest {
 
         verify(stockRepository, never()).save(any());
         verify(stockMovementRepository, never()).save(any());
-
+        verify(batchRepository, never()).save(any());
     }
 
     /**
@@ -651,12 +663,17 @@ class StockMovementServiceImplTest {
         stock.setQuantity(10);
         User userRef = createUserReference(USER_ID, USERNAME);
 
+        // Создаем фейковую партию для инвентаризации
+        Batch batch = Batch.builder().id(1L).item(item).quantity(10).expiryDate(LocalDateTime.now().plusDays(365)).build();
+
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(batchService.findByItemIdOrderByExpiryDate(ITEM_ID)).thenReturn(List.of(batch));
+        when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
-        when(mapper.toResponse(any(), eq(15), eq(false))).thenReturn(
-                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5, 15, null, null, null, false));
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
+                .thenReturn(new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5, 15, 1L, LocalDateTime.now().plusDays(365), null, false));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -665,6 +682,8 @@ class StockMovementServiceImplTest {
         assertEquals(5, response.quantity());
         assertEquals(15, stock.getQuantity());
         verify(metricService).increment("warehouse.movements.adjustment.total");
+        // Проверяем, что партия была обновлена (добавление 5 единиц к партии)
+        assertEquals(15, batch.getQuantity());
     }
 
     /**
@@ -682,12 +701,17 @@ class StockMovementServiceImplTest {
         stock.setQuantity(20);
         User userRef = createUserReference(USER_ID, USERNAME);
 
+        // Создаем фейковую партию для инвентаризации
+        Batch batch = Batch.builder().id(1L).item(item).quantity(20).expiryDate(LocalDateTime.now().plusDays(365)).build();
+
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(batchService.findByItemIdOrderByExpiryDate(ITEM_ID)).thenReturn(List.of(batch));
+        when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
-        when(mapper.toResponse(any(), eq(5), eq(true))).thenReturn(
-                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5, null, null, null, true));
+        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
+                .thenReturn(new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5, 1L, LocalDateTime.now().plusDays(365), null, true));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -697,6 +721,8 @@ class StockMovementServiceImplTest {
         LowStockAlertEvent savedEvent = eventCaptor.getValue();
         assertEquals(ITEM_ID, savedEvent.itemId());
         verify(metricService).increment("warehouse.movements.adjustment.total");
+        // Проверяем, что партия была обновлена (списание 15 единиц из партии)
+        assertEquals(5, batch.getQuantity());
     }
 
     /**
@@ -714,11 +740,9 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(mapper.toNoMovementResponse(ITEM_ID, 10)).thenReturn(
-                new StockMovementResponse(ITEM_ID, null, null, 0, 10, null, null, null, false));
-        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
+        assertNotNull(response, "Response should not be null");
 
         assertEquals(10, response.stockAfter());
         assertNull(response.movementId());

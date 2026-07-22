@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -55,6 +56,18 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     where s.item.id = :itemId
         """)
     Optional<Stock> findByItemIdForUpdate(Long itemId);
+
+    // Получает остаток без резервов с блокировкой для FEFO
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select s.quantity - coalesce(
+            (select sum(r.quantity) from Reservation r
+             where r.stock = s and r.status = com.warehouse.entity.ReservationStatus.ACTIVE
+             and r.expiredAt > :now), 0)
+        from Stock s
+        where s.item.id = :itemId
+        """)
+    Optional<Integer> findAvailableQuantityForUpdate(@Param("itemId") Long itemId, @Param("now") LocalDateTime now);
 
     void deleteByItemId(Long itemId);
 }
