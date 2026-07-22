@@ -31,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -150,7 +151,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Should replay outbox event after simulated crash")
     void shouldReplayOutboxEventAfterSimulatedCrash() {
         // Arrange - списываем 16, чтобы остаток стал 4 (меньше minStock=10)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16, LocalDateTime.now());
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Act 1 - выполняем транзакцию (движение и outbox сохранены атомарно)
@@ -230,7 +231,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Should not lose event on repeated crash")
     void shouldNotLoseEventOnRepeatedCrash() {
         // Arrange - создаем событие вручную в статусе PENDING (симуляция краша до обновления статуса)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16, LocalDateTime.now());
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Выполняем транзакцию

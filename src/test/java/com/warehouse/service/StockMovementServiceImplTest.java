@@ -101,7 +101,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptSuccess() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -119,7 +119,7 @@ class StockMovementServiceImplTest {
                     return new StockMovementResponse(
                             movement.getItem().getId(), movement.getId(),
                             movement.getType(), movement.getQuantity(),
-                            stockAfter, movement.getCreatedAt(), lowStockAlert);
+                            stockAfter, null, null, movement.getCreatedAt(), lowStockAlert);
                 });
 
         StockMovementResponse response = stockMovementService.registerReceipt(request, userContext);
@@ -144,7 +144,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptWithZeroQuantityThrowsException() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 0);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 0, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         InvalidMovementRequestException ex = assertThrows(InvalidMovementRequestException.class,
@@ -158,7 +158,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptWithNegativeQuantityThrowsException() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, -1);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, -1, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         InvalidMovementRequestException ex = assertThrows(InvalidMovementRequestException.class,
@@ -172,7 +172,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptItemNotFoundThrowsException() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
@@ -189,7 +189,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptInactiveItemThrowsException() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false, 0);
 
@@ -207,7 +207,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptUserNotNull() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -232,7 +232,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void writeOffReceiptSuccess() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -251,7 +251,7 @@ class StockMovementServiceImplTest {
                     return new StockMovementResponse(
                             movement.getItem().getId(), movement.getId(),
                             movement.getType(), movement.getQuantity(),
-                            stockAfter, movement.getCreatedAt(), lowStockAlert);
+                            stockAfter, null, null, movement.getCreatedAt(), lowStockAlert);
                 });
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
@@ -269,7 +269,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void writeOffReceiptItemNotFoundThrowsException() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(NON_EXISTENT_ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         when(itemRepository.findById(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
@@ -286,7 +286,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void writeOffReceiptInactiveItemThrowsException() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item inactiveItem = createItem(ITEM_ID, "Тестовый товар", false, 0);
 
@@ -304,7 +304,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void writeOffReceiptInsufficientStockThrowsException() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 20);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 20, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
 
@@ -323,7 +323,7 @@ class StockMovementServiceImplTest {
      */
     @Test
     void writeOffReceiptUserNotNull() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -453,7 +453,7 @@ class StockMovementServiceImplTest {
     void writeOffReceiptBelowMinStockSavesToOutbox() {
         int minStock = 10;
         int stockAfterWriteOff = 3;
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -465,7 +465,7 @@ class StockMovementServiceImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(true)))
                 .thenReturn(new StockMovementResponse(
-                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, true));
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, null, null, true));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -484,7 +484,7 @@ class StockMovementServiceImplTest {
     void writeOffReceiptAboveMinStockDoesNotSaveToOutbox() {
         int minStock = 5;
         int stockAfterWriteOff = 10;
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -496,7 +496,7 @@ class StockMovementServiceImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
                 .thenReturn(new StockMovementResponse(
-                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, false));
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, null, null, false));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -511,7 +511,7 @@ class StockMovementServiceImplTest {
     void writeOffReceiptEqualToMinStockDoesNotSendAlert() {
         int minStock = 5;
         int stockAfterWriteOff = 5;
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -523,7 +523,7 @@ class StockMovementServiceImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
                 .thenReturn(new StockMovementResponse(
-                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, false));
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, null, null, false));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -538,7 +538,7 @@ class StockMovementServiceImplTest {
     void writeOffReceiptEqualToMinStockDoesNotSaveToOutbox() {
         int minStock = 5;
         int stockAfterWriteOff = 5;
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Ноутбук", true, minStock);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -550,7 +550,7 @@ class StockMovementServiceImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
                 .thenReturn(new StockMovementResponse(
-                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, false));
+                        ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY, stockAfterWriteOff, null, null, null, false));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -577,7 +577,7 @@ class StockMovementServiceImplTest {
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
-                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null, false));
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null, null, null, false));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -638,7 +638,7 @@ class StockMovementServiceImplTest {
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(15), eq(false))).thenReturn(
-                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5, 15, null, false));
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5, 15, null, null, null, false));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -669,7 +669,7 @@ class StockMovementServiceImplTest {
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(5), eq(true))).thenReturn(
-                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5, null, true));
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5, null, null, null, true));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -697,7 +697,7 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(mapper.toNoMovementResponse(ITEM_ID, 10)).thenReturn(
-                new StockMovementResponse(ITEM_ID, null, null, 0, 10, null, false));
+                new StockMovementResponse(ITEM_ID, null, null, 0, 10, null, null, null, false));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);

@@ -6,11 +6,7 @@ import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
-import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.StockReserveRepository;
-import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.*;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,14 +44,18 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Autowired
     private StockAlertRepository stockAlertRepository;
 
+    @Autowired
+    private BatchRepository batchRepository;
+
     private Long itemId;
 
     @BeforeEach
     void setUp() {
         // Очищаем таблицы в правильном порядке, учитывая внешние ключи
+        stockMovementRepository.deleteAllInBatch();
+        batchRepository.deleteAll();
         stockAlertRepository.deleteAll();
         reserveRepository.deleteAll();
-        stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
 
@@ -117,7 +118,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5);
+        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5, LocalDateTime.now());
         stockMovementService.registerReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
@@ -133,7 +134,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 3);
+        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 3, LocalDateTime.now());
         stockMovementService.writeOffReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 

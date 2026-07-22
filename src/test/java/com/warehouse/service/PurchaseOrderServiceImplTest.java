@@ -29,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -243,7 +244,7 @@ class PurchaseOrderServiceImplTest {
         assertThat(orderItem.getReceivedQty()).isEqualTo(4);
 
         verify(stockMovementService).registerReceipt(
-                new ChangeQuantityMovementRequest(10L, 4),
+                new ChangeQuantityMovementRequest(10L, 4, LocalDateTime.now()),
                 context
         );
     }
@@ -295,7 +296,7 @@ class PurchaseOrderServiceImplTest {
         assertThat(orderItem.getReceivedQty()).isEqualTo(10);
 
         verify(stockMovementService).registerReceipt(
-                new ChangeQuantityMovementRequest(10L, 10),
+                new ChangeQuantityMovementRequest(10L, 10, LocalDateTime.now()),
                 context
         );
     }

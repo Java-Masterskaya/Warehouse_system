@@ -23,6 +23,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -97,7 +98,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void bothMovementAndOutboxSavedOnSuccessfulTransaction() {
         // Arrange - списываем 16, чтобы остаток стал 4 (меньше minStock=10)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16, LocalDateTime.now());
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Act
@@ -133,7 +134,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void bothMovementAndOutboxRollbackOnError() {
         // Arrange
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5, LocalDateTime.now());
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Подсчитываем начальное количество
@@ -176,7 +177,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void neitherMovementNorOutboxSavedOnValidationFailure() {
         // Arrange - списываем больше, чем есть на складе
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 100);
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 100, LocalDateTime.now());
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Подсчитываем начальное количество
