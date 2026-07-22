@@ -3,7 +3,8 @@ CREATE TABLE batches (
     item_id     BIGINT      NOT NULL REFERENCES items(id),
     quantity    INTEGER     NOT NULL CHECK (quantity > 0),
     expiry_date TIMESTAMP   NOT NULL,
-    created_at  TIMESTAMP   NOT NULL DEFAULT NOW()
+    created_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
+    version     BIGINT      NOT NULL DEFAULT 0 -- Для optimistic locking
 );
 
 CREATE INDEX idx_batches_item_expiry ON batches (item_id, expiry_date);

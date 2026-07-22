@@ -1,9 +1,7 @@
 package com.warehouse.repository;
 
 import com.warehouse.entity.Batch;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -37,7 +35,6 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
      * @param now текущее время
      * @return список неистекших партий с количеством > 0
      */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT b
             FROM Batch b

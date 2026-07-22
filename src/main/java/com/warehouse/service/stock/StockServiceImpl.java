@@ -22,7 +22,8 @@ public class StockServiceImpl implements StockService {
     @Override
     public int receiveStock(Long itemId, int quantity) {
         // Optimistic locking через save() - автоматически обновляет версию
-        Stock stock = stockRepository.findByItemId(itemId)
+        // Используем findByItemIdForUpdate для предотвращения race condition
+        Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
         
         int newQuantity = stock.getQuantity() + quantity;

@@ -106,6 +106,7 @@ public class BatchServiceImpl implements BatchService {
                 batch.setQuantity(batch.getQuantity() - remaining);
                 remaining = 0;
             }
+            batchRepository.save(batch); // @Version гарантирует атомарность для каждой партии
         }
 
         // Пересчитываем total quantity из партий
