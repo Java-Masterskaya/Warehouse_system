@@ -37,6 +37,16 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             """)
     int decreaseQuantityIfEnough(@Param("itemId") Long itemId, @Param("quantity") int quantity);
 
+    // Обновление quantity напрямую (для FEFO списания)
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update Stock s
+            set s.quantity = :quantity,
+                s.updatedAt = CURRENT_TIMESTAMP
+            where s.item.id = :itemId
+            """)
+    int updateQuantity(@Param("itemId") Long itemId, @Param("quantity") int quantity);
+
     //Дополнительная операция не блокирующая операции чтения
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

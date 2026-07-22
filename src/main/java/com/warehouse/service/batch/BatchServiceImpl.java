@@ -2,8 +2,11 @@ package com.warehouse.service.batch;
 
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.Stock;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.StockRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -22,6 +25,7 @@ import java.util.Optional;
 public class BatchServiceImpl implements BatchService {
 
     BatchRepository batchRepository;
+    StockRepository stockRepository;
 
     @Override
     @Transactional
@@ -59,5 +63,59 @@ public class BatchServiceImpl implements BatchService {
     public List<Batch> findAllWithItemByItemId(Long itemId) {
         log.debug("Finding all batches with item for itemId={}", itemId);
         return batchRepository.findAllWithItemByItemId(itemId);
+    }
+
+    @Override
+    @Transactional
+    public int writeOffByFEFO(Long itemId, int quantity, LocalDateTime now) {
+        log.debug("FEFO write-off: itemId={}, quantity={}, now={}", itemId, quantity, now);
+
+        // Сначала блокируем Stock, чтобы избежать deadlock
+        Stock stock = stockRepository.findByItemIdForUpdate(itemId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
+
+        // Получаем неистекшие партии, отсортированные по expiryDate ASC
+        List<Batch> batches = batchRepository.findNonExpiredByItemIdOrderByExpiryDateAsc(itemId, now);
+
+        // Проверяем доступное количество
+        int available = batches.stream().mapToInt(Batch::getQuantity).sum();
+        if (available < quantity) {
+            log.warn("Insufficient stock for FEFO write-off: itemId={}, requested={}, available={}",
+                    itemId, quantity, available);
+            throw new com.warehouse.exception.InsufficientStockException(
+                    "Insufficient stock for FEFO write-off: requested " + quantity + ", available " + available);
+        }
+
+        // Списываем по очереди из каждой партии
+        int remaining = quantity;
+        for (Batch batch : batches) {
+            if (remaining <= 0) {
+                break;
+            }
+
+            if (batch.getQuantity() <= remaining) {
+                // Списываем всю партию
+                log.debug("Writing off entire batch: id={}, quantity={}, remaining={}",
+                        batch.getId(), batch.getQuantity(), remaining);
+                remaining -= batch.getQuantity();
+                batch.setQuantity(0);
+            } else {
+                // Списываем часть партии
+                log.debug("Writing off partial batch: id={}, batchQty={}, writeOff={}, remaining={}",
+                        batch.getId(), batch.getQuantity(), remaining, 0);
+                batch.setQuantity(batch.getQuantity() - remaining);
+                remaining = 0;
+            }
+        }
+
+        // Пересчитываем total quantity из партий
+        int totalQuantity = batches.stream().mapToInt(Batch::getQuantity).sum();
+        stock.setQuantity(totalQuantity);
+        stockRepository.save(stock); // @Version гарантирует атомарность
+
+        log.info("FEFO write-off completed: itemId={}, requested={}, remaining={}, totalStock={}",
+                itemId, quantity, remaining, totalQuantity);
+
+        return quantity - remaining; // Возвращаем actual списанное количество
     }
 }

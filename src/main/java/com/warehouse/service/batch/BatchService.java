@@ -2,6 +2,7 @@ package com.warehouse.service.batch;
 
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
+import com.warehouse.exception.InsufficientStockException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,4 +43,17 @@ public interface BatchService {
      * @return список партий товара
      */
     List<Batch> findAllWithItemByItemId(Long itemId);
+
+    /**
+     * Списание товара по алгоритму FEFO (First-Expire-First-Out).
+     * Гасим из партии с ближайшим сроком, при нехватке — добираем из следующих.
+     * Одно списание может затронуть несколько партий.
+     *
+     * @param itemId      ID товара
+     * @param quantity    количество для списания
+     * @param now         текущее время (для проверки срока годности)
+     * @return количество списанных единиц (может быть меньше запрошенного при нехватке)
+     * @throws InsufficientStockException если недостаточно товара во всех неистекших партиях
+     */
+    int writeOffByFEFO(Long itemId, int quantity, LocalDateTime now) throws InsufficientStockException;
 }

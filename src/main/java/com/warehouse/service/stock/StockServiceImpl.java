@@ -21,12 +21,14 @@ public class StockServiceImpl implements StockService {
 
     @Override
     public int receiveStock(Long itemId, int quantity) {
-        int updatedRows = stockRepository.increaseQuantity(itemId, quantity);
-        if (updatedRows == 0) {
-            throw stockNotFound(itemId);
-        }
-
-        int newQuantity = getCurrentQuantity(itemId);
+        // Optimistic locking через save() - автоматически обновляет версию
+        Stock stock = stockRepository.findByItemId(itemId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
+        
+        int newQuantity = stock.getQuantity() + quantity;
+        stock.setQuantity(newQuantity);
+        stockRepository.save(stock); // @Version гарантирует атомарность
+        
         log.info("Stock receipt completed: itemId={}, quantity={}, new stock={}", itemId, quantity, newQuantity);
         return newQuantity;
     }
@@ -50,13 +52,9 @@ public class StockServiceImpl implements StockService {
             throw InsufficientStockException.of(itemId, quantity, current);
         }
 
-        int newQuantity = getCurrentQuantity(itemId);
+        int newQuantity = stock.getQuantity(); // Получаем текущее значение после UPDATE
         log.info("Write-off completed: itemId={}, quantity={}, new stock={}", itemId, quantity, newQuantity);
         return newQuantity;
-    }
-
-    private int getCurrentQuantity(Long itemId) {
-        return stockRepository.findQuantityByItemId(itemId).orElseThrow(() -> stockNotFound(itemId));
     }
 
     private EntityNotFoundException stockNotFound(Long itemId) {

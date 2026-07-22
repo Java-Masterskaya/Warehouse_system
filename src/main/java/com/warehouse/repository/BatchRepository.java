@@ -1,7 +1,9 @@
 package com.warehouse.repository;
 
 import com.warehouse.entity.Batch;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -26,6 +28,25 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
             ORDER BY b.expiryDate ASC
             """)
     List<Batch> findByItemIdOrderByExpiryDateAsc(@Param("itemId") Long itemId);
+
+    /**
+     * Найти неистекшие партии товара, отсортированные по возрастанию срока годности (FEFO).
+     * Используется для списания - не используем просроченные партии.
+     *
+     * @param itemId ID товара
+     * @param now текущее время
+     * @return список неистекших партий с количеством > 0
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT b
+            FROM Batch b
+            WHERE b.item.id = :itemId
+            AND b.expiryDate > :now
+            AND b.quantity > 0
+            ORDER BY b.expiryDate ASC
+            """)
+    List<Batch> findNonExpiredByItemIdOrderByExpiryDateAsc(@Param("itemId") Long itemId, @Param("now") LocalDateTime now);
 
     /**
      * Найти партию по ID (с подгрузкой item).
@@ -55,4 +76,5 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
             ORDER BY b.expiryDate ASC
             """)
     List<Batch> findAllWithItemByItemId(@Param("itemId") Long itemId);
+
 }

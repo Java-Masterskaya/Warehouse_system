@@ -38,9 +38,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalDate;
 
 /**
  * Реализация сервиса для управления движениями товаров на складе.
@@ -122,8 +120,11 @@ public class StockMovementServiceImpl implements StockMovementService {
         log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}",
                 itemId, quantity, ctx.userId());
 
+        LocalDateTime now = LocalDateTime.now();
+
         try {
-            int stockAfter = stockService.writeOffStock(itemId, quantity);
+            // FEFO списание: гасим из партий с ближайшим сроком
+            int stockAfter = batchService.writeOffByFEFO(itemId, quantity, now);
 
             StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.WRITE_OFF);
 
