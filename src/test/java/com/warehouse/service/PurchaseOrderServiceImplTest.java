@@ -36,6 +36,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -244,8 +246,8 @@ class PurchaseOrderServiceImplTest {
         assertThat(orderItem.getReceivedQty()).isEqualTo(4);
 
         verify(stockMovementService).registerReceipt(
-                new ChangeQuantityMovementRequest(10L, 4, LocalDateTime.now()),
-                context
+                argThat(r -> r.itemId().equals(10L) && r.quantity() == 4),
+                eq(context)
         );
     }
 
@@ -296,8 +298,8 @@ class PurchaseOrderServiceImplTest {
         assertThat(orderItem.getReceivedQty()).isEqualTo(10);
 
         verify(stockMovementService).registerReceipt(
-                new ChangeQuantityMovementRequest(10L, 10, LocalDateTime.now()),
-                context
+                argThat(r -> r.itemId().equals(10L) && r.quantity() == 10),
+                eq(context)
         );
     }
 

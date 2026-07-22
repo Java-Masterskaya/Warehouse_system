@@ -11,6 +11,7 @@ import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockMovement;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
@@ -22,6 +23,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.movement.StockMovementServiceImpl;
 import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.service.reservation.StockAvailabilityService;
@@ -78,6 +80,8 @@ class StockMovementServiceImplTest {
     @Mock
     private StockAvailabilityService availabilityService;
     @Mock
+    private BatchService batchService;
+    @Mock
     private ItemRepository itemRepository;
     @Mock
     private StockRepository stockRepository;
@@ -101,7 +105,8 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptSuccess() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now()
+                .plusDays(1));
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -109,6 +114,12 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.receiveStock(ITEM_ID, QUANTITY)).thenReturn(STOCK_AFTER_RECEIPT);
+        when(batchService.createBatch(any(Item.class), eq(QUANTITY), any(LocalDateTime.class)))
+                .thenAnswer(invocation -> {
+                    Item i = invocation.getArgument(0);
+                    int q = invocation.getArgument(1);
+                    return Batch.builder().id(1L).item(i).quantity(q).expiryDate(invocation.getArgument(2)).build();
+                });
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(STOCK_AFTER_RECEIPT), eq(false)))
@@ -207,7 +218,8 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptUserNotNull() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now());
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, QUANTITY, LocalDateTime.now()
+                .plusDays(1));
         UserContext userContext = new UserContext(USER_ID, USERNAME);
         Item item = createItem(ITEM_ID, "Тестовый товар", true, 0);
         User userRef = createUserReference(USER_ID, USERNAME);
@@ -215,6 +227,12 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.receiveStock(ITEM_ID, QUANTITY)).thenReturn(STOCK_AFTER_RECEIPT);
+        when(batchService.createBatch(any(Item.class), eq(QUANTITY), any(LocalDateTime.class)))
+                .thenAnswer(invocation -> {
+                    Item i = invocation.getArgument(0);
+                    int q = invocation.getArgument(1);
+                    return Batch.builder().id(1L).item(i).quantity(q).expiryDate(invocation.getArgument(2)).build();
+                });
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 

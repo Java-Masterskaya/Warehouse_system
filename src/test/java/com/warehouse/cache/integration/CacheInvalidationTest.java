@@ -41,6 +41,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockMovementService stockMovementService;
+
     @Autowired
     private StockAlertRepository stockAlertRepository;
 
@@ -118,7 +119,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5, LocalDateTime.now());
+        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5, LocalDateTime.now().plusDays(1));
         stockMovementService.registerReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 

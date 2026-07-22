@@ -11,17 +11,7 @@ import com.warehouse.entity.OutboxStatus;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
-import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.OutboxDltEventRepository;
-import com.warehouse.repository.OutboxEventRepository;
-import com.warehouse.repository.PurchaseOrderItemRepository;
-import com.warehouse.repository.PurchaseOrderRepository;
-import com.warehouse.repository.StockAlertRepository;
-import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.StockReserveRepository;
-import com.warehouse.repository.SupplierRepository;
-import com.warehouse.repository.UserRepository;
+import com.warehouse.repository.*;
 import com.warehouse.service.movement.StockMovementService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -90,6 +80,8 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private OutboxEventRelay outboxEventRelay;
+    @Autowired
+    private BatchRepository batchRepository;
 
     private Item testItem;
     private Long testItemId;
@@ -102,6 +94,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         reserveRepository.deleteAll();
         stockAlertRepository.deleteAll();
         stockMovementRepository.deleteAll();
+        batchRepository.deleteAll();
         purchaseOrderItemRepository.deleteAll();
         purchaseOrderRepository.deleteAll();
         stockRepository.deleteAll();
