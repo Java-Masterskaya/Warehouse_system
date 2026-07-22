@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
  * @param type Тип движения (приход/списание)
  * @param quantity Количество изменённых единиц
  * @param stockAfter Остаток после операции
+ * @param batchId ID партии (для поступлений)
+ * @param expiryDate Срок годности партии (для поступлений)
  * @param createdAt Время операции
  * @param lowStockAlert true, если остаток опустился ниже минимального
  */
@@ -21,6 +23,8 @@ public record StockMovementResponse(
     MovementType type,
     int quantity,
     int stockAfter,
+    Long batchId,
+    LocalDateTime expiryDate,
     LocalDateTime createdAt,
     boolean lowStockAlert
 ) {}

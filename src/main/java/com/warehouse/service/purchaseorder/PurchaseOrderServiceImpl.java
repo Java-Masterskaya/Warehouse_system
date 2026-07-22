@@ -30,6 +30,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -228,7 +229,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         ChangeQuantityMovementRequest movementRequest =
                 new ChangeQuantityMovementRequest(
                         orderItem.getItem().getId(),
-                        request.quantity()
+                        request.quantity(),
+                        LocalDateTime.now()
                 );
 
         stockMovementService.registerReceipt(movementRequest, context);

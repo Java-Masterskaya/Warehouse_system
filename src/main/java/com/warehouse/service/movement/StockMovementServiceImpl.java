@@ -7,6 +7,7 @@ import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
@@ -23,6 +24,7 @@ import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.kafka.outbox.OutboxService;
+import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;
@@ -36,7 +38,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 /**
  * Реализация сервиса для управления движениями товаров на складе.
@@ -58,6 +62,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
     StockRepository stockRepository;
+    BatchService batchService;
     OutboxService outboxService;
     MetricService metricService;
 
@@ -85,15 +90,18 @@ public class StockMovementServiceImpl implements StockMovementService {
         Item item = itemCheckForExist(itemId);
         itemCheckForActive(item);
 
-        log.debug("Processing stock receipt for itemId={}, quantity={}, userId={}",
-                itemId, quantity, ctx.userId());
+        log.debug("Processing stock receipt for itemId={}, quantity={}, expiryDate={}, userId={}",
+                itemId, quantity, request.expiryDate(), ctx.userId());
 
         int stockAfter = stockService.receiveStock(itemId, quantity);
 
-        StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.RECEIVE);
+        // Создаем партию с указанным сроком годности
+        Batch batch = batchService.createBatch(item, quantity, request.expiryDate());
 
-        log.info("Stock receipt registered: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}", itemId,
-                quantity, stockAfter, ctx.userId(), stockMovement.getId());
+        StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.RECEIVE, batch);
+
+        log.info("Stock receipt registered: itemId={}, quantity={}, expiryDate={}, batchId={}, newTotal={}, userId={}, movementId={}", itemId,
+                quantity, request.expiryDate(), batch.getId(), stockAfter, ctx.userId(), stockMovement.getId());
 
         metricService.increment("warehouse.movements.receive.total");
 
@@ -200,7 +208,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         User userRef = userRepository.getReferenceById(ctx.userId());
 
         StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.ADJUSTMENT)
-                .quantity(delta).build();
+                .quantity(delta).batch(null).build();
         stockMovementRepository.save(stockMovement);
 
         boolean lowStock = counted < item.getMinStock();
@@ -230,10 +238,24 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Override
     public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type) {
+        return newStockMovement(item, quantity, ctx, type, null);
+    }
+
+    /**
+     * Сохраняет новое движение товара с опциональной партией.
+     *
+     * @param item     перемещаемый товар
+     * @param quantity количество перемещаемых товаров
+     * @param ctx      пользователь, выполняющий операцию
+     * @param type     тип выполняемой операции
+     * @param batch    партия (опционально)
+     * @return сохраненное движение товара
+     */
+    public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type, Batch batch) {
         User userRef = userRepository.getReferenceById(ctx.userId());
 
         StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(type).quantity(quantity)
-                .build();
+                .batch(batch).build();
         return stockMovementRepository.save(stockMovement);
     }
 

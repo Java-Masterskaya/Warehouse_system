@@ -25,6 +25,8 @@ public interface StockMovementMapper {
     @Mappings({
         @Mapping(target = "itemId", source = "entity", qualifiedByName = "getItemId"),
         @Mapping(target = "movementId", source = "entity.id"),
+        @Mapping(target = "batchId", source = "entity.batch.id"),
+        @Mapping(target = "expiryDate", source = "entity.batch.expiryDate"),
         @Mapping(target = "lowStockAlert", source = "lowStockAlert")
     })
     StockMovementResponse toResponse(StockMovement entity, int stockAfter, boolean lowStockAlert);
@@ -59,6 +61,8 @@ public interface StockMovementMapper {
                 null,      // type
                 0,         // quantity
                 stockAfter,
+                null,      // batchId
+                null,      // expiryDate
                 null,      // createdAt
                 false      // lowStockAlert
         );

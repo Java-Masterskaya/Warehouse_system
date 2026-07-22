@@ -35,7 +35,7 @@ public class StockMovement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Товар, к которому относится движение. */
+    /** Товар, к котором относится движение. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
@@ -57,6 +57,11 @@ public class StockMovement {
     /** Время операции. */
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /** Партия, с которой связано движение (для поступлений). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    private Batch batch;
 
     @PrePersist
     private void prePersist() {
