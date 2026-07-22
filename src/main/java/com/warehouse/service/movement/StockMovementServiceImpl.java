@@ -24,6 +24,7 @@ import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.kafka.outbox.OutboxService;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.stock.StockService;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Реализация сервиса для управления движениями товаров на складе.
@@ -61,6 +63,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     UserRepository userRepository;
     StockRepository stockRepository;
     BatchService batchService;
+    BatchRepository batchRepository;
     OutboxService outboxService;
     MetricService metricService;
 
@@ -203,13 +206,63 @@ public class StockMovementServiceImpl implements StockMovementService {
             return mapper.toNoMovementResponse(itemId, counted);
         }
 
+        // Получаем все партии товара
+        List<Batch> batches = batchService.findByItemIdOrderByExpiryDate(itemId);
+        
+        if (batches.isEmpty()) {
+            log.warn("Stocktake: no batches found for itemId={}. Cannot perform stocktake without batches", itemId);
+            throw new IllegalStateException("Cannot perform stocktake: no batches found for item");
+        }
+        
+        // Распределяем разницу по партиям
+        int remainingDelta = delta;
+        
+        if (remainingDelta > 0) {
+            // Нам нужно увеличить остаток (нашли лишние товары)
+            // Добавляем к первой партии (самый ранний срок годности)
+            Batch firstBatch = batches.get(0);
+            firstBatch.setQuantity(firstBatch.getQuantity() + remainingDelta);
+            batchRepository.save(firstBatch);
+            remainingDelta = 0;
+        } else if (remainingDelta < 0) {
+            // Нам нужно уменьшить остаток (товар пропал)
+            // Списываем из последней партии (самый отдаленный срок годности - FEFO reversed)
+            // Но логичнее списать из самых близких - First Expire First Out
+            // Пройдем с начала списка (ближайшие сроки)
+            for (Batch batch : batches) {
+                if (remainingDelta == 0) break;
+                
+                int batchQty = batch.getQuantity();
+                int writeOff = Math.min(-remainingDelta, batchQty);
+                batch.setQuantity(batchQty - writeOff);
+                remainingDelta += writeOff;
+                batchRepository.save(batch);
+            }
+        }
+        
+        if (remainingDelta != 0) {
+            log.error("Stocktake: unable to distribute delta={}. remaining={}", delta, remainingDelta);
+            throw new IllegalStateException("Unable to distribute adjustment across batches");
+        }
+
+        // Обновляем общий остаток
         stock.setQuantity(counted);
         stockRepository.save(stock);
 
         User userRef = userRepository.getReferenceById(ctx.userId());
 
+        // Создаем движение с партией, к которой было применено изменение
+        Batch affectedBatch;
+        if (delta > 0) {
+            // Добавили товар - связываем с первой партией (ближайший срок)
+            affectedBatch = batches.get(0);
+        } else {
+            // Списали товар - связываем с последней партией (FEFO - отдаленный срок)
+            affectedBatch = batches.get(batches.size() - 1);
+        }
+        
         StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.ADJUSTMENT)
-                .quantity(delta).batch(null).build();
+                .quantity(delta).batch(affectedBatch).build();
         stockMovementRepository.save(stockMovement);
 
         boolean lowStock = counted < item.getMinStock();

@@ -15,6 +15,17 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
 
     /**
      * Найти все партии товара, отсортированные по возрастанию срока годности (FEFO).
+     * Алиас для findByItemIdOrderByExpiryDateAsc для удобства.
+     *
+     * @param itemId ID товара
+     * @return список партий, отсортированных по expiryDate
+     */
+    default List<Batch> findByItemIdOrderByExpiryDate(Long itemId) {
+        return findByItemIdOrderByExpiryDateAsc(itemId);
+    }
+
+    /**
+     * Найти все партии товара, отсортированные по возрастанию срока годности (FEFO).
      *
      * @param itemId ID товара
      * @return список партий, отсортированных по expiryDate
