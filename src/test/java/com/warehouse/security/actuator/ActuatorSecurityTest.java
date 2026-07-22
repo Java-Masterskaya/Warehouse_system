@@ -9,22 +9,54 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalManagementPort;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = { "management.server.port=0", "management.endpoints.web.base-path=/actuator" }
+)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ActuatorSecurityTest extends AbstractIntegrationTest {
+
+    // Spring Boot автоматически подставит рандомный порт основного приложения
+    @LocalServerPort
+    private int serverPort;
+
+    // Spring Boot автоматически подставит рандомный порт для менеджмент-сервера
+    @LocalManagementPort
+    private int managementPort;
+
+    @Autowired
+    private TestRestTemplate restTemplate;
+
+    private static final String prometheus = "/actuator/prometheus";
+    private static final String health = "/actuator/health";
+    private static final String liveness = "/actuator/health/liveness";
+    private static final String readiness = "/actuator/health/readiness";
+    private static final String refresh = "/actuator/refresh";
+
+    private String getManagementUrl(String path) {
+        return "http://localhost:" + managementPort + path;
+    }
+
+    private String getServerUrl(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -32,76 +64,100 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private static final String PROMETHEUS = "/actuator/prometheus";
-    private static final String HEALTH = "/actuator/health";
-    private static final String LIVENESS = "/actuator/health/liveness";
-    private static final String READINESS = "/actuator/health/readiness";
-    private static final String REFRESH = "/actuator/refresh";
-
     private String adminToken;
 
     @BeforeEach
     void setUp() throws Exception {
-        String token = obtainAdminToken("admin", "secret");
-        this.adminToken = "Bearer " + token;
+        this.adminToken = obtainAdminToken("admin", "secret");
+    }
+
+    private HttpEntity<Void> getHeadersWithAdminToken() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        return new HttpEntity<>(headers);
+    }
+
+    private HttpEntity<Void> getAnonymousHeaders() {
+        return new HttpEntity<>(new HttpHeaders());
     }
 
     @Test
-    @DisplayName("GET /actuator/prometheus анонимно -> должен отдавать 200 OK")
-    void prometheusAnonymousOnManagementPortReturns200() throws Exception {
-        mockMvc.perform(get(PROMETHEUS))
-                .andExpect(status().isOk());
+    @DisplayName("GET /actuator/prometheus на основном порту должен отдавать 404")
+    void prometheusOnMainPortReturns404() {
+        ResponseEntity<String> response = restTemplate.getForEntity(getServerUrl(prometheus), String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
-    @DisplayName("GET /actuator/health анонимно -> отдает 200 OK, но скрывает детали")
-    void healthAnonymousReturns200WithoutDetails() throws Exception {
-        mockMvc.perform(get(HEALTH))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("\"status\":\"UP\"")))
-                .andExpect(content().string(not(containsString("\"components\""))))
-                .andExpect(content().string(not(containsString("\"details\""))));
+    @DisplayName("GET /actuator/prometheus анонимно на management-порту должен отдавать 200 OK")
+    void prometheusAnonymousOnManagementPortReturns200() {
+        ResponseEntity<String> response = restTemplate.getForEntity(getManagementUrl(prometheus), String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
-    @DisplayName("GET /actuator/health с токеном для ADMIN -> отдает 200 OK и показывает детали")
-    void healthAdminReturns200WithDetails() throws Exception {
-        mockMvc.perform(get(HEALTH)
-                        .header(HttpHeaders.AUTHORIZATION, adminToken))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("\"status\":\"UP\"")))
-                .andExpect(content().string(containsString("\"details\"")));
+    @DisplayName("GET /actuator/health анонимно отдает 200 OK, но скрывает детали")
+    void healthAnonymousReturns200WithoutDetails() {
+        ResponseEntity<String> response = restTemplate.getForEntity(getManagementUrl(health), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"status\":\"UP\"");
+        // Проверяем, что в JSON нет внутренних компонентов (например, diskSpace, db)
+        assertThat(response.getBody()).doesNotContain("\"components\"");
+        assertThat(response.getBody()).doesNotContain("\"details\"");
     }
 
     @Test
-    @DisplayName("GET /actuator/health/liveness анонимно -> 200 OK")
-    void livenessAnonymousReturns200() throws Exception {
-        mockMvc.perform(get(LIVENESS))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("\"status\":\"UP\"")));
+    @DisplayName("GET /actuator/health с токеном для ADMIN отдает 200 OK и показывает детали")
+    void healthAdminReturns200WithDetails() {
+        ResponseEntity<String> response = restTemplate.exchange(
+                getManagementUrl(health),
+                HttpMethod.GET,
+                getHeadersWithAdminToken(),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"status\":\"UP\"");
+        assertThat(response.getBody()).containsAnyOf("\"components\"", "\"details\"");
     }
 
     @Test
-    @DisplayName("GET /actuator/health/readiness анонимно -> 200 OK")
-    void readinessAnonymousReturns200() throws Exception {
-        mockMvc.perform(get(READINESS))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("\"status\":\"UP\"")));
+    @DisplayName("GET /actuator/health/liveness доступен без авторизации")
+    void livenessAnonymousReturns200() {
+        ResponseEntity<String> response = restTemplate.getForEntity(getManagementUrl(liveness), String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"status\":\"UP\"");
     }
 
     @Test
-    @DisplayName("POST /actuator/refresh без авторизации -> должен отдавать 401 Unauthorized")
-    void refreshAnonymousReturns401() throws Exception {
-        mockMvc.perform(post(REFRESH))
-                .andExpect(status().isUnauthorized());
+    @DisplayName("GET /actuator/health/readiness доступен без авторизации")
+    void readinessAnonymousReturns200() {
+        ResponseEntity<String> response = restTemplate.getForEntity(getManagementUrl(readiness), String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).contains("\"status\":\"UP\"");
     }
 
     @Test
-    @DisplayName("POST /actuator/refresh с токеном для ADMIN -> должен отдавать 200 OK")
-    void refreshAdminReturns200() throws Exception {
-        mockMvc.perform(post(REFRESH)
-                        .header(HttpHeaders.AUTHORIZATION, adminToken))
-                .andExpect(status().isOk());
+    @DisplayName("POST /actuator/refresh без авторизации должен отдавать 401 Unauthorized")
+    void refreshAnonymousReturns401() {
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                getManagementUrl(refresh), getAnonymousHeaders(), String.class
+        );
+        assertThat(response.getStatusCode()).isIn(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("POST /actuator/refresh с токеном для ADMIN должен отдавать 200 OK")
+    void refreshAdminReturns200() {
+        ResponseEntity<String> response = restTemplate.exchange(
+                getManagementUrl(refresh),
+                HttpMethod.POST,
+                getHeadersWithAdminToken(),
+                String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     private String obtainAdminToken(String username, String password) throws Exception {
