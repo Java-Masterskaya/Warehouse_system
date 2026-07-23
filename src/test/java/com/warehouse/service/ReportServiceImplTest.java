@@ -202,7 +202,8 @@ public class ReportServiceImplTest {
         batch.setQuantity(10);
         batch.setExpiryDate(expiryDate);
 
-        when(batchRepository.findExpiringByDays(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of(batch));
+        when(batchRepository.findExpiringByDays(any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(List.of(batch));
 
         List<ExpiringBatch> batches = reportService.getExpiringBatches(5);
 

@@ -15,7 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,7 +24,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -60,7 +58,8 @@ public class BatchServiceImplTest {
 
     @BeforeEach
     public void setUp() {
-        batchService = new BatchServiceImpl(batchRepository, stockRepository, itemRepository, stockMovementRepository, userRepository);
+        batchService = new BatchServiceImpl(batchRepository, stockRepository, itemRepository,
+                stockMovementRepository, userRepository);
     }
 
     /**
@@ -217,7 +216,8 @@ public class BatchServiceImplTest {
         InsufficientStockException exception = assertThrows(InsufficientStockException.class,
                 () -> batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now()));
 
-        assertEquals("Insufficient stock for FEFO write-off: requested 20, available 10", exception.getMessage());
+        assertEquals("Insufficient stock for FEFO write-off: requested 20, available 10",
+                exception.getMessage());
     }
 
     /**

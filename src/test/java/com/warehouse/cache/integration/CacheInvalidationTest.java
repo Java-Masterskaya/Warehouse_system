@@ -6,7 +6,12 @@ import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
-import com.warehouse.repository.*;
+import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockReserveRepository;
+import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -134,7 +139,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void writeOffMovementShouldEvictItemCache() {
         // Сначала создаем партию через приход
-        ChangeQuantityMovementRequest receiptRequest = new ChangeQuantityMovementRequest(itemId, 10, LocalDateTime.now().plusDays(1));
+        ChangeQuantityMovementRequest receiptRequest = new ChangeQuantityMovementRequest(
+                itemId, 10, LocalDateTime.now().plusDays(1));
         stockMovementService.registerReceipt(receiptRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
@@ -143,7 +149,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         assertThat(response1.getCurrentStock()).isEqualTo(20);
 
         // Теперь списываем
-        ChangeQuantityMovementRequest writeOffRequest = new ChangeQuantityMovementRequest(itemId, 3, LocalDateTime.now());
+        ChangeQuantityMovementRequest writeOffRequest = new ChangeQuantityMovementRequest(
+                itemId, 3, LocalDateTime.now());
         stockMovementService.writeOffReceipt(writeOffRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
