@@ -7,11 +7,7 @@ import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
-import com.warehouse.entity.Stock;
-import com.warehouse.entity.StockMovement;
-import com.warehouse.entity.User;
+import com.warehouse.entity.*;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
@@ -727,11 +723,15 @@ class StockMovementServiceImplTest {
     }
 
     private Item createItem(Long itemId, String name, boolean active, int minStock) {
+        Category category = new Category();
+        category.setId(1L);
+        category.setName("Тестовая категория");
+
         Item item = new Item();
         item.setId(itemId);
         item.setName(name);
         item.setSku("SKU-" + itemId);
-        item.setCategory("Тестовая категория");
+        item.setCategory(category);
         item.setActive(active);
         item.setMinStock(minStock);
         item.setPrice(BigDecimal.valueOf(100.00));

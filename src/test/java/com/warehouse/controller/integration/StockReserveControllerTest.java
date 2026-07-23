@@ -4,16 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
-import com.warehouse.entity.Item;
-import com.warehouse.entity.Reservation;
-import com.warehouse.entity.ReservationStatus;
-import com.warehouse.entity.Role;
-import com.warehouse.entity.Stock;
-import com.warehouse.entity.User;
-import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.StockReserveRepository;
-import com.warehouse.repository.UserRepository;
+import com.warehouse.entity.*;
+import com.warehouse.repository.*;
 import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,19 +46,30 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
     @Autowired
     UserRepository userRepository;
 
+    @Autowired
+    CategoryRepository categoryRepository;
+
     private String adminToken;
     private String userToken;
 
     private Item item;
     private Stock stock;
+    private Category category;
 
     @BeforeEach
     void setUp() throws Exception {
 
+        category = categoryRepository.findByName("test")
+                .orElseGet(() -> categoryRepository.save(
+                        Category.builder()
+                                .name("test")
+                                .build()
+                ));
+
         item = new Item();
         item.setSku("SKU-" + System.currentTimeMillis());
         item.setName("Test item");
-        item.setCategory("test");
+        item.setCategory(category);
         item.setMinStock(1);
         item.setActive(true);
 

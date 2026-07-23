@@ -8,17 +8,8 @@ import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderItemRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderRequest;
 import com.warehouse.dto.request.security.LoginRequest;
-import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
-import com.warehouse.entity.Role;
-import com.warehouse.entity.Stock;
-import com.warehouse.entity.Supplier;
-import com.warehouse.entity.User;
-import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.SupplierRepository;
-import com.warehouse.repository.UserRepository;
+import com.warehouse.entity.*;
+import com.warehouse.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,9 +56,13 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private String adminToken;
     private Supplier supplier;
     private Item item;
+    private Category category;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -95,10 +90,17 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                 .build();
         supplier = supplierRepository.save(supplier);
 
+        category = categoryRepository.findByName("Test")
+                .orElseGet(() -> categoryRepository.save(
+                        Category.builder()
+                                .name("Test")
+                                .build()
+                ));
+
         item = Item.builder()
                 .sku("PO-SKU-" + System.nanoTime())
                 .name("Test Purchase Order Item")
-                .category("Test")
+                .category(category)
                 .minStock(0)
                 .active(true)
                 .price(new BigDecimal("1500.00"))

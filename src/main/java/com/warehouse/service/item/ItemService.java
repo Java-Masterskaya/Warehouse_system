@@ -19,8 +19,6 @@ public interface ItemService {
 
     PageResponse<ItemResponse> getItems(String sort, String order, String category, String search, int page, int size);
 
-    List<String> getCategories();
-
     void softDeleteItem(Long itemId);
 
     BigDecimal confirmPrice(BigDecimal price);
