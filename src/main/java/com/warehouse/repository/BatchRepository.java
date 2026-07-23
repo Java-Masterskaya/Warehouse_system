@@ -107,6 +107,22 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
     List<Batch> findExpiringByDays(@Param("now") LocalDateTime now, @Param("maxDate") LocalDateTime maxDate);
 
     /**
+     * Сумма количества непросроченных партий.
+     * Используется для проверки доступного остатка без резерваций.
+     *
+     * @param itemId ID товара
+     * @param now текущее время
+     * @return сумма количества непросроченных партий или 0
+     */
+    @Query("""
+            SELECT COALESCE(SUM(b.quantity), 0)
+            FROM Batch b
+            WHERE b.item.id = :itemId
+            AND b.expiryDate > :now
+            """)
+    Optional<Integer> findNonExpiredSumByItemId(@Param("itemId") Long itemId, @Param("now") LocalDateTime now);
+
+    /**
      * Очистить просроченные партии для конкретного товара.
      * Атомарное обновление всех просроченных партий в 0.
      * @param itemId ID товара

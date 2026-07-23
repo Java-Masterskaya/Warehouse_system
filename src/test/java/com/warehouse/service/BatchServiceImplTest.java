@@ -88,14 +88,14 @@ public class BatchServiceImplTest {
         when(batchRepository.findNonExpiredByItemIdOrderByExpiryDateAsc(eq(itemId), any(LocalDateTime.class)))
                 .thenReturn(List.of(batch));
         when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
-        when(stockRepository.save(any(Stock.class))).thenAnswer(i -> i.getArgument(0));
+        when(stockRepository.syncQuantityWithBatches(eq(itemId))).thenReturn(1);
+        when(stockRepository.findQuantityByItemId(eq(itemId))).thenReturn(Optional.of(newStockQuantity));
 
         // When
         int result = batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now());
 
         // Then
         assertEquals(newStockQuantity, result);
-        verify(batchRepository).findNonExpiredByItemIdOrderByExpiryDateAsc(eq(itemId), any(LocalDateTime.class));
         verify(stockRepository).findByItemIdForUpdate(eq(itemId));
     }
 
@@ -128,7 +128,8 @@ public class BatchServiceImplTest {
         when(batchRepository.findNonExpiredByItemIdOrderByExpiryDateAsc(eq(itemId), any(LocalDateTime.class)))
                 .thenReturn(List.of(batch1, batch2));
         when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
-        when(stockRepository.save(any(Stock.class))).thenAnswer(i -> i.getArgument(0));
+        when(stockRepository.syncQuantityWithBatches(eq(itemId))).thenReturn(1);
+        when(stockRepository.findQuantityByItemId(eq(itemId))).thenReturn(Optional.of(newStockQuantity));
 
         // When
         int result = batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now());
@@ -137,14 +138,16 @@ public class BatchServiceImplTest {
         assertEquals(newStockQuantity, result);
         // Проверяем, что batchRepository.save() вызывался для каждой партии
         verify(batchRepository, Mockito.times(2)).save(any(Batch.class));
-        verify(stockRepository).save(any(Stock.class));
+        verify(stockRepository).findByItemIdForUpdate(eq(itemId));
+        verify(stockRepository).syncQuantityWithBatches(eq(itemId));
+        verify(stockRepository).findQuantityByItemId(eq(itemId));
     }
 
     /**
      * FEFO списание: проверка консистентности stock.quantity = SUM(Batch.quantity).
      * Проверяет, что после списания:
      * 1. Партии обновляются правильно (полностью или частично)
-     * 2. Stock.quantity обновляется на разницу списанного
+     * 2. Stock.quantity обновляется через syncQuantityWithBatches()
      * 3. Консистентность между stock и партиями соблюдается
      */
     @Test
@@ -179,7 +182,8 @@ public class BatchServiceImplTest {
             Batch saved = i.getArgument(0);
             return saved;
         });
-        when(stockRepository.save(any(Stock.class))).thenAnswer(i -> i.getArgument(0));
+        when(stockRepository.syncQuantityWithBatches(eq(itemId))).thenReturn(1);
+        when(stockRepository.findQuantityByItemId(eq(itemId))).thenReturn(Optional.of(expectedStockAfter));
 
         // When
         int result = batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now());
@@ -190,13 +194,9 @@ public class BatchServiceImplTest {
         // Проверяем, что batchRepository.save() вызывался для каждой партии
         verify(batchRepository, Mockito.times(2)).save(any(Batch.class));
         
-        // Проверяем, что stockRepository.save() вызывался
-        verify(stockRepository).save(any(Stock.class));
-        
-        // Проверяем, что stock.setQuantity() вызывается с правильным значением
-        ArgumentCaptor<Stock> stockCaptor = ArgumentCaptor.forClass(Stock.class);
-        verify(stockRepository).save(stockCaptor.capture());
-        assertEquals(expectedStockAfter, stockCaptor.getValue().getQuantity());
+        // Проверяем, что syncQuantityWithBatches вызывается для синхронизации
+        verify(stockRepository).syncQuantityWithBatches(eq(itemId));
+        verify(stockRepository).findQuantityByItemId(eq(itemId));
     }
 
     /**
@@ -261,11 +261,9 @@ public class BatchServiceImplTest {
         when(batchRepository.findExpiredWithQuantity(any(LocalDateTime.class)))
                 .thenReturn(List.of(expiredBatch));
         when(stockRepository.findByItemIdForUpdate(eq(itemId))).thenReturn(Optional.of(stock));
-        when(stockRepository.decreaseQuantityIfEnough(eq(itemId), eq(totalQty))).thenReturn(1);
         when(batchRepository.clearExpiredBatchesByItemId(eq(itemId), any(LocalDateTime.class)))
                 .thenReturn(1);
         when(stockRepository.syncQuantityWithBatches(eq(itemId))).thenReturn(1);
-        when(itemRepository.findById(eq(itemId))).thenReturn(Optional.of(item));
 
         // When
         int cleared = batchService.clearExpiredBatches(LocalDateTime.now());
@@ -273,16 +271,15 @@ public class BatchServiceImplTest {
         // Then
         assertEquals(1, cleared);
         verify(stockRepository).findByItemIdForUpdate(eq(itemId));
-        verify(stockRepository).decreaseQuantityIfEnough(eq(itemId), eq(totalQty));
         verify(batchRepository).clearExpiredBatchesByItemId(eq(itemId), any(LocalDateTime.class));
+        verify(stockRepository).syncQuantityWithBatches(eq(itemId));
     }
 
     /**
      * Проверка консистентности: stock.quantity = SUM(Batch.quantity) после очистки просроченных.
      * Проверяет, что:
-     * 1. stock.quantity уменьшается на количество просроченных партий
-     * 2. syncQuantityWithBatches вызывается для окончательной синхронизации
-     * 3. stock.quantity после очистки = начальный остаток - количество просроченных
+     * 1. syncQuantityWithBatches вызывается для окончательной синхронизации
+     * 2. stock.quantity после очистки = начальный остаток - количество просроченных
      */
     @Test
     public void shouldSyncStockQuantityAfterClearExpired() {
@@ -305,11 +302,9 @@ public class BatchServiceImplTest {
         when(batchRepository.findExpiredWithQuantity(any(LocalDateTime.class)))
                 .thenReturn(List.of(expiredBatch));
         when(stockRepository.findByItemIdForUpdate(eq(itemId))).thenReturn(Optional.of(stock));
-        when(stockRepository.decreaseQuantityIfEnough(eq(itemId), eq(expiredQty))).thenReturn(1);
         when(batchRepository.clearExpiredBatchesByItemId(eq(itemId), any(LocalDateTime.class)))
                 .thenReturn(1);
         when(stockRepository.syncQuantityWithBatches(eq(itemId))).thenReturn(1);
-        when(itemRepository.findById(eq(itemId))).thenReturn(Optional.of(item));
 
         // When
         int cleared = batchService.clearExpiredBatches(LocalDateTime.now());
@@ -317,7 +312,6 @@ public class BatchServiceImplTest {
         // Then
         assertEquals(1, cleared);
         verify(stockRepository).findByItemIdForUpdate(eq(itemId));
-        verify(stockRepository).decreaseQuantityIfEnough(eq(itemId), eq(expiredQty));
         verify(batchRepository).clearExpiredBatchesByItemId(eq(itemId), any(LocalDateTime.class));
         verify(stockRepository).syncQuantityWithBatches(eq(itemId));
     }

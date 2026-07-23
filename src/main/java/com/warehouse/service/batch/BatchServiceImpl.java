@@ -125,12 +125,15 @@ public class BatchServiceImpl implements BatchService {
 
         // Уменьшаем общий остаток на фактически списанное количество
         int actuallyWrittenOff = quantity - remaining;
-        int newStockQuantity = stock.getQuantity() - actuallyWrittenOff;
         
         // СИНХРОНИЗИРУЕМ stock.quantity = SUM(Batch.quantity)
-        // Используем optimistic locking через @Version
-        stock.setQuantity(newStockQuantity);
-        stockRepository.save(stock); // @Version гарантирует атомарность
+        // Используем atomic sync через syncQuantityWithBatches()
+        // Это гарантирует, что stock.quantity всегда совпадает с суммой партий
+        stockRepository.syncQuantityWithBatches(itemId);
+        
+        // Получаем обновленное значение stock.quantity
+        int newStockQuantity = stockRepository.findQuantityByItemId(itemId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
         
         log.info("FEFO write-off completed: itemId={}, requested={}, actuallyWrittenOff={}, newStockQuantity={}",
                 itemId, quantity, actuallyWrittenOff, newStockQuantity);
@@ -177,14 +180,6 @@ public class BatchServiceImpl implements BatchService {
                     continue;
                 }
 
-                // Атомарно уменьшаем stock на общее количество просроченных партий
-                int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, totalQty);
-                if (updatedRows == 0) {
-                    log.warn("Failed to decrease stock for expired batch cleanup: itemId={}, requested={}",
-                            itemId, totalQty);
-                    continue;
-                }
-
                 // Атомарно очищаем все просроченные партии для этого товара
                 int clearedCount = batchRepository.clearExpiredBatchesByItemId(itemId, now);
                 totalCleared += clearedCount;
@@ -192,23 +187,6 @@ public class BatchServiceImpl implements BatchService {
                 // СИНХРОНИЗИРУЕМ stock.quantity = SUM(Batch.quantity)
                 // После очистки партий нужно обновить stock.quantity
                 stockRepository.syncQuantityWithBatches(itemId);
-
-                // Создаем движение для списания просроченных партий
-                // EXPIRED: quantity должно быть > 0 (количество списанного товара)
-                Item item = itemRepository.findById(itemId)
-                        .orElseThrow(() -> EntityNotFoundException.forId("Item", itemId));
-                User userRef = userRepository.getReferenceById(1L); // Системный пользователь
-                StockMovement movement = StockMovement.builder()
-                        .item(item)
-                        .user(userRef)
-                        .type(MovementType.EXPIRED)
-                        .quantity(totalQty)  // ← Положительное количество!
-                        .batch(null) // Списываем из нескольких партий
-                        .build();
-                stockMovementRepository.save(movement);
-
-                log.info("Expired batches cleared for itemId={}, count={}, totalQuantity={}",
-                        itemId, clearedCount, totalQty);
 
                 log.info("Expired batches cleared for itemId={}, count={}, totalQuantity={}",
                         itemId, clearedCount, totalQty);

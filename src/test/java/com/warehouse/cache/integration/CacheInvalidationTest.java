@@ -4,6 +4,7 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.repository.ItemRepository;
@@ -79,6 +80,13 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         stock.setItem(item);
         stock.setQuantity(10);
         stockRepository.save(stock);
+        
+        // Создаем начальную партию для синхронизации с stock.quantity
+        Batch batch = new Batch();
+        batch.setItem(item);
+        batch.setQuantity(10);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365));
+        batchRepository.save(batch);
 
         itemId = item.getId();
     }
