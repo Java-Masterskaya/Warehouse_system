@@ -101,7 +101,8 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.RECEIVE, batch);
 
-        log.info("Stock receipt registered: itemId={}, quantity={}, expiryDate={}, batchId={}, newTotal={}, userId={}, movementId={}", itemId,
+        log.info("Stock receipt registered: itemId={}, quantity={}, expiryDate={}, "
+                        + "batchId={}, newTotal={}, userId={}, movementId={}", itemId,
                 quantity, request.expiryDate(), batch.getId(), stockAfter, ctx.userId(), stockMovement.getId());
 
         metricService.increment("warehouse.movements.receive.total");
@@ -228,35 +229,7 @@ public class StockMovementServiceImpl implements StockMovementService {
         }
         
         // Распределяем разницу по партиям
-        int remainingDelta = delta;
-        
-        if (remainingDelta > 0) {
-            // Нам нужно увеличить остаток (нашли лишние товары)
-            // Добавляем к первой партии (самый ранний срок годности)
-            Batch firstBatch = batches.get(0);
-            firstBatch.setQuantity(firstBatch.getQuantity() + remainingDelta);
-            batchRepository.save(firstBatch);
-            remainingDelta = 0;
-        } else if (remainingDelta < 0) {
-            // Нам нужно уменьшить остаток (товар пропал)
-            // Списываем из последней партии (самый отдаленный срок годности - FEFO reversed)
-            // Но логичнее списать из самых близких - First Expire First Out
-            // Пройдем с начала списка (ближайшие сроки)
-            for (Batch batch : batches) {
-                if (remainingDelta == 0) break;
-                
-                int batchQty = batch.getQuantity();
-                int writeOff = Math.min(-remainingDelta, batchQty);
-                batch.setQuantity(batchQty - writeOff);
-                remainingDelta += writeOff;
-                batchRepository.save(batch);
-            }
-        }
-        
-        if (remainingDelta != 0) {
-            log.error("Stocktake: unable to distribute delta={}. remaining={}", delta, remainingDelta);
-            throw new IllegalStateException("Unable to distribute adjustment across batches");
-        }
+        distributeDeltaAcrossBatches(batches, delta);
 
         // Обновляем общий остаток
         stock.setQuantity(counted);
@@ -324,6 +297,44 @@ public class StockMovementServiceImpl implements StockMovementService {
         StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(type).quantity(quantity)
                 .batch(batch).build();
         return stockMovementRepository.save(stockMovement);
+    }
+
+    /**
+     * Распределяет разницу (delta) по партиям.
+     * При положительном delta добавляет к первой партии.
+     * При отрицательном списывает из партий по FEFO (начиная с ближайших сроков).
+     *
+     * @param batches список партий, отсортированных по expiryDate ASC
+     * @param delta   разница между фактическим и учтенным остатком
+     */
+    private void distributeDeltaAcrossBatches(List<Batch> batches, int delta) {
+        if (delta > 0) {
+            // Нам нужно увеличить остаток (нашли лишние товары)
+            // Добавляем к первой партии (самый ранний срок годности)
+            Batch firstBatch = batches.get(0);
+            firstBatch.setQuantity(firstBatch.getQuantity() + delta);
+            batchRepository.save(firstBatch);
+        } else if (delta < 0) {
+            // Нам нужно уменьшить остаток (товар пропал)
+            // Списываем из партий по FEFO (начиная с ближайших сроков)
+            int remainingDelta = delta;
+            for (Batch batch : batches) {
+                if (remainingDelta == 0) {
+                    break;
+                }
+                
+                int batchQty = batch.getQuantity();
+                int writeOff = Math.min(-remainingDelta, batchQty);
+                batch.setQuantity(batchQty - writeOff);
+                remainingDelta += writeOff;
+                batchRepository.save(batch);
+            }
+            
+            if (remainingDelta != 0) {
+                log.error("Stocktake: unable to distribute delta={}. remaining={}", delta, remainingDelta);
+                throw new IllegalStateException("Unable to distribute adjustment across batches");
+            }
+        }
     }
 
     private void itemCheckForActive(Item item) {

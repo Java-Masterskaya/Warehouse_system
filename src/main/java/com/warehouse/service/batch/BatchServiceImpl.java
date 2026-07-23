@@ -7,7 +7,6 @@ import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
-import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;

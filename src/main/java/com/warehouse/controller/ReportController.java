@@ -52,7 +52,8 @@ public class ReportController {
     }
 
     @Operation(summary = "Партии с истекающим сроком годности",
-            description = "Найти партии, срок годности которых истекает в ближайшие N дней. FEFO: first-expire-first-out. Доступно только ADMIN.")
+            description = "Найти партии, срок годности которых истекает в ближайшие N дней. FEFO:"
+                   + " first-expire-first-out. Доступно только ADMIN.")
     @GetMapping("/expiring")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")

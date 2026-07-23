@@ -83,7 +83,8 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
         left join Batch b on b.item.id = i.id and b.expiryDate > :now
         where s.item.id = :itemId
         """)
-    Optional<Integer> findAvailableQuantityFromBatchesForUpdate(@Param("itemId") Long itemId, @Param("now") LocalDateTime now);
+    Optional<Integer> findAvailableQuantityFromBatchesForUpdate(@Param("itemId") Long itemId,
+                                                                @Param("now") LocalDateTime now);
 
     void deleteByItemId(Long itemId);
 }

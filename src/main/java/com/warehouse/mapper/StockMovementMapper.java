@@ -1,7 +1,6 @@
 package com.warehouse.mapper;
 
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.Batch;
 import com.warehouse.entity.StockMovement;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -15,7 +14,8 @@ import org.mapstruct.Named;
  * Всякая запись движения должна иметь партию (включая инвентаризацию, которая распределяет разницу по партиям).
  * Для инвентаризации партия может быть null (корректировка без привязки к конкретной партии).
  */
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = org.mapstruct.NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy =
+        org.mapstruct.NullValuePropertyMappingStrategy.IGNORE)
 public interface StockMovementMapper {
 
     /**

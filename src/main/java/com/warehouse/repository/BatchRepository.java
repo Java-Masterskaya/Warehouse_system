@@ -1,9 +1,7 @@
 package com.warehouse.repository;
 
 import com.warehouse.entity.Batch;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -57,7 +55,8 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
             AND b.quantity > 0
             ORDER BY b.expiryDate ASC
             """)
-    List<Batch> findNonExpiredByItemIdOrderByExpiryDateAsc(@Param("itemId") Long itemId, @Param("now") LocalDateTime now);
+    List<Batch> findNonExpiredByItemIdOrderByExpiryDateAsc(@Param("itemId") Long itemId,
+                                                           @Param("now") LocalDateTime now);
 
     /**
      * Найти партию по ID (с подгрузкой item).

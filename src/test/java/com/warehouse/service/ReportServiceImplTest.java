@@ -236,7 +236,8 @@ public class ReportServiceImplTest {
         validBatch.setQuantity(20);
         validBatch.setExpiryDate(expiryDate);
 
-        when(batchRepository.findExpiringByDays(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of(validBatch));
+        when(batchRepository.findExpiringByDays(any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(List.of(validBatch));
 
         List<ExpiringBatch> batches = reportService.getExpiringBatches(3);
 
@@ -263,7 +264,8 @@ public class ReportServiceImplTest {
         validBatch.setQuantity(20);
         validBatch.setExpiryDate(expiryDate);
 
-        when(batchRepository.findExpiringByDays(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of(validBatch));
+        when(batchRepository.findExpiringByDays(any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(List.of(validBatch));
 
         List<ExpiringBatch> batches = reportService.getExpiringBatches(3);
 
@@ -276,7 +278,8 @@ public class ReportServiceImplTest {
      */
     @Test
     public void shouldHandleEmptyBatchesList() {
-        when(batchRepository.findExpiringByDays(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
+        when(batchRepository.findExpiringByDays(any(LocalDateTime.class),
+                any(LocalDateTime.class))).thenReturn(List.of());
 
         List<ExpiringBatch> batches = reportService.getExpiringBatches(7);
 
