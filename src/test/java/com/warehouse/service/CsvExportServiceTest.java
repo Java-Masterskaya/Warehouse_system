@@ -1,7 +1,10 @@
 package com.warehouse.service;
 
 import com.warehouse.dto.response.item.ItemExportDto;
+import com.warehouse.dto.response.movement.StockMovementExportDto;
+import com.warehouse.entity.MovementType;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.service.import_export.CsvExportService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,9 +34,12 @@ class CsvExportServiceTest {
     @Mock
     private ItemRepository itemRepository;
 
+    @Mock
+    private StockMovementRepository movementRepository;
+
     @Spy
-    private TransactionTemplate transactionTemplate = new TransactionTemplate(
-            (PlatformTransactionManager) new PseudoTransactionManager());
+    private TransactionTemplate transactionTemplate =
+            new TransactionTemplate((PlatformTransactionManager) new PseudoTransactionManager());
 
     @InjectMocks
     private CsvExportService csvExportService;
@@ -40,8 +48,8 @@ class CsvExportServiceTest {
     @DisplayName("Должен корректно формировать CSV со всеми полями и BOM")
     void exportItemsShouldWriteCorrectCsv() throws Exception {
         // Arrange
-        ItemExportDto item1 = new ItemExportDto("SKU-001", "Молоко", "Молочные продукты", 10L,
-                new BigDecimal("89.90"));
+        ItemExportDto item1 =
+                new ItemExportDto("SKU-001", "Молоко", "Молочные продукты", 10L, new BigDecimal("89.90"));
         ItemExportDto item2 = new ItemExportDto("SKU-002", "Хлеб, \"Ржаной\"", "Выпечка", 5L, new BigDecimal("45.00"));
 
         Mockito.when(itemRepository.streamAllForExport()).thenReturn(Stream.of(item1, item2));
@@ -82,5 +90,49 @@ class CsvExportServiceTest {
         @Override
         protected void doRollback(DefaultTransactionStatus status) {
         }
+    }
+
+    //movement export test
+
+    @Test
+    @DisplayName("Должен корректно формировать CSV со всеми полями журнала движений")
+    void exportMovementShouldWriteCorrectCsv() {
+        // Arrange
+        UUID transferUuid = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+        LocalDateTime now = LocalDateTime.of(2026, 7, 23, 14, 30, 0);
+
+        StockMovementExportDto movement1 =
+                new StockMovementExportDto("SKU-100", "Молоко", "Главный склад", MovementType.RECEIVE, 50,
+                        "admin_ivan", now, null // Обычный приход без трансфера
+                );
+
+        StockMovementExportDto movement2 =
+                new StockMovementExportDto("SKU-200", "Хлеб, \"Ржаной\"", "Склад №2", MovementType.TRANSFER_OUT, -10,
+                        "operator_petr", now.plusHours(1), transferUuid // Перевод между складами
+                );
+
+        Mockito.when(movementRepository.streamAllForExport()).thenReturn(Stream.of(movement1, movement2));
+
+        StringWriter writer = new StringWriter();
+
+        // Act
+        csvExportService.exportMovement(writer);
+
+        // Assert
+        String csvOutput = writer.toString();
+
+        // 1. Проверяем наличие BOM метки (\uFEFF)
+        assertThat(csvOutput).startsWith("\uFEFF");
+
+        // 2. Проверяем заголовки
+        assertThat(csvOutput).contains(
+                "Item_sku,Item_name,Warehouse,Movement_type,Quantity,Creator,Created_at,Transfer_id");
+
+        // 3. Проверяем первую строку (без transferId)
+        assertThat(csvOutput).contains("SKU-100,Молоко,Главный склад,RECEIVE,50,admin_ivan,2026-07-23T14:30");
+
+        // 4. Проверяем вторую строку (с эскейпингом кавычек в названии и заполнением transferId)
+        assertThat(csvOutput).contains("SKU-200,\"Хлеб, \"\"Ржаной\"\"\",Склад №2,TRANSFER_OUT,-10,operator_petr,"
+                + "2026-07-23T15:30,123e4567-e89b-12d3-a456-426614174000");
     }
 }
