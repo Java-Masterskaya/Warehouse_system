@@ -48,6 +48,21 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             """)
     int updateQuantity(@Param("itemId") Long itemId, @Param("quantity") int quantity);
 
+    // Синхронизация stock.quantity = SUM(batch.quantity)
+    // Обновляет stock.quantity на сумму количества всех активных партий
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update Stock s
+            set s.quantity = (
+                select coalesce(sum(b.quantity), 0)
+                from Batch b
+                where b.item.id = :itemId
+            ),
+            s.updatedAt = CURRENT_TIMESTAMP
+            where s.item.id = :itemId
+            """)
+    int syncQuantityWithBatches(@Param("itemId") Long itemId);
+
     //Дополнительная операция не блокирующая операции чтения
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -58,16 +73,17 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     Optional<Stock> findByItemIdForUpdate(Long itemId);
 
     // Получает остаток без резервов с блокировкой для FEFO
+    // ВАЖНО: Возвращаем SUM(batches.quantity), а не stock.quantity!
+    // stock.quantity может не совпадать с суммой партий (это агрегатное поле)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-        select s.quantity - coalesce(
-            (select sum(r.quantity) from Reservation r
-             where r.stock = s and r.status = com.warehouse.entity.ReservationStatus.ACTIVE
-             and r.expiredAt > :now), 0)
+        select coalesce(sum(b.quantity), 0)
         from Stock s
+        join s.item i
+        left join Batch b on b.item.id = i.id and b.expiryDate > :now
         where s.item.id = :itemId
         """)
-    Optional<Integer> findAvailableQuantityForUpdate(@Param("itemId") Long itemId, @Param("now") LocalDateTime now);
+    Optional<Integer> findAvailableQuantityFromBatchesForUpdate(@Param("itemId") Long itemId, @Param("now") LocalDateTime now);
 
     void deleteByItemId(Long itemId);
 }

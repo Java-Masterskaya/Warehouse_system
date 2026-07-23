@@ -127,7 +127,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         try {
             // FEFO списание: гасим из партий с ближайшим сроком
-            // Движения для каждой партии создаются внутри writeOffByFEFO()
+            // Движения не создаются внутри writeOffByFEFO()
             int stockAfter = batchService.writeOffByFEFO(itemId, quantity, now);
 
             // Создаем общее движение для всей операции списания
@@ -136,7 +136,7 @@ public class StockMovementServiceImpl implements StockMovementService {
                     .item(item)
                     .user(userRef)
                     .type(MovementType.WRITE_OFF)
-                    .quantity(-quantity)
+                    .quantity(quantity)  // ← Положительное количество!
                     .batch(null) // Списываем из нескольких партий
                     .build();
             stockMovementRepository.save(stockMovement);
@@ -208,6 +208,9 @@ public class StockMovementServiceImpl implements StockMovementService {
             throw StocktakeConflictException.of(counted, reserved);
         }
 
+        // Stock.quantity = SUM of batch quantities (БЕЗ резерваций!)
+        // Доступный остаток = stock.quantity - reserved
+        int available = availabilityService.getAvailable(itemId);
         int current = stock.getQuantity();
         int delta = counted - current;
 

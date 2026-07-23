@@ -26,9 +26,15 @@ public class StockServiceImpl implements StockService {
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
         
-        int newQuantity = stock.getQuantity() + quantity;
-        stock.setQuantity(newQuantity);
-        stockRepository.save(stock); // @Version гарантирует атомарность
+        // Используем increaseQuantity() для атомарного обновления
+        // Stock.quantity = SUM of batch quantities (БЕЗ резерваций)
+        int updatedRows = stockRepository.increaseQuantity(itemId, quantity);
+        if (updatedRows == 0) {
+            throw EntityNotFoundException.forId("Stock", itemId);
+        }
+        
+        int newQuantity = stockRepository.findQuantityByItemId(itemId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
         
         log.info("Stock receipt completed: itemId={}, quantity={}, new stock={}", itemId, quantity, newQuantity);
         return newQuantity;
@@ -40,12 +46,15 @@ public class StockServiceImpl implements StockService {
 
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock by item", itemId));
+        
+        // Проверяем доступный остаток (без резерваций)
         int available = availabilityService.getAvailable(itemId);
         if (available < quantity) {
             log.warn("Can not write-off {} because available {}", quantity, available);
             throw InsufficientStockException.of(itemId, quantity, available);
         }
 
+        // Уменьшаем stock.quantity на quantity (БЕЗ резерваций!)
         int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, quantity);
         if (updatedRows == 0) {
             int current = stockRepository.findQuantityByItemId(itemId).orElseThrow(() -> stockNotFound(itemId));

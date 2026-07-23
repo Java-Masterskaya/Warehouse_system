@@ -5,12 +5,14 @@ import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockMovement;
+import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.UserRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -32,6 +34,7 @@ public class BatchServiceImpl implements BatchService {
     StockRepository stockRepository;
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
+    UserRepository userRepository;
 
     @Override
     @Transactional
@@ -76,8 +79,8 @@ public class BatchServiceImpl implements BatchService {
     public int writeOffByFEFO(Long itemId, int quantity, LocalDateTime now) {
         log.debug("FEFO write-off: itemId={}, quantity={}, now={}", itemId, quantity, now);
 
-        // Получаем доступный остаток (без резервов) с блокировкой
-        Optional<Integer> availableOpt = stockRepository.findAvailableQuantityForUpdate(itemId, now);
+        // Получаем доступный остаток из партий (без резервов и просроченных) с блокировкой
+        Optional<Integer> availableOpt = stockRepository.findAvailableQuantityFromBatchesForUpdate(itemId, now);
         if (availableOpt.isEmpty()) {
             throw EntityNotFoundException.forId("Stock", itemId);
         }
@@ -119,26 +122,17 @@ public class BatchServiceImpl implements BatchService {
                 remaining = 0;
             }
             batchRepository.save(batch); // @Version гарантирует атомарность для каждой партии
-            
-            // Создаем движение для каждой партии
-            Item item = itemRepository.findById(itemId)
-                    .orElseThrow(() -> EntityNotFoundException.forId("Item", itemId));
-            StockMovement movement = StockMovement.builder()
-                    .item(item)
-                    .user(null) // Нет пользователя - системная операция
-                    .type(MovementType.WRITE_OFF)
-                    .quantity(-batchQty)
-                    .batch(batch)
-                    .build();
-            stockMovementRepository.save(movement);
         }
 
         // Уменьшаем общий остаток на фактически списанное количество
         int actuallyWrittenOff = quantity - remaining;
         int newStockQuantity = stock.getQuantity() - actuallyWrittenOff;
+        
+        // СИНХРОНИЗИРУЕМ stock.quantity = SUM(Batch.quantity)
+        // Используем optimistic locking через @Version
         stock.setQuantity(newStockQuantity);
         stockRepository.save(stock); // @Version гарантирует атомарность
-
+        
         log.info("FEFO write-off completed: itemId={}, requested={}, actuallyWrittenOff={}, newStockQuantity={}",
                 itemId, quantity, actuallyWrittenOff, newStockQuantity);
 
@@ -195,19 +189,27 @@ public class BatchServiceImpl implements BatchService {
                 // Атомарно очищаем все просроченные партии для этого товара
                 int clearedCount = batchRepository.clearExpiredBatchesByItemId(itemId, now);
                 totalCleared += clearedCount;
+                
+                // СИНХРОНИЗИРУЕМ stock.quantity = SUM(Batch.quantity)
+                // После очистки партий нужно обновить stock.quantity
+                stockRepository.syncQuantityWithBatches(itemId);
 
                 // Создаем движение для списания просроченных партий
+                // EXPIRED: quantity должно быть > 0 (количество списанного товара)
                 Item item = itemRepository.findById(itemId)
                         .orElseThrow(() -> EntityNotFoundException.forId("Item", itemId));
-                
+                User userRef = userRepository.getReferenceById(1L); // Системный пользователь
                 StockMovement movement = StockMovement.builder()
                         .item(item)
-                        .user(null) // Нет пользователя - системная операция
+                        .user(userRef)
                         .type(MovementType.EXPIRED)
-                        .quantity(-totalQty)
+                        .quantity(totalQty)  // ← Положительное количество!
                         .batch(null) // Списываем из нескольких партий
                         .build();
                 stockMovementRepository.save(movement);
+
+                log.info("Expired batches cleared for itemId={}, count={}, totalQuantity={}",
+                        itemId, clearedCount, totalQty);
 
                 log.info("Expired batches cleared for itemId={}, count={}, totalQuantity={}",
                         itemId, clearedCount, totalQty);
