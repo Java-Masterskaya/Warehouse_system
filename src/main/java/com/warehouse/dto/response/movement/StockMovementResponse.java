@@ -10,7 +10,7 @@ import java.util.UUID;
  * 
  * @param itemId ID товара
  * @param movementId ID записи движения
- * @param type Тип движения (приход/списание)
+ * @param type Тип движения товара
  * @param quantity Количество изменённых единиц
  * @param stockAfter Остаток после операции
  * @param createdAt Время операции

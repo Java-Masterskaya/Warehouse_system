@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,6 +51,7 @@ class WarehouseMigrationIntegrationTest {
         assertThat(countRows("stock_movements")).isEqualTo(movementCountBefore);
         assertThat(countRows("reserves")).isEqualTo(reserveCountBefore);
         assertRequiredWarehouseColumns();
+        assertWarehouseIdsMustBeExplicit(legacy);
 
         long secondWarehouseId = insertWarehouse("Secondary Warehouse");
         assertThat(secondWarehouseId).isEqualTo(2L);
@@ -60,6 +62,7 @@ class WarehouseMigrationIntegrationTest {
         long secondStockId = insertStock(legacy.itemId(), secondWarehouseId, 11);
         assertThat(secondStockId).isPositive();
         assertThat(sumStock(legacy.itemId())).isEqualTo(LEGACY_QUANTITY + 11L);
+        assertTransferMovementTypesAccepted(legacy, secondWarehouseId);
 
         assertThatThrownBy(() -> insertStock(legacy.itemId(), secondWarehouseId, 5))
                 .isInstanceOf(SQLException.class)
@@ -220,6 +223,11 @@ class WarehouseMigrationIntegrationTest {
                     WHERE table_schema = 'public' AND table_name = 'stock' AND column_name = 'warehouse_id'
                     """)).isEqualTo("NO");
             assertThat(queryString(connection, """
+                    SELECT column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'stock' AND column_name = 'warehouse_id'
+                    """)).isNull();
+            assertThat(queryString(connection, """
                     SELECT is_nullable
                     FROM information_schema.columns
                     WHERE table_schema = 'public'
@@ -227,12 +235,88 @@ class WarehouseMigrationIntegrationTest {
                       AND column_name = 'warehouse_id'
                     """)).isEqualTo("NO");
             assertThat(queryString(connection, """
+                    SELECT column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'stock_movements'
+                      AND column_name = 'warehouse_id'
+                    """)).isNull();
+            assertThat(queryString(connection, """
                     SELECT data_type
                     FROM information_schema.columns
                     WHERE table_schema = 'public'
                       AND table_name = 'stock_movements'
                       AND column_name = 'transfer_id'
                     """)).isEqualTo("uuid");
+        }
+    }
+
+    private void assertTransferMovementTypesAccepted(LegacyData legacy, long secondWarehouseId)
+            throws SQLException {
+        UUID transferId = UUID.fromString("5ac37a55-bd71-4021-acd3-10ae1c5ea68c");
+
+        assertThat(insertMovement(
+                legacy.itemId(),
+                legacy.userId(),
+                "TRANSFER_OUT",
+                DEFAULT_WAREHOUSE_ID,
+                transferId
+        )).isPositive();
+        assertThat(insertMovement(
+                legacy.itemId(),
+                legacy.userId(),
+                "TRANSFER_IN",
+                secondWarehouseId,
+                transferId
+        )).isPositive();
+    }
+
+    private long insertMovement(
+            long itemId,
+            long userId,
+            String type,
+            long warehouseId,
+            UUID transferId
+    ) throws SQLException {
+        try (Connection connection = connection()) {
+            return insertReturningId(connection, """
+                    INSERT INTO stock_movements
+                        (item_id, user_id, type, quantity, created_at, warehouse_id, transfer_id)
+                    VALUES (?, ?, ?, 1, NOW(), ?, ?)
+                    RETURNING id
+                    """, itemId, userId, type, warehouseId, transferId);
+        }
+    }
+
+    private void assertWarehouseIdsMustBeExplicit(LegacyData legacy) {
+        assertThatThrownBy(() -> insertStockWithoutWarehouse(legacy.itemId()))
+                .isInstanceOfSatisfying(SQLException.class,
+                        exception -> assertThat(exception.getSQLState()).isEqualTo("23502"));
+        assertThatThrownBy(() -> insertMovementWithoutWarehouse(legacy.itemId(), legacy.userId()))
+                .isInstanceOfSatisfying(SQLException.class,
+                        exception -> assertThat(exception.getSQLState()).isEqualTo("23502"));
+    }
+
+    private void insertStockWithoutWarehouse(long itemId) throws SQLException {
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO stock (item_id, quantity, updated_at, version)
+                     VALUES (?, 1, NOW(), 0)
+                     """)) {
+            statement.setLong(1, itemId);
+            statement.executeUpdate();
+        }
+    }
+
+    private void insertMovementWithoutWarehouse(long itemId, long userId) throws SQLException {
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     INSERT INTO stock_movements (item_id, user_id, type, quantity, created_at)
+                     VALUES (?, ?, 'RECEIVE', 1, NOW())
+                     """)) {
+            statement.setLong(1, itemId);
+            statement.setLong(2, userId);
+            statement.executeUpdate();
         }
     }
 

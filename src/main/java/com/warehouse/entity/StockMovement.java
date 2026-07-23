@@ -51,7 +51,7 @@ public class StockMovement {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** Тип движения (приход/списание). */
+    /** Тип движения (приход, списание, корректировка или перевод). */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MovementType type;

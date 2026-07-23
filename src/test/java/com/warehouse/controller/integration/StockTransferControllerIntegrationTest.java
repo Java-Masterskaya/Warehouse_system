@@ -44,6 +44,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -169,8 +171,8 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
         assertThat(movements)
                 .extracting(MovementRow::warehouseId, MovementRow::type, MovementRow::quantity)
                 .containsExactlyInAnyOrder(
-                        tuple(sourceWarehouse.getId(), MovementType.WRITE_OFF, quantity),
-                        tuple(destinationWarehouse.getId(), MovementType.RECEIVE, quantity)
+                        tuple(sourceWarehouse.getId(), MovementType.TRANSFER_OUT, quantity),
+                        tuple(destinationWarehouse.getId(), MovementType.TRANSFER_IN, quantity)
             );
         assertThat(movements)
                 .extracting(MovementRow::transferId)
@@ -182,6 +184,13 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
                         response.get("inMovementId").asLong()
             );
         assertThat(countMovements()).isEqualTo(2);
+
+        mockMvc.perform(get("/api/movements/{itemId}/history", item.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[*].type")
+                        .value(containsInAnyOrder("TRANSFER_OUT", "TRANSFER_IN")));
     }
 
     @Test

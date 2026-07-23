@@ -810,9 +810,9 @@ class StockMovementServiceImplTest {
         verify(stockMovementRepository).saveAllAndFlush(stockMovementsCaptor.capture());
         List<StockMovement> movements = stockMovementsCaptor.getValue();
         assertEquals(2, movements.size());
-        assertEquals(MovementType.WRITE_OFF, movements.get(0).getType());
+        assertEquals(MovementType.TRANSFER_OUT, movements.get(0).getType());
         assertEquals(DEFAULT_WAREHOUSE_ID, movements.get(0).getWarehouse().getId());
-        assertEquals(MovementType.RECEIVE, movements.get(1).getType());
+        assertEquals(MovementType.TRANSFER_IN, movements.get(1).getType());
         assertEquals(SECONDARY_WAREHOUSE_ID, movements.get(1).getWarehouse().getId());
         assertEquals(response.transferId(), movements.get(0).getTransferId());
         assertEquals(response.transferId(), movements.get(1).getTransferId());
