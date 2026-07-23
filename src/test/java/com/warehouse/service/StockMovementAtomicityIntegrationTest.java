@@ -77,6 +77,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         // Создаём остаток
         Stock stock = new Stock();
         stock.setItem(testItem);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(20);
         stockRepository.save(stock);
 

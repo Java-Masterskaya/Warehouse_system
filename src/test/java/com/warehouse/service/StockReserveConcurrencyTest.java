@@ -45,7 +45,11 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
     void shouldNotAllowOverReservation() throws Exception {
         Item item = itemRepository.save(
                 Item.builder().sku("12345676").name("name").category("category").minStock(0).active(true).build());
-        Stock stock = stockRepository.save(Stock.builder().item(item).quantity(10).build());
+        Stock stock = stockRepository.save(Stock.builder()
+                .item(item)
+                .warehouse(defaultWarehouse())
+                .quantity(10)
+                .build());
         User user = userRepository.save(
                 User.builder().username("name").password("sOme1@@@").role(Role.ROLE_ADMIN).build());
         ReserveRequest request = new ReserveRequest(7, 1);

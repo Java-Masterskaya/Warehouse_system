@@ -4,14 +4,17 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
+import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.dto.response.movement.StockTransferResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
@@ -22,10 +25,12 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.movement.StockMovementServiceImpl;
 import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.stock.StockService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -50,8 +55,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,6 +75,8 @@ class StockMovementServiceImplTest {
     private static final int QUANTITY = 5;
     private static final int STOCK_AFTER_RECEIPT = 15;
     private static final Long USER_ID = 10L;
+    private static final Long DEFAULT_WAREHOUSE_ID = 1L;
+    private static final Long SECONDARY_WAREHOUSE_ID = 2L;
     private static final String USERNAME = "admin";
     private static final String PASSWORD = "password";
 
@@ -86,6 +95,8 @@ class StockMovementServiceImplTest {
     @Mock
     private UserRepository userRepository;
     @Mock
+    private WarehouseRepository warehouseRepository;
+    @Mock
     private OutboxService outboxService;
     @Mock
     private MetricService metricService;
@@ -95,6 +106,21 @@ class StockMovementServiceImplTest {
     private ArgumentCaptor<StockMovement> stockMovementCaptor;
     @Captor
     private ArgumentCaptor<LowStockAlertEvent> eventCaptor;
+    @Captor
+    private ArgumentCaptor<List<StockMovement>> stockMovementsCaptor;
+
+    private Warehouse defaultWarehouse;
+
+    @BeforeEach
+    void setUp() {
+        defaultWarehouse = Warehouse.builder()
+                .id(DEFAULT_WAREHOUSE_ID)
+                .name("Default Warehouse")
+                .defaultWarehouse(true)
+                .build();
+        lenient().when(warehouseRepository.findByDefaultWarehouseTrue())
+                .thenReturn(Optional.of(defaultWarehouse));
+    }
 
     /**
      * Регистрация прихода товара.
@@ -135,6 +161,7 @@ class StockMovementServiceImplTest {
         StockMovement savedMovement = stockMovementCaptor.getValue();
         assertEquals(ITEM_ID, savedMovement.getItem().getId());
         assertEquals(USER_ID, savedMovement.getUser().getId());
+        assertEquals(DEFAULT_WAREHOUSE_ID, savedMovement.getWarehouse().getId());
         assertEquals(MovementType.RECEIVE, savedMovement.getType());
         assertEquals(QUANTITY, savedMovement.getQuantity());
     }
@@ -241,6 +268,7 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(availabilityService.getTotalQuantity(ITEM_ID)).thenReturn((long) stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
@@ -332,6 +360,7 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(availabilityService.getTotalQuantity(ITEM_ID)).thenReturn((long) stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -461,6 +490,7 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(availabilityService.getTotalQuantity(ITEM_ID)).thenReturn((long) stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(true)))
@@ -492,6 +522,7 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(availabilityService.getTotalQuantity(ITEM_ID)).thenReturn((long) stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
@@ -519,6 +550,7 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(availabilityService.getTotalQuantity(ITEM_ID)).thenReturn((long) stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
@@ -546,6 +578,7 @@ class StockMovementServiceImplTest {
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockService.writeOffStock(ITEM_ID, QUANTITY)).thenReturn(stockAfterWriteOff);
+        when(availabilityService.getTotalQuantity(ITEM_ID)).thenReturn((long) stockAfterWriteOff);
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), eq(stockAfterWriteOff), eq(false)))
@@ -569,11 +602,13 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Test", true, 5);
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(10);
         User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID)).thenReturn(10L);
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
@@ -603,10 +638,12 @@ class StockMovementServiceImplTest {
 
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(10);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID)).thenReturn(10L);
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(8);
 
         assertThrows(
@@ -630,11 +667,13 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Test", true, 5);
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(10);
         User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID)).thenReturn(10L);
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(15), eq(false))).thenReturn(
@@ -661,11 +700,13 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Test", true, minStock);
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(20);
         User userRef = createUserReference(USER_ID, USERNAME);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID)).thenReturn(20L);
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(5), eq(true))).thenReturn(
@@ -692,10 +733,12 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Test", true, 5);
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(10);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID)).thenReturn(10L);
         when(mapper.toNoMovementResponse(ITEM_ID, 10)).thenReturn(
                 new StockMovementResponse(ITEM_ID, null, null, 0, 10, null, false));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
@@ -707,6 +750,123 @@ class StockMovementServiceImplTest {
         verify(stockRepository, never()).save(any());
         verify(stockMovementRepository, never()).save(any());
         verify(metricService, never()).increment(any());
+    }
+
+    /**
+     * Перевод атомарно меняет оба остатка и создает два связанных движения.
+     */
+    @Test
+    void transferMovesStockAndCreatesTwoLinkedMovements() {
+        int transferQuantity = 5;
+        TransferStockRequest request = new TransferStockRequest(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID,
+                SECONDARY_WAREHOUSE_ID,
+                transferQuantity
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Transfer item", true, 0);
+        Warehouse destination = Warehouse.builder()
+                .id(SECONDARY_WAREHOUSE_ID)
+                .name("Secondary Warehouse")
+                .build();
+        Stock sourceStock = Stock.builder()
+                .item(item)
+                .warehouse(defaultWarehouse)
+                .quantity(12)
+                .build();
+        Stock destinationStock = Stock.builder()
+                .item(item)
+                .warehouse(destination)
+                .quantity(4)
+                .build();
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(warehouseRepository.findById(DEFAULT_WAREHOUSE_ID)).thenReturn(Optional.of(defaultWarehouse));
+        when(warehouseRepository.findById(SECONDARY_WAREHOUSE_ID)).thenReturn(Optional.of(destination));
+        when(stockRepository.findByItemAndWarehousesForUpdate(
+                ITEM_ID, List.of(DEFAULT_WAREHOUSE_ID, SECONDARY_WAREHOUSE_ID)))
+                .thenReturn(List.of(sourceStock, destinationStock));
+        when(availabilityService.getAvailable(sourceStock)).thenReturn(12);
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
+        when(stockMovementRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> {
+            List<StockMovement> movements = invocation.getArgument(0);
+            movements.get(0).setId(101L);
+            movements.get(1).setId(102L);
+            return movements;
+        });
+
+        StockTransferResponse response = stockMovementService.transfer(request, userContext);
+
+        assertEquals(7, sourceStock.getQuantity());
+        assertEquals(9, destinationStock.getQuantity());
+        assertEquals(7, response.fromStockAfter());
+        assertEquals(9, response.toStockAfter());
+        assertEquals(101L, response.outMovementId());
+        assertEquals(102L, response.inMovementId());
+        assertNotNull(response.transferId());
+
+        verify(stockMovementRepository).saveAllAndFlush(stockMovementsCaptor.capture());
+        List<StockMovement> movements = stockMovementsCaptor.getValue();
+        assertEquals(2, movements.size());
+        assertEquals(MovementType.TRANSFER_OUT, movements.get(0).getType());
+        assertEquals(DEFAULT_WAREHOUSE_ID, movements.get(0).getWarehouse().getId());
+        assertEquals(MovementType.TRANSFER_IN, movements.get(1).getType());
+        assertEquals(SECONDARY_WAREHOUSE_ID, movements.get(1).getWarehouse().getId());
+        assertEquals(response.transferId(), movements.get(0).getTransferId());
+        assertEquals(response.transferId(), movements.get(1).getTransferId());
+        assertEquals(movements.get(0).getCreatedAt(), movements.get(1).getCreatedAt());
+        verify(metricService).increment("warehouse.movements.transfer.total");
+    }
+
+    /**
+     * При нехватке доступного остатка перевод не меняет остатки и не создает движения.
+     */
+    @Test
+    void transferWithInsufficientStockDoesNotChangeAnything() {
+        int transferQuantity = 5;
+        TransferStockRequest request = new TransferStockRequest(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID,
+                SECONDARY_WAREHOUSE_ID,
+                transferQuantity
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+        Item item = createItem(ITEM_ID, "Transfer item", true, 0);
+        Warehouse destination = Warehouse.builder()
+                .id(SECONDARY_WAREHOUSE_ID)
+                .name("Secondary Warehouse")
+                .build();
+        Stock sourceStock = Stock.builder()
+                .item(item)
+                .warehouse(defaultWarehouse)
+                .quantity(4)
+                .build();
+        Stock destinationStock = Stock.builder()
+                .item(item)
+                .warehouse(destination)
+                .quantity(8)
+                .build();
+
+        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(warehouseRepository.findById(DEFAULT_WAREHOUSE_ID)).thenReturn(Optional.of(defaultWarehouse));
+        when(warehouseRepository.findById(SECONDARY_WAREHOUSE_ID)).thenReturn(Optional.of(destination));
+        when(stockRepository.findByItemAndWarehousesForUpdate(
+                ITEM_ID, List.of(DEFAULT_WAREHOUSE_ID, SECONDARY_WAREHOUSE_ID)))
+                .thenReturn(List.of(sourceStock, destinationStock));
+        when(availabilityService.getAvailable(sourceStock)).thenReturn(4);
+
+        assertThrows(
+                InsufficientStockException.class,
+                () -> stockMovementService.transfer(request, userContext)
+        );
+
+        assertEquals(4, sourceStock.getQuantity());
+        assertEquals(8, destinationStock.getQuantity());
+        verify(stockMovementRepository, never()).saveAllAndFlush(anyList());
+        verify(userRepository, never()).getReferenceById(anyLong());
+        verify(metricService).increment("warehouse.movements.transfer.rejected.total");
     }
 
     /**

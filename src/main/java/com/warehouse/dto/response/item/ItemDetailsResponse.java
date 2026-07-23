@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -17,12 +18,13 @@ public class ItemDetailsResponse {
     String name;
     String category;
     int minStock;
-    int currentStock;
+    long currentStock;
     BigDecimal price;
     BigDecimal cost;
     @JsonProperty("isActive") boolean active;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
-    int available;
-    int reserved;
+    long available;
+    long reserved;
+    List<WarehouseStockResponse> warehouseStocks;
 }
