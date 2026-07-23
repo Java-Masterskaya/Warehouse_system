@@ -38,9 +38,10 @@ class CsvExportServiceTest {
 
     @Test
     @DisplayName("Должен корректно формировать CSV со всеми полями и BOM")
-    void exportItems_ShouldWriteCorrectCsv() throws Exception {
+    void exportItemsShouldWriteCorrectCsv() throws Exception {
         // Arrange
-        ItemExportDto item1 = new ItemExportDto("SKU-001", "Молоко", "Молочные продукты", 10L, new BigDecimal("89.90"));
+        ItemExportDto item1 = new ItemExportDto("SKU-001", "Молоко", "Молочные продукты", 10L,
+                new BigDecimal("89.90"));
         ItemExportDto item2 = new ItemExportDto("SKU-002", "Хлеб, \"Ржаной\"", "Выпечка", 5L, new BigDecimal("45.00"));
 
         Mockito.when(itemRepository.streamAllForExport()).thenReturn(Stream.of(item1, item2));
@@ -57,22 +58,29 @@ class CsvExportServiceTest {
         assertThat(csvOutput).startsWith("\uFEFF");
 
         // 2. Проверяем заголовки и строки
-        assertThat(csvOutput)
-                .contains("SKU,Name,Category,Quantity,Price")
-                .contains("SKU-001,Молоко,Молочные продукты,10,89.90")
-                // Commons CSV должен автоматически обернуть в кавычки значение с запятой/кавычками
-                .contains("SKU-002,\"Хлеб, \"\"Ржаной\"\"\",Выпечка,5,45.00");
+        assertThat(csvOutput).contains("SKU,Name,Category,Quantity,Price")
+                             .contains("SKU-001,Молоко,Молочные продукты,10,89.90")
+                             // Commons CSV должен автоматически обернуть в кавычки значение с запятой/кавычками
+                             .contains("SKU-002,\"Хлеб, \"\"Ржаной\"\"\",Выпечка,5,45.00");
     }
 
     // Заглушка для TransactionTemplate
     private static class PseudoTransactionManager extends AbstractPlatformTransactionManager {
         @Override
-        protected Object doGetTransaction() { return new Object(); }
+        protected Object doGetTransaction() {
+            return new Object();
+        }
+
         @Override
-        protected void doBegin(Object transaction, TransactionDefinition definition) {}
+        protected void doBegin(Object transaction, TransactionDefinition definition) {
+        }
+
         @Override
-        protected void doCommit(DefaultTransactionStatus status) {}
+        protected void doCommit(DefaultTransactionStatus status) {
+        }
+
         @Override
-        protected void doRollback(DefaultTransactionStatus status) {}
+        protected void doRollback(DefaultTransactionStatus status) {
+        }
     }
 }
