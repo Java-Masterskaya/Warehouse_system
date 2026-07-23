@@ -3,6 +3,7 @@ package com.warehouse.security.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.security.JwtAuthFilter;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/env").hasRole("ADMIN")
                         .requestMatchers("/actuator/env/**").hasRole("ADMIN")
                         .requestMatchers("/actuator/refresh").hasRole("ADMIN")
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions
