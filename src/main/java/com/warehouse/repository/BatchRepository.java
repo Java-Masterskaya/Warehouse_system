@@ -1,7 +1,10 @@
 package com.warehouse.repository;
 
 import com.warehouse.entity.Batch;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -103,5 +106,36 @@ public interface BatchRepository extends JpaRepository<Batch, Long> {
             ORDER BY b.expiryDate ASC
             """)
     List<Batch> findExpiringByDays(@Param("now") LocalDateTime now, @Param("maxDate") LocalDateTime maxDate);
+
+    /**
+     * Очистить просроченные партии для конкретного товара.
+     * Атомарное обновление всех просроченных партий в 0.
+     * @param itemId ID товара
+     * @param now текущее время
+     * @return количество очищенных партий
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            UPDATE Batch b SET b.quantity = 0
+            WHERE b.item.id = :itemId
+            AND b.expiryDate < :now
+            AND b.quantity > 0
+            """)
+    int clearExpiredBatchesByItemId(@Param("itemId") Long itemId, @Param("now") LocalDateTime now);
+
+    /**
+     * Найти все протухшие партии (expiryDate < now) с количеством > 0.
+     * Используется для очистки просроченных партий.
+     *
+     * @param now текущее время
+     * @return список протухших партий
+     */
+    @Query("""
+            SELECT b
+            FROM Batch b
+            WHERE b.expiryDate < :now
+            AND b.quantity > 0
+            """)
+    List<Batch> findExpiredWithQuantity(@Param("now") LocalDateTime now);
 
 }

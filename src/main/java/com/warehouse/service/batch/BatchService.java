@@ -56,4 +56,14 @@ public interface BatchService {
      * @throws InsufficientStockException если недостаточно товара во всех неистекших партиях
      */
     int writeOffByFEFO(Long itemId, int quantity, LocalDateTime now) throws InsufficientStockException;
+
+    /**
+     * Очистить протухшие партии (списать их количество в Stock).
+     * Использует optimistic locking (@Version) для безопасного обновления.
+     * Метод не блокирует таблицы и безопасен для конкурентности.
+     *
+     * @param now текущее время
+     * @return количество очищенных партий
+     */
+    int clearExpiredBatches(LocalDateTime now);
 }

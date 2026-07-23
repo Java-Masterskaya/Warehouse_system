@@ -2,11 +2,15 @@ package com.warehouse.service.batch;
 
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.StockMovement;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockMovementRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -26,6 +30,8 @@ public class BatchServiceImpl implements BatchService {
 
     BatchRepository batchRepository;
     StockRepository stockRepository;
+    ItemRepository itemRepository;
+    StockMovementRepository stockMovementRepository;
 
     @Override
     @Transactional
@@ -113,6 +119,18 @@ public class BatchServiceImpl implements BatchService {
                 remaining = 0;
             }
             batchRepository.save(batch); // @Version гарантирует атомарность для каждой партии
+            
+            // Создаем движение для каждой партии
+            Item item = itemRepository.findById(itemId)
+                    .orElseThrow(() -> EntityNotFoundException.forId("Item", itemId));
+            StockMovement movement = StockMovement.builder()
+                    .item(item)
+                    .user(null) // Нет пользователя - системная операция
+                    .type(MovementType.WRITE_OFF)
+                    .quantity(-batchQty)
+                    .batch(batch)
+                    .build();
+            stockMovementRepository.save(movement);
         }
 
         // Уменьшаем общий остаток на фактически списанное количество
@@ -125,5 +143,83 @@ public class BatchServiceImpl implements BatchService {
                 itemId, quantity, actuallyWrittenOff, newStockQuantity);
 
         return newStockQuantity; // Возвращаем остаток после списания
+    }
+
+    @Override
+    @Transactional
+    public int clearExpiredBatches(LocalDateTime now) {
+        log.debug("Clearing expired batches: now={}", now);
+
+        // Получаем все просроченные партии
+        List<Batch> expiredBatches = batchRepository.findExpiredWithQuantity(now);
+        if (expiredBatches.isEmpty()) {
+            log.info("No expired batches to clear");
+            return 0;
+        }
+
+        // Собираем данные по товарам (группируем по itemId)
+        var batchesByItem = expiredBatches.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        batch -> batch.getItem().getId(),
+                        java.util.stream.Collectors.summingInt(Batch::getQuantity)
+                ));
+
+        int totalCleared = 0;
+
+        for (var entry : batchesByItem.entrySet()) {
+            Long itemId = entry.getKey();
+            int totalQty = entry.getValue();
+
+            try {
+                log.debug("Clearing expired batches for itemId={}, totalQuantity={}", itemId, totalQty);
+
+                // Блокируем stock с pessimistic locking
+                Stock stock = stockRepository.findByItemIdForUpdate(itemId)
+                        .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
+
+                // Проверяем, что есть достаточно остатка
+                if (stock.getQuantity() < totalQty) {
+                    log.warn("Insufficient stock for expired batch cleanup: itemId={}, stock={}, requested={}",
+                            itemId, stock.getQuantity(), totalQty);
+                    continue;
+                }
+
+                // Атомарно уменьшаем stock на общее количество просроченных партий
+                int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, totalQty);
+                if (updatedRows == 0) {
+                    log.warn("Failed to decrease stock for expired batch cleanup: itemId={}, requested={}",
+                            itemId, totalQty);
+                    continue;
+                }
+
+                // Атомарно очищаем все просроченные партии для этого товара
+                int clearedCount = batchRepository.clearExpiredBatchesByItemId(itemId, now);
+                totalCleared += clearedCount;
+
+                // Создаем движение для списания просроченных партий
+                Item item = itemRepository.findById(itemId)
+                        .orElseThrow(() -> EntityNotFoundException.forId("Item", itemId));
+                
+                StockMovement movement = StockMovement.builder()
+                        .item(item)
+                        .user(null) // Нет пользователя - системная операция
+                        .type(MovementType.EXPIRED)
+                        .quantity(-totalQty)
+                        .batch(null) // Списываем из нескольких партий
+                        .build();
+                stockMovementRepository.save(movement);
+
+                log.info("Expired batches cleared for itemId={}, count={}, totalQuantity={}",
+                        itemId, clearedCount, totalQty);
+
+            } catch (Exception e) {
+                log.error("Error clearing expired batches for itemId={}", itemId, e);
+                // Продолжаем обработку других товаров
+            }
+        }
+
+        log.info("Clear expired batches completed: cleared={}", totalCleared);
+
+        return totalCleared;
     }
 }

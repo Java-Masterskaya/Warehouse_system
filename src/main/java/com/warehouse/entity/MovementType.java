@@ -11,5 +11,8 @@ public enum MovementType {
     WRITE_OFF,
 
     /** Корректировка остатков. */
-    ADJUSTMENT
+    ADJUSTMENT,
+
+    /** Списание просроченных партий. */
+    EXPIRED
 }

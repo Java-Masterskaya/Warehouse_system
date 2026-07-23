@@ -127,9 +127,19 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         try {
             // FEFO списание: гасим из партий с ближайшим сроком
+            // Движения для каждой партии создаются внутри writeOffByFEFO()
             int stockAfter = batchService.writeOffByFEFO(itemId, quantity, now);
 
-            StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.WRITE_OFF);
+            // Создаем общее движение для всей операции списания
+            User userRef = userRepository.getReferenceById(ctx.userId());
+            StockMovement stockMovement = StockMovement.builder()
+                    .item(item)
+                    .user(userRef)
+                    .type(MovementType.WRITE_OFF)
+                    .quantity(-quantity)
+                    .batch(null) // Списываем из нескольких партий
+                    .build();
+            stockMovementRepository.save(stockMovement);
 
             boolean lowStock = stockAfter < item.getMinStock();
             if (lowStock) {
