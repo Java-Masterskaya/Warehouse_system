@@ -45,7 +45,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -138,13 +137,18 @@ public class StockMovementServiceImpl implements StockMovementService {
             // Движения не создаются внутри writeOffByFEFO()
             int stockAfter = batchService.writeOffByFEFO(itemId, quantity, now);
 
+            // Получаем склад по умолчанию
+            Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
+                    .orElseThrow(() -> new EntityNotFoundException("Default warehouse not found"));
+
             // Создаем общее движение для всей операции списания
             User userRef = userRepository.getReferenceById(ctx.userId());
             StockMovement stockMovement = StockMovement.builder()
                     .item(item)
+                    .warehouse(defaultWarehouse)
                     .user(userRef)
                     .type(MovementType.WRITE_OFF)
-                    .quantity(quantity)  // ← Положительное количество!
+                    .quantity(quantity)
                     .batch(null) // Списываем из нескольких партий
                     .build();
             stockMovementRepository.save(stockMovement);
@@ -256,7 +260,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.ADJUSTMENT)
                 .warehouse(stock.getWarehouse()).quantity(delta).batch(affectedBatch).build();
-        .build();
+
         stockMovementRepository.save(stockMovement);
 
         boolean lowStock = counted < item.getMinStock();
@@ -374,8 +378,8 @@ public class StockMovementServiceImpl implements StockMovementService {
     }
 
     @Override
-    public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type) {
-        return newStockMovement(item, quantity, ctx, type, null);
+    public StockMovement newStockMovement(Item item, Warehouse warehouse, int quantity, UserContext ctx, MovementType type) {
+        return newStockMovement(item, warehouse, quantity, ctx, type, null);
     }
 
     /**

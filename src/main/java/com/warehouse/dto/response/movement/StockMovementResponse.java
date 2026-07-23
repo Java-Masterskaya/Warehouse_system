@@ -35,15 +35,4 @@ public record StockMovementResponse(
         String warehouseName,
         UUID transferId
 ) {
-    public StockMovementResponse(
-            Long itemId,
-            Long movementId,
-            MovementType type,
-            int quantity,
-            int stockAfter,
-            LocalDateTime createdAt,
-            boolean lowStockAlert
-    ) {
-        this(itemId, movementId, type, quantity, stockAfter, null, null, createdAt, lowStockAlert, null, null, null);
-    }
 }

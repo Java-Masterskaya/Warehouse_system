@@ -19,11 +19,13 @@ import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.movement.StockMovementService;
 
 /**
@@ -44,6 +46,9 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    private WarehouseRepository warehouseRepository;
 
     @Autowired
     private StockMovementService stockMovementService;
@@ -72,6 +77,8 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
         // Создаем stock для товара (необходим для registerReceipt)
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(warehouseRepository.findByDefaultWarehouseTrue()
+                .orElseThrow(() -> new IllegalStateException("Default warehouse not found")));
         stock.setQuantity(0);
         stockRepository.save(stock);
 

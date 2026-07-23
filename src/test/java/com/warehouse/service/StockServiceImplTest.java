@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
@@ -56,7 +57,7 @@ class StockServiceImplTest {
                 .thenReturn(Optional.of(EXPECTED_STOCK_AFTER_WRITE_OFF));
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(stock)).thenReturn(EXCESSIVE_AMOUNT);
+        Mockito.lenient().when(availabilityService.getAvailable(ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT);
 
         // Act
         int result = stockService.writeOffStock(ITEM_ID, WRITE_OFF_AMOUNT);
@@ -76,7 +77,7 @@ class StockServiceImplTest {
         when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(0));
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(stock)).thenReturn(EXCESSIVE_AMOUNT);
+        Mockito.lenient().when(availabilityService.getAvailable(ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT);
 
         // Act
         int result = stockService.writeOffStock(ITEM_ID, WRITE_OFF_AMOUNT);
@@ -116,9 +117,10 @@ class StockServiceImplTest {
     void insufficientStockThrowsInsufficientStockException() {
         // Arrange
         when(stockRepository.decreaseQuantityIfEnough(ITEM_ID, EXCESSIVE_AMOUNT)).thenReturn(0);
+        when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(LOW_STOCK_QUANTITY));
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(stock)).thenReturn(EXCESSIVE_AMOUNT, LOW_STOCK_QUANTITY);
+        Mockito.lenient().when(availabilityService.getAvailable(ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT, LOW_STOCK_QUANTITY);
 
         // Act & Assert
         InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
@@ -147,7 +149,7 @@ class StockServiceImplTest {
         // Arrange
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(stock)).thenReturn(LOW_STOCK_QUANTITY);
+        Mockito.lenient().when(availabilityService.getAvailable(ITEM_ID)).thenReturn(LOW_STOCK_QUANTITY);
 
         // Act & Assert
         InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {

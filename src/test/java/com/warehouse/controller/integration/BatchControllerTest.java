@@ -8,10 +8,12 @@ import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +61,9 @@ class BatchControllerTest extends AbstractIntegrationTest {
     private BatchRepository batchRepository;
 
     @Autowired
+    private WarehouseRepository warehouseRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private String adminToken;
@@ -80,6 +85,8 @@ class BatchControllerTest extends AbstractIntegrationTest {
 
         Stock stock = new Stock();
         stock.setItem(testItem);
+        stock.setWarehouse(warehouseRepository.findByDefaultWarehouseTrue()
+                .orElseThrow(() -> new IllegalStateException("Default warehouse not found")));
         stock.setQuantity(10);
         stockRepository.save(stock);
 

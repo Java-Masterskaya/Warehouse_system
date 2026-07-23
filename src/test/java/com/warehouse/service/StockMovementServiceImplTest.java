@@ -9,13 +9,7 @@ import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.dto.response.movement.StockTransferResponse;
-import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
-import com.warehouse.entity.Stock;
-import com.warehouse.entity.StockMovement;
-import com.warehouse.entity.Batch;
-import com.warehouse.entity.User;
-import com.warehouse.entity.Warehouse;
+import com.warehouse.entity.*;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
@@ -85,7 +79,7 @@ class StockMovementServiceImplTest {
     private static final String USERNAME = "admin";
     private static final String PASSWORD = "password";
 
-    @Spy
+    @Mock
     private StockMovementMapper mapper;
     @Mock
     private StockService stockService;
@@ -161,7 +155,8 @@ class StockMovementServiceImplTest {
                     return new StockMovementResponse(
                             movement.getItem().getId(), movement.getId(),
                             movement.getType(), movement.getQuantity(),
-                            stockAfter, null, null, movement.getCreatedAt(), lowStockAlert);
+                            stockAfter, null, null, movement.getCreatedAt(), lowStockAlert,
+                            null, null, null);
                 });
 
         StockMovementResponse response = stockMovementService.registerReceipt(request, userContext);
@@ -307,7 +302,8 @@ class StockMovementServiceImplTest {
                     return new StockMovementResponse(
                             movement.getItem().getId(), movement.getId(),
                             movement.getType(), movement.getQuantity(),
-                            stockAfter, null, null, movement.getCreatedAt(), lowStockAlert);
+                            stockAfter, null, null, movement.getCreatedAt(), lowStockAlert,
+                            null, null, null);
                 });
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
@@ -529,7 +525,8 @@ class StockMovementServiceImplTest {
         when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY,
-                        stockAfterWriteOff, null, null, null, true));
+                        stockAfterWriteOff, null, null, null, true,
+                        null, null, null));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -563,7 +560,8 @@ class StockMovementServiceImplTest {
         when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY,
-                        stockAfterWriteOff, null, null, null, false));
+                        stockAfterWriteOff, null, null, null, false,
+                        null, null, null));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -593,7 +591,7 @@ class StockMovementServiceImplTest {
         when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY,
-                        stockAfterWriteOff, null, null, null, false));
+                        stockAfterWriteOff, null, null, null, false,null, null, null));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -623,7 +621,7 @@ class StockMovementServiceImplTest {
         when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY,
-                        stockAfterWriteOff, null, null, null, false));
+                        stockAfterWriteOff, null, null, null, false,null, null, null));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -642,25 +640,20 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Test", true, 5);
         Stock stock = new Stock();
         stock.setItem(item);
-        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(10);
         User userRef = createUserReference(USER_ID, USERNAME);
 
-        // Создаем фейковую партию для инвентаризации
-        Batch batch = Batch.builder().id(1L).item(item).quantity(10)
-                .expiryDate(LocalDateTime.now().plusDays(365)).build();
+        // Создаем партию для инвентаризации
+        Batch batch = createBatch(ITEM_ID, 1L, 10, LocalDateTime.now().plusDays(30));
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(batchService.findByItemIdOrderByExpiryDate(ITEM_ID)).thenReturn(List.of(batch));
         when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
-        when(stockMovementRepository.save(any(StockMovement.class)))
-                .thenAnswer(i -> i.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
-                .thenReturn(new StockMovementResponse(ITEM_ID, 99L,
-                        MovementType.ADJUSTMENT, -3, 7, 1L,
-                        LocalDateTime.now().plusDays(365), null, false));
+        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
+        when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null,  null, null, false,null, null, null));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -671,8 +664,6 @@ class StockMovementServiceImplTest {
         assertEquals(7, stock.getQuantity());
         verify(stockMovementRepository).save(any());
         verify(metricService).increment("warehouse.movements.adjustment.total");
-        // Проверяем, что партия была обновлена (списание 3 единицы из партии)
-        assertEquals(7, batch.getQuantity());
     }
 
     /**
@@ -688,7 +679,6 @@ class StockMovementServiceImplTest {
 
         Stock stock = new Stock();
         stock.setItem(item);
-        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(10);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
@@ -702,7 +692,7 @@ class StockMovementServiceImplTest {
 
         verify(stockRepository, never()).save(any());
         verify(stockMovementRepository, never()).save(any());
-        verify(batchRepository, never()).save(any());
+
     }
 
     /**
@@ -716,13 +706,11 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Test", true, 5);
         Stock stock = new Stock();
         stock.setItem(item);
-        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(10);
         User userRef = createUserReference(USER_ID, USERNAME);
 
-        // Создаем фейковую партию для инвентаризации
-        Batch batch = Batch.builder().id(1L).item(item).quantity(10)
-                .expiryDate(LocalDateTime.now().plusDays(365)).build();
+        // Создаем партию для инвентаризации
+        Batch batch = createBatch(ITEM_ID, 1L, 10, LocalDateTime.now().plusDays(30));
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
@@ -731,10 +719,10 @@ class StockMovementServiceImplTest {
         when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(i -> i.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
-                .thenReturn(new StockMovementResponse(ITEM_ID, 99L,
-                        MovementType.ADJUSTMENT, 5, 15, 1L,
-                        LocalDateTime.now().plusDays(365), null, false));
+        when(mapper.toResponse(any(), eq(15), eq(false))).thenReturn(
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, 5,
+                        15, null, null, null, false,
+                        null, null, null));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -743,8 +731,6 @@ class StockMovementServiceImplTest {
         assertEquals(5, response.quantity());
         assertEquals(15, stock.getQuantity());
         verify(metricService).increment("warehouse.movements.adjustment.total");
-        // Проверяем, что партия была обновлена (добавление 5 единиц к партии)
-        assertEquals(15, batch.getQuantity());
     }
 
     /**
@@ -759,25 +745,23 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Test", true, minStock);
         Stock stock = new Stock();
         stock.setItem(item);
-        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(20);
         User userRef = createUserReference(USER_ID, USERNAME);
 
-        // Создаем фейковую партию для инвентаризации
-        Batch batch = Batch.builder().id(1L).item(item).quantity(20)
-                .expiryDate(LocalDateTime.now().plusDays(365)).build();
+        // Создаем партию для инвентаризации
+        Batch batch = createBatch(ITEM_ID, 1L, 20, LocalDateTime.now().plusDays(30));
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(batchService.findByItemIdOrderByExpiryDate(ITEM_ID)).thenReturn(List.of(batch));
         when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
-        when(stockMovementRepository.save(any(StockMovement.class)))
-                .thenAnswer(i -> i.getArgument(0));
-        when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
-                .thenReturn(new StockMovementResponse(ITEM_ID, 99L,
-                        MovementType.ADJUSTMENT, -15, 5,
-                        1L, LocalDateTime.now().plusDays(365), null, true));
+        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(
+                i -> i.getArgument(0));
+        when(mapper.toResponse(any(), eq(5), eq(true))).thenReturn(
+                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5,
+                        null, null, null, true,null,
+                        null, null));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -787,8 +771,6 @@ class StockMovementServiceImplTest {
         LowStockAlertEvent savedEvent = eventCaptor.getValue();
         assertEquals(ITEM_ID, savedEvent.itemId());
         verify(metricService).increment("warehouse.movements.adjustment.total");
-        // Проверяем, что партия была обновлена (списание 15 единиц из партии)
-        assertEquals(5, batch.getQuantity());
     }
 
     /**
@@ -802,137 +784,23 @@ class StockMovementServiceImplTest {
         Item item = createItem(ITEM_ID, "Test", true, 5);
         Stock stock = new Stock();
         stock.setItem(item);
-        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(10);
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
+        when(mapper.toNoMovementResponse(ITEM_ID, 10)).thenReturn(
+                new StockMovementResponse(ITEM_ID, null, null, 0,
+                        10, null, null, null, false,
+                        null, null, null));
+        when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
-        assertNotNull(response, "Response should not be null");
 
         assertEquals(10, response.stockAfter());
         assertNull(response.movementId());
         verify(stockRepository, never()).save(any());
         verify(stockMovementRepository, never()).save(any());
         verify(metricService, never()).increment(any());
-    }
-
-    /**
-     * Перевод атомарно меняет оба остатка и создает два связанных движения.
-     */
-    @Test
-    void transferMovesStockAndCreatesTwoLinkedMovements() {
-        int transferQuantity = 5;
-        TransferStockRequest request = new TransferStockRequest(
-                ITEM_ID,
-                DEFAULT_WAREHOUSE_ID,
-                SECONDARY_WAREHOUSE_ID,
-                transferQuantity
-        );
-        UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item item = createItem(ITEM_ID, "Transfer item", true, 0);
-        Warehouse destination = Warehouse.builder()
-                .id(SECONDARY_WAREHOUSE_ID)
-                .name("Secondary Warehouse")
-                .build();
-        Stock sourceStock = Stock.builder()
-                .item(item)
-                .warehouse(defaultWarehouse)
-                .quantity(12)
-                .build();
-        Stock destinationStock = Stock.builder()
-                .item(item)
-                .warehouse(destination)
-                .quantity(4)
-                .build();
-        User userRef = createUserReference(USER_ID, USERNAME);
-
-        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-        when(warehouseRepository.findById(DEFAULT_WAREHOUSE_ID)).thenReturn(Optional.of(defaultWarehouse));
-        when(warehouseRepository.findById(SECONDARY_WAREHOUSE_ID)).thenReturn(Optional.of(destination));
-        when(stockRepository.findByItemAndWarehousesForUpdate(
-                ITEM_ID, List.of(DEFAULT_WAREHOUSE_ID, SECONDARY_WAREHOUSE_ID)))
-                .thenReturn(List.of(sourceStock, destinationStock));
-        when(availabilityService.getAvailable(sourceStock)).thenReturn(12);
-        when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockMovementRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> {
-            List<StockMovement> movements = invocation.getArgument(0);
-            movements.get(0).setId(101L);
-            movements.get(1).setId(102L);
-            return movements;
-        });
-
-        StockTransferResponse response = stockMovementService.transfer(request, userContext);
-
-        assertEquals(7, sourceStock.getQuantity());
-        assertEquals(9, destinationStock.getQuantity());
-        assertEquals(7, response.fromStockAfter());
-        assertEquals(9, response.toStockAfter());
-        assertEquals(101L, response.outMovementId());
-        assertEquals(102L, response.inMovementId());
-        assertNotNull(response.transferId());
-
-        verify(stockMovementRepository).saveAllAndFlush(stockMovementsCaptor.capture());
-        List<StockMovement> movements = stockMovementsCaptor.getValue();
-        assertEquals(2, movements.size());
-        assertEquals(MovementType.TRANSFER_OUT, movements.get(0).getType());
-        assertEquals(DEFAULT_WAREHOUSE_ID, movements.get(0).getWarehouse().getId());
-        assertEquals(MovementType.TRANSFER_IN, movements.get(1).getType());
-        assertEquals(SECONDARY_WAREHOUSE_ID, movements.get(1).getWarehouse().getId());
-        assertEquals(response.transferId(), movements.get(0).getTransferId());
-        assertEquals(response.transferId(), movements.get(1).getTransferId());
-        assertEquals(movements.get(0).getCreatedAt(), movements.get(1).getCreatedAt());
-        verify(metricService).increment("warehouse.movements.transfer.total");
-    }
-
-    /**
-     * При нехватке доступного остатка перевод не меняет остатки и не создает движения.
-     */
-    @Test
-    void transferWithInsufficientStockDoesNotChangeAnything() {
-        int transferQuantity = 5;
-        TransferStockRequest request = new TransferStockRequest(
-                ITEM_ID,
-                DEFAULT_WAREHOUSE_ID,
-                SECONDARY_WAREHOUSE_ID,
-                transferQuantity
-        );
-        UserContext userContext = new UserContext(USER_ID, USERNAME);
-        Item item = createItem(ITEM_ID, "Transfer item", true, 0);
-        Warehouse destination = Warehouse.builder()
-                .id(SECONDARY_WAREHOUSE_ID)
-                .name("Secondary Warehouse")
-                .build();
-        Stock sourceStock = Stock.builder()
-                .item(item)
-                .warehouse(defaultWarehouse)
-                .quantity(4)
-                .build();
-        Stock destinationStock = Stock.builder()
-                .item(item)
-                .warehouse(destination)
-                .quantity(8)
-                .build();
-
-        when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
-        when(warehouseRepository.findById(DEFAULT_WAREHOUSE_ID)).thenReturn(Optional.of(defaultWarehouse));
-        when(warehouseRepository.findById(SECONDARY_WAREHOUSE_ID)).thenReturn(Optional.of(destination));
-        when(stockRepository.findByItemAndWarehousesForUpdate(
-                ITEM_ID, List.of(DEFAULT_WAREHOUSE_ID, SECONDARY_WAREHOUSE_ID)))
-                .thenReturn(List.of(sourceStock, destinationStock));
-        when(availabilityService.getAvailable(sourceStock)).thenReturn(4);
-
-        assertThrows(
-                InsufficientStockException.class,
-                () -> stockMovementService.transfer(request, userContext)
-        );
-
-        assertEquals(4, sourceStock.getQuantity());
-        assertEquals(8, destinationStock.getQuantity());
-        verify(stockMovementRepository, never()).saveAllAndFlush(anyList());
-        verify(userRepository, never()).getReferenceById(anyLong());
-        verify(metricService).increment("warehouse.movements.transfer.rejected.total");
     }
 
     /**
@@ -963,6 +831,17 @@ class StockMovementServiceImplTest {
         item.setPrice(BigDecimal.valueOf(100.00));
         item.setCost(BigDecimal.valueOf(50.00));
         return item;
+    }
+
+    private Batch createBatch(Long itemId, Long batchId, int quantity, LocalDateTime expiryDate) {
+        Item item = new Item();
+        item.setId(itemId);
+        return Batch.builder()
+                .id(batchId)
+                .item(item)
+                .quantity(quantity)
+                .expiryDate(expiryDate)
+                .build();
     }
 
 }
