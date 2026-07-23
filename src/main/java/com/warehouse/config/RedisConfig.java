@@ -45,8 +45,7 @@ public class RedisConfig {
                         )
                 )
                 .disableCachingNullValues();
-
-
+        
         var categoriesListType = objectMapper
                 .getTypeFactory()
                 .constructCollectionType(List.class, CategoryResponse.class);

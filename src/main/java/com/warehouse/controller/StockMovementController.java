@@ -2,9 +2,11 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.dto.response.movement.StockTransferResponse;
 import com.warehouse.entity.MovementType;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.movement.StockMovementService;
@@ -36,7 +38,7 @@ import org.springframework.validation.annotation.Validated;
 @RequiredArgsConstructor
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-@Tag(name = "Движения товара", description = "Поступление и списание (только ADMIN)")
+@Tag(name = "Движения товара", description = "Поступление, списание и переводы (только ADMIN)")
 @SecurityRequirement(name = "bearerAuth")
 @Validated
 public class StockMovementController {
@@ -67,12 +69,33 @@ public class StockMovementController {
                 request, new UserContext(currentUser.getId(), currentUser.getUsername()));
     }
 
+    @Operation(summary = "Перевести товар между складами")
+    @PostMapping("/transfer")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public StockTransferResponse transfer(
+            @Valid @RequestBody TransferStockRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        log.debug(
+                "Received stock transfer request: itemId={}, fromWarehouseId={}, toWarehouseId={}, quantity={}",
+                request.itemId(),
+                request.fromWarehouseId(),
+                request.toWarehouseId(),
+                request.quantity()
+        );
+        return stockMovementService.transfer(
+                request,
+                new UserContext(currentUser.getId(), currentUser.getUsername())
+        );
+    }
+
     /**
      * Показывает историю движения указанного товара.
      * Поддерживает фильтрацию по типу движения и пагинацию результатов.
      *
      * @param itemId идентификатор товара
-     * @param type   необязательный фильтр по типу движения (RECEIVE или WRITE_OFF)
+     * @param type   необязательный фильтр по типу движения
      * @param page   номер страницы (начиная с 0)
      * @param size   количество записей на странице
      * @return история движений товара в виде страницы результатов

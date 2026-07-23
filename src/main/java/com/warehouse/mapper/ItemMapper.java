@@ -5,10 +5,13 @@ import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.item.WarehouseStockResponse;
 import com.warehouse.entity.Item;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+
+import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface ItemMapper {
@@ -32,5 +35,11 @@ public interface ItemMapper {
 
     @Mapping(target = "available", source = "available")
     @Mapping(target = "reserved", source = "reserved")
-    ItemDetailsResponse mapProjectionToDetailsResponse(ItemDetailsProjection projection, int available, int reserved);
+    @Mapping(target = "warehouseStocks", source = "warehouseStocks")
+    ItemDetailsResponse mapProjectionToDetailsResponse(
+            ItemDetailsProjection projection,
+            long available,
+            long reserved,
+            List<WarehouseStockResponse> warehouseStocks
+    );
 }

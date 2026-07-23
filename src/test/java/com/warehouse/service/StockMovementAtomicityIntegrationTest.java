@@ -5,8 +5,17 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.*;
-import com.warehouse.repository.*;
+import com.warehouse.entity.Category;
+import com.warehouse.entity.Item;
+import com.warehouse.entity.OutboxEvent;
+import com.warehouse.entity.Stock;
+import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.OutboxEventRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,6 +89,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         // Создаём остаток
         Stock stock = new Stock();
         stock.setItem(testItem);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(20);
         stockRepository.save(stock);
 

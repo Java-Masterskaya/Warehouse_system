@@ -88,6 +88,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
         Stock stock = new Stock();
         stock.setItem(testItem);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(10);
         stockRepository.save(stock);
 

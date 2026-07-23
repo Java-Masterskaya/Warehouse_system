@@ -5,8 +5,17 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.security.LoginRequest;
-import com.warehouse.entity.*;
-import com.warehouse.repository.*;
+import com.warehouse.entity.Category;
+import com.warehouse.entity.Item;
+import com.warehouse.entity.Role;
+import com.warehouse.entity.Stock;
+import com.warehouse.entity.StockAlert;
+import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -151,6 +160,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         Stock stock = Stock.builder()
                 .item(testItem)
+                .warehouse(defaultWarehouse())
                 .quantity(5)
                 .build();
         stockRepository.save(stock);

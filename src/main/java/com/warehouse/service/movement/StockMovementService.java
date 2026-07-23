@@ -3,12 +3,15 @@ package com.warehouse.service.movement;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
+import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.dto.response.movement.StockTransferResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.StockMovement;
+import com.warehouse.entity.Warehouse;
 
 /**
  * Сервис для управления движениями товаров на складе.
@@ -60,6 +63,15 @@ public interface StockMovementService {
     StockMovementResponse stocktake(StocktakeRequest request, UserContext ctx);
 
     /**
+     * Atomically transfers an item between warehouses.
+     *
+     * @param request transfer parameters
+     * @param ctx user performing the transfer
+     * @return transfer result and both resulting balances
+     */
+    StockTransferResponse transfer(TransferStockRequest request, UserContext ctx);
+
+    /**
      * Выполняет сохранение нового движение товаров на складе.
      *
      * @param item     перемещаемый товар
@@ -69,4 +81,22 @@ public interface StockMovementService {
      * @return ответ о созданном движении товара
      */
     StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type);
+
+    /**
+     * Persists a stock movement for a specific warehouse.
+     *
+     * @param item moved item
+     * @param warehouse movement warehouse
+     * @param quantity movement quantity
+     * @param ctx user performing the operation
+     * @param type movement type
+     * @return persisted movement
+     */
+    StockMovement newStockMovement(
+            Item item,
+            Warehouse warehouse,
+            int quantity,
+            UserContext ctx,
+            MovementType type
+    );
 }

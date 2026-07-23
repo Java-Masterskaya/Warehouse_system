@@ -7,7 +7,6 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 public interface ItemService {
 

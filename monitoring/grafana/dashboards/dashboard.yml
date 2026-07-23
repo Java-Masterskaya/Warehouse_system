@@ -6,3 +6,9 @@ providers:
     type: file
     options:
       path: /etc/grafana/provisioning/dashboards
+
+alerting:
+  - name: 'warehouse-alerts'
+    type: file
+    options:
+      path: /etc/grafana/provisioning/alerting

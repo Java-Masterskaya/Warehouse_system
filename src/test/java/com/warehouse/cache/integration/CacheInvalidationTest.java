@@ -7,7 +7,12 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
-import com.warehouse.repository.*;
+import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +80,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(10);
         stockRepository.save(stock);
 

@@ -92,7 +92,5 @@ class CategoryCacheTest extends AbstractIntegrationTest {
         assertThat(secondCall)
                 .extracting(CategoryResponse::name)
                 .containsExactly("Мебель", "Электроника");
-
-
     }
 }

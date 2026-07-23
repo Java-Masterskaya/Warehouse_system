@@ -8,8 +8,19 @@ import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderItemRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderRequest;
 import com.warehouse.dto.request.security.LoginRequest;
-import com.warehouse.entity.*;
-import com.warehouse.repository.*;
+import com.warehouse.entity.Category;
+import com.warehouse.entity.Item;
+import com.warehouse.entity.MovementType;
+import com.warehouse.entity.Role;
+import com.warehouse.entity.Stock;
+import com.warehouse.entity.Supplier;
+import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.SupplierRepository;
+import com.warehouse.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -110,6 +121,7 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
 
         Stock stock = Stock.builder()
                 .item(item)
+                .warehouse(defaultWarehouse())
                 .quantity(0)
                 .build();
         stockRepository.save(stock);

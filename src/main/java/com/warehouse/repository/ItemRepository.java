@@ -36,7 +36,7 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 i.name,
                 i.category.name,
                 i.minStock,
-                s.quantity,
+                COALESCE(SUM(s.quantity), 0),
                 i.price,
                 i.cost,
                 i.active,
@@ -44,8 +44,10 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 i.updatedAt
             )
             FROM Item i
-            JOIN Stock s on s.item.id = i.id
+            LEFT JOIN Stock s ON s.item.id = i.id
             WHERE i.id = :itemId
+            GROUP BY i.id, i.sku, i.name, i.category.name, i.minStock,
+                i.price, i.cost, i.active, i.createdAt, i.updatedAt
             """)
     Optional<ItemDetailsProjection> findWithStock(@Param("itemId") Long itemId);
 
@@ -55,12 +57,14 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
             i.sku as sku,
             i.name as name,
             i.category.name as category,
-            s.quantity as currentStock,
+            COALESCE(SUM(s.quantity), 0) as currentStock,
             i.minStock as minStock
         FROM Item i
-        JOIN Stock s ON s.item.id = i.id
-        WHERE s.quantity < i.minStock AND i.active = true
-        ORDER BY (i.minStock - s.quantity) DESC
+        LEFT JOIN Stock s ON s.item.id = i.id
+        WHERE i.active = true
+        GROUP BY i.id, i.sku, i.name, i.category.name, i.minStock
+        HAVING COALESCE(SUM(s.quantity), 0) < i.minStock
+        ORDER BY (i.minStock - COALESCE(SUM(s.quantity), 0)) DESC
         """)
     List<LowStockProjection> findLowStockItems();
 
@@ -105,4 +109,3 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
 
     boolean existsByCategoryId(Long categoryId);
 }
-
