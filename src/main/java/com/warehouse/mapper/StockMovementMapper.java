@@ -8,7 +8,6 @@ import org.mapstruct.Mappings;
 import org.mapstruct.Named;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 /**
  * Маппер для преобразования сущности движения товара в DTO-ответ.

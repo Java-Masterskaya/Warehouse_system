@@ -379,7 +379,8 @@ public class StockMovementServiceImpl implements StockMovementService {
     }
 
     @Override
-    public StockMovement newStockMovement(Item item, Warehouse warehouse, int quantity, UserContext ctx, MovementType type) {
+    public StockMovement newStockMovement(Item item, Warehouse warehouse,
+                                          int quantity, UserContext ctx, MovementType type) {
         return newStockMovement(item, warehouse, quantity, ctx, type, null);
     }
 

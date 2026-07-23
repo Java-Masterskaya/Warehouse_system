@@ -6,10 +6,7 @@ import com.warehouse.entity.Stock;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.repository.BatchRepository;
-import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -118,7 +115,6 @@ public class BatchServiceImpl implements BatchService {
      * @param quantity    количество для списания
      * @param now         текущее время (для проверки срока годности)
      * @return остаток после списания (newStockQuantity)
-     * @throws InsufficientStockException если недостаточно товара во всех неистекших партиях
      */
     @Override
     @Transactional
@@ -182,7 +178,8 @@ public class BatchServiceImpl implements BatchService {
         // Это гарантирует атомарность и проверку остатка
         int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, actuallyWrittenOff);
         if (updatedRows == 0) {
-            log.error("FEFO write-off failed: stock quantity not updated. This should not happen after successful write-off from batches.");
+            log.error("FEFO write-off failed: stock quantity not updated. This should not happen after "
+                    + "successful write-off from batches.");
             throw new IllegalStateException("Stock quantity update failed after successful batch write-off");
         }
         
@@ -243,7 +240,8 @@ public class BatchServiceImpl implements BatchService {
                 // Это гарантирует атомарность и проверку остатка
                 int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, totalQty);
                 if (updatedRows == 0) {
-                    log.error("Expired batch cleanup failed: stock quantity not updated. This should not happen after successful batch clearing.");
+                    log.error("Expired batch cleanup failed: stock quantity not updated. This should not happen "
+                           + "after successful batch clearing.");
                     throw new IllegalStateException("Stock quantity update failed after clearing expired batches");
                 }
 

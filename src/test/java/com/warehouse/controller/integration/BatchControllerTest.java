@@ -8,7 +8,6 @@ import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
-import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;

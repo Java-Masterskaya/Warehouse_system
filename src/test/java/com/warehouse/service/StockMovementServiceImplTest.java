@@ -4,12 +4,16 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
-import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.dto.response.movement.StockTransferResponse;
-import com.warehouse.entity.*;
+import com.warehouse.entity.Batch;
+import com.warehouse.entity.Item;
+import com.warehouse.entity.MovementType;
+import com.warehouse.entity.Stock;
+import com.warehouse.entity.User;
+import com.warehouse.entity.StockMovement;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
@@ -33,7 +37,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -52,7 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
+
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -182,7 +185,8 @@ class StockMovementServiceImplTest {
      */
     @Test
     void registerReceiptWithZeroQuantityThrowsException() {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID, 0, LocalDateTime.now());
+        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(ITEM_ID,
+                0, LocalDateTime.now());
         UserContext userContext = new UserContext(USER_ID, USERNAME);
 
         InvalidMovementRequestException ex = assertThrows(InvalidMovementRequestException.class,
@@ -591,7 +595,8 @@ class StockMovementServiceImplTest {
         when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY,
-                        stockAfterWriteOff, null, null, null, false,null, null, null));
+                        stockAfterWriteOff, null, null, null, false,
+                         null, null, null));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -621,7 +626,8 @@ class StockMovementServiceImplTest {
         when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY,
-                        stockAfterWriteOff, null, null, null, false,null, null, null));
+                        stockAfterWriteOff, null, null, null,
+                        false, null, null, null));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -651,9 +657,13 @@ class StockMovementServiceImplTest {
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
         when(batchService.findByItemIdOrderByExpiryDate(ITEM_ID)).thenReturn(List.of(batch));
         when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
-        when(stockMovementRepository.save(any(StockMovement.class))).thenAnswer(i -> i.getArgument(0));
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(7), eq(false))).thenReturn(
-                new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -3, 7, null,  null, null, false,null, null, null));
+                new StockMovementResponse(ITEM_ID, 99L,
+                        MovementType.ADJUSTMENT, -3, 7, null,
+                        null, null, false,
+                        null, null, null));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 
         StockMovementResponse response = stockMovementService.stocktake(request, userContext);
@@ -760,7 +770,7 @@ class StockMovementServiceImplTest {
                 i -> i.getArgument(0));
         when(mapper.toResponse(any(), eq(5), eq(true))).thenReturn(
                 new StockMovementResponse(ITEM_ID, 99L, MovementType.ADJUSTMENT, -15, 5,
-                        null, null, null, true,null,
+                        null, null, null, true, null,
                         null, null));
         when(availabilityService.getReserved(ITEM_ID)).thenReturn(3);
 

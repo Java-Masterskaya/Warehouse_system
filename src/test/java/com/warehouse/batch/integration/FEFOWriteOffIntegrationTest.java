@@ -19,7 +19,6 @@ import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
-import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;

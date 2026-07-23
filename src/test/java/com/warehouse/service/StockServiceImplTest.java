@@ -120,7 +120,8 @@ class StockServiceImplTest {
         when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(LOW_STOCK_QUANTITY));
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        Mockito.lenient().when(availabilityService.getAvailable(ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT, LOW_STOCK_QUANTITY);
+        Mockito.lenient().when(availabilityService.getAvailable(ITEM_ID))
+                .thenReturn(EXCESSIVE_AMOUNT, LOW_STOCK_QUANTITY);
 
         // Act & Assert
         InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {

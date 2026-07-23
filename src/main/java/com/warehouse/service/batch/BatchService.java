@@ -2,7 +2,6 @@ package com.warehouse.service.batch;
 
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
-import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
 
 import java.time.LocalDateTime;
