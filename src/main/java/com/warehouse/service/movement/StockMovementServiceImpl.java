@@ -100,10 +100,11 @@ public class StockMovementServiceImpl implements StockMovementService {
         log.debug("Processing stock receipt for itemId={}, quantity={}, expiryDate={}, userId={}",
                 itemId, quantity, request.expiryDate(), ctx.userId());
 
-        int stockAfter = stockService.receiveStock(itemId, quantity);
+        // Создаем партию и обновляем stock.quantity атомарно
+        Batch batch = batchService.createBatchAndIncreaseStock(item, quantity, request.expiryDate());
 
-        // Создаем партию с указанным сроком годности
-        Batch batch = batchService.createBatch(item, quantity, request.expiryDate());
+        int stockAfter = stockRepository.findQuantityByItemId(itemId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
 
         StockMovement stockMovement = newStockMovement(item, quantity, ctx, MovementType.RECEIVE, batch);
 

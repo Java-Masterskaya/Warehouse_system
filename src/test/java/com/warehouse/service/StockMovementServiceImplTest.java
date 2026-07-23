@@ -138,13 +138,13 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockService.receiveStock(ITEM_ID, QUANTITY)).thenReturn(STOCK_AFTER_RECEIPT);
-        when(batchService.createBatch(any(Item.class), eq(QUANTITY), any(LocalDateTime.class)))
+        when(batchService.createBatchAndIncreaseStock(any(Item.class), eq(QUANTITY), any(LocalDateTime.class)))
                 .thenAnswer(invocation -> {
                     Item i = invocation.getArgument(0);
                     int q = invocation.getArgument(1);
                     return Batch.builder().id(1L).item(i).quantity(q).expiryDate(invocation.getArgument(2)).build();
                 });
+        when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(STOCK_AFTER_RECEIPT));
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toResponse(any(StockMovement.class), anyInt(), anyBoolean()))
@@ -256,14 +256,14 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
         when(userRepository.getReferenceById(USER_ID)).thenReturn(userRef);
-        when(stockService.receiveStock(ITEM_ID, QUANTITY)).thenReturn(STOCK_AFTER_RECEIPT);
-        when(batchService.createBatch(any(Item.class), eq(QUANTITY), any(LocalDateTime.class)))
+        when(batchService.createBatchAndIncreaseStock(any(Item.class), eq(QUANTITY), any(LocalDateTime.class)))
                 .thenAnswer(invocation -> {
                     Item i = invocation.getArgument(0);
                     int q = invocation.getArgument(1);
                     return Batch.builder().id(1L).item(i).quantity(q).expiryDate(
                             invocation.getArgument(2)).build();
                 });
+        when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(STOCK_AFTER_RECEIPT));
         when(stockMovementRepository.save(any(StockMovement.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 

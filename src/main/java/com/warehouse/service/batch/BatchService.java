@@ -2,6 +2,7 @@ package com.warehouse.service.batch;
 
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,17 @@ public interface BatchService {
      * @return созданная партия
      */
     Batch createBatch(Item item, int quantity, LocalDateTime expiryDate);
+
+    /**
+     * Создать новую партию товара и обновить stock.quantity для default warehouse.
+     * Атомарная операция для сохранения консистентности.
+     *
+     * @param item       товар
+     * @param quantity   количество единиц
+     * @param expiryDate срок годности
+     * @return созданная партия
+     */
+    Batch createBatchAndIncreaseStock(Item item, int quantity, LocalDateTime expiryDate);
 
     /**
      * Найти все партии товара, отсортированные по возрастанию срока годности (FEFO).
@@ -59,8 +71,8 @@ public interface BatchService {
 
     /**
      * Очистить протухшие партии (списать их количество в Stock).
-     * Использует optimistic locking (@Version) для безопасного обновления.
-     * Метод не блокирует таблицы и безопасен для конкурентности.
+     * Атомарная операция: очищает партии и уменьшает stock.quantity.
+     * Использует pessimistic locking для безопасности.
      *
      * @param now текущее время
      * @return количество очищенных партий

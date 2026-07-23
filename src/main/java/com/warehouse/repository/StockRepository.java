@@ -87,6 +87,8 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     );
 
     // Обновление quantity напрямую (для FEFO списания)
+    // ВАЖНО: обновляет ВСЕ stock-строки для товара (для multi-warehouse).
+    // Для работы с конкретным складом используйте decreaseQuantityIfEnoughAtWarehouse().
     @Modifying(flushAutomatically = true)
     @Query("""
             update Stock s
@@ -95,21 +97,6 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             where s.item.id = :itemId
             """)
     int updateQuantity(@Param("itemId") Long itemId, @Param("quantity") int quantity);
-
-    // Синхронизация stock.quantity = SUM(batch.quantity)
-    // Обновляет stock.quantity на сумму количества всех активных партий
-    @Modifying(flushAutomatically = true)
-    @Query("""
-            update Stock s
-            set s.quantity = (
-                select coalesce(sum(b.quantity), 0)
-                from Batch b
-                where b.item.id = :itemId
-            ),
-            s.updatedAt = CURRENT_TIMESTAMP
-            where s.item.id = :itemId
-            """)
-    int syncQuantityWithBatches(@Param("itemId") Long itemId);
 
     //Дополнительная операция не блокирующая операции чтения
     @Lock(LockModeType.PESSIMISTIC_WRITE)

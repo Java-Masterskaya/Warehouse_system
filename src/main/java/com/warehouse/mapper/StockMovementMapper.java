@@ -7,6 +7,9 @@ import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;
 import org.mapstruct.Named;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 /**
  * Маппер для преобразования сущности движения товара в DTO-ответ.
  * Предоставляет метод для маппинга {@link StockMovement} в {@link StockMovementResponse}.
@@ -20,6 +23,7 @@ public interface StockMovementMapper {
 
     /**
      * Преобразует сущность движения товара в ответ с информацией о движении.
+     * Обрабатывает случаи, когда партия может быть null (например, при FEFO списании).
      *
      * @param entity       сущность движения товара
      * @param stockAfter   остаток после операции
@@ -31,8 +35,8 @@ public interface StockMovementMapper {
         @Mapping(target = "movementId", source = "entity.id"),
         @Mapping(target = "warehouseId", source = "entity.warehouse.id"),
         @Mapping(target = "warehouseName", source = "entity.warehouse.name"),
-        @Mapping(target = "batchId", source = "entity.batch.id"),
-        @Mapping(target = "expiryDate", source = "entity.batch.expiryDate"),
+        @Mapping(target = "batchId", source = "entity", qualifiedByName = "getBatchId"),
+        @Mapping(target = "expiryDate", source = "entity", qualifiedByName = "getExpiryDate"),
         @Mapping(target = "lowStockAlert", source = "lowStockAlert")
     })
     StockMovementResponse toResponse(StockMovement entity, int stockAfter, boolean lowStockAlert);
@@ -49,6 +53,38 @@ public interface StockMovementMapper {
     default Long getItemId(StockMovement entity) {
         if (entity.getItem() != null) {
             return entity.getItem().getId();
+        }
+        return null;
+    }
+
+    /**
+     * Извлекает ID партии из сущности движения.
+     * Безопасно обрабатывает случаи, когда партия может быть null.
+     *
+     * @param entity сущность движения товара
+     * @return ID партии или null, если партия отсутствует
+     */
+    @Named("getBatchId")
+    @SuppressWarnings("unused")
+    default Long getBatchId(StockMovement entity) {
+        if (entity.getBatch() != null) {
+            return entity.getBatch().getId();
+        }
+        return null;
+    }
+
+    /**
+     * Извлекает срок годности из сущности движения.
+     * Безопасно обрабатывает случаи, когда партия может быть null.
+     *
+     * @param entity сущность движения товара
+     * @return срок годности или null, если партия отсутствует
+     */
+    @Named("getExpiryDate")
+    @SuppressWarnings("unused")
+    default LocalDateTime getExpiryDate(StockMovement entity) {
+        if (entity.getBatch() != null) {
+            return entity.getBatch().getExpiryDate();
         }
         return null;
     }

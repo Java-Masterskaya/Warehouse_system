@@ -2,16 +2,15 @@ package com.warehouse.service.batch;
 
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
-import com.warehouse.entity.StockMovement;
-import com.warehouse.entity.User;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.repository.WarehouseRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -31,9 +30,7 @@ public class BatchServiceImpl implements BatchService {
 
     BatchRepository batchRepository;
     StockRepository stockRepository;
-    ItemRepository itemRepository;
-    StockMovementRepository stockMovementRepository;
-    UserRepository userRepository;
+    WarehouseRepository warehouseRepository;
 
     @Override
     @Transactional
@@ -49,6 +46,45 @@ public class BatchServiceImpl implements BatchService {
         Batch saved = batchRepository.save(batch);
         log.info("Batch created: id={}, itemId={}, quantity={}, expiryDate={}",
                 saved.getId(), saved.getItem().getId(), saved.getQuantity(), saved.getExpiryDate());
+
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public Batch createBatchAndIncreaseStock(Item item, int quantity, LocalDateTime expiryDate) {
+        log.debug("Creating batch and increasing stock for itemId={}, quantity={}, expiryDate={}",
+                item.getId(), quantity, expiryDate);
+
+        // Получаем default warehouse для логирования (не сохраняем в batch)
+        Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
+                .orElseThrow(() -> new EntityNotFoundException("Default warehouse not found"));
+
+        Batch batch = Batch.builder()
+                .item(item)
+                .quantity(quantity)
+                .expiryDate(expiryDate)
+                .build();
+
+        Batch saved = batchRepository.save(batch);
+        log.info("Batch created: id={}, itemId={}, quantity={}, expiryDate={}",
+                saved.getId(), saved.getItem().getId(), saved.getQuantity(), saved.getExpiryDate());
+
+        // Атомарно создаем stock для default warehouse, если его нет, и увеличиваем quantity
+        Long warehouseId = defaultWarehouse.getId();
+        log.debug("Creating empty stock if absent: itemId={}, warehouseId={}", item.getId(), warehouseId);
+        int createdRows = stockRepository.createEmptyStockIfAbsent(item.getId(), warehouseId);
+        log.debug("createEmptyStockIfAbsent result: createdRows={}", createdRows);
+        
+        int updatedRows = stockRepository.increaseQuantity(item.getId(), quantity);
+        log.debug("increaseQuantity result: updatedRows={}", updatedRows);
+        if (updatedRows == 0) {
+            log.error("Stock not found for itemId={} after batch creation. This should not happen.", item.getId());
+            throw new IllegalStateException("Stock not found after batch creation");
+        }
+
+        log.info("Batch created and stock increased: itemId={}, batchId={}, quantity={}",
+                item.getId(), saved.getId(), quantity);
 
         return saved;
     }
@@ -73,6 +109,17 @@ public class BatchServiceImpl implements BatchService {
         return batchRepository.findAllWithItemByItemId(itemId);
     }
 
+    /**
+     * Списание товара по алгоритму FEFO (First-Expire-First-Out).
+     * Гасим из партии с ближайшим сроком, при нехватке — добираем из следующих.
+     * Одно списание может затронуть несколько партий.
+     *
+     * @param itemId      ID товара
+     * @param quantity    количество для списания
+     * @param now         текущее время (для проверки срока годности)
+     * @return остаток после списания (newStockQuantity)
+     * @throws InsufficientStockException если недостаточно товара во всех неистекших партиях
+     */
     @Override
     @Transactional
     public int writeOffByFEFO(Long itemId, int quantity, LocalDateTime now) {
@@ -96,17 +143,22 @@ public class BatchServiceImpl implements BatchService {
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
 
-        // Получаем неистекшие партии, отсортированные по expiryDate ASC
-        List<Batch> batches = batchRepository.findNonExpiredByItemIdOrderByExpiryDateAsc(itemId, now);
+        // Получаем неистекшие партии с блокировкой для обновления
+        List<Batch> batches = batchRepository.findNonExpiredByItemIdOrderByExpiryDateAscForUpdate(itemId, now);
 
-        // Списываем по очереди из каждой партии
+        // Списываем по очереди из каждой партии с блокировкой
         int remaining = quantity;
         for (Batch batch : batches) {
             if (remaining <= 0) {
                 break;
             }
 
+            // Проверяем остаток в партии (может измениться после блокировки)
             int batchQty = batch.getQuantity();
+            if (batchQty <= 0) {
+                continue;
+            }
+
             if (batchQty <= remaining) {
                 // Списываем всю партию
                 log.debug("Writing off entire batch: id={}, quantity={}, remaining={}",
@@ -126,12 +178,15 @@ public class BatchServiceImpl implements BatchService {
         // Уменьшаем общий остаток на фактически списанное количество
         int actuallyWrittenOff = quantity - remaining;
         
-        // СИНХРОНИЗИРУЕМ stock.quantity = SUM(Batch.quantity)
-        // Используем atomic sync через syncQuantityWithBatches()
-        // Это гарантирует, что stock.quantity всегда совпадает с суммой партий
-        stockRepository.syncQuantityWithBatches(itemId);
+        // Обновляем stock.quantity для default warehouse через decreaseQuantityIfEnough()
+        // Это гарантирует атомарность и проверку остатка
+        int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, actuallyWrittenOff);
+        if (updatedRows == 0) {
+            log.error("FEFO write-off failed: stock quantity not updated. This should not happen after successful write-off from batches.");
+            throw new IllegalStateException("Stock quantity update failed after successful batch write-off");
+        }
         
-        // Получаем обновленное значение stock.quantity
+        // Получаем обновленное значение stock.quantity для default warehouse
         int newStockQuantity = stockRepository.findQuantityByItemId(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
         
@@ -180,13 +235,17 @@ public class BatchServiceImpl implements BatchService {
                     continue;
                 }
 
-                // Атомарно очищаем все просроченные партии для этого товара
+                // Атомарно очищаем все просроченные партии для этого товара с блокировкой
                 int clearedCount = batchRepository.clearExpiredBatchesByItemId(itemId, now);
                 totalCleared += clearedCount;
                 
-                // СИНХРОНИЗИРУЕМ stock.quantity = SUM(Batch.quantity)
-                // После очистки партий нужно обновить stock.quantity
-                stockRepository.syncQuantityWithBatches(itemId);
+                // Уменьшаем stock.quantity для default warehouse через decreaseQuantityIfEnough()
+                // Это гарантирует атомарность и проверку остатка
+                int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, totalQty);
+                if (updatedRows == 0) {
+                    log.error("Expired batch cleanup failed: stock quantity not updated. This should not happen after successful batch clearing.");
+                    throw new IllegalStateException("Stock quantity update failed after clearing expired batches");
+                }
 
                 log.info("Expired batches cleared for itemId={}, count={}, totalQuantity={}",
                         itemId, clearedCount, totalQty);
