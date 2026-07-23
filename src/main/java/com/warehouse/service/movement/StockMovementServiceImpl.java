@@ -4,15 +4,18 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
+import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Batch;
+import com.warehouse.dto.response.movement.StockTransferResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
@@ -23,6 +26,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.service.batch.BatchService;
@@ -41,6 +45,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Реализация сервиса для управления движениями товаров на складе.
@@ -61,6 +67,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     ItemRepository itemRepository;
     StockMovementRepository stockMovementRepository;
     UserRepository userRepository;
+    WarehouseRepository warehouseRepository;
     StockRepository stockRepository;
     BatchService batchService;
     BatchRepository batchRepository;
@@ -222,12 +229,12 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         // Получаем все партии товара
         List<Batch> batches = batchService.findByItemIdOrderByExpiryDate(itemId);
-        
+
         if (batches.isEmpty()) {
             log.warn("Stocktake: no batches found for itemId={}. Cannot perform stocktake without batches", itemId);
             throw new IllegalStateException("Cannot perform stocktake: no batches found for item");
         }
-        
+
         // Распределяем разницу по партиям
         distributeDeltaAcrossBatches(batches, delta);
 
@@ -246,9 +253,10 @@ public class StockMovementServiceImpl implements StockMovementService {
             // Списали товар - связываем с последней партией (FEFO - отдаленный срок)
             affectedBatch = batches.get(batches.size() - 1);
         }
-        
+
         StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.ADJUSTMENT)
-                .quantity(delta).batch(affectedBatch).build();
+                .warehouse(stock.getWarehouse()).quantity(delta).batch(affectedBatch).build();
+        .build();
         stockMovementRepository.save(stockMovement);
 
         boolean lowStock = counted < item.getMinStock();
@@ -277,6 +285,95 @@ public class StockMovementServiceImpl implements StockMovementService {
     }
 
     @Override
+    @Transactional
+    @CacheEvict(value = "item", key = "#request.itemId")
+    public StockTransferResponse transfer(TransferStockRequest request, UserContext ctx) {
+        Long itemId = request.itemId();
+        Long fromWarehouseId = request.fromWarehouseId();
+        Long toWarehouseId = request.toWarehouseId();
+        int quantity = request.quantity();
+
+        if (fromWarehouseId.equals(toWarehouseId)) {
+            throw new InvalidMovementRequestException("Source and destination warehouses must be different");
+        }
+
+        Item item = itemCheckForExist(itemId);
+        itemCheckForActive(item);
+        Warehouse fromWarehouse = warehouseCheckForExist(fromWarehouseId);
+        Warehouse toWarehouse = warehouseCheckForExist(toWarehouseId);
+
+        List<Long> warehouseIds = List.of(fromWarehouseId, toWarehouseId).stream().sorted().toList();
+        for (Long warehouseId : warehouseIds) {
+            stockRepository.createEmptyStockIfAbsent(itemId, warehouseId);
+        }
+
+        List<Stock> lockedStocks = stockRepository.findByItemAndWarehousesForUpdate(itemId, warehouseIds);
+        Stock fromStock = findLockedStock(lockedStocks, fromWarehouseId, itemId);
+        Stock toStock = findLockedStock(lockedStocks, toWarehouseId, itemId);
+
+        int available = availabilityService.getAvailable(fromStock);
+        if (available < quantity) {
+            metricService.increment("warehouse.movements.transfer.rejected.total");
+            throw InsufficientStockException.atWarehouse(itemId, fromWarehouseId, quantity, available);
+        }
+
+        fromStock.setQuantity(fromStock.getQuantity() - quantity);
+        toStock.setQuantity(toStock.getQuantity() + quantity);
+
+        UUID transferId = UUID.randomUUID();
+        LocalDateTime transferredAt = LocalDateTime.now();
+        User userRef = userRepository.getReferenceById(ctx.userId());
+
+        StockMovement outMovement = StockMovement.builder()
+                .item(item)
+                .warehouse(fromWarehouse)
+                .user(userRef)
+                .type(MovementType.TRANSFER_OUT)
+                .quantity(quantity)
+                .createdAt(transferredAt)
+                .transferId(transferId)
+                .build();
+        StockMovement inMovement = StockMovement.builder()
+                .item(item)
+                .warehouse(toWarehouse)
+                .user(userRef)
+                .type(MovementType.TRANSFER_IN)
+                .quantity(quantity)
+                .createdAt(transferredAt)
+                .transferId(transferId)
+                .build();
+
+        stockMovementRepository.saveAllAndFlush(List.of(outMovement, inMovement));
+        metricService.increment("warehouse.movements.transfer.total");
+
+        log.info(
+                "Stock transfer completed: transferId={}, itemId={}, fromWarehouseId={}, "
+                        + "toWarehouseId={}, quantity={}, fromStockAfter={}, toStockAfter={}, userId={}",
+                transferId,
+                itemId,
+                fromWarehouseId,
+                toWarehouseId,
+                quantity,
+                fromStock.getQuantity(),
+                toStock.getQuantity(),
+                ctx.userId()
+        );
+
+        return new StockTransferResponse(
+                transferId,
+                itemId,
+                fromWarehouseId,
+                toWarehouseId,
+                quantity,
+                fromStock.getQuantity(),
+                toStock.getQuantity(),
+                outMovement.getId(),
+                inMovement.getId(),
+                transferredAt
+        );
+    }
+
+    @Override
     public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type) {
         return newStockMovement(item, quantity, ctx, type, null);
     }
@@ -292,11 +389,44 @@ public class StockMovementServiceImpl implements StockMovementService {
      * @return сохраненное движение товара
      */
     public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type, Batch batch) {
+        Warehouse warehouse = warehouseRepository.findByDefaultWarehouseTrue()
+                .orElseThrow(() -> new EntityNotFoundException("Default warehouse not found"));
+        return newStockMovement(item, warehouse, quantity, ctx, type);
+    }
+
+    @Override
+    public StockMovement newStockMovement(
+            Item item,
+            Warehouse warehouse,
+            int quantity,
+            UserContext ctx,
+            MovementType type,
+            Batch batch
+    ) {
         User userRef = userRepository.getReferenceById(ctx.userId());
 
-        StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(type).quantity(quantity)
-                .batch(batch).build();
+        StockMovement stockMovement = StockMovement.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .user(userRef)
+                .type(type)
+                .quantity(quantity)
+                .batch(batch)
+                .build();
         return stockMovementRepository.save(stockMovement);
+    }
+
+    private Stock findLockedStock(List<Stock> stocks, Long warehouseId, Long itemId) {
+        return stocks.stream()
+                .filter(stock -> stock.getWarehouse().getId().equals(warehouseId))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Stock not found for item " + itemId + " at warehouse " + warehouseId));
+    }
+
+    private Warehouse warehouseCheckForExist(Long warehouseId) {
+        return warehouseRepository.findById(warehouseId)
+                .orElseThrow(() -> EntityNotFoundException.forId("Warehouse", warehouseId));
     }
 
     /**
@@ -322,14 +452,14 @@ public class StockMovementServiceImpl implements StockMovementService {
                 if (remainingDelta == 0) {
                     break;
                 }
-                
+
                 int batchQty = batch.getQuantity();
                 int writeOff = Math.min(-remainingDelta, batchQty);
                 batch.setQuantity(batchQty - writeOff);
                 remainingDelta += writeOff;
                 batchRepository.save(batch);
             }
-            
+
             if (remainingDelta != 0) {
                 log.error("Stocktake: unable to distribute delta={}. remaining={}", delta, remainingDelta);
                 throw new IllegalStateException("Unable to distribute adjustment across batches");

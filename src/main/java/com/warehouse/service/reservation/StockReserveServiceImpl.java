@@ -60,7 +60,7 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         Stock stock = lockStock(itemId);
 
-        int available = availabilityService.getAvailable(itemId);
+        int available = availabilityService.getAvailable(stock);
         if (available < quantity) {
             log.warn("Reservation quantity is more then now available: available = {}, quantity = {}", available,
                     quantity);
@@ -98,7 +98,11 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         Reservation reservation = getActiveReservation(request.reservationId(), itemId);
         //write-off
-        int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, reservation.getQuantity());
+        int updatedRows = stockRepository.decreaseQuantityIfEnoughAtWarehouse(
+                itemId,
+                stock.getWarehouse().getId(),
+                reservation.getQuantity()
+        );
         if (updatedRows == 0) {
             throw InsufficientStockException.of(
                     itemId,
@@ -108,10 +112,16 @@ public class StockReserveServiceImpl implements StockReserveService {
         }
         updateReservationStatus(reservation, ReservationStatus.CONSUMED);
         //for alert
-        stock.setQuantity(stockRepository.findQuantityByItemId(itemId).get());
+        stock.setQuantity(stock.getQuantity() - reservation.getQuantity());
 
         //make movement and alert
-        stockMovementService.newStockMovement(getItem(itemId), reservation.getQuantity(), ctx, MovementType.WRITE_OFF);
+        stockMovementService.newStockMovement(
+                getItem(itemId),
+                stock.getWarehouse(),
+                reservation.getQuantity(),
+                ctx,
+                MovementType.WRITE_OFF
+        );
         sendAlert(stock, ctx);
 
         metricService.increment("warehouse.reservation.writeOff.total");
@@ -181,11 +191,12 @@ public class StockReserveServiceImpl implements StockReserveService {
     }
 
     private void sendAlert(Stock stock, UserContext ctx) {
-        if (stock.getQuantity() < stock.getItem().getMinStock()) {
+        long totalQuantity = stockRepository.findTotalQuantityByItemId(stock.getItem().getId());
+        if (totalQuantity < stock.getItem().getMinStock()) {
             long itemId = stock.getItem().getId();
             String sku = stock.getItem().getSku();
             String name = stock.getItem().getName();
-            int quantity = stock.getQuantity();
+            int quantity = Math.toIntExact(totalQuantity);
             int minStock = stock.getItem().getMinStock();
 
             LowStockAlertEvent event = new LowStockAlertEvent(itemId, sku, name, quantity, minStock, ctx.username(),

@@ -10,7 +10,7 @@ import org.mapstruct.Named;
 /**
  * Маппер для преобразования сущности движения товара в DTO-ответ.
  * Предоставляет метод для маппинга {@link StockMovement} в {@link StockMovementResponse}.
- * 
+ *
  * Всякая запись движения должна иметь партию (включая инвентаризацию, которая распределяет разницу по партиям).
  * Для инвентаризации партия может быть null (корректировка без привязки к конкретной партии).
  */
@@ -29,6 +29,8 @@ public interface StockMovementMapper {
     @Mappings({
         @Mapping(target = "itemId", source = "entity", qualifiedByName = "getItemId"),
         @Mapping(target = "movementId", source = "entity.id"),
+        @Mapping(target = "warehouseId", source = "entity.warehouse.id"),
+        @Mapping(target = "warehouseName", source = "entity.warehouse.name"),
         @Mapping(target = "batchId", source = "entity.batch.id"),
         @Mapping(target = "expiryDate", source = "entity.batch.expiryDate"),
         @Mapping(target = "lowStockAlert", source = "lowStockAlert")
@@ -68,7 +70,10 @@ public interface StockMovementMapper {
                 null,      // batchId
                 null,      // expiryDate
                 null,      // createdAt
-                false      // lowStockAlert
+                false,     // lowStockAlert
+                null,      // warehouseId
+                null,      // warehouseName
+                null       // transferId
         );
     }
 }

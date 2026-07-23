@@ -25,17 +25,17 @@ public class StockServiceImpl implements StockService {
         // Используем findByItemIdForUpdate для предотвращения race condition
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
-        
+
         // Используем increaseQuantity() для атомарного обновления
         // Stock.quantity = SUM of batch quantities (БЕЗ резерваций)
         int updatedRows = stockRepository.increaseQuantity(itemId, quantity);
         if (updatedRows == 0) {
             throw EntityNotFoundException.forId("Stock", itemId);
         }
-        
+
         int newQuantity = stockRepository.findQuantityByItemId(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
-        
+
         log.info("Stock receipt completed: itemId={}, quantity={}, new stock={}", itemId, quantity, newQuantity);
         return newQuantity;
     }
@@ -46,7 +46,7 @@ public class StockServiceImpl implements StockService {
 
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock by item", itemId));
-        
+
         // Проверяем доступный остаток (без резерваций)
         int available = availabilityService.getAvailable(itemId);
         if (available < quantity) {

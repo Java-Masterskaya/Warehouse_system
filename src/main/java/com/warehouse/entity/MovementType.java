@@ -14,5 +14,11 @@ public enum MovementType {
     ADJUSTMENT,
 
     /** Списание просроченных партий. */
-    EXPIRED
+    EXPIRED,
+
+    /** Перевод товара со склада-источника. */
+    TRANSFER_OUT,
+
+    /** Перевод товара на склад-получатель. */
+    TRANSFER_IN
 }
