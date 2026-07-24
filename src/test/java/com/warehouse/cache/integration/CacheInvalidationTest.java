@@ -10,6 +10,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,9 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     private StockMovementRepository stockMovementRepository;
 
     @Autowired
+    private StockReserveRepository reserveRepository;
+
+    @Autowired
     private ItemService itemService;
 
     @Autowired
@@ -53,6 +57,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         // Очищаем данные в правильном порядке из-за внешних ключей:
         // stock_alerts -> stock -> items
         stockAlertRepository.deleteAllInBatch();
+        reserveRepository.deleteAll();
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
@@ -69,6 +74,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(10);
         stockRepository.save(stock);
 
@@ -87,8 +93,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         itemService.updateItem(itemId, updateRequest);
 
         ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.name()).isEqualTo("Ноутбук Pro");
-        assertThat(response.minStock()).isEqualTo(10);
+        assertThat(response.getName()).isEqualTo("Ноутбук Pro");
+        assertThat(response.getMinStock()).isEqualTo(10);
     }
 
     /**
@@ -97,7 +103,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void softDeleteItemShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.active()).isTrue();
+        assertThat(firstCall.isActive()).isTrue();
 
         itemService.softDeleteItem(itemId);
 
@@ -114,14 +120,14 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void receiveMovementShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.currentStock()).isEqualTo(10);
+        assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
         ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5);
         stockMovementService.registerReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
         ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.currentStock()).isEqualTo(15);
+        assertThat(response.getCurrentStock()).isEqualTo(15);
     }
 
     /**
@@ -130,14 +136,14 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void writeOffMovementShouldEvictItemCache() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.currentStock()).isEqualTo(10);
+        assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
         ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 3);
         stockMovementService.writeOffReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
         ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.currentStock()).isEqualTo(7);
+        assertThat(response.getCurrentStock()).isEqualTo(7);
     }
 
     /**

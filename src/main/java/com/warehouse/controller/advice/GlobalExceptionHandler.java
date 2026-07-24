@@ -51,6 +51,13 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("INSUFFICIENT_STOCK", ex.getMessage());
     }
 
+    @ExceptionHandler(PurchaseOrderOverReceiptException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    public ErrorResponse handlePurchaseOrderOverReceipt(
+            PurchaseOrderOverReceiptException ex) {
+        return new ErrorResponse("PURCHASE_ORDER_OVER_RECEIPT", ex.getMessage());
+    }
+
     @ExceptionHandler(DuplicateSkuException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDuplicateSku(DuplicateSkuException ex) {
@@ -75,10 +82,29 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("DUPLICATE_USERNAME", message);
     }
 
+    @ExceptionHandler(DuplicateWarehouseNameException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDuplicateWarehouseName(DuplicateWarehouseNameException ex) {
+        return new ErrorResponse("DUPLICATE_WAREHOUSE_NAME", ex.getMessage());
+    }
+
     @ExceptionHandler(LastAdminDeactivationException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleLastAdminDeactivation(LastAdminDeactivationException ex) {
         return new ErrorResponse("LAST_ADMIN", ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPurchaseOrderStatusException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleInvalidPurchaseOrderStatus(
+            InvalidPurchaseOrderStatusException ex) {
+        return new ErrorResponse("INVALID_PURCHASE_ORDER_STATUS", ex.getMessage());
+    }
+
+    @ExceptionHandler(StocktakeConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleStocktakeConflict(StocktakeConflictException ex) {
+        return new ErrorResponse("INVENTORY_RESULT_LESS_THAN_RESERVED", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -97,6 +123,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("SELF_DEACTIVATION", ex.getMessage());
     }
 
+    @ExceptionHandler(ReservationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleUnexpectedReservationStatus(ReservationException ex) {
+        return new ErrorResponse("UNEXPECTED_RESERVATION_STATUS", ex.getMessage());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleAccessDenied(AccessDeniedException ex) {
@@ -107,6 +139,20 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleAuthentication(AuthenticationException ex) {
         return new ErrorResponse("UNAUTHORIZED", "Authentication failed");
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleInvalidTokenException(InvalidTokenException ex) {
+        log.warn("Invalid token: {}", ex.getMessage());
+        return new ErrorResponse("INVALID_TOKEN", ex.getMessage());
+    }
+
+    @ExceptionHandler(TokenReuseException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleTokenReuseException(TokenReuseException ex) {
+        log.warn("Token reuse detected: {}", ex.getMessage());
+        return new ErrorResponse("TOKEN_REUSE", ex.getMessage());
     }
 
     @ExceptionHandler(InvalidMovementRequestException.class)
