@@ -8,7 +8,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
@@ -54,6 +57,8 @@ public class BackfillAdminController {
 
     /**
      * Мягко запросить остановку работающей джобы после текущего батча.
+     *
+     * @return подтверждение запроса остановки
      */
     @Operation(summary = "Остановить backfill штрихкодов")
     @PostMapping("/barcode/stop")

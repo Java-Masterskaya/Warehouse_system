@@ -43,6 +43,11 @@ public class ItemBarcodeBackfillJob {
      */
     public static final int DEFAULT_BATCH_SIZE = 500;
 
+    /**
+     * Интервал логирования прогресса (в итерациях).
+     */
+    private static final int LOG_INTERVAL = 10;
+
     private final ItemRepository itemRepository;
     private final AtomicBoolean stopped = new AtomicBoolean(false);
 
@@ -87,13 +92,18 @@ public class ItemBarcodeBackfillJob {
             // Следующая итерация начинается после максимального id в текущем батче
             lastId = batch.get(batch.size() - 1).getId();
 
-            if (iterations % 10 == 0) {
+            if (iterations % LOG_INTERVAL == 0) {
                 log.info("Прогресс backfill: {} строк обработано, lastId={}", totalProcessed.get(), lastId);
             }
         }
 
         boolean hasRemainingNulls = itemRepository.existsByBarcodeIsNull();
-        Status status = hasRemainingNulls ? Status.PARTIAL : Status.COMPLETE;
+        Status status;
+        if (hasRemainingNulls) {
+            status = Status.PARTIAL;
+        } else {
+            status = Status.COMPLETE;
+        }
 
         if (stopped.get() && hasRemainingNulls) {
             status = Status.STOPPED;
@@ -107,6 +117,8 @@ public class ItemBarcodeBackfillJob {
 
     /**
      * Перегрузка с размером батча по умолчанию.
+     *
+     * @return сводка по выполнению
      */
     public Result run() {
         return run(DEFAULT_BATCH_SIZE);
@@ -118,6 +130,10 @@ public class ItemBarcodeBackfillJob {
      * Не аннотирован @Transactional, т.к. вызывается из {@link #run}
      * (самовызов внутри бина обходит Spring-прокси). Нижележащий
      * Spring Data репозиторий сам управляет границами транзакций для чтения.
+     *
+     * @param lastProcessedId id последнего обработанного товара
+     * @param batchSize       размер батча
+     * @return список товаров без barcode
      */
     public List<Item> fetchNextBatch(long lastProcessedId, int batchSize) {
         Pageable pageable = PageRequest.of(0, batchSize);
@@ -138,6 +154,9 @@ public class ItemBarcodeBackfillJob {
     /**
      * Детерминированная генерация barcode. Использование id гарантирует
      * уникальность и делает операцию идемпотентной (один вход → один выход).
+     *
+     * @param item товар
+     * @return сгенерированный barcode
      */
     private String generateBarcode(Item item) {
         return String.format("ITEM-%010d", item.getId());
