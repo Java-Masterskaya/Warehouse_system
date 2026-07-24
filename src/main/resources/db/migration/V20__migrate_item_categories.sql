@@ -1,13 +1,17 @@
 CREATE TABLE categories
 (
     id   BIGSERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE
+    name VARCHAR(100) NOT NULL
 );
+
+CREATE UNIQUE INDEX idx_categories_name_lower
+    ON categories (LOWER(name));
 
 -- Переносим существующие категории
 INSERT INTO categories (name)
-SELECT DISTINCT category
-FROM items;
+SELECT MIN(category)
+FROM items
+GROUP BY LOWER(category);
 
 -- Добавляем новую колонку
 ALTER TABLE items
@@ -17,7 +21,7 @@ ALTER TABLE items
 UPDATE items i
 SET category_id = c.id
 FROM categories c
-WHERE c.name = i.category;
+WHERE LOWER(c.name) = LOWER(i.category);
 
 -- Делаем колонку обязательной
 ALTER TABLE items
