@@ -59,7 +59,7 @@
 
 ## Пример: добавление колонки `items.barcode`
 
-### Шаг 1 — миграция `V19__add_items_barcode_nullable.sql`
+### Шаг 1 — миграция `V20__add_items_barcode_nullable.sql`
 
 ```sql
 ALTER TABLE items ADD COLUMN barcode VARCHAR(255);
@@ -89,7 +89,7 @@ curl -X POST http://app/admin/backfill/barcode?batchSize=500
 
 Контролируем прогресс по логам. Джоба идемпотентна — можно перезапустить.
 
-### Шаг 3 — миграция `V21__set_items_barcode_not_null.sql`
+### Шаг 3 — миграция `V22__set_items_barcode_not_null.sql`
 
 Перед деплоем проверяем:
 
@@ -114,7 +114,7 @@ ALTER TABLE items ALTER COLUMN barcode SET NOT NULL;
 [Старый код] ------+------+------+------+------+ [Новый код]
                     \     |      |      /
                      \    |      |     /
-[V19] - - - - - - - +----+------+----+ - - - -  (колонка nullable)
+[V20] - - - - - - - +----+------+----+ - - - -  (колонка nullable)
                       \   |      |   /
                        \  |      |  /
 [Backfill] - - - - - - - +------+- - - - - - - -  (заполняем NULL)
@@ -123,8 +123,8 @@ ALTER TABLE items ALTER COLUMN barcode SET NOT NULL;
 [V21] - - - - - - - - - - + - - - - - - - - - -  (NOT NULL)
 ```
 
-- В промежутке между V19 и V21 старый и новый код работают одновременно.
-- V19 безопасна, потому что не ломает старый INSERT.
+- В промежутке между V20 и V21 старый и новый код работают одновременно.
+- V20 безопасна, потому что не ломает старый INSERT.
 - V21 деплоится только когда все инстансы уже новые.
 
 ---

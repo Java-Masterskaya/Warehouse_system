@@ -10,6 +10,7 @@ import com.warehouse.dto.response.item.WarehouseStockResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.Warehouse;
+import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
@@ -58,12 +59,22 @@ public class ItemServiceImpl implements ItemService {
         Item item = itemMapper.toEntity(request);
         item.setPrice(confirmPrice(request.price()));
         item.setCost(confirmCost(request.cost()));
+
+        // Проверка уникальности пользовательского barcode (OPS-5)
+        if (request.barcode() != null && !request.barcode().isBlank()) {
+            if (itemRepository.existsByBarcode(request.barcode())) {
+                log.warn("Duplicate barcode '{}' — item already exists", request.barcode());
+                throw DuplicateBarcodeException.forBarcode(request.barcode());
+            }
+            item.setBarcode(request.barcode());
+        }
+
         itemRepository.save(item);
 
         Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
                 .orElseThrow(() -> new IllegalStateException("Default warehouse is not configured"));
 
-        // генерируем штрихкод на основе id, если не задан в запросе
+        // Генерируем штрихкод на основе id, если не задан в запросе
         if (item.getBarcode() == null || item.getBarcode().isBlank()) {
             item.setBarcode(String.format("ITEM-%010d", item.getId()));
             itemRepository.save(item);
@@ -104,7 +115,16 @@ public class ItemServiceImpl implements ItemService {
         item.setMinStock(request.minStock());
         item.setPrice(confirmPrice(request.price()));
         item.setCost(confirmCost(request.cost()));
-        item.setBarcode(request.barcode());
+
+        // Проверка уникальности barcode при обновлении (OPS-5)
+        if (request.barcode() != null && !request.barcode().isBlank()
+                && !request.barcode().equals(item.getBarcode())) {
+            if (itemRepository.existsByBarcode(request.barcode())) {
+                log.warn("Duplicate barcode '{}' — cannot update item id={}", request.barcode(), itemId);
+                throw DuplicateBarcodeException.forBarcode(request.barcode());
+            }
+            item.setBarcode(request.barcode());
+        }
 
         Item savedItem = itemRepository.save(item);
         log.info("Item updated: id={}, SKU='{}'", savedItem.getId(), savedItem.getSku());

@@ -9,6 +9,7 @@ import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.Warehouse;
+import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
@@ -145,6 +146,54 @@ class ItemServiceImplTest {
 
         verify(itemRepository, never()).save(any());
         verify(stockRepository, never()).save(any());
+    }
+
+    /**
+     * Попытка создать товар с дублирующимся barcode выбрасывает DuplicateBarcodeException.
+     */
+    @Test
+    void createItemDuplicateBarcodeThrowsDuplicateBarcodeException() {
+        CreateItemRequest request = new CreateItemRequest("SKU-BAR-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), "EXIST-BARCODE");
+
+        when(itemRepository.existsBySku("SKU-BAR-001")).thenReturn(false);
+        when(itemRepository.existsByBarcode("EXIST-BARCODE")).thenReturn(true);
+
+        assertThatThrownBy(() -> itemService.createItem(request))
+                .isInstanceOf(DuplicateBarcodeException.class)
+                .hasMessageContaining("EXIST-BARCODE");
+
+        verify(itemRepository, never()).save(any());
+        verify(stockRepository, never()).save(any());
+    }
+
+    /**
+     * Попытка обновить товар на дублирующийся barcode выбрасывает DuplicateBarcodeException.
+     */
+    @Test
+    void updateItemDuplicateBarcodeThrowsDuplicateBarcodeException() {
+        Long itemId = 3L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory("Категория");
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+        existingItem.setBarcode("OLD-BARCODE");
+
+        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00), "EXIST-BARCODE");
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(itemRepository.existsByBarcode("EXIST-BARCODE")).thenReturn(true);
+
+        assertThatThrownBy(() -> itemService.updateItem(itemId, request))
+                .isInstanceOf(DuplicateBarcodeException.class)
+                .hasMessageContaining("EXIST-BARCODE");
+
+        verify(itemRepository, never()).save(any());
     }
 
     /**

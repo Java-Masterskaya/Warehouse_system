@@ -22,6 +22,8 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
 
     Optional<Item> findBySku(String sku);
 
+    boolean existsByBarcode(String barcode);
+
     @Query("""
             SELECT DISTINCT i.category
             FROM Item i
@@ -108,10 +110,6 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
             """)
     List<CategoryValuation> calculateValuationByCategory();
 
-    // -------------------------------------------------------------------------
-    // OPS-5: поддержка barcode backfill
-    // -------------------------------------------------------------------------
-
     /**
      * Найти товары с NULL barcode, отсортированные по id для стабильной пагинации.
      * Используется батчевой backfill-джобой.
@@ -128,7 +126,6 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
 
     /**
      * Быстро проверить, остались ли ещё NULL barcode.
-     * Вызвать перед деплоем миграции V21.
      *
      * @return true, если хотя бы одна строка всё ещё имеет NULL barcode
      */

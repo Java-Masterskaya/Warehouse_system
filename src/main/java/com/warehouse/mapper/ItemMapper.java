@@ -33,7 +33,6 @@ public interface ItemMapper {
     @Mapping(target = "available", source = "available")
     @Mapping(target = "reserved", source = "reserved")
     @Mapping(target = "warehouseStocks", source = "warehouseStocks")
-    @Mapping(target = "barcode", source = "projection.barcode")
     ItemDetailsResponse mapProjectionToDetailsResponse(
             ItemDetailsProjection projection,
             long available,

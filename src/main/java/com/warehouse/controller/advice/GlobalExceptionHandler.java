@@ -3,6 +3,7 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
+import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.DuplicateWarehouseNameException;
@@ -60,6 +61,18 @@ public class GlobalExceptionHandler {
     public ErrorResponse handlePurchaseOrderOverReceipt(
             PurchaseOrderOverReceiptException ex) {
         return new ErrorResponse("PURCHASE_ORDER_OVER_RECEIPT", ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateBarcodeException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDuplicateBarcode(DuplicateBarcodeException ex) {
+        String message;
+        if (isAdmin()) {
+            message = ex.getMessage();
+        } else {
+            message = "Barcode already exists";
+        }
+        return new ErrorResponse("DUPLICATE_BARCODE", message);
     }
 
     @ExceptionHandler(DuplicateSkuException.class)
