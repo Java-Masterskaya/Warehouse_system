@@ -56,6 +56,12 @@ public class ItemServiceImpl implements ItemService {
         item.setCost(confirmCost(request.cost()));
         itemRepository.save(item);
 
+        // генерируем штрихкод на основе id, если не задан в запросе
+        if (item.getBarcode() == null || item.getBarcode().isBlank()) {
+            item.setBarcode(String.format("ITEM-%010d", item.getId()));
+            itemRepository.save(item);
+        }
+
         Stock stock = new Stock();
         stock.setItem(item);
         stock.setQuantity(0);
@@ -90,6 +96,7 @@ public class ItemServiceImpl implements ItemService {
         item.setMinStock(request.minStock());
         item.setPrice(confirmPrice(request.price()));
         item.setCost(confirmCost(request.cost()));
+        item.setBarcode(request.barcode());
 
         Item savedItem = itemRepository.save(item);
         log.info("Item updated: id={}, SKU='{}'", savedItem.getId(), savedItem.getSku());

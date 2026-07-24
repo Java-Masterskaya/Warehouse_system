@@ -23,6 +23,7 @@ public class ItemDetailsResponse {
     @JsonProperty("isActive") boolean active;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
+    String barcode;
     int available;
     int reserved;
 }

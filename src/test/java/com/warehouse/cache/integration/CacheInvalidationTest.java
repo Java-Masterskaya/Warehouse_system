@@ -84,7 +84,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         itemService.getItem(itemId);
 
         UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук Pro", "Электроника",
-                10, BigDecimal.valueOf(1700.00), BigDecimal.valueOf(1100.00));
+                10, BigDecimal.valueOf(1700.00), BigDecimal.valueOf(1100.00), null);
         itemService.updateItem(itemId, updateRequest);
 
         ItemDetailsResponse response = itemService.getItem(itemId);
@@ -151,7 +151,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
         com.warehouse.dto.request.item.CreateItemRequest createRequest =
                 new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель",
-                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00));
+                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00), null);
         itemService.createItem(createRequest);
 
         List<String> secondCall = itemService.getCategories();
@@ -165,14 +165,14 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     void updateItemWithCategoryChangeShouldEvictCategoriesCache() {
         com.warehouse.dto.request.item.CreateItemRequest createRequest =
                 new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель",
-                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00));
+                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00), null);
         itemService.createItem(createRequest);
 
         List<String> firstCall = itemService.getCategories();
         assertThat(firstCall).contains("Электроника", "Мебель");
 
         UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук", "Мебель", 5,
-                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00));
+                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00), null);
         itemService.updateItem(itemId, updateRequest);
 
         List<String> secondCall = itemService.getCategories();

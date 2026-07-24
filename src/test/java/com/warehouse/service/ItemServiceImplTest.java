@@ -83,7 +83,7 @@ class ItemServiceImplTest {
     @Test
     void createItemSuccess() {
         CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
-                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), null);
 
         Item item = new Item();
         item.setId(1L);
@@ -111,7 +111,7 @@ class ItemServiceImplTest {
         assertThat(result.minStock()).isEqualTo(5);
         assertThat(result.active()).isTrue();
         assertThat(result.createdAt()).isNotNull();
-        verify(itemRepository).save(any(Item.class));
+        verify(itemRepository, times(2)).save(any(Item.class)); // 2 saves: item + barcode update
         verify(stockRepository).save(any(Stock.class));
     }
 
@@ -121,7 +121,7 @@ class ItemServiceImplTest {
     @Test
     void createItemDuplicateSkuThrowsDuplicateSkuException() {
         CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
-                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), null);
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(true);
 
@@ -149,7 +149,7 @@ class ItemServiceImplTest {
         existingItem.setCost(BigDecimal.valueOf(75.25));
 
         UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
-                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(itemRepository.save(any(Item.class)))
@@ -184,7 +184,7 @@ class ItemServiceImplTest {
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
         UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория",
-                10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+                10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(itemRepository.save(any(Item.class)))
@@ -215,7 +215,7 @@ class ItemServiceImplTest {
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
         UpdateItemRequest request = new UpdateItemRequest("Товар с нулевой ценой",
-                "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+                "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO, null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(itemRepository.save(any(Item.class)))
@@ -244,7 +244,7 @@ class ItemServiceImplTest {
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
         UpdateItemRequest request = new UpdateItemRequest("Товар", "Категория",
-                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(itemRepository.save(any(Item.class)))
@@ -264,7 +264,7 @@ class ItemServiceImplTest {
     void updateItemItemNotFoundThrowsException() {
         Long itemId = 3L;
         UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
-                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
@@ -289,7 +289,7 @@ class ItemServiceImplTest {
         inactiveItem.setCost(BigDecimal.valueOf(30.00));
 
         UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
-                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
@@ -367,7 +367,8 @@ class ItemServiceImplTest {
         ItemDetailsProjection projection = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
-                true, LocalDateTime.now(), LocalDateTime.now()
+                true, LocalDateTime.now(), LocalDateTime.now(),
+                null
         );
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(projection));
@@ -418,7 +419,8 @@ class ItemServiceImplTest {
         ItemDetailsProjection response = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
-                false, LocalDateTime.now(), LocalDateTime.now()
+                false, LocalDateTime.now(), LocalDateTime.now(),
+                null
         );
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(response));
@@ -554,7 +556,8 @@ class ItemServiceImplTest {
         ItemDetailsProjection response = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.99), BigDecimal.valueOf(1000.49),
-                true, LocalDateTime.now(), LocalDateTime.now()
+                true, LocalDateTime.now(), LocalDateTime.now(),
+                null
         );
 
         assertThat(response.price()).isEqualTo(BigDecimal.valueOf(1500.99));

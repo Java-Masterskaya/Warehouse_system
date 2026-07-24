@@ -83,6 +83,12 @@ public class Item {
     @Column(columnDefinition = "DECIMAL(19,2)")
     private BigDecimal cost;
 
+    /**
+     * Штрихкод товара.
+     */
+    @Column(length = 255)
+    private String barcode;
+
     @PrePersist
     private void prePersist() {
         createdAt = LocalDateTime.now();

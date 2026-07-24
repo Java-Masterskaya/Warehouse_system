@@ -4,6 +4,7 @@ import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.valuation.CategoryValuation;
 import com.warehouse.entity.Item;
 import com.warehouse.repository.projection.LowStockProjection;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -40,7 +41,8 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 i.cost,
                 i.active,
                 i.createdAt,
-                i.updatedAt
+                i.updatedAt,
+                i.barcode
             )
             FROM Item i
             JOIN Stock s on s.item.id = i.id
@@ -101,5 +103,31 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
             ORDER BY i.category
             """)
     List<CategoryValuation> calculateValuationByCategory();
-}
 
+    // -------------------------------------------------------------------------
+    // OPS-5: поддержка barcode backfill
+    // -------------------------------------------------------------------------
+
+    /**
+     * Найти товары с NULL barcode, отсортированные по id для стабильной пагинации.
+     * Используется батчевой backfill-джобой.
+     *
+     * @param lastProcessedId id последнего обработанного товара (не включая)
+     * @param pageable        пагинация, определяющая размер батча
+     * @return список товаров, требующих backfill
+     */
+    @Query("SELECT i FROM Item i WHERE i.barcode IS NULL AND i.id > :lastId ORDER BY i.id ASC")
+    List<Item> findByBarcodeIsNullAndIdGreaterThanOrderByIdAsc(
+            @Param("lastId") Long lastProcessedId,
+            Pageable pageable
+    );
+
+    /**
+     * Быстро проверить, остались ли ещё NULL barcode.
+     * Вызвать перед деплоем миграции V21.
+     *
+     * @return true, если хотя бы одна строка всё ещё имеет NULL barcode
+     */
+    @Query(value = "SELECT EXISTS(SELECT 1 FROM items WHERE barcode IS NULL)", nativeQuery = true)
+    boolean existsByBarcodeIsNull();
+}

@@ -16,5 +16,6 @@ public record ItemDetailsProjection(
         BigDecimal cost,
         @JsonProperty("isActive") boolean active,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String barcode
 ) {}

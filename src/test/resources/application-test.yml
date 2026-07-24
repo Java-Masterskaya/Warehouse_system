@@ -4,6 +4,7 @@ spring:
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
   flyway:
     enabled: true
+    target: 20
   jpa:
     hibernate:
       ddl-auto: validate
