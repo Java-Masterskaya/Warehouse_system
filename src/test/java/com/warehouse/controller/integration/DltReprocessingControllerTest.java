@@ -147,6 +147,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         Stock stock = Stock.builder()
                 .item(testItem)
+                .warehouse(defaultWarehouse())
                 .quantity(5)
                 .build();
         stockRepository.save(stock);

@@ -197,6 +197,7 @@ class StockServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
     private Stock createStock(Item item, int quantity) {
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(quantity);
 
         return stockRepository.saveAndFlush(stock);

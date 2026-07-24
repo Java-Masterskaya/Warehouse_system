@@ -37,7 +37,7 @@ public class StockServiceImpl implements StockService {
 
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock by item", itemId));
-        int available = availabilityService.getAvailable(itemId);
+        int available = availabilityService.getAvailable(stock);
         if (available < quantity) {
             log.warn("Can not write-off {} because available {}", quantity, available);
             throw InsufficientStockException.of(itemId, quantity, available);
@@ -45,7 +45,7 @@ public class StockServiceImpl implements StockService {
 
         int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, quantity);
         if (updatedRows == 0) {
-            int current = stockRepository.findQuantityByItemId(itemId).orElseThrow(() -> stockNotFound(itemId));
+            int current = availabilityService.getAvailable(stock);
             log.warn("Insufficient stock for itemId={}: requested {}, available {}", itemId, quantity, current);
             throw InsufficientStockException.of(itemId, quantity, current);
         }

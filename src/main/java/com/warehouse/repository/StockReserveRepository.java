@@ -6,6 +6,7 @@ import com.warehouse.entity.Stock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 
@@ -19,6 +20,19 @@ public interface StockReserveRepository extends JpaRepository<Reservation, Long>
                 and r.expiredAt > :now
             """)
     Integer findActiveReserveSumByStock(Stock stock, ReservationStatus status, LocalDateTime now);
+
+    @Query("""
+                select coalesce(sum(r.quantity), 0)
+                from Reservation r
+                where r.stock.item.id = :itemId
+                and r.status = :status
+                and r.expiredAt > :now
+            """)
+    Long findActiveReserveSumByItemId(
+            @Param("itemId") Long itemId,
+            @Param("status") ReservationStatus status,
+            @Param("now") LocalDateTime now
+    );
 
     @Modifying(clearAutomatically = true)
     @Query("""

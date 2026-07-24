@@ -11,7 +11,7 @@ public record ItemDetailsProjection(
         String name,
         String category,
         int minStock,
-        int currentStock,
+        long currentStock,
         BigDecimal price,
         BigDecimal cost,
         @JsonProperty("isActive") boolean active,
