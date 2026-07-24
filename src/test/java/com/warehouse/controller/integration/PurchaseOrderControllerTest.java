@@ -101,7 +101,7 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                 .build();
         supplier = supplierRepository.save(supplier);
 
-        category = categoryRepository.findByName("Test")
+        category = categoryRepository.findByNameIgnoreCase("Test")
                 .orElseGet(() -> categoryRepository.save(
                         Category.builder()
                                 .name("Test")

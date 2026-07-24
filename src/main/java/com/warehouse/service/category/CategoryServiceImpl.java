@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,18 +36,25 @@ public class CategoryServiceImpl implements CategoryService {
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         log.debug("Creating category with name='{}'", request.name());
 
-        if (categoryRepository.existsByName(request.name())) {
-            log.warn("Category with name='{}' already exists", request.name());
-            throw DuplicateCategoryException.forName(request.name());
+        String name = request.name().trim();
+        if (categoryRepository.existsByNameIgnoreCase(name)) {
+            log.warn("Category with name='{}' already exists", name);
+            throw DuplicateCategoryException.forName(name);
         }
 
         Category category = categoryMapper.toEntity(request);
-        Category savedCategory = categoryRepository.save(category);
+        category.setName(name);
+        try {
+            Category savedCategory = categoryRepository.saveAndFlush(category);
 
-        log.info("Category created: id={}, name='{}'",
-                savedCategory.getId(), savedCategory.getName());
+            log.info("Category created: id={}, name='{}'",
+                    savedCategory.getId(), savedCategory.getName());
 
-        return categoryMapper.toResponse(savedCategory);
+            return categoryMapper.toResponse(savedCategory);
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("Category with name='{}' already exists", name, ex);
+            throw DuplicateCategoryException.forName(name);
+        }
     }
 
     @Override
@@ -77,7 +86,10 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "categories", allEntries = true)
+    @Caching(evict = {
+        @CacheEvict(value = "categories", allEntries = true),
+        @CacheEvict(value = "item", allEntries = true)
+    })
     public CategoryResponse updateCategory(
             Long categoryId,
             UpdateCategoryRequest request) {
@@ -86,21 +98,28 @@ public class CategoryServiceImpl implements CategoryService {
 
         Category category = findCategory(categoryId);
 
-        if (categoryRepository.existsByNameAndIdNot(
-                request.name(), categoryId)) {
+        String name = request.name().trim();
 
-            log.warn("Category with name='{}' already exists", request.name());
-            throw DuplicateCategoryException.forName(request.name());
+        if (categoryRepository.existsByNameIgnoreCaseAndIdNot(
+                name, categoryId)) {
+
+            log.warn("Category with name='{}' already exists", name);
+            throw DuplicateCategoryException.forName(name);
         }
 
-        categoryMapper.updateEntity(request, category);
+        category.setName(name);
 
-        Category savedCategory = categoryRepository.save(category);
+        try {
+            Category savedCategory = categoryRepository.saveAndFlush(category);
 
-        log.info("Category updated: id={}, name='{}'",
-                savedCategory.getId(), savedCategory.getName());
+            log.info("Category updated: id={}, name='{}'",
+                    savedCategory.getId(), savedCategory.getName());
 
-        return categoryMapper.toResponse(savedCategory);
+            return categoryMapper.toResponse(savedCategory);
+        } catch (DataIntegrityViolationException ex) {
+            log.warn("Category with name='{}' already exists", name, ex);
+            throw DuplicateCategoryException.forName(name);
+        }
     }
 
     @Override

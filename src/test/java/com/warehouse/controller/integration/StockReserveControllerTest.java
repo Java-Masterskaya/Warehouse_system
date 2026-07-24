@@ -69,7 +69,7 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
 
-        category = categoryRepository.findByName("test")
+        category = categoryRepository.findByNameIgnoreCase("test")
                 .orElseGet(() -> categoryRepository.save(
                         Category.builder()
                                 .name("test")

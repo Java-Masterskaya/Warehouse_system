@@ -189,7 +189,7 @@ class StockServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Item createItem() {
-        Category category = categoryRepository.findByName("Test")
+        Category category = categoryRepository.findByNameIgnoreCase("Test")
                 .orElseGet(() -> categoryRepository.save(
                         Category.builder()
                                 .name("Test")

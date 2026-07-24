@@ -104,7 +104,7 @@ class ItemServiceImplTest {
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(false);
 
-        when(categoryRepository.findByName("Электроника"))
+        when(categoryRepository.findByNameIgnoreCase("Электроника"))
                 .thenReturn(Optional.of(category));
         when(warehouseRepository.findByDefaultWarehouseTrue()).thenReturn(Optional.of(
                 Warehouse.builder().id(1L).name("Default Warehouse").defaultWarehouse(true).build()
@@ -129,7 +129,7 @@ class ItemServiceImplTest {
         assertThat(result.createdAt()).isNotNull();
         verify(itemRepository).save(any(Item.class));
         verify(stockRepository).save(any(Stock.class));
-        verify(categoryRepository).findByName("Электроника");
+        verify(categoryRepository).findByNameIgnoreCase("Электроника");
     }
 
     /**
@@ -169,7 +169,7 @@ class ItemServiceImplTest {
                 10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(categoryRepository.findByName("Новая категория"))
+        when(categoryRepository.findByNameIgnoreCase("Новая категория"))
                 .thenReturn(Optional.of(createCategory("Новая категория")));
         when(itemRepository.save(any(Item.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -206,7 +206,7 @@ class ItemServiceImplTest {
                 10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(categoryRepository.findByName("Обновленная категория"))
+        when(categoryRepository.findByNameIgnoreCase("Обновленная категория"))
                 .thenReturn(Optional.of(createCategory("Обновленная категория")));
         when(itemRepository.save(any(Item.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -239,7 +239,7 @@ class ItemServiceImplTest {
                 "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(categoryRepository.findByName("Категория"))
+        when(categoryRepository.findByNameIgnoreCase("Категория"))
                 .thenReturn(Optional.of(createCategory("Категория")));
         when(itemRepository.save(any(Item.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -270,7 +270,7 @@ class ItemServiceImplTest {
                 5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
-        when(categoryRepository.findByName("Категория"))
+        when(categoryRepository.findByNameIgnoreCase("Категория"))
                 .thenReturn(Optional.of(createCategory("Категория")));
         when(itemRepository.save(any(Item.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));

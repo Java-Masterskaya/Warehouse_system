@@ -677,7 +677,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     }
 
     private void createCategoryIfAbsent(String name) {
-        if (!categoryRepository.existsByName(name)) {
+        if (!categoryRepository.existsByNameIgnoreCase(name)) {
             categoryRepository.save(
                     Category.builder()
                             .name(name)

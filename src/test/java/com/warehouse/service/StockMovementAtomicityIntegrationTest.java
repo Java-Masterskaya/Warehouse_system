@@ -70,7 +70,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         // Очищаем outbox перед каждым тестом
         outboxEventRepository.deleteAll();
 
-        Category category = categoryRepository.findByName("Категория")
+        Category category = categoryRepository.findByNameIgnoreCase("Категория")
                 .orElseGet(() -> categoryRepository.save(
                         Category.builder()
                                 .name("Категория")

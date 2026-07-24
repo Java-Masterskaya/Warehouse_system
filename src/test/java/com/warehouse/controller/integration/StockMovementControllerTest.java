@@ -70,7 +70,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         String uniqueSku = "SKU-MOV-" + System.currentTimeMillis();
-        testCategory = categoryRepository.findByName("Категория")
+        testCategory = categoryRepository.findByNameIgnoreCase("Категория")
                 .orElseGet(() -> categoryRepository.save(
                         Category.builder()
                                 .name("Категория")

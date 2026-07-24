@@ -198,9 +198,10 @@ public class ItemServiceImpl implements ItemService {
     }
 
     private Category getCategory(String categoryName) {
-        return categoryRepository.findByName(categoryName)
+        String name = categoryName.trim();
+        return categoryRepository.findByNameIgnoreCase(name)
                 .orElseThrow(() ->
-                        new EntityNotFoundException("Категория не найдена"));
+                        new EntityNotFoundException("Категория " + name + " не найдена"));
     }
 
     private WarehouseStockResponse toWarehouseStockResponse(Stock stock) {

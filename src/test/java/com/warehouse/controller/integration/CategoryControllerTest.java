@@ -108,7 +108,7 @@ class CategoryControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.name").value(categoryName));
 
-        assertThat(categoryRepository.existsByName(categoryName)).isTrue();
+        assertThat(categoryRepository.existsByNameIgnoreCase(categoryName)).isTrue();
     }
 
     /**
