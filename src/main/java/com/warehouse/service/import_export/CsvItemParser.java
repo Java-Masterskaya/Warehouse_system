@@ -32,12 +32,10 @@ public class CsvItemParser {
         Set<String> seenSkusInFile = new HashSet<>();
 
         CSVFormat format =
-                CSVFormat.DEFAULT.builder().setHeader("SKU", "Name", "Category", "Quantity", "Price", "Cost")
+                CSVFormat.DEFAULT.builder().setHeader("SKU", "Name", "Category", "Price", "Cost")
                                  .setSkipHeaderRecord(true).setIgnoreSurroundingSpaces(true).setTrim(true)
-                                 .setIgnoreHeaderCase(true) // Игнорируем регистр заголовков (sku == SKU)
-                                 .build();
+                                 .setIgnoreHeaderCase(true).build();
 
-        // BOMInputStream срезает невидимую метку \uFEFF в начале UTF-8 файлов из Excel
         try (BOMInputStream bomStream = new BOMInputStream(inputStream);
              InputStreamReader reader = new InputStreamReader(bomStream, StandardCharsets.UTF_8);
              CSVParser csvParser = new CSVParser(reader, format)) {
@@ -45,7 +43,6 @@ public class CsvItemParser {
             int totalRows = 0;
 
             for (CSVRecord record : csvParser) {
-                // record.getRecordNumber() корректно считает номер записи без заголовка
                 int fileRowNumber = (int) record.getRecordNumber() + 1;
                 totalRows++;
 
@@ -54,14 +51,12 @@ public class CsvItemParser {
                 try {
                     ItemImportRowDto dto = mapRecordToDto(record);
 
-                    // 1. Проверяем дубликаты SKU прямо внутри файла
                     if (dto.sku() != null && !seenSkusInFile.add(dto.sku())) {
                         errors.add(new ItemImportErrorDto(fileRowNumber, dto.sku(),
                                 "Дубликат SKU '" + dto.sku() + "' внутри импортируемого файла"));
                         continue;
                     }
 
-                    // 2. Bean Validation (@NotBlank, @Positive)
                     Set<ConstraintViolation<ItemImportRowDto>> violations = validator.validate(dto);
 
                     if (!violations.isEmpty()) {
@@ -87,7 +82,7 @@ public class CsvItemParser {
 
     private ItemImportRowDto mapRecordToDto(CSVRecord record) {
         return new ItemImportRowDto(record.get("SKU"), record.get("Name"), record.get("Category"),
-                parseInteger(record.get("Quantity")), parseBigDecimal(record.get("Price")),
+                parseBigDecimal(record.get("Price")),
                 parseBigDecimal(record.get("Cost")));
     }
 
