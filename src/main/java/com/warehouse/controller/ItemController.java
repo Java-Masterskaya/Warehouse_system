@@ -3,9 +3,11 @@ package com.warehouse.controller;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.service.import_export.CsvExportService;
+import com.warehouse.service.import_export.CsvImportService;
 import com.warehouse.service.item.ItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -16,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -31,6 +34,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.io.OutputStreamWriter;
@@ -48,6 +52,7 @@ public class ItemController {
 
     private final ItemService itemService;
     private final CsvExportService csvExportService;
+    private final CsvImportService csvImportService;
 
     @Operation(summary = "Список товаров", description = "Постраничный список с фильтрацией и сортировкой")
     @GetMapping
@@ -120,15 +125,12 @@ public class ItemController {
     public ResponseEntity<StreamingResponseBody> exportItems(Authentication authentication) {
         SecurityContext context = SecurityContextHolder.getContext();
         StreamingResponseBody responseBody = outputStream -> {
-            // 1. Устанавливаем контекст
             SecurityContextHolder.setContext(context);
             try (OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
                 csvExportService.exportItems(writer);
             } catch (UncheckedIOException e) {
-                // Клиент отменил загрузку или обвалилась сеть — это нормальное поведение для стриминга
                 log.warn("Экспорт CSV был прерван клиентом: {}", e.getMessage());
             } finally {
-                // 2. ОБЯЗАТЕЛЬНО очищаем контекст безопасности после завершения потока!
                 SecurityContextHolder.clearContext();
             }
         };
@@ -137,5 +139,14 @@ public class ItemController {
                              .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
                              .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"items.csv\"")
                              .body(responseBody);
+    }
+
+    @Operation(summary = "Импорт товаров из csv")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ItemImportResultDto> importItems(@RequestParam("file") MultipartFile file) {
+        ItemImportResultDto result = csvImportService.importItems(file);
+        return ResponseEntity.ok(result);
     }
 }

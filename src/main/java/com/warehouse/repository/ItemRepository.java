@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 @Repository
@@ -124,4 +125,7 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 group by i.id, i.sku, i.name, i.category, i.price
             """)
     Stream<ItemExportDto> streamAllForExport();
+
+    @Query("select i.sku from Item i where i.sku in :skus")
+    List<String> findAllSkusIn(@Param("skus") Set<String> skus);
 }

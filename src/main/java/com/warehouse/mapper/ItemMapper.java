@@ -1,14 +1,12 @@
 package com.warehouse.mapper;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
-import com.warehouse.dto.request.item.ItemImportRowDto;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.item.WarehouseStockResponse;
 import com.warehouse.entity.Item;
-import org.apache.commons.csv.CSVRecord;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -36,9 +34,7 @@ public interface ItemMapper {
     @Mapping(target = "reserved", source = "reserved")
     @Mapping(target = "warehouseStocks", source = "warehouseStocks")
     ItemDetailsResponse mapProjectionToDetailsResponse(
-            ItemDetailsProjection projection,
-            long available,
-            long reserved,
+            ItemDetailsProjection projection, long available, long reserved,
             List<WarehouseStockResponse> warehouseStocks
     );
 }

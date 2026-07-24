@@ -17,5 +17,7 @@ public record ItemImportRowDto(@NotBlank(message = "SKU не может быть
                                        message = "Количество не может быть отрицательным") Integer quantity,
 
                                @NotNull(message = "Цена обязательна") @Positive(
-                                       message = "Цена должна быть больше нуля") BigDecimal price) {
+                                       message = "Цена должна быть больше нуля") BigDecimal price,
+                               @NotNull(message = "Себестоимость обязательна") @Positive(
+                                       message = "Себестоимость должна быть больше нуля") BigDecimal cost) {
 }

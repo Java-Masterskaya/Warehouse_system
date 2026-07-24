@@ -12,12 +12,7 @@ import java.util.List;
  * @param failed    количество элементов, завершившихся ошибкой
  * @param errors    список деталей по каждой возникшей ошибке
  */
-public record ItemImportResultDto(
-        int totalRows,
-        int imported,
-        int failed,
-        List<ItemImportErrorDto> errors
-) {
+public record ItemImportResultDto(int totalRows, int imported, int failed, List<ItemImportErrorDto> errors) {
     /**
      * Создаёт объект результата импорта, автоматически рассчитывая
      * количество ошибок на основе размера списка {@code errors}.
@@ -28,7 +23,12 @@ public record ItemImportResultDto(
      * @return заполненный объект результата импорта
      */
     public static ItemImportResultDto of(int totalRows, int imported, List<ItemImportErrorDto> errors) {
-        List<ItemImportErrorDto> safeErrors = errors != null ? errors : List.of();
+        List<ItemImportErrorDto> safeErrors;
+        if (errors != null) {
+            safeErrors = errors;
+        } else {
+            safeErrors = List.of();
+        }
         return new ItemImportResultDto(totalRows, imported, safeErrors.size(), safeErrors);
     }
 }

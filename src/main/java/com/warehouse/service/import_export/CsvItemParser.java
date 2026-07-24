@@ -31,10 +31,11 @@ public class CsvItemParser {
         List<ItemImportErrorDto> errors = new ArrayList<>();
         Set<String> seenSkusInFile = new HashSet<>();
 
-        CSVFormat format = CSVFormat.DEFAULT.builder().setHeader("SKU", "Name", "Category", "Quantity", "Price")
-                                            .setSkipHeaderRecord(true).setIgnoreSurroundingSpaces(true).setTrim(true)
-                                            .setIgnoreHeaderCase(true) // Игнорируем регистр заголовков (sku == SKU)
-                                            .build();
+        CSVFormat format =
+                CSVFormat.DEFAULT.builder().setHeader("SKU", "Name", "Category", "Quantity", "Price", "Cost")
+                                 .setSkipHeaderRecord(true).setIgnoreSurroundingSpaces(true).setTrim(true)
+                                 .setIgnoreHeaderCase(true) // Игнорируем регистр заголовков (sku == SKU)
+                                 .build();
 
         // BOMInputStream срезает невидимую метку \uFEFF в начале UTF-8 файлов из Excel
         try (BOMInputStream bomStream = new BOMInputStream(inputStream);
@@ -86,16 +87,21 @@ public class CsvItemParser {
 
     private ItemImportRowDto mapRecordToDto(CSVRecord record) {
         return new ItemImportRowDto(record.get("SKU"), record.get("Name"), record.get("Category"),
-                parseInteger(record.get("Quantity")), parseBigDecimal(record.get("Price")));
+                parseInteger(record.get("Quantity")), parseBigDecimal(record.get("Price")),
+                parseBigDecimal(record.get("Cost")));
     }
 
     private Integer parseInteger(String value) {
-        if (value == null || value.isBlank()) return null;
+        if (value == null || value.isBlank()) {
+            return null;
+        }
         return Integer.parseInt(value.trim());
     }
 
     private BigDecimal parseBigDecimal(String value) {
-        if (value == null || value.isBlank()) return null;
+        if (value == null || value.isBlank()) {
+            return null;
+        }
         return new BigDecimal(value.trim());
     }
 
@@ -103,14 +109,22 @@ public class CsvItemParser {
         if (e instanceof NumberFormatException) {
             return "Неверный числовой формат (ожидалось число)";
         }
-        return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+        if (e.getMessage() != null) {
+            return e.getMessage();
+        } else {
+            return e.getClass().getSimpleName();
+        }
     }
 
     private String safeGetField(CSVRecord record, String header) {
         if (record.isMapped(header)) {
             try {
                 String val = record.get(header);
-                return (val != null && !val.isBlank()) ? val.trim() : null;
+                if (val != null && !val.isBlank()) {
+                    return val.trim();
+                } else {
+                    return null;
+                }
             } catch (Exception e) {
                 return null;
             }
