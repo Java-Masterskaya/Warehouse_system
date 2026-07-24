@@ -58,6 +58,7 @@ dependencies {
 
     //CSV
     implementation 'org.apache.commons:commons-csv:1.10.0'
+    implementation 'org.apache.commons:commons-io:2.18.0'
 
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
