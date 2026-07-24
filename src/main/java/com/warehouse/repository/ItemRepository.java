@@ -1,6 +1,6 @@
 package com.warehouse.repository;
 
-import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.valuation.CategoryValuation;
 import com.warehouse.entity.Item;
 import com.warehouse.repository.projection.LowStockProjection;
@@ -29,13 +29,13 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
     List<String> findDistinctCategories();
 
     @Query("""
-            SELECT new com.warehouse.dto.response.item.ItemDetailsResponse(
+            SELECT new com.warehouse.dto.response.item.ItemDetailsProjection(
                 i.id,
                 i.sku,
                 i.name,
                 i.category,
                 i.minStock,
-                s.quantity,
+                COALESCE(SUM(s.quantity), 0),
                 i.price,
                 i.cost,
                 i.active,
@@ -43,10 +43,12 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 i.updatedAt
             )
             FROM Item i
-            JOIN Stock s on s.item.id = i.id
+            LEFT JOIN Stock s ON s.item.id = i.id
             WHERE i.id = :itemId
+            GROUP BY i.id, i.sku, i.name, i.category, i.minStock,
+                i.price, i.cost, i.active, i.createdAt, i.updatedAt
             """)
-    Optional<ItemDetailsResponse> findWithStock(@Param("itemId") Long itemId);
+    Optional<ItemDetailsProjection> findWithStock(@Param("itemId") Long itemId);
 
     @Query("""
         SELECT
@@ -54,12 +56,14 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
             i.sku as sku,
             i.name as name,
             i.category as category,
-            s.quantity as currentStock,
+            COALESCE(SUM(s.quantity), 0) as currentStock,
             i.minStock as minStock
         FROM Item i
-        JOIN Stock s ON s.item.id = i.id
-        WHERE s.quantity < i.minStock AND i.active = true
-        ORDER BY (i.minStock - s.quantity) DESC
+        LEFT JOIN Stock s ON s.item.id = i.id
+        WHERE i.active = true
+        GROUP BY i.id, i.sku, i.name, i.category, i.minStock
+        HAVING COALESCE(SUM(s.quantity), 0) < i.minStock
+        ORDER BY (i.minStock - COALESCE(SUM(s.quantity), 0)) DESC
         """)
     List<LowStockProjection> findLowStockItems();
 
@@ -102,4 +106,3 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
             """)
     List<CategoryValuation> calculateValuationByCategory();
 }
-

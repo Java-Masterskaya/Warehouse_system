@@ -7,7 +7,7 @@ import com.warehouse.dto.request.user.UserCreateRequest;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.security.JwtUtil;
+import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -118,6 +118,6 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
-                .getContentAsString()).get("token").asText();
+                .getContentAsString()).get("accessToken").asText();
     }
 }

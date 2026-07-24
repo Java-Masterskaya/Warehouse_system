@@ -49,7 +49,7 @@ public class ReportServiceImplTest {
         when(projection.getSku()).thenReturn("WH-001");
         when(projection.getName()).thenReturn("Ноутбук Dell XPS 15");
         when(projection.getCategory()).thenReturn("Электроника");
-        when(projection.getCurrentStock()).thenReturn(2);
+        when(projection.getCurrentStock()).thenReturn(2L);
         when(projection.getMinStock()).thenReturn(5);
         when(itemRepository.findLowStockItems()).thenReturn(List.of(projection));
 
@@ -74,7 +74,7 @@ public class ReportServiceImplTest {
         when(projection.getSku()).thenReturn("WH-001");
         when(projection.getName()).thenReturn("Ноутбук Dell XPS 15");
         when(projection.getCategory()).thenReturn("Электроника");
-        when(projection.getCurrentStock()).thenReturn(2);
+        when(projection.getCurrentStock()).thenReturn(2L);
         when(projection.getMinStock()).thenReturn(5);
         when(itemRepository.findLowStockItems()).thenReturn(List.of(projection));
 

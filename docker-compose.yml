@@ -102,6 +102,8 @@ services:
       - CONSUL_BIND_INTERFACE=eth0
     volumes:
       - consul_data:/consul/data
+    networks:
+      - app-network
     healthcheck:
       test: [ "CMD", "consul", "members", "-detailed" ]
       interval: 10s
@@ -148,8 +150,6 @@ services:
       - "${SERVER_PORT}:8080"
     env_file:
       - .env
-    networks:
-      - app-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -161,6 +161,8 @@ services:
         condition: service_healthy
       consul-seed:
         condition: service_completed_successfully
+    networks:
+      - app-network
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness" ]
       interval: 10s

@@ -7,6 +7,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
   kafka:
     consumer:
       group-id: warehouse-alerts-test
@@ -22,7 +27,7 @@ spring:
       enabled: false
 
   cache:
-    type: redis
+    type: none
 
   bucket4j:
     enabled: true
@@ -38,3 +43,5 @@ app:
   jwt:
     secret: test-secret-key-that-is-at-least-256-bits-long
     expiration-ms: 86400000
+    refresh-expiration-ms: 604800000
+    refresh-retry-ttl-seconds: 3

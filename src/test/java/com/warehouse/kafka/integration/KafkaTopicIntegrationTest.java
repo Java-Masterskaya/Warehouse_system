@@ -12,7 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.redpanda.RedpandaContainer;
+import org.testcontainers.utility.DockerImageName;
 
 import java.time.LocalDateTime;
 import java.util.Properties;
@@ -25,6 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /**
  * Интеграционный тест для проверки создания топика Kafka при старте.
+ *
+ * <p>Использует свой Redpanda контейнер (не shared), т.к. проверяет создание топика
+ * при старте приложения. Для shared контейнера топик уже может существовать.
  */
 @Tag("integration")
 @Testcontainers
@@ -45,6 +51,10 @@ class KafkaTopicIntegrationTest extends AbstractIntegrationTest {
     private static final int MIN_STOCK = 5;
     private static final String TRIGGERED_BY = "admin";
 
+    @Container
+    static RedpandaContainer redpanda = new RedpandaContainer(
+            DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1")
+    );
 
 
     /**

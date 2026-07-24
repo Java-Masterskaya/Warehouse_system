@@ -147,6 +147,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         Stock stock = Stock.builder()
                 .item(testItem)
+                .warehouse(defaultWarehouse())
                 .quantity(5)
                 .build();
         stockRepository.save(stock);
@@ -265,7 +266,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return objectMapper.readTree(response).get("token").asText();
+        return objectMapper.readTree(response).get("accessToken").asText();
     }
 
     // ==================== DLT Reading ====================

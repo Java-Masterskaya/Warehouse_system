@@ -1,11 +1,17 @@
 package com.warehouse.security.service;
 
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.dto.request.security.LogoutRequest;
+import com.warehouse.dto.request.security.RefreshRequest;
 import com.warehouse.dto.response.security.LoginResponse;
+import com.warehouse.dto.response.security.RefreshResponse;
+import com.warehouse.exception.InvalidTokenException;
+import com.warehouse.exception.TokenReuseException;
 import com.warehouse.metric.MetricService;
-import com.warehouse.security.JwtUtil;
+import com.warehouse.security.util.JwtUtil;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.exception.TooManyAttemptLoginException;
+import com.warehouse.security.model.TokenPair;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -13,10 +19,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.token.TokenService;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service

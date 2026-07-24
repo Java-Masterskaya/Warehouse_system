@@ -65,7 +65,6 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-
         stockAlertRepository.deleteAll();
         stockMovementRepository.deleteAll();
         stockRepository.deleteAll();

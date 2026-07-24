@@ -1,6 +1,7 @@
 app:
   jwt:
     expiration-ms: 86400000
+    refresh-expiration-ms: 604800000
 
 redis:
   cache:

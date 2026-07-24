@@ -3,15 +3,20 @@ package com.warehouse.service.item;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.dto.response.item.WarehouseStockResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.WarehouseRepository;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +40,9 @@ public class ItemServiceImpl implements ItemService {
 
     private final ItemRepository itemRepository;
     private final StockRepository stockRepository;
+    private final WarehouseRepository warehouseRepository;
     private final ItemMapper itemMapper;
+    private final StockAvailabilityService availabilityService;
 
     @Transactional
     @Override
@@ -53,8 +60,12 @@ public class ItemServiceImpl implements ItemService {
         item.setCost(confirmCost(request.cost()));
         itemRepository.save(item);
 
+        Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
+                .orElseThrow(() -> new IllegalStateException("Default warehouse is not configured"));
+
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(0);
         stockRepository.save(stock);
 
@@ -134,18 +145,23 @@ public class ItemServiceImpl implements ItemService {
     @Cacheable(value = "item", key = "#itemId")
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
-        ItemDetailsResponse item = itemRepository.findWithStock(itemId)
+        ItemDetailsProjection item = itemRepository.findWithStock(itemId)
                 .orElseThrow(() -> {
                     log.warn("Item not found: id={}", itemId);
                     return new EntityNotFoundException("Товар не найден");
                 });
-
         if (!item.active()) {
             log.warn("Item inactive: id={}", itemId);
             throw new EntityNotFoundException("Товар неактивен");
         }
+        long reserved = availabilityService.getTotalReserved(itemId);
+        long available = item.currentStock() - reserved;
 
-        return item;
+        List<WarehouseStockResponse> warehouseStocks = stockRepository.findAllByItemIdWithWarehouse(itemId).stream()
+                .map(this::toWarehouseStockResponse)
+                .toList();
+
+        return itemMapper.mapProjectionToDetailsResponse(item, available, reserved, warehouseStocks);
     }
 
     @Transactional
@@ -190,5 +206,16 @@ public class ItemServiceImpl implements ItemService {
             return BigDecimal.ZERO;
         }
         return cost.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private WarehouseStockResponse toWarehouseStockResponse(Stock stock) {
+        long reserved = availabilityService.getReserved(stock);
+        return new WarehouseStockResponse(
+                stock.getWarehouse().getId(),
+                stock.getWarehouse().getName(),
+                stock.getQuantity(),
+                reserved,
+                (long) stock.getQuantity() - reserved
+        );
     }
 }
