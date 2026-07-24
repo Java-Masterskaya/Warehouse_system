@@ -46,7 +46,7 @@ public interface StockMovementService {
      * @param page   номер страницы
      * @param size   количество записей на странице
      * @return страница с историей движений товара
-     * @throws EntityNotFoundException если товар не найден
+     * @throws com.warehouse.exception.EntityNotFoundException если товар не найден
      */
     PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId, MovementType type, int page,
             int size);
