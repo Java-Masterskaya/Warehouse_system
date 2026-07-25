@@ -29,4 +29,22 @@ public interface IdempotencyKeyRepository extends JpaRepository<IdempotencyKey, 
     @Transactional
     @Query("DELETE FROM IdempotencyKey ik WHERE ik.expiresAt < :cutoff")
     int deleteExpiredKeys(@Param("cutoff") LocalDateTime cutoff);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE IdempotencyKey ik "
+            + "SET ik.responseBody = :responseBody, "
+            + "    ik.statusCode = :statusCode, "
+            + "    ik.expiresAt = :expiresAt "
+            + "WHERE ik.keyHash = :keyHash "
+            + "AND ik.user.id = :userId "
+            + "AND ik.endpoint = :endpoint")
+    int updateResponseAndStatus(
+            @Param("keyHash") String keyHash,
+            @Param("userId") Long userId,
+            @Param("endpoint") String endpoint,
+            @Param("responseBody") String responseBody,
+            @Param("statusCode") Integer statusCode,
+            @Param("expiresAt") LocalDateTime expiresAt
+    );
 }

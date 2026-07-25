@@ -9,6 +9,7 @@ import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.IdempotencyKey;
 import com.warehouse.entity.User;
 import com.warehouse.exception.IdempotencyConflictException;
+import com.warehouse.exception.IdempotencyExecutionException;
 import com.warehouse.exception.IdempotencyKeyDuplicateException;
 import com.warehouse.exception.IdempotencyKeyRequiredException;
 import com.warehouse.exception.IdempotencyStorageException;
@@ -36,6 +37,8 @@ import java.util.function.Supplier;
 @Slf4j
 @RequiredArgsConstructor
 public class IdempotencyServiceImpl implements IdempotencyService {
+
+    private static final int HTTP_ERROR_THRESHOLD = 400;
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final UserRepository userRepository;
@@ -66,116 +69,206 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         String endpoint = context.endpoint();
         UserContext ctx = context.userContext();
 
-        // Проверяем, нужно ли уже принудительно требовать ключ
         if (!context.hasKey()) {
-            if (shouldEnforceIdempotency()) {
-                throw IdempotencyKeyRequiredException.forEndpoint(endpoint);
-            }
-            // Grace period: логируем и пропускаем
-            log.warn("Request without Idempotency-Key received during grace period. "
-                            + "Endpoint: {}, User: {}. This will become required after {}",
-                    endpoint, ctx.username(), enforceAfterDate);
-            return operation.get();
+            return handleRequestWithoutKey(endpoint, ctx, operation);
         }
 
         String keyHash = TokenHashUtil.hashToken(key);
         log.debug("Processing idempotent request, endpoint: {}", endpoint);
 
-        // Проверяем существующий ключ
         Optional<IdempotencyKey> existingKey = idempotencyKeyRepository
                 .findByKeyHashAndUserIdAndEndpoint(keyHash, ctx.userId(), endpoint, LocalDateTime.now());
 
         if (existingKey.isPresent()) {
-            IdempotencyKey idempotencyKey = existingKey.get();
-
-            // Проверяем, что тело запроса не изменилось
-            String currentBodyHash = hashRequestBody(requestBody);
-            String storedBodyHash = idempotencyKey.getRequestBodyHash();
-
-            if (!storedBodyHash.equals(currentBodyHash)) {
-                log.warn("Idempotency conflict: same key but different body for user {}, endpoint {}",
-                        ctx.userId(), endpoint);
-                throw IdempotencyConflictException.of(key, endpoint);
-            }
-
-            // Возвращаем закешированный ответ (полный JSON из response_body)
-            try {
-                log.info("Returning cached response for idempotent request, endpoint={}", endpoint);
-                return objectMapper.readValue(idempotencyKey.getResponseBody(), StockMovementResponse.class);
-            } catch (JsonProcessingException e) {
-                // Критическая ошибка - не можем десериализовать сохраненный ответ
-                // Это указывает на повреждение данных в БД или изменение структуры DTO
-                log.error("CRITICAL: Failed to deserialize cached response for endpoint={}. "
-                        + "This indicates data corruption or incompatible DTO changes. "
-                        + "Error: {}", endpoint, e.getMessage());
-                throw new IdempotencyStorageException(
-                        "Failed to retrieve cached response for idempotency key", e
-                );
-            }
+            return handleExistingKey(existingKey.get(), key, endpoint, requestBody);
         }
 
-        // Новый ключ - выполняем операцию
-        StockMovementResponse response = operation.get();
-
-        // Сохраняем ключ с результатом
-        saveIdempotencyKey(keyHash, ctx, endpoint, response, requestBody);
-        log.info("Idempotency key saved for endpoint={} and userId={}", endpoint, ctx.userId());
-
-        return response;
+        return handleNewKey(keyHash, ctx, endpoint, requestBody, operation);
     }
 
-    private void saveIdempotencyKey(
+    private StockMovementResponse handleRequestWithoutKey(
+            String endpoint,
+            UserContext ctx,
+            Supplier<StockMovementResponse> operation
+    ) {
+        if (shouldEnforceIdempotency()) {
+            throw IdempotencyKeyRequiredException.forEndpoint(endpoint);
+        }
+        log.warn("Request without Idempotency-Key received during grace period. "
+                        + "Endpoint: {}, User: {}. This will become required after {}",
+                endpoint, ctx.username(), enforceAfterDate);
+        return operation.get();
+    }
+
+    private StockMovementResponse handleExistingKey(
+            IdempotencyKey idempotencyKey,
+            String key,
+            String endpoint,
+            ChangeQuantityMovementRequest requestBody
+    ) {
+        validateRequestBodyHash(idempotencyKey, requestBody, key, endpoint);
+        validateKeyStatus(idempotencyKey, endpoint);
+        return deserializeCachedResponse(idempotencyKey, endpoint);
+    }
+
+    private void validateRequestBodyHash(
+            IdempotencyKey idempotencyKey,
+            ChangeQuantityMovementRequest requestBody,
+            String key,
+            String endpoint
+    ) {
+        String currentBodyHash = hashRequestBody(requestBody);
+        String storedBodyHash = idempotencyKey.getRequestBodyHash();
+
+        if (!storedBodyHash.equals(currentBodyHash)) {
+            log.warn("Idempotency conflict: same key but different body for user {}, endpoint {}",
+                    idempotencyKey.getUser().getId(), endpoint);
+            throw IdempotencyConflictException.of(key, endpoint);
+        }
+    }
+
+    private void validateKeyStatus(IdempotencyKey idempotencyKey, String endpoint) {
+        String responseBody = idempotencyKey.getResponseBody();
+        Integer statusCode = idempotencyKey.getStatusCode();
+
+        if (responseBody == null || responseBody.isEmpty()) {
+            throw new IdempotencyExecutionException(
+                    "Request with this idempotency key is currently being processed"
+            );
+        }
+
+        if (statusCode != null && statusCode >= HTTP_ERROR_THRESHOLD) {
+            log.warn("Idempotency key failed previously: endpoint={}, statusCode={}", endpoint, statusCode);
+            throw new IdempotencyExecutionException("Previous request with this idempotency key failed");
+        }
+    }
+
+    private StockMovementResponse deserializeCachedResponse(IdempotencyKey idempotencyKey, String endpoint) {
+        try {
+            log.info("Returning cached response for idempotent request, endpoint={}", endpoint);
+            return objectMapper.readValue(idempotencyKey.getResponseBody(), StockMovementResponse.class);
+        } catch (JsonProcessingException e) {
+            log.error("CRITICAL: Failed to deserialize cached response for endpoint={}. "
+                    + "This indicates data corruption or incompatible DTO changes. "
+                    + "Error: {}", endpoint, e.getMessage());
+            throw new IdempotencyStorageException(
+                    "Failed to retrieve cached response for idempotency key", e
+            );
+        }
+    }
+
+    private StockMovementResponse handleNewKey(
             String keyHash,
             UserContext ctx,
             String endpoint,
-            StockMovementResponse response,
-            ChangeQuantityMovementRequest requestBody
+            ChangeQuantityMovementRequest requestBody,
+            Supplier<StockMovementResponse> operation
     ) {
+        String bodyHash = hashRequestBody(requestBody);
+        saveIdempotencyKeyPlaceholder(keyHash, ctx, endpoint, bodyHash);
+
         try {
-            User user = userRepository.getReferenceById(ctx.userId());
-            String responseJson = objectMapper.writeValueAsString(response);
-            String bodyHash = hashRequestBody(requestBody);
+            StockMovementResponse response = operation.get();
+            updateIdempotencyKeyWithResult(keyHash, ctx, endpoint, response);
+            log.info("Idempotency key saved for endpoint={} and userId={}", endpoint, ctx.userId());
+            return response;
+        } catch (IdempotencyStorageException e) {
+            markIdempotencyKeyAsFailed(keyHash, ctx, endpoint, e);
+            throw e;
+        } catch (Exception e) {
+            markIdempotencyKeyAsFailed(keyHash, ctx, endpoint, e);
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
+            }
+            throw new RuntimeException(e);
+        }
+    }
 
-            IdempotencyKey idempotencyKey = IdempotencyKey.builder()
-                    .keyHash(keyHash)
-                    .user(user)
-                    .endpoint(endpoint)
-                    .requestBodyHash(bodyHash)
-                    .responseBody(responseJson)
-                    .statusCode(HttpStatus.OK.value())
-                    .expiresAt(LocalDateTime.now().plusHours(ttlHours))
-                    .build();
+    private void saveIdempotencyKeyPlaceholder(String keyHash, UserContext ctx, String endpoint, String bodyHash) {
+        User user = userRepository.getReferenceById(ctx.userId());
 
+        IdempotencyKey idempotencyKey = IdempotencyKey.builder()
+                .keyHash(keyHash)
+                .user(user)
+                .endpoint(endpoint)
+                .requestBodyHash(bodyHash)
+                .responseBody("")
+                .statusCode(HttpStatus.PROCESSING.value())
+                .expiresAt(LocalDateTime.now().plusHours(ttlHours))
+                .build();
+
+        try {
             idempotencyKeyRepository.save(idempotencyKey);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize response for idempotency key: {}", e.getMessage());
-            throw new IdempotencyStorageException("Failed to save idempotency key", e);
         } catch (DataIntegrityViolationException e) {
-            // Конфликт уникальности (key_hash, user_id, endpoint)
             throw new IdempotencyKeyDuplicateException("Duplicate idempotency key", e);
         }
     }
 
+    private void updateIdempotencyKeyWithResult(
+            String keyHash,
+            UserContext ctx,
+            String endpoint,
+            StockMovementResponse response
+    ) {
+        try {
+            String responseJson = objectMapper.writeValueAsString(response);
+            int updated = idempotencyKeyRepository.updateResponseAndStatus(
+                    keyHash, ctx.userId(), endpoint,
+                    responseJson, HttpStatus.OK.value(),
+                    LocalDateTime.now().plusHours(ttlHours)
+            );
+
+            if (updated == 0) {
+                log.warn("Failed to update idempotency key: keyHash={}, userId={}, endpoint={}",
+                        keyHash, ctx.userId(), endpoint);
+            }
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize response for idempotency key: {}", e.getMessage());
+            throw new IdempotencyStorageException("Failed to store idempotency key", e);
+        }
+    }
+
+    private void markIdempotencyKeyAsFailed(String keyHash, UserContext ctx, String endpoint, Exception e) {
+        String errorMessage = e.getMessage();
+        String escapedMessage;
+
+        if (errorMessage != null) {
+            escapedMessage = errorMessage.replace("\"", "\\\"").replace("\n", " ");
+        } else {
+            escapedMessage = "Unknown error";
+        }
+
+        String errorJson = String.format(
+                "{\"error\":\"%s\",\"message\":\"%s\"}",
+                e.getClass().getSimpleName(),
+                escapedMessage
+        );
+
+        idempotencyKeyRepository.updateResponseAndStatus(
+                keyHash, ctx.userId(), endpoint,
+                errorJson,
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                LocalDateTime.now().plusHours(ttlHours)
+        );
+    }
+
     private String hashRequestBody(ChangeQuantityMovementRequest request) {
-        // Создаем детерминированную строку для сравнения тел запросов
         return TokenHashUtil.hashToken(
                 request.itemId() + ":" + request.quantity()
         );
     }
 
     private boolean shouldEnforceIdempotency() {
-        // Если задана дата - проверяем
         if (enforceAfterDate != null && !enforceAfterDate.isEmpty()) {
             try {
                 LocalDate enforceDate = LocalDate.parse(enforceAfterDate);
-                return LocalDate.now().isAfter(enforceDate) || LocalDate.now().isEqual(enforceDate);
+                LocalDate now = LocalDate.now();
+                return now.isAfter(enforceDate) || now.isEqual(enforceDate);
             } catch (DateTimeParseException e) {
                 log.warn("Invalid enforceAfterDate format: {}. Expected yyyy-MM-dd", enforceAfterDate);
-                // Если дата невалидна - используем required как fallback
                 return idempotencyRequired;
             }
         }
-        // 2. Если дата не задана - используем required
         return idempotencyRequired;
     }
 

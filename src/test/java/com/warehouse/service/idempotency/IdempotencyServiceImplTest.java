@@ -10,6 +10,7 @@ import com.warehouse.entity.IdempotencyKey;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.User;
 import com.warehouse.exception.IdempotencyConflictException;
+import com.warehouse.exception.IdempotencyExecutionException;
 import com.warehouse.exception.IdempotencyKeyDuplicateException;
 import com.warehouse.exception.IdempotencyKeyRequiredException;
 import com.warehouse.exception.IdempotencyStorageException;
@@ -31,16 +32,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -147,9 +144,8 @@ class IdempotencyServiceImplTest {
 
             when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
 
-            String responseJson = """
-                    {"itemId":1,"movementId":100,"type":"RECEIVE","quantity":5,"stockAfter":10,"lowStockAlert":false}
-                    """;
+            String responseJson = "{\"itemId\":1,\"movementId\":100,\"type\":\"RECEIVE\","
+                    + "\"quantity\":5,\"stockAfter\":10,\"lowStockAlert\":false}";
             when(objectMapper.writeValueAsString(response)).thenReturn(responseJson);
 
             Supplier<StockMovementResponse> operation = () -> response;
@@ -162,21 +158,22 @@ class IdempotencyServiceImplTest {
             // then
             assertThat(result).isEqualTo(response);
 
-            ArgumentCaptor<IdempotencyKey> keyCaptor = ArgumentCaptor.forClass(IdempotencyKey.class);
-            verify(idempotencyKeyRepository).save(keyCaptor.capture());
+            // Проверяем сохранение placeholder
+            ArgumentCaptor<IdempotencyKey> placeholderCaptor = ArgumentCaptor.forClass(IdempotencyKey.class);
+            verify(idempotencyKeyRepository, times(1)).save(placeholderCaptor.capture());
+            IdempotencyKey savedPlaceholder = placeholderCaptor.getValue();
+            assertThat(savedPlaceholder.getResponseBody()).isEmpty();  // ← пустой маркер
+            assertThat(savedPlaceholder.getStatusCode()).isEqualTo(102);  // PROCESSING
 
-            IdempotencyKey savedKey = keyCaptor.getValue();
-            assertThat(savedKey.getKeyHash()).isEqualTo(KEY_HASH);
-            assertThat(savedKey.getUser().getId()).isEqualTo(USER_ID);
-            assertThat(savedKey.getEndpoint()).isEqualTo(ENDPOINT);
-            assertThat(savedKey.getResponseBody()).isEqualTo(responseJson);
-            assertThat(savedKey.getRequestBodyHash()).isNotNull();
-            assertThat(savedKey.getStatusCode()).isEqualTo(200);
-            assertThat(savedKey.getExpiresAt()).isAfter(LocalDateTime.now());
+            // Проверяем обновление результата
+            verify(idempotencyKeyRepository, times(1)).updateResponseAndStatus(
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT),
+                    eq(responseJson), eq(200), any(LocalDateTime.class)
+            );
         }
 
         @Test
-        @DisplayName("Ошибка сериализации ответа - должен выбросить исключение IdempotencyStorageException")
+        @DisplayName("Ошибка сериализации ответа - должен выбросить IdempotencyStorageException")
         void shouldThrowExceptionWhenSerializationFails() throws Exception {
             // given
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
@@ -184,7 +181,9 @@ class IdempotencyServiceImplTest {
             )).thenReturn(Optional.empty());
 
             when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
-            when(objectMapper.writeValueAsString(response))
+
+            // Мокаем падение сериализации для response
+            when(objectMapper.writeValueAsString(any(StockMovementResponse.class)))
                     .thenThrow(new JsonProcessingException("Serialization error") {
                     });
 
@@ -195,9 +194,18 @@ class IdempotencyServiceImplTest {
                     idempotencyService.processIdempotentRequest(context, requestBody, operation)
             )
                     .isInstanceOf(IdempotencyStorageException.class)
-                    .hasMessageContaining("Failed to save idempotency key");
+                    .hasMessageContaining("Failed to store idempotency key");
 
-            verify(idempotencyKeyRepository, never()).save(any());
+            // Проверяем, что placeholder был сохранен
+            verify(idempotencyKeyRepository, times(1)).save(any(IdempotencyKey.class));
+
+            // Проверяем, что update был вызван с любым строковым значением (не null)
+            verify(idempotencyKeyRepository, times(1)).updateResponseAndStatus(
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT),
+                    anyString(), // теперь точно не null
+                    eq(422),
+                    any(LocalDateTime.class)
+            );
         }
 
         @Test
@@ -209,7 +217,6 @@ class IdempotencyServiceImplTest {
             )).thenReturn(Optional.empty());
 
             when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
-            when(objectMapper.writeValueAsString(response)).thenReturn("{}");
             when(idempotencyKeyRepository.save(any(IdempotencyKey.class)))
                     .thenThrow(new DataIntegrityViolationException("Duplicate key"));
 
@@ -250,11 +257,25 @@ class IdempotencyServiceImplTest {
         @DisplayName("Повторный запрос с тем же ключом и телом - должен вернуть кешированный ответ")
         void shouldReturnCachedResponseForDuplicateRequest() throws Exception {
             // given
+            String responseJson = "{\"itemId\":1,\"movementId\":100,\"type\":\"RECEIVE\","
+                    + "\"quantity\":5,\"stockAfter\":10,\"lowStockAlert\":false}";
+            String requestBodyHash = TokenHashUtil.hashToken("1:5");
+
+            IdempotencyKey cachedKey = IdempotencyKey.builder()
+                    .keyHash(KEY_HASH)
+                    .user(user)
+                    .endpoint(ENDPOINT)
+                    .requestBodyHash(requestBodyHash)
+                    .responseBody(responseJson)  // ← (COMPLETED)
+                    .statusCode(200)             // ← 200 OK
+                    .expiresAt(LocalDateTime.now().plusHours(24))
+                    .build();
+
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
                     eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
-            )).thenReturn(Optional.of(existingKey));
+            )).thenReturn(Optional.of(cachedKey));
 
-            when(objectMapper.readValue(existingKey.getResponseBody(), StockMovementResponse.class))
+            when(objectMapper.readValue(responseJson, StockMovementResponse.class))
                     .thenReturn(response);
 
             Supplier<StockMovementResponse> operation = () -> {
@@ -269,6 +290,66 @@ class IdempotencyServiceImplTest {
             // then
             assertThat(result).isEqualTo(response);
             verify(idempotencyKeyRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Повторный запрос во время обработки - должен выбросить IdempotencyExecutionException")
+        void shouldThrowExceptionWhenKeyIsProcessing() {
+            // given
+            String requestBodyHash = TokenHashUtil.hashToken("1:5");
+            IdempotencyKey processingKey = IdempotencyKey.builder()
+                    .keyHash(KEY_HASH)
+                    .user(user)
+                    .endpoint(ENDPOINT)
+                    .requestBodyHash(requestBodyHash)
+                    .responseBody("")  // ← ПУСТОЙ! (PROCESSING)
+                    .statusCode(102)   // PROCESSING
+                    .expiresAt(LocalDateTime.now().plusHours(24))
+                    .build();
+
+            // Используем any() для LocalDateTime
+            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
+            )).thenReturn(Optional.of(processingKey));
+
+            Supplier<StockMovementResponse> operation = () -> response;
+
+            // when & then
+            assertThatThrownBy(() ->
+                    idempotencyService.processIdempotentRequest(context, requestBody, operation)
+            )
+                    .isInstanceOf(IdempotencyExecutionException.class)
+                    .hasMessageContaining("currently being processed");
+        }
+
+        @Test
+        @DisplayName("Повторный запрос после ошибки - должен выбросить IdempotencyExecutionException")
+        void shouldThrowExceptionWhenKeyFailed() {
+            // given
+            String requestBodyHash = TokenHashUtil.hashToken("1:5");
+            String errorJson = "{\"error\":\"InsufficientStockException\",\"message\":\"Not enough stock\"}";
+            IdempotencyKey failedKey = IdempotencyKey.builder()
+                    .keyHash(KEY_HASH)
+                    .user(user)
+                    .endpoint(ENDPOINT)
+                    .requestBodyHash(requestBodyHash)
+                    .responseBody(errorJson)
+                    .statusCode(422)    // UNPROCESSABLE_ENTITY
+                    .expiresAt(LocalDateTime.now().plusHours(24))
+                    .build();
+
+            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
+            )).thenReturn(Optional.of(failedKey));
+
+            Supplier<StockMovementResponse> operation = () -> response;
+
+            // when & then
+            assertThatThrownBy(() ->
+                    idempotencyService.processIdempotentRequest(context, requestBody, operation)
+            )
+                    .isInstanceOf(IdempotencyExecutionException.class)
+                    .hasMessageContaining("Previous request with this idempotency key failed");
         }
 
         @Test
@@ -399,90 +480,7 @@ class IdempotencyServiceImplTest {
     }
 
     @Nested
-    @DisplayName("5. Параллельные запросы")
-    class ConcurrentTests {
-
-        @Test
-        @DisplayName("Параллельные запросы с одинаковым ключом - не должны создавать дубли")
-        void shouldNotCreateDuplicatesForConcurrentRequests() throws Exception {
-            // given
-            int threadCount = 5;
-            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-            CountDownLatch latch = new CountDownLatch(1);
-            AtomicInteger successCount = new AtomicInteger(0);
-            AtomicInteger operationCallCount = new AtomicInteger(0);
-
-            // Мокаем: первый раз ключа нет, потом есть
-            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
-            )).thenAnswer(invocation -> {
-                if (operationCallCount.get() == 0) {
-                    return Optional.empty();
-                } else {
-                    return Optional.of(IdempotencyKey.builder()
-                            .keyHash(KEY_HASH)
-                            .user(user)
-                            .endpoint(ENDPOINT)
-                            .requestBodyHash(TokenHashUtil.hashToken("1:5"))
-                            .responseBody("{}")
-                            .statusCode(200)
-                            .expiresAt(LocalDateTime.now().plusHours(24))
-                            .build());
-                }
-            });
-
-            when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
-
-            // Имитируем DataIntegrityViolationException при конкурентной вставке
-            when(idempotencyKeyRepository.save(any(IdempotencyKey.class)))
-                    .thenAnswer(invocation -> {
-                        if (operationCallCount.incrementAndGet() == 1) {
-                            // Первый сохраняет успешно
-                            return invocation.getArgument(0);
-                        } else {
-                            // Второй получает ошибку (симулируем дубликат)
-                            throw new DataIntegrityViolationException("Duplicate key");
-                        }
-                    });
-
-            when(objectMapper.writeValueAsString(any(StockMovementResponse.class)))
-                    .thenReturn("{}");
-
-            Supplier<StockMovementResponse> operation = () -> {
-                operationCallCount.incrementAndGet();
-                return response;
-            };
-
-            // when
-            for (int i = 0; i < threadCount; i++) {
-                executor.submit(() -> {
-                    try {
-                        latch.await();
-                        idempotencyService.processIdempotentRequest(
-                                context, requestBody, operation
-                        );
-                        successCount.incrementAndGet();
-                    } catch (Exception e) {
-                        // Ожидаем, что некоторые потоки могут упасть с ошибкой
-                    }
-                });
-            }
-
-            latch.countDown();
-            executor.shutdown();
-            boolean finished = executor.awaitTermination(5, TimeUnit.SECONDS);
-
-            // then
-            assertThat(finished).isTrue();
-            // Операция должна быть вызвана только 1-2 раза (успешно + возможно retry)
-            assertThat(operationCallCount.get()).isLessThanOrEqualTo(2);
-            // Все запросы должны завершиться успешно (кроме тех, что упали)
-            assertThat(successCount.get()).isBetween(1, threadCount);
-        }
-    }
-
-    @Nested
-    @DisplayName("6. Очистка просроченных ключей")
+    @DisplayName("5. Очистка просроченных ключей")
     class CleanupTests {
 
         @Test
