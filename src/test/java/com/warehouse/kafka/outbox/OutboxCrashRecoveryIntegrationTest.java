@@ -4,13 +4,14 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
-
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -98,6 +99,9 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private BatchService batchService;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private Item testItem;
     private Long testItemId;
     private User testUser;
@@ -116,12 +120,19 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         outboxEventRepository.deleteAll();
         itemRepository.deleteAll();
         supplierRepository.deleteAll();
+        categoryRepository.deleteAll();
+
+        Category category = categoryRepository.save(
+                Category.builder()
+                        .name("Категория")
+                        .build()
+        );
 
         // Создаём тестовый товар
         testItem = new Item();
         testItem.setSku("SKU-CRASH-" + System.currentTimeMillis());
         testItem.setName("Тестовый товар для краш-теста");
-        testItem.setCategory("Категория");
+        testItem.setCategory(category);
         testItem.setMinStock(10);
         testItem.setActive(true);
         testItem = itemRepository.save(testItem);

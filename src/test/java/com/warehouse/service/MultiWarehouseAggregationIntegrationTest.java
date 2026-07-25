@@ -5,12 +5,14 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.WarehouseStockResponse;
 import com.warehouse.dto.response.report.LowStockItem;
 import com.warehouse.dto.response.valuation.StockValuationResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Reservation;
 import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
@@ -54,15 +56,25 @@ class MultiWarehouseAggregationIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ReportService reportService;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private Item item;
     private Warehouse defaultWarehouse;
     private Warehouse secondaryWarehouse;
-    private String category;
+    private String categoryName;
+    private Category category;
 
     @BeforeEach
     void setUp() {
         String suffix = UUID.randomUUID().toString();
-        category = "Multi Warehouse Category-" + suffix;
+        categoryName = "Multi Warehouse Category-" + suffix;
+
+        category = categoryRepository.saveAndFlush(
+                Category.builder()
+                        .name(categoryName)
+                        .build()
+        );
 
         defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue().orElseThrow();
         secondaryWarehouse = warehouseRepository.saveAndFlush(Warehouse.builder()
@@ -146,7 +158,7 @@ class MultiWarehouseAggregationIntegrationTest extends AbstractIntegrationTest {
         StockValuationResponse response = reportService.getStockValuation();
 
         assertThat(response.byCategory())
-                .filteredOn(categoryValuation -> categoryValuation.category().equals(category))
+                .filteredOn(categoryValuation -> categoryValuation.category().equals(categoryName))
                 .singleElement()
                 .satisfies(categoryValuation ->
                         assertThat(categoryValuation.valuation()).isEqualByComparingTo("250.00"));

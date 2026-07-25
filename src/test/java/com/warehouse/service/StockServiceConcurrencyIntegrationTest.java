@@ -1,9 +1,11 @@
 package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.service.stock.StockService;
@@ -28,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Интеграционные тесты конкурентного обновления остатков.
- *
+ * <p>
  * Важно: сам тест не должен выполняться в одной общей транзакции,
  * иначе worker-потоки могут не увидеть созданные Item/Stock.
  */
@@ -46,12 +48,15 @@ class StockServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private StockRepository stockRepository;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     /**
      * Проверяет, что параллельные списания одного товара не приводят к oversell.
-
+     * <p>
      * Несколько потоков одновременно пытаются списать товар с одного и того же остатка.
      * Успешных списаний должно быть ровно столько, сколько позволяет текущий остаток,
-       а лишняя операция должна получить ошибку недостаточного количества товара.
+     * а лишняя операция должна получить ошибку недостаточного количества товара.
      */
     @Test
     void parallelWriteOffsDoNotOversell() throws Exception {
@@ -91,10 +96,10 @@ class StockServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
 
     /**
      * Проверяет, что параллельные приходы одного товара не теряют обновления.
-
+     * <p>
      * Несколько потоков одновременно увеличивают один и тот же остаток.
      * Итоговое количество должно быть равно сумме всех успешных приходов,
-       без перезаписи результата одного потока другим.
+     * без перезаписи результата одного потока другим.
      */
     @Test
     void parallelReceiptsDoNotLoseUpdates() throws Exception {
@@ -184,10 +189,17 @@ class StockServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Item createItem() {
+        Category category = categoryRepository.findByNameIgnoreCase("Test")
+                .orElseGet(() -> categoryRepository.save(
+                        Category.builder()
+                                .name("Test")
+                                .build()
+                ));
+
         Item item = new Item();
         item.setSku("SKU-CONC-" + UUID.randomUUID());
         item.setName("Concurrent item");
-        item.setCategory("Test");
+        item.setCategory(category);
         item.setMinStock(5);
         item.setActive(true);
 

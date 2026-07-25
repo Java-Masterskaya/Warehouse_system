@@ -98,8 +98,13 @@ make up
 | `PUT`    | `/api/items/{id}`                                | Редактировать товар                 |
 | `DELETE` | `/api/items/{id}`                                | Удалить товар                       |
 | `GET`    | `/api/items/{itemId}`                            | Карточка и остатки по складам       |
-| `GET`    | `/api/warehouses`                               | Список складов                      |
-| `POST`   | `/api/warehouses`                               | Создать склад                       |
+| `GET`    | `/api/items/categories`                          | Список категорий                    |
+| `POST`   | `/api/categories`                                | Создать категорию                   |
+| `GET`    | `/api/categories/{categoryId}`                   | Получить категорию по ID            |
+| `PUT`    | `/api/categories/{categoryId}`                   | Обновить категорию                  |
+| `DELETE` | `/api/categories/{categoryId}`                   | Удалить категорию                   |
+| `GET`    | `/api/warehouses`                                | Список складов                      |
+| `POST`   | `/api/warehouses`                                | Создать склад                       |
 | `POST`   | `/api/movements/receive`                         | Зарегистрировать поступление        |
 | `POST`   | `/api/movements/write-off`                       | Списать товар                       |
 | `POST`   | `/api/movements/transfer`                        | Перевести товар между складами      |

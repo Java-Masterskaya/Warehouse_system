@@ -7,7 +7,9 @@ import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.dto.response.movement.StockTransferResponse;
 import com.warehouse.entity.Batch;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
@@ -831,11 +833,15 @@ class StockMovementServiceImplTest {
     }
 
     private Item createItem(Long itemId, String name, boolean active, int minStock) {
+        Category category = new Category();
+        category.setId(1L);
+        category.setName("Тестовая категория");
+
         Item item = new Item();
         item.setId(itemId);
         item.setName(name);
         item.setSku("SKU-" + itemId);
-        item.setCategory("Тестовая категория");
+        item.setCategory(category);
         item.setActive(active);
         item.setMinStock(minStock);
         item.setPrice(BigDecimal.valueOf(100.00));
