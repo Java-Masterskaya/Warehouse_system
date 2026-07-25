@@ -9,24 +9,27 @@ import com.warehouse.audit.entity.EntityType;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SpringBootTest
 public class ItemServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -40,6 +43,9 @@ public class ItemServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private AuditRepository auditRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     @Test
     void shouldCreateAuditRecordWhenItemCreated() {
@@ -81,7 +87,7 @@ public class ItemServiceIntegrationTest extends AbstractIntegrationTest {
             ItemResponse item = createItem();
 
             itemService.updateItem(item.id(),
-                    new UpdateItemRequest("New name", "New category", 20, BigDecimal.valueOf(200),
+                    new UpdateItemRequest("New name", item.category(), 20, BigDecimal.valueOf(200),
                             BigDecimal.valueOf(150)));
 
             AuditLogEntity audit = auditRepository.findTopByOrderByIdDesc();
@@ -101,9 +107,10 @@ public class ItemServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThat(newNode.get("name").asText()).isEqualTo("New name");
 
-            assertThat(oldNode.get("category").asText()).isEqualTo("Category");
+//            assertThat(oldNode.get("category").asText()).isEqualTo("Category");
+            assertThat(oldNode.get("category").get("name").asText()).isEqualTo("Category");
 
-            assertThat(newNode.get("category").asText()).isEqualTo("New category");
+            assertThat(newNode.get("category").get("name").asText()).isEqualTo("Category");
 
             assertThat(oldNode.get("minStock").asInt()).isEqualTo(10);
 
@@ -171,8 +178,23 @@ public class ItemServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private ItemResponse createItem() {
+        String categoryName = "Category";
+
+        if (!categoryRepository.existsByNameIgnoreCase(categoryName)) {
+            Category category = new Category();
+            category.setName(categoryName);
+            categoryRepository.save(category);
+        }
+
         return itemService.createItem(
-                new CreateItemRequest("SKU-001" + LocalDateTime.now(), "Test item", "Category", 10,
-                        BigDecimal.valueOf(100), BigDecimal.valueOf(70)));
+                new CreateItemRequest(
+                        "SKU-001-" + System.currentTimeMillis(),
+                        "Test item",
+                        categoryName,
+                        10,
+                        BigDecimal.valueOf(100),
+                        BigDecimal.valueOf(70)
+                )
+        );
     }
 }

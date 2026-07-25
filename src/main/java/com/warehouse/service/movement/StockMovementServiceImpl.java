@@ -32,7 +32,6 @@ import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
-import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.stock.StockService;
 import lombok.AccessLevel;

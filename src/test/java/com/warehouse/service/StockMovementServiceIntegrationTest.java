@@ -11,11 +11,13 @@ import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
@@ -24,17 +26,18 @@ import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SpringBootTest
 public class StockMovementServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ItemService itemService;
@@ -56,6 +59,9 @@ public class StockMovementServiceIntegrationTest extends AbstractIntegrationTest
 
     @Autowired
     private AuditRepository auditRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     @Test
     void shouldCreateAuditRecordWhenStockReceiptRegistered() {
@@ -183,8 +189,16 @@ public class StockMovementServiceIntegrationTest extends AbstractIntegrationTest
     }
 
     private ItemResponse createItem() {
+        String categoryName = "Category";
+
+        if (!categoryRepository.existsByNameIgnoreCase(categoryName)) {
+            Category category = new Category();
+            category.setName(categoryName);
+            categoryRepository.save(category);
+        }
+
         return itemService.createItem(
-                new CreateItemRequest("SKU-001" + LocalDateTime.now(), "Test item", "Category", 10,
+                new CreateItemRequest("SKU-001-" + System.currentTimeMillis(), "Test item", categoryName, 10,
                         BigDecimal.valueOf(100), BigDecimal.valueOf(70)));
     }
 }

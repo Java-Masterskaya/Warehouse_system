@@ -19,6 +19,7 @@ import com.warehouse.security.UserPrincipal;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,7 +72,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        setAuthentification();
+        SecurityContextHolder.clearContext();
         // Очищаем таблицы в правильном порядке, учитывая внешние ключи
         stockAlertRepository.deleteAll();
         reserveRepository.deleteAll();
@@ -103,6 +104,13 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         stockRepository.save(stock);
 
         itemId = item.getId();
+
+        setAuthentification();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     /**
@@ -171,7 +179,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     }
 
     private void setAuthentification() {
-        User admin = createActiveAdmin("Admin");
+        User admin = createActiveAdmin("admin");
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 new UserPrincipal(admin.getId(), admin.getUsername(), admin.getPassword(), admin.isActive(),
                         List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))), null,

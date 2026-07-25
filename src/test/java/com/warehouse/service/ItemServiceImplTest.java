@@ -90,6 +90,7 @@ class ItemServiceImplTest {
                 stockRepository,
                 warehouseRepository,
                 itemMapper,
+                auditContext,
                 availabilityService,
                 categoryRepository
         );
