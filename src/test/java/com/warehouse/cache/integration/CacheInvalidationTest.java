@@ -18,6 +18,7 @@ import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Интеграционный тест для проверки инвалидации кэша.
  */
+@SpringBootTest
 class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
