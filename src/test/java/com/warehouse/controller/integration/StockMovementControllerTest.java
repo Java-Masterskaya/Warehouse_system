@@ -27,6 +27,11 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -594,6 +599,52 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error").value("IDEMPOTENCY_KEY_REQUIRED"));
         }
+
+        @Test
+        @DisplayName("Параллельные запросы с одинаковым ключом не создают дубль")
+        void concurrentRequestsWithSameKeyDoNotCreateDuplicate() throws Exception {
+            String key = UUID.randomUUID().toString();
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+            int threadCount = 10;
+            ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+            CountDownLatch latch = new CountDownLatch(1);
+            AtomicInteger successCount = new AtomicInteger(0);
+            AtomicInteger conflictCount = new AtomicInteger(0);
+
+            String requestJson = objectMapper.writeValueAsString(request);
+
+            for (int i = 0; i < threadCount; i++) {
+                executor.submit(() -> {
+                    try {
+                        latch.await();
+                        mockMvc.perform(post("/api/movements/receive")
+                                        .header("Authorization", "Bearer " + adminToken)
+                                        .header("Idempotency-Key", key)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(requestJson))
+                                .andExpect(status().isOk());
+                        successCount.incrementAndGet();
+                    } catch (Exception e) {
+                        conflictCount.incrementAndGet();
+                    }
+                });
+            }
+
+            latch.countDown();
+            executor.shutdown();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+
+            // Все запросы должны быть успешными или получить конфликт, но движение только одно
+            assertThat(successCount.get() + conflictCount.get()).isEqualTo(threadCount);
+
+            // Проверяем, что создано только одно движение
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(13); // 10 + 3
+
+            // В БД только одна запись идемпотентного ключа
+            long keyCount = idempotencyKeyRepository.count();
+            assertThat(keyCount).isEqualTo(1);
+        }
     }
 
     @Nested
@@ -605,6 +656,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @BeforeEach
         void setUp() {
             idempotencyKey = UUID.randomUUID().toString();
+            idempotencyKeyRepository.deleteAll();
         }
 
         @Test
