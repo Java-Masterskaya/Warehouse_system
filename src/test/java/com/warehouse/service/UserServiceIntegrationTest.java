@@ -7,15 +7,13 @@ import com.warehouse.audit.AuditRepository;
 import com.warehouse.audit.entity.AuditAction;
 import com.warehouse.audit.entity.AuditLogEntity;
 import com.warehouse.audit.entity.EntityType;
-import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.user.UserCreateRequest;
 import com.warehouse.dto.response.user.UserResponse;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.security.util.JwtUtil;
-import com.warehouse.security.service.TokenService;
 import com.warehouse.security.UserPrincipal;
+import com.warehouse.security.service.TokenService;
 import com.warehouse.service.user.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,9 +24,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.List;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,7 +51,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private TokenService tokenService;
 
-    private User testUser;
+    private User   testUser;
     private String accessToken;
     private String refreshToken;
 
@@ -70,7 +68,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         // Generate and store tokens using public method
         List<String> roles = List.of("ROLE_USER");
         var tokenPair = tokenService.generateTokenPair(testUser.getUsername(), testUser.getId(), roles);
-        accessToken = tokenPair.accessToken();
+        accessToken  = tokenPair.accessToken();
         refreshToken = tokenPair.refreshToken();
     }
 
@@ -207,23 +205,19 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Deactivation should revoke all tokens in Redis")
     void deactivationShouldRevokeAllTokensInRedis() {
         // 1. Verify tokens are stored and valid
-        assertThat(tokenService.validateRefreshToken(refreshToken))
-                .as("Refresh token should be valid before deactivation")
-                .isTrue();
-        assertThat(tokenService.isAccessTokenBlacklisted(accessToken))
-                .as("Access token should not be blacklisted before deactivation")
-                .isFalse();
+        assertThat(tokenService.validateRefreshToken(refreshToken)).as(
+                "Refresh token should be valid before deactivation").isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken)).as(
+                "Access token should not be blacklisted before deactivation").isFalse();
 
         // 2. Deactivate user
         userService.deactivateUser(testUser.getId(), 999L); // 999 = admin id
 
         // 3. Verify tokens are revoked
-        assertThat(tokenService.validateRefreshToken(refreshToken))
-                .as("Refresh token should be revoked after deactivation")
-                .isFalse();
-        assertThat(tokenService.isAccessTokenBlacklisted(accessToken))
-                .as("Access token should be blacklisted after deactivation")
-                .isTrue();
+        assertThat(tokenService.validateRefreshToken(refreshToken)).as(
+                "Refresh token should be revoked after deactivation").isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken)).as(
+                "Access token should be blacklisted after deactivation").isTrue();
 
         // 4. Verify user is deactivated in DB
         User deactivatedUser = userRepository.findById(testUser.getId()).orElseThrow();
@@ -247,35 +241,27 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         String refreshToken2 = pair2.refreshToken();
 
         // 2. Verify tokens are valid before deactivation
-        assertThat(tokenService.validateRefreshToken(refreshToken1))
-                .as("First refresh token should be valid")
-                .isTrue();
-        assertThat(tokenService.validateRefreshToken(refreshToken2))
-                .as("Second refresh token should be valid")
-                .isTrue();
-        assertThat(tokenService.isAccessTokenBlacklisted(accessToken1))
-                .as("First access token should not be blacklisted")
-                .isFalse();
-        assertThat(tokenService.isAccessTokenBlacklisted(accessToken2))
-                .as("Second access token should not be blacklisted")
-                .isFalse();
+        assertThat(tokenService.validateRefreshToken(refreshToken1)).as("First refresh token should be valid")
+                                                                    .isTrue();
+        assertThat(tokenService.validateRefreshToken(refreshToken2)).as("Second refresh token should be valid")
+                                                                    .isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken1)).as(
+                "First access token should not be blacklisted").isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken2)).as(
+                "Second access token should not be blacklisted").isFalse();
 
         // 3. Deactivate user
         userService.deactivateUser(testUser.getId(), 999L);
 
         // 4. Verify ALL tokens are revoked
-        assertThat(tokenService.validateRefreshToken(refreshToken1))
-                .as("First refresh token should be revoked")
-                .isFalse();
-        assertThat(tokenService.validateRefreshToken(refreshToken2))
-                .as("Second refresh token should be revoked")
-                .isFalse();
-        assertThat(tokenService.isAccessTokenBlacklisted(accessToken1))
-                .as("First access token should be blacklisted")
-                .isTrue();
-        assertThat(tokenService.isAccessTokenBlacklisted(accessToken2))
-                .as("Second access token should be blacklisted")
-                .isTrue();
+        assertThat(tokenService.validateRefreshToken(refreshToken1)).as("First refresh token should be revoked")
+                                                                    .isFalse();
+        assertThat(tokenService.validateRefreshToken(refreshToken2)).as("Second refresh token should be revoked")
+                                                                    .isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken1)).as("First access token should be blacklisted")
+                                                                       .isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken2)).as("Second access token should be blacklisted")
+                                                                       .isTrue();
 
         // 5. Verify user is deactivated in DB
         User deactivatedUser = userRepository.findById(testUser.getId()).orElseThrow();
@@ -321,18 +307,14 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         userService.deactivateUser(testUser.getId(), 999L);
 
         // 4. Verify only first user's tokens are revoked
-        assertThat(tokenService.validateRefreshToken(refreshToken))
-                .as("First user's refresh token should be revoked")
-                .isFalse();
-        assertThat(tokenService.validateRefreshToken(otherRefreshToken))
-                .as("Other user's refresh token should still be valid")
-                .isTrue();
-        assertThat(tokenService.isAccessTokenBlacklisted(accessToken))
-                .as("First user's access token should be blacklisted")
-                .isTrue();
-        assertThat(tokenService.isAccessTokenBlacklisted(otherAccessToken))
-                .as("Other user's access token should not be blacklisted")
-                .isFalse();
+        assertThat(tokenService.validateRefreshToken(refreshToken)).as("First user's refresh token should be revoked")
+                                                                   .isFalse();
+        assertThat(tokenService.validateRefreshToken(otherRefreshToken)).as(
+                "Other user's refresh token should still be valid").isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken)).as(
+                "First user's access token should be blacklisted").isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(otherAccessToken)).as(
+                "Other user's access token should not be blacklisted").isFalse();
     }
 
     @Test

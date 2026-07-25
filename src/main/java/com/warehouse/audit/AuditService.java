@@ -2,10 +2,7 @@ package com.warehouse.audit;
 
 import com.warehouse.audit.dto.AuditEvent;
 import com.warehouse.audit.entity.AuditLogEntity;
-import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,17 +16,14 @@ import java.time.LocalDateTime;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuditService {
 
-    AuditRepository auditRepository;
-    JdbcTemplate    jdbcTemplate;
+    private final AuditRepository auditRepository;
+    private final JdbcTemplate    jdbcTemplate;
 
-    @NonFinal
     @Value("${app.audit.retention.days:547}")
     private int retentionDays;
 
-    @NonFinal
     @Value("${app.audit.retention.batch-size:500}")
     private int batchSize;
 
@@ -60,8 +54,14 @@ public class AuditService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int deleteBatch(int retentionDays, int batchSize) {
+    public int deleteBatch(int retention, int batch) {
         String sql = "SELECT purge_old_audit_logs_batch(?, ?)";
-        return jdbcTemplate.update(sql, retentionDays, batchSize);
+        Integer deletedCount = jdbcTemplate.queryForObject(sql, Integer.class, retention, batch);
+
+        if (deletedCount == null) {
+            return 0;
+        }
+
+        return deletedCount;
     }
 }
