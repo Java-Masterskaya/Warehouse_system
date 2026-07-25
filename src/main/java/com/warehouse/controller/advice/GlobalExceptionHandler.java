@@ -3,23 +3,7 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
-import com.warehouse.exception.DuplicateSkuException;
-import com.warehouse.exception.DuplicateUsernameException;
-import com.warehouse.exception.EntityNotFoundException;
-import com.warehouse.exception.IdempotencyConflictException;
-import com.warehouse.exception.IdempotencyKeyRequiredException;
-import com.warehouse.exception.IdempotencyStorageException;
-import com.warehouse.exception.InsufficientStockException;
-import com.warehouse.exception.InvalidMovementRequestException;
-import com.warehouse.exception.InvalidPurchaseOrderStatusException;
-import com.warehouse.exception.InvalidTokenException;
-import com.warehouse.exception.LastAdminDeactivationException;
-import com.warehouse.exception.PurchaseOrderOverReceiptException;
-import com.warehouse.exception.ReservationException;
-import com.warehouse.exception.SelfDeactivationException;
-import com.warehouse.exception.StockMovementInvariantException;
-import com.warehouse.exception.StocktakeConflictException;
-import com.warehouse.exception.TokenReuseException;
+import com.warehouse.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -210,6 +194,14 @@ public class GlobalExceptionHandler {
         log.error("Idempotency storage error: {}", ex.getMessage(), ex);
         return new ErrorResponse("IDEMPOTENCY_STORAGE_ERROR",
                 "Internal error processing idempotent request. Please retry with a new key.");
+    }
+
+    @ExceptionHandler(IdempotencyKeyDuplicateException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleIdempotencyKeyDuplicate(IdempotencyKeyDuplicateException ex) {
+        log.warn("Idempotency key duplicate: {}", ex.getMessage());
+        return new ErrorResponse("IDEMPOTENCY_KEY_DUPLICATE",
+                "Concurrent request with same idempotency key detected. Please retry.");
     }
 
     private boolean isAdmin() {

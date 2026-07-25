@@ -14,12 +14,15 @@ public interface IdempotencyKeyRepository extends JpaRepository<IdempotencyKey, 
 
     @Query("SELECT ik FROM IdempotencyKey ik "
             + "JOIN FETCH ik.user "
-            + "LEFT JOIN FETCH ik.movement "
-            + "WHERE ik.keyHash = :keyHash AND ik.user.id = :userId AND ik.endpoint = :endpoint")
+            + "WHERE ik.keyHash = :keyHash "
+            + "AND ik.user.id = :userId "
+            + "AND ik.endpoint = :endpoint "
+            + "AND ik.expiresAt > :now")
     Optional<IdempotencyKey> findByKeyHashAndUserIdAndEndpoint(
             @Param("keyHash") String keyHash,
             @Param("userId") Long userId,
-            @Param("endpoint") String endpoint
+            @Param("endpoint") String endpoint,
+            @Param("now") LocalDateTime now
     );
 
     @Modifying

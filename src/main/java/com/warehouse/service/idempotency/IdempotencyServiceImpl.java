@@ -9,6 +9,7 @@ import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.IdempotencyKey;
 import com.warehouse.entity.User;
 import com.warehouse.exception.IdempotencyConflictException;
+import com.warehouse.exception.IdempotencyKeyDuplicateException;
 import com.warehouse.exception.IdempotencyKeyRequiredException;
 import com.warehouse.exception.IdempotencyStorageException;
 import com.warehouse.repository.IdempotencyKeyRepository;
@@ -47,7 +48,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
     @Override
     @Transactional
     @Retryable(
-            retryFor = DataIntegrityViolationException.class,
+            retryFor = IdempotencyKeyDuplicateException.class,
             maxAttempts = 3,
             backoff = @Backoff(delay = 100)
     )
@@ -70,11 +71,11 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         }
 
         String keyHash = TokenHashUtil.hashToken(key);
-        log.debug("Processing idempotent request with key: {}, endpoint: {}", key, endpoint);
+        log.debug("Processing idempotent request, endpoint: {}", endpoint);
 
         // Проверяем существующий ключ
         Optional<IdempotencyKey> existingKey = idempotencyKeyRepository
-                .findByKeyHashAndUserIdAndEndpoint(keyHash, ctx.userId(), endpoint);
+                .findByKeyHashAndUserIdAndEndpoint(keyHash, ctx.userId(), endpoint, LocalDateTime.now());
 
         if (existingKey.isPresent()) {
             IdempotencyKey idempotencyKey = existingKey.get();
@@ -91,16 +92,16 @@ public class IdempotencyServiceImpl implements IdempotencyService {
 
             // Возвращаем закешированный ответ (полный JSON из response_body)
             try {
-                log.info("Returning cached response for idempotent request: key={}, endpoint={}", key, endpoint);
+                log.info("Returning cached response for idempotent request, endpoint={}", endpoint);
                 return objectMapper.readValue(idempotencyKey.getResponseBody(), StockMovementResponse.class);
             } catch (JsonProcessingException e) {
                 // Критическая ошибка - не можем десериализовать сохраненный ответ
                 // Это указывает на повреждение данных в БД или изменение структуры DTO
-                log.error("CRITICAL: Failed to deserialize cached response for key={}, endpoint={}. "
+                log.error("CRITICAL: Failed to deserialize cached response for endpoint={}. "
                         + "This indicates data corruption or incompatible DTO changes. "
-                        + "Error: {}", key, endpoint, e.getMessage());
+                        + "Error: {}", endpoint, e.getMessage());
                 throw new IdempotencyStorageException(
-                        "Failed to retrieve cached response for idempotency key: " + key, e
+                        "Failed to retrieve cached response for idempotency key", e
                 );
             }
         }
@@ -110,9 +111,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
 
         // Сохраняем ключ с результатом
         saveIdempotencyKey(keyHash, ctx, endpoint, response, requestBody);
-
-        log.info("Idempotency key saved: key={}, endpoint={}, movementId={}",
-                key, endpoint, response.movementId());
+        log.info("Idempotency key saved for endpoint={} and userId={}", endpoint, ctx.userId());
 
         return response;
     }
@@ -143,7 +142,11 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize response for idempotency key: {}", e.getMessage());
             throw new RuntimeException("Failed to save idempotency key", e);
-        }
+        } catch (DataIntegrityViolationException e) {
+        // Конфликт уникальности (key_hash, user_id, endpoint)
+        throw new IdempotencyKeyDuplicateException("Duplicate idempotency key", e);
+    }
+
     }
 
     private String hashRequestBody(ChangeQuantityMovementRequest request) {
