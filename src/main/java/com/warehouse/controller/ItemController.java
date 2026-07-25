@@ -2,9 +2,11 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.service.category.CategoryService;
 import com.warehouse.service.item.ItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -37,6 +39,7 @@ import java.util.List;
 public class ItemController {
 
     private final ItemService itemService;
+    private final CategoryService categoryService;
 
     @Operation(summary = "Список товаров", description = "Постраничный список с фильтрацией и сортировкой")
     @GetMapping
@@ -97,8 +100,8 @@ public class ItemController {
     @GetMapping("/categories")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public List<String> getCategories() {
+    public List<CategoryResponse> getCategories() {
         log.debug("Received get categories request");
-        return itemService.getCategories();
+        return categoryService.getCategories();
     }
 }

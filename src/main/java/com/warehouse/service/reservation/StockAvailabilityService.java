@@ -17,19 +17,42 @@ public class StockAvailabilityService {
     private final StockRepository stockRepository;
 
     public int getAvailable(long itemId) {
-        Stock stock = getStock(itemId);
-        long reserved = reservationRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE,
-                LocalDateTime.now());
-
-        return Math.toIntExact(stock.getQuantity() - reserved);
+        return getAvailable(getDefaultStock(itemId));
     }
 
     public int getReserved(long itemId) {
-        Stock stock = getStock(itemId);
-        return reservationRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now());
+        return getReserved(getDefaultStock(itemId));
     }
 
-    private Stock getStock(long itemId) {
+    public int getAvailable(Stock stock) {
+        return stock.getQuantity() - getReserved(stock);
+    }
+
+    public int getReserved(Stock stock) {
+        return reservationRepository.findActiveReserveSumByStock(
+                stock,
+                ReservationStatus.ACTIVE,
+                LocalDateTime.now()
+        );
+    }
+
+    public long getTotalQuantity(long itemId) {
+        return stockRepository.findTotalQuantityByItemId(itemId);
+    }
+
+    public long getTotalReserved(long itemId) {
+        return reservationRepository.findActiveReserveSumByItemId(
+                itemId,
+                ReservationStatus.ACTIVE,
+                LocalDateTime.now()
+        );
+    }
+
+    public long getTotalAvailable(long itemId) {
+        return getTotalQuantity(itemId) - getTotalReserved(itemId);
+    }
+
+    private Stock getDefaultStock(long itemId) {
         return stockRepository.findByItemId(itemId)
                 .orElseThrow(() -> EntityNotFoundException.forId("Stock by item", itemId));
     }

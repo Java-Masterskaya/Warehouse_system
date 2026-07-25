@@ -5,10 +5,12 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
 import com.warehouse.repository.IdempotencyKeyRepository;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
@@ -69,18 +71,28 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private String adminToken;
     private String userToken;
     private Item testItem;
     private Long testItemId;
+    private Category testCategory;
 
     @BeforeEach
     void setUp() throws Exception {
         String uniqueSku = "SKU-MOV-" + System.currentTimeMillis();
+        testCategory = categoryRepository.findByNameIgnoreCase("Категория")
+                .orElseGet(() -> categoryRepository.save(
+                        Category.builder()
+                                .name("Категория")
+                                .build()
+                ));
         testItem = new Item();
         testItem.setSku(uniqueSku);
         testItem.setName("Тестовый товар");
-        testItem.setCategory("Категория");
+        testItem.setCategory(testCategory);
         testItem.setMinStock(5);
         testItem.setActive(true);
         testItem.setPrice(BigDecimal.valueOf(500.00));
@@ -89,6 +101,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
         Stock stock = new Stock();
         stock.setItem(testItem);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(10);
         stockRepository.save(stock);
 
