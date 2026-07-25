@@ -45,13 +45,23 @@ public class AuditService {
     }
 
     @Scheduled(cron = "0 0 3 * * ?")
-    @Transactional
     public void cleanupOldAuditLogs() {
         log.info("Starting audit log retention cleanup (older than {} days)...", retentionDays);
+        int totalDeleted = 0;
+        int deletedInBatch;
 
-        Integer deletedRows = jdbcTemplate.queryForObject("SELECT purge_old_audit_logs(?, ?)", Integer.class,
-                retentionDays, batchSize);
+        do {
+            // Вызываем один батч в отдельной короткой транзакции
+            deletedInBatch = deleteBatch(retentionDays, batchSize);
+            totalDeleted += deletedInBatch;
+        } while (deletedInBatch == batchSize); // Крутим, пока батчи полные
 
-        log.info("Audit log cleanup finished. Total deleted rows: {}", deletedRows);
+        log.info("Audit log retention finished. Total deleted rows: {}", totalDeleted);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int deleteBatch(int retentionDays, int batchSize) {
+        String sql = "SELECT purge_old_audit_logs_batch(?, ?)";
+        return jdbcTemplate.update(sql, retentionDays, batchSize);
     }
 }
