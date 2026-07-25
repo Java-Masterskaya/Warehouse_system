@@ -7,7 +7,6 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 public interface ItemService {
 
@@ -18,8 +17,6 @@ public interface ItemService {
     ItemDetailsResponse getItem(Long itemId);
 
     PageResponse<ItemResponse> getItems(String sort, String order, String category, String search, int page, int size);
-
-    List<String> getCategories();
 
     void softDeleteItem(Long itemId);
 

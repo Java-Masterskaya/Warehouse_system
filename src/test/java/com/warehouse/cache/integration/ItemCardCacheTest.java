@@ -2,8 +2,10 @@ package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
@@ -11,6 +13,7 @@ import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
 import org.springframework.test.context.TestPropertySource;
 
@@ -22,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Интеграционный тест для проверки кэширования карточки товара.
  */
 @TestPropertySource(properties = "bucket4j.enabled=false")
+@SpringBootTest
 class ItemCardCacheTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -39,6 +43,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     @Autowired
     CacheManager cacheManager;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private Long itemId;
 
     @BeforeEach
@@ -48,11 +55,18 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
+        categoryRepository.deleteAllInBatch();
+
+        Category electronics = categoryRepository.save(
+                Category.builder()
+                        .name("Электроника")
+                        .build()
+        );
 
         Item item = new Item();
         item.setSku("SKU-001");
         item.setName("Ноутбук");
-        item.setCategory("Электроника");
+        item.setCategory(electronics);
         item.setMinStock(5);
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));

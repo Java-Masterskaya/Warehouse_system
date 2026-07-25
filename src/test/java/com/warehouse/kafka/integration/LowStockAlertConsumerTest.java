@@ -3,8 +3,10 @@ package com.warehouse.kafka.integration;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.StockAlert;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -63,6 +65,9 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     @Autowired
     StringRedisTemplate redisTemplate;
 
+    @Autowired
+    CategoryRepository categoryRepository;
+
     private Long testItemId;
 
     @BeforeEach
@@ -71,11 +76,19 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
         stockMovementRepository.deleteAll();
         stockRepository.deleteAll();
         itemRepository.deleteAll();
+        categoryRepository.deleteAll();
+
+        Category category = categoryRepository.save(
+                Category.builder()
+                        .name(TEST_CATEGORY)
+                        .build()
+        );
+
 
         Item item = Item.builder()
                 .sku(TEST_SKU)
                 .name(TEST_ITEM_NAME)
-                .category(TEST_CATEGORY)
+                .category(category)
                 .minStock(TEST_MIN_STOCK)
                 .active(true)
                 .price(BigDecimal.valueOf(100.00))
@@ -112,7 +125,7 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     /**
      * Проверяет, что повторная доставка одного и того же сообщения из Kafka
      * не создает дубликат и не вызывает исключений.
-     *
+     * 
      * Это критичный сценарий: при сбое consumer'а после commit offset'а,
      * Kafka может доставить сообщение повторно. Уникальный индекс и INSERT IGNORE
      * должны пропустить дубликат без DataIntegrityViolationException.

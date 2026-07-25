@@ -5,7 +5,6 @@ import com.warehouse.repository.WarehouseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -23,7 +22,6 @@ import org.testcontainers.utility.DockerImageName;
  * Порты не меняются между тест-классами, поэтому кэшированный Spring-контекст
  * всегда имеет актуальные адреса.
  */
-@SpringBootTest
 @AutoConfigureMockMvc
 public abstract class AbstractIntegrationTest {
 

@@ -3,6 +3,8 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
+import com.warehouse.exception.CategoryInUseException;
+import com.warehouse.exception.DuplicateCategoryException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.DuplicateWarehouseNameException;
@@ -32,6 +34,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -114,6 +117,18 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("INVENTORY_RESULT_LESS_THAN_RESERVED", ex.getMessage());
     }
 
+    @ExceptionHandler(CategoryInUseException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleCategoryInUse(CategoryInUseException ex) {
+        return new ErrorResponse("CATEGORY_IN_USE", ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateCategoryException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDuplicateCategory(DuplicateCategoryException ex) {
+        return new ErrorResponse("DUPLICATE_CATEGORY", ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ValidationErrorResponse handleValidation(MethodArgumentNotValidException ex) {
@@ -189,6 +204,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getWaitTime()))
                 .body(new ErrorResponse("SECURITY_LOCKOUT_ERROR", ex.getMessage()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNoResourceFound(NoResourceFoundException ex) {
+        log.warn("Invalid request: {}", ex.getMessage());
+        return new ErrorResponse("INVALID_REQUEST",
+                "Our server could not locate the specific resource you requested. Please check the URL.");
     }
 
     @ExceptionHandler(Exception.class)
