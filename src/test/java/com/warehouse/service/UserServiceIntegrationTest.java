@@ -7,6 +7,9 @@ import com.warehouse.audit.AuditRepository;
 import com.warehouse.audit.entity.AuditAction;
 import com.warehouse.audit.entity.AuditLogEntity;
 import com.warehouse.audit.entity.EntityType;
+import com.warehouse.dto.UserContext;
+import com.warehouse.dto.request.user.UserCreateRequest;
+import com.warehouse.dto.response.user.UserResponse;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
@@ -49,9 +52,6 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private TokenService tokenService;
-
-    @Autowired
-    private JwtUtil jwtUtil;
 
     private User testUser;
     private String accessToken;
@@ -125,6 +125,48 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
+    // ==================== AUDIT TESTS ====================
+    @Test
+    @DisplayName("Should create audit record without password when user is created")
+    void shouldCreateAuditRecordWhenUserCreated() throws Exception {
+        User admin = createActiveAdmin("Admin_Creator");
+
+        UserCreateRequest createRequest = new UserCreateRequest();
+        createRequest.setUsername("NewUserToAudit");
+        createRequest.setPassword("SuperSecret123!");
+        createRequest.setRole(Role.ROLE_USER);
+
+        UserResponse createdUser;
+
+        try {
+            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                    new UserPrincipal(admin.getId(), admin.getUsername(), admin.getPassword(), admin.isActive(),
+                            List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))), null,
+                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+
+            createdUser = userService.createUser(createRequest);
+
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+
+        AuditLogEntity audit = auditRepository.findTopByOrderByIdDesc();
+        JsonNode newNode = audit.getNewValue();
+
+        assertThat(audit.getAuditAction()).isEqualTo(AuditAction.CREATE);
+        assertThat(audit.getEntityType()).isEqualTo(EntityType.USER);
+        assertThat(audit.getEntityId()).isEqualTo(createdUser.getId());
+        assertThat(audit.getUsername()).isEqualTo(admin.getUsername());
+
+        assertThat(audit.getOldValue()).isNull();
+
+        assertThat(newNode).isNotNull();
+        assertThat(newNode.get("username").asText()).isEqualTo("NewUserToAudit");
+        assertThat(newNode.get("role").asText()).isEqualTo(Role.ROLE_USER.name());
+
+        assertThat(newNode.has("password")).isFalse();
+    }
+
     @Test
     void shouldCreateAuditRecordWhenUserDeactivated() throws JsonProcessingException {
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
@@ -155,6 +197,8 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(audit.getUsername()).isEqualTo(admin.getUsername());
         assertThat(oldNode.get("active").asBoolean()).isTrue();
         assertThat(newNode.get("active").asBoolean()).isFalse();
+
+        assertThat(newNode.has("password")).isFalse();
     }
 
     // ==================== NEW DEACTIVATION TESTS ====================
