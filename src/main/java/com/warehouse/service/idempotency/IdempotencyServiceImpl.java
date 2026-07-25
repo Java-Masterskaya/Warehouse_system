@@ -26,7 +26,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -42,8 +44,11 @@ public class IdempotencyServiceImpl implements IdempotencyService {
     @Value("${app.idempotency.ttl-hours:24}")
     private long ttlHours;
 
-    @Value("${app.idempotency.required:true}")
+    @Value("${app.idempotency.required:false}")
     private boolean idempotencyRequired;
+
+    @Value("${app.idempotency.enforce-after:}")
+    private String enforceAfterDate;
 
     @Override
     @Transactional
@@ -61,12 +66,15 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         String endpoint = context.endpoint();
         UserContext ctx = context.userContext();
 
-        // Если ключ не предоставлен - либо ошибка, либо выполняем обычную обработку в зависимости от настройки
+        // Проверяем, нужно ли уже принудительно требовать ключ
         if (!context.hasKey()) {
-            if (idempotencyRequired) {
+            if (shouldEnforceIdempotency()) {
                 throw IdempotencyKeyRequiredException.forEndpoint(endpoint);
             }
-            log.debug("Executing non-idempotent request for endpoint: {}", endpoint);
+            // Grace period: логируем и пропускаем
+            log.warn("Request without Idempotency-Key received during grace period. "
+                            + "Endpoint: {}, User: {}. This will become required after {}",
+                    endpoint, ctx.username(), enforceAfterDate);
             return operation.get();
         }
 
@@ -153,6 +161,22 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         return TokenHashUtil.hashToken(
                 request.itemId() + ":" + request.quantity()
         );
+    }
+
+    private boolean shouldEnforceIdempotency() {
+        // Если задана дата - проверяем
+        if (enforceAfterDate != null && !enforceAfterDate.isEmpty()) {
+            try {
+                LocalDate enforceDate = LocalDate.parse(enforceAfterDate);
+                return LocalDate.now().isAfter(enforceDate) || LocalDate.now().isEqual(enforceDate);
+            } catch (DateTimeParseException e) {
+                log.warn("Invalid enforceAfterDate format: {}. Expected yyyy-MM-dd", enforceAfterDate);
+                // Если дата невалидна - используем required как fallback
+                return idempotencyRequired;
+            }
+        }
+        // 2. Если дата не задана - используем required
+        return idempotencyRequired;
     }
 
     @Override

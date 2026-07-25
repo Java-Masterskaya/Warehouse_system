@@ -44,3 +44,4 @@ app:
     ttl-hours: 1
     required: true
     cleanup-cron: "0 0/1 * * * *"
+    enforce-after: 2020-01-01  # Дата в прошлом

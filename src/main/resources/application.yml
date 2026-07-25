@@ -79,6 +79,7 @@ app:
     ttl-hours: 24
     required: true # Обязательность заголовка Idempotency-Key
     cleanup-cron: "0 0 * * * *"  # Каждый час
+    enforce-after: 2026-08-26
 
 management:
   endpoints:
