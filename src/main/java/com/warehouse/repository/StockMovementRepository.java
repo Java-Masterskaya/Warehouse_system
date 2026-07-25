@@ -28,13 +28,17 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
                     sm.type,
                     sm.quantity,
                     u.username,
-                    sm.createdAt
+                    sm.createdAt,
+                    w.id,
+                    w.name,
+                    sm.transferId
                 )
                 from StockMovement sm
                 join sm.user u
+                join sm.warehouse w
                 where sm.item.id = :itemId
                   and (:type is null or sm.type = :type)
-                order by sm.createdAt desc
+                order by sm.createdAt desc, sm.id desc
             """)
     Page<StockMovementHistoryResponse> findHistoryByItemId(
             @Param("itemId") Long itemId,

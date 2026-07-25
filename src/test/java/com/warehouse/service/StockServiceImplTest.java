@@ -52,10 +52,11 @@ class StockServiceImplTest {
     void writeOffStockSuccess() {
         // Arrange
         when(stockRepository.decreaseQuantityIfEnough(ITEM_ID, WRITE_OFF_AMOUNT)).thenReturn(1);
-        when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(EXPECTED_STOCK_AFTER_WRITE_OFF));
+        when(stockRepository.findQuantityByItemId(ITEM_ID))
+                .thenReturn(Optional.of(EXPECTED_STOCK_AFTER_WRITE_OFF));
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT);
+        when(availabilityService.getAvailable(stock)).thenReturn(EXCESSIVE_AMOUNT);
 
         // Act
         int result = stockService.writeOffStock(ITEM_ID, WRITE_OFF_AMOUNT);
@@ -75,7 +76,7 @@ class StockServiceImplTest {
         when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(0));
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT);
+        when(availabilityService.getAvailable(stock)).thenReturn(EXCESSIVE_AMOUNT);
 
         // Act
         int result = stockService.writeOffStock(ITEM_ID, WRITE_OFF_AMOUNT);
@@ -90,11 +91,7 @@ class StockServiceImplTest {
     @Test
     void stockNotFoundThrowsEntityNotFoundException() {
         // Arrange
-        when(stockRepository.decreaseQuantityIfEnough(NON_EXISTENT_ITEM_ID, WRITE_OFF_AMOUNT)).thenReturn(0);
-        when(stockRepository.findQuantityByItemId(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
-        Stock stock = new Stock();
-        when(stockRepository.findByItemIdForUpdate(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(NON_EXISTENT_ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT);
+        when(stockRepository.findByItemIdForUpdate(NON_EXISTENT_ITEM_ID)).thenReturn(Optional.empty());
 
         // Act & Assert
         EntityNotFoundException ex = assertThrows(EntityNotFoundException.class, () -> {
@@ -109,8 +106,7 @@ class StockServiceImplTest {
         assertTrue(message.contains("not found"),
                 "Сообщение должно содержать 'not found'");
 
-        // Сохранение не вызывалось
-        verify(stockRepository, never()).findByItemId(NON_EXISTENT_ITEM_ID);
+        verify(stockRepository, never()).decreaseQuantityIfEnough(NON_EXISTENT_ITEM_ID, WRITE_OFF_AMOUNT);
     }
 
     /**
@@ -120,10 +116,9 @@ class StockServiceImplTest {
     void insufficientStockThrowsInsufficientStockException() {
         // Arrange
         when(stockRepository.decreaseQuantityIfEnough(ITEM_ID, EXCESSIVE_AMOUNT)).thenReturn(0);
-        when(stockRepository.findQuantityByItemId(ITEM_ID)).thenReturn(Optional.of(LOW_STOCK_QUANTITY));
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(ITEM_ID)).thenReturn(EXCESSIVE_AMOUNT);
+        when(availabilityService.getAvailable(stock)).thenReturn(EXCESSIVE_AMOUNT, LOW_STOCK_QUANTITY);
 
         // Act & Assert
         InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
@@ -141,8 +136,7 @@ class StockServiceImplTest {
         assertTrue(message.contains(String.valueOf(LOW_STOCK_QUANTITY)),
                 "Сообщение должно содержать доступное количество");
 
-        // Остаток не должен измениться
-        verify(stockRepository, never()).findByItemId(ITEM_ID);
+        verify(stockRepository).decreaseQuantityIfEnough(ITEM_ID, EXCESSIVE_AMOUNT);
     }
 
     /**
@@ -153,7 +147,7 @@ class StockServiceImplTest {
         // Arrange
         Stock stock = new Stock();
         when(stockRepository.findByItemIdForUpdate(ITEM_ID)).thenReturn(Optional.of(stock));
-        when(availabilityService.getAvailable(ITEM_ID)).thenReturn(LOW_STOCK_QUANTITY);
+        when(availabilityService.getAvailable(stock)).thenReturn(LOW_STOCK_QUANTITY);
 
         // Act & Assert
         InsufficientStockException ex = assertThrows(InsufficientStockException.class, () -> {
@@ -171,7 +165,6 @@ class StockServiceImplTest {
         assertTrue(message.contains(String.valueOf(LOW_STOCK_QUANTITY)),
                 "Сообщение должно содержать доступное количество");
 
-        // Остаток не должен измениться
-        verify(stockRepository, never()).findByItemId(ITEM_ID);
+        verify(stockRepository, never()).decreaseQuantityIfEnough(ITEM_ID, EXCESSIVE_AMOUNT);
     }
 }

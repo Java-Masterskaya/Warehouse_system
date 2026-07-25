@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SpringBootTest
 @DisplayName("UserService Integration Tests")
 class UserServiceIntegrationTest extends AbstractIntegrationTest {
 

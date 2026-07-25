@@ -7,10 +7,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,11 +22,16 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
- * Остаток товара на складе.
- * Содержит текущее количество единиц товара и время последнего обновления.
- * Связан с товаром (Item) отношением один к одному.
+ * Остаток конкретного товара на конкретном складе.
  */
-@Entity @Table(name = "stock")
+@Entity
+@Table(
+        name = "stock",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_stock_item_warehouse",
+                columnNames = {"item_id", "warehouse_id"}
+        )
+)
 @Getter @Setter @Builder
 @NoArgsConstructor @AllArgsConstructor
 public class Stock {
@@ -35,9 +41,14 @@ public class Stock {
     private Long id;
 
     /** Товар, для которого хранится остаток. */
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "item_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "item_id", nullable = false)
     private Item item;
+
+    /** Склад, на котором находится товар. */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "warehouse_id", nullable = false)
+    private Warehouse warehouse;
 
     /** Текущее количество единиц товара на складе. */
     @Column(nullable = false)

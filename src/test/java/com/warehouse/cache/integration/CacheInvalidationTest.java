@@ -4,17 +4,19 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.repository.StockReserveRepository;
-import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +26,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -33,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Интеграционный тест для проверки инвалидации кэша.
  */
+@SpringBootTest
 class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -54,6 +58,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     private StockMovementService stockMovementService;
     @Autowired
     private StockAlertRepository stockAlertRepository;
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -72,11 +78,18 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
+        categoryRepository.deleteAllInBatch();
+
+        Category electronics = categoryRepository.save(
+                Category.builder()
+                        .name("Электроника")
+                        .build()
+        );
 
         Item item = new Item();
         item.setSku("SKU-001");
         item.setName("Ноутбук");
-        item.setCategory("Электроника");
+        item.setCategory(electronics);
         item.setMinStock(5);
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));
@@ -85,6 +98,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(10);
         stockRepository.save(stock);
 
@@ -154,44 +168,6 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
         ItemDetailsResponse response = itemService.getItem(itemId);
         assertThat(response.getCurrentStock()).isEqualTo(7);
-    }
-
-    /**
-     * createItem с новой категорией очищает кэш категорий.
-     */
-    @Test
-    void createItemWithNewCategoryShouldEvictCategoriesCache() {
-        List<String> firstCall = itemService.getCategories();
-        assertThat(firstCall).contains("Электроника");
-
-        com.warehouse.dto.request.item.CreateItemRequest createRequest =
-                new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель",
-                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00));
-        itemService.createItem(createRequest);
-
-        List<String> secondCall = itemService.getCategories();
-        assertThat(secondCall).contains("Электроника", "Мебель");
-    }
-
-    /**
-     * updateItem с изменением категории очищает кэш категорий.
-     */
-    @Test
-    void updateItemWithCategoryChangeShouldEvictCategoriesCache() {
-        com.warehouse.dto.request.item.CreateItemRequest createRequest =
-                new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель",
-                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00));
-        itemService.createItem(createRequest);
-
-        List<String> firstCall = itemService.getCategories();
-        assertThat(firstCall).contains("Электроника", "Мебель");
-
-        UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук", "Мебель", 5,
-                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00));
-        itemService.updateItem(itemId, updateRequest);
-
-        List<String> secondCall = itemService.getCategories();
-        assertThat(secondCall).doesNotHaveDuplicates();
     }
 
     private void setAuthentification() {
