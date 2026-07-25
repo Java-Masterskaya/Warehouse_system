@@ -1,6 +1,5 @@
 package com.warehouse.kafka.integration;
 
-import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.Category;
@@ -9,17 +8,18 @@ import com.warehouse.entity.StockAlert;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
-import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.redpanda.RedpandaContainer;
+import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -32,13 +32,11 @@ import static org.awaitility.Awaitility.await;
 
 /**
  * Интеграционный тест для проверки потребления alertов о низких остатках из Kafka.
- * Наследуется от AbstractIntegrationTest для использования общей инфраструктуры тестов.
  */
 @Tag("integration")
 @Testcontainers
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 @SpringBootTest(classes = WarehouseApp.class)
-class LowStockAlertConsumerTest extends AbstractIntegrationTest {
+class LowStockAlertConsumerTest {
 
     private static final String TEST_SKU = "SKU-001";
     private static final String TEST_ITEM_NAME = "Test Item";
@@ -47,6 +45,18 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     private static final int TEST_CURRENT_STOCK = 5;
     private static final String TEST_TRIGGERED_BY = "admin";
 
+    static final RedpandaContainer redpanda =
+            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1"));
+
+    static {
+        redpanda.start();
+    }
+
+    @DynamicPropertySource
+    static void kafkaProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.kafka.bootstrap-servers", redpanda::getBootstrapServers);
+    }
+
     @Autowired
     KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -54,16 +64,10 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     StockAlertRepository stockAlertRepository;
 
     @Autowired
-    StockMovementRepository stockMovementRepository;
-
-    @Autowired
-    StockRepository stockRepository;
-
-    @Autowired
     ItemRepository itemRepository;
 
     @Autowired
-    StringRedisTemplate redisTemplate;
+    StockRepository stockRepository;
 
     @Autowired
     CategoryRepository categoryRepository;
@@ -73,7 +77,6 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         stockAlertRepository.deleteAll();
-        stockMovementRepository.deleteAll();
         stockRepository.deleteAll();
         itemRepository.deleteAll();
         categoryRepository.deleteAll();
@@ -124,7 +127,7 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     /**
      * Проверяет, что повторная доставка одного и того же сообщения из Kafka
      * не создает дубликат и не вызывает исключений.
-     * 
+     *
      * Это критичный сценарий: при сбое consumer'а после commit offset'а,
      * Kafka может доставить сообщение повторно. Уникальный индекс и INSERT IGNORE
      * должны пропустить дубликат без DataIntegrityViolationException.
