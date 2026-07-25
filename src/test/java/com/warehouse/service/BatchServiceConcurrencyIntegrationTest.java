@@ -14,6 +14,7 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.service.batch.BatchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Важно: сам тест не должен выполняться в одной общей транзакции,
  * иначе worker-потоки могут не увидеть созданные Item/Stock.
  */
+@SpringBootTest
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
 

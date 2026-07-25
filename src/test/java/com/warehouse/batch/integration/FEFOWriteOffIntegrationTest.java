@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,6 +34,7 @@ import com.warehouse.service.movement.StockMovementService;
  * Интеграционный тест для проверки FEFO (First Expire First Out) списания.
  * Проверяет, что списание гасит партии по возрастанию срока годности.
  */
+@SpringBootTest
 @DisplayName("FEFO write-off integration test")
 class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 

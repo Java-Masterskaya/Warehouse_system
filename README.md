@@ -60,7 +60,7 @@ make up
 | PostgreSQL       | postgres:16        | 5432 |
 | Redis            | redis:7-alpine     | 6379 |
 | Redpanda (Kafka) | redpanda:v23.2.11  | 9092 (внутри Docker: 29092) |
-| Schema Registry  | встроен в Redpanda | 8081 |
+| Schema Registry  | встроен в Redpanda | 18081 (внутри Docker: 8081) |
 | Consul           | hashicorp/consul:1.16 | 8500 (UI) |
 
 ## Бэкап и восстановление БД
@@ -234,7 +234,7 @@ http://localhost:8500/v1/kv/config/warehouse-system/data
 "@warehouse-config.yaml"
 * Приложение автоматически применит изменения (в течение 1 секунды, благодаря ConfigWatch), либо:
 ```bash
-  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8080/actuator/refresh
+  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8081/actuator/refresh
 ```
 Способ 2. Через Consul UI
 Откройте http://localhost:8500
@@ -332,8 +332,8 @@ make checkstyle
 **Важно:** Для запуска через `docker-compose up` или `make up` **обязательно** должен быть запущен контейнер `warehouse-app`, так как Prometheus собирает метрики с приложения через `/actuator/prometheus`. Если приложение не запущено - алерты не будут работать.
 
 **Настройка цели (target):**
-- В Docker-сети: `['warehouse-app:8080']`
-- При локальном запуске: `['host.docker.internal:8080']`
+- В Docker-сети: `['warehouse-app:8081']`
+- При локальном запуске: `['host.docker.internal:8081']`
 
 ### Alertmanager
 
