@@ -41,10 +41,6 @@ public class IdempotencyKey {
     @Column(name = "endpoint", nullable = false, length = 255)
     private String endpoint;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "movement_id")
-    private StockMovement movement;
-
     @Column(name = "request_body_hash", nullable = false, length = 64)
     private String requestBodyHash;  // Хеш для проверки конфликтов
 

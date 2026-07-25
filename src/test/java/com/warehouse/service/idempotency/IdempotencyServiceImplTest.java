@@ -142,7 +142,7 @@ class IdempotencyServiceImplTest {
         void shouldCreateMovementAndSaveKeyForNewRequest() throws Exception {
             // given
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    KEY_HASH, USER_ID, ENDPOINT, any(LocalDateTime.class)
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenReturn(Optional.empty());
 
             when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
@@ -180,7 +180,7 @@ class IdempotencyServiceImplTest {
         void shouldThrowExceptionWhenSerializationFails() throws Exception {
             // given
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    KEY_HASH, USER_ID, ENDPOINT, any(LocalDateTime.class)
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenReturn(Optional.empty());
 
             when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
@@ -251,7 +251,7 @@ class IdempotencyServiceImplTest {
         void shouldReturnCachedResponseForDuplicateRequest() throws Exception {
             // given
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    KEY_HASH, USER_ID, ENDPOINT, any(LocalDateTime.class)
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenReturn(Optional.of(existingKey));
 
             when(objectMapper.readValue(existingKey.getResponseBody(), StockMovementResponse.class))
@@ -276,7 +276,7 @@ class IdempotencyServiceImplTest {
         void shouldThrowConflictExceptionWhenSameKeyDifferentBody() {
             // given
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    KEY_HASH, USER_ID, ENDPOINT, any(LocalDateTime.class)
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenReturn(Optional.of(existingKey));
 
             ChangeQuantityMovementRequest differentBody = new ChangeQuantityMovementRequest(1L, 10);
@@ -305,7 +305,7 @@ class IdempotencyServiceImplTest {
                     .build();
 
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    KEY_HASH, USER_ID, ENDPOINT, any(LocalDateTime.class)
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenReturn(Optional.of(invalidKey));
 
             when(objectMapper.readValue("invalid json", StockMovementResponse.class))
@@ -370,11 +370,11 @@ class IdempotencyServiceImplTest {
                     new IdempotentRequestContext(secondKey, ENDPOINT, userContext);
 
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    KEY_HASH, USER_ID, ENDPOINT, any(LocalDateTime.class)
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenReturn(Optional.empty());
 
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    secondKeyHash, USER_ID, ENDPOINT, any(LocalDateTime.class)
+                    eq(secondKeyHash), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenReturn(Optional.empty());
 
             when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
@@ -414,7 +414,7 @@ class IdempotencyServiceImplTest {
 
             // Мокаем: первый раз ключа нет, потом есть
             when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
-                    KEY_HASH, USER_ID, ENDPOINT, any(LocalDateTime.class)
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenAnswer(invocation -> {
                 if (operationCallCount.get() == 0) {
                     return Optional.empty();

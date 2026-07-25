@@ -141,12 +141,11 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             idempotencyKeyRepository.save(idempotencyKey);
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize response for idempotency key: {}", e.getMessage());
-            throw new RuntimeException("Failed to save idempotency key", e);
+            throw new IdempotencyStorageException("Failed to save idempotency key", e);
         } catch (DataIntegrityViolationException e) {
-        // Конфликт уникальности (key_hash, user_id, endpoint)
-        throw new IdempotencyKeyDuplicateException("Duplicate idempotency key", e);
-    }
-
+            // Конфликт уникальности (key_hash, user_id, endpoint)
+            throw new IdempotencyKeyDuplicateException("Duplicate idempotency key", e);
+        }
     }
 
     private String hashRequestBody(ChangeQuantityMovementRequest request) {
