@@ -4,6 +4,10 @@ import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.valuation.CategoryValuation;
 import com.warehouse.entity.Item;
 import com.warehouse.repository.projection.LowStockProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -19,23 +23,20 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
 
     boolean existsBySku(String sku);
 
-    Optional<Item> findBySku(String sku);
+    @Override
+    @EntityGraph(attributePaths = "category")
+    Page<Item> findAll(Specification<Item> spec, Pageable pageable);
 
-    @Query("""
-            SELECT DISTINCT i.category
-            FROM Item i
-            WHERE i.active = true
-            """)
-    List<String> findDistinctCategories();
+    Optional<Item> findBySku(String sku);
 
     @Query("""
             SELECT new com.warehouse.dto.response.item.ItemDetailsProjection(
                 i.id,
                 i.sku,
                 i.name,
-                i.category,
+                i.category.name,
                 i.minStock,
-                s.quantity,
+                COALESCE(SUM(s.quantity), 0),
                 i.price,
                 i.cost,
                 i.active,
@@ -43,8 +44,10 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 i.updatedAt
             )
             FROM Item i
-            JOIN Stock s on s.item.id = i.id
+            LEFT JOIN Stock s ON s.item.id = i.id
             WHERE i.id = :itemId
+            GROUP BY i.id, i.sku, i.name, i.category.name, i.minStock,
+                i.price, i.cost, i.active, i.createdAt, i.updatedAt
             """)
     Optional<ItemDetailsProjection> findWithStock(@Param("itemId") Long itemId);
 
@@ -53,13 +56,15 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
             i.id as id,
             i.sku as sku,
             i.name as name,
-            i.category as category,
-            s.quantity as currentStock,
+            i.category.name as category,
+            COALESCE(SUM(s.quantity), 0) as currentStock,
             i.minStock as minStock
         FROM Item i
-        JOIN Stock s ON s.item.id = i.id
-        WHERE s.quantity < i.minStock AND i.active = true
-        ORDER BY (i.minStock - s.quantity) DESC
+        LEFT JOIN Stock s ON s.item.id = i.id
+        WHERE i.active = true
+        GROUP BY i.id, i.sku, i.name, i.category.name, i.minStock
+        HAVING COALESCE(SUM(s.quantity), 0) < i.minStock
+        ORDER BY (i.minStock - COALESCE(SUM(s.quantity), 0)) DESC
         """)
     List<LowStockProjection> findLowStockItems();
 
@@ -91,15 +96,16 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
      */
     @Query("""
             SELECT new com.warehouse.dto.response.valuation.CategoryValuation(
-                i.category,
+                i.category.name,
                 COALESCE(SUM(COALESCE(s.quantity, 0) * COALESCE(i.cost, 0)), 0)
             )
             FROM Item i
             LEFT JOIN Stock s ON s.item = i
             WHERE i.active = true
-            GROUP BY i.category
-            ORDER BY i.category
+            GROUP BY i.category.name
+            ORDER BY i.category.name
             """)
     List<CategoryValuation> calculateValuationByCategory();
-}
 
+    boolean existsByCategoryId(Long categoryId);
+}

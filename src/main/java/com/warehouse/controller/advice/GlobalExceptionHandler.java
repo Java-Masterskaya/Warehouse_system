@@ -3,8 +3,11 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
+import com.warehouse.exception.CategoryInUseException;
+import com.warehouse.exception.DuplicateCategoryException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
+import com.warehouse.exception.DuplicateWarehouseNameException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
@@ -86,6 +89,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("DUPLICATE_USERNAME", message);
     }
 
+    @ExceptionHandler(DuplicateWarehouseNameException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDuplicateWarehouseName(DuplicateWarehouseNameException ex) {
+        return new ErrorResponse("DUPLICATE_WAREHOUSE_NAME", ex.getMessage());
+    }
+
     @ExceptionHandler(LastAdminDeactivationException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleLastAdminDeactivation(LastAdminDeactivationException ex) {
@@ -103,6 +112,18 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleStocktakeConflict(StocktakeConflictException ex) {
         return new ErrorResponse("INVENTORY_RESULT_LESS_THAN_RESERVED", ex.getMessage());
+    }
+
+    @ExceptionHandler(CategoryInUseException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleCategoryInUse(CategoryInUseException ex) {
+        return new ErrorResponse("CATEGORY_IN_USE", ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateCategoryException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDuplicateCategory(DuplicateCategoryException ex) {
+        return new ErrorResponse("DUPLICATE_CATEGORY", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

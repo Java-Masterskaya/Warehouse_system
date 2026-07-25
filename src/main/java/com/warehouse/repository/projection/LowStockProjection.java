@@ -10,7 +10,7 @@ public interface LowStockProjection {
 
     String getCategory();
 
-    int getCurrentStock();
+    long getCurrentStock();
 
     int getMinStock();
 }

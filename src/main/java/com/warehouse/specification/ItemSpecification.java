@@ -13,7 +13,7 @@ public class ItemSpecification {
     }
 
     public static Specification<Item> hasCategory(String category) {
-        return (root, query, cb) -> cb.equal(root.get("category"), category);
+        return (root, query, cb) -> cb.equal(root.get("category").get("name"), category);
     }
 
     public static Specification<Item> nameContains(String search) {

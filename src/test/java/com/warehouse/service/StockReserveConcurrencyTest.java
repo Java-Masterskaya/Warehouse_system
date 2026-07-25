@@ -3,11 +3,13 @@ package com.warehouse.service;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.reservation.ReserveRequest;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
@@ -43,11 +45,24 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
     @Autowired
     StockReserveService stockReserveService;
 
+    @Autowired
+    CategoryRepository categoryRepository;
+
     @Test
     void shouldNotAllowOverReservation() throws Exception {
+        Category category = categoryRepository.save(
+                Category.builder()
+                        .name("category")
+                        .build()
+        );
+
         Item item = itemRepository.save(
-                Item.builder().sku("12345676").name("name").category("category").minStock(0).active(true).build());
-        Stock stock = stockRepository.save(Stock.builder().item(item).quantity(10).build());
+                Item.builder().sku("12345676").name("name").category(category).minStock(0).active(true).build());
+        Stock stock = stockRepository.save(Stock.builder()
+                .item(item)
+                .warehouse(defaultWarehouse())
+                .quantity(10)
+                .build());
         User user = userRepository.save(
                 User.builder().username("name").password("sOme1@@@").role(Role.ROLE_ADMIN).build());
         ReserveRequest request = new ReserveRequest(7, 1);

@@ -2,8 +2,10 @@ package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
@@ -39,6 +41,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     @Autowired
     CacheManager cacheManager;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private Long itemId;
 
     @BeforeEach
@@ -48,11 +53,18 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
+        categoryRepository.deleteAllInBatch();
+
+        Category electronics = categoryRepository.save(
+                Category.builder()
+                        .name("Электроника")
+                        .build()
+        );
 
         Item item = new Item();
         item.setSku("SKU-001");
         item.setName("Ноутбук");
-        item.setCategory("Электроника");
+        item.setCategory(electronics);
         item.setMinStock(5);
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));
@@ -61,6 +73,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
 
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(10);
         stockRepository.save(stock);
 
