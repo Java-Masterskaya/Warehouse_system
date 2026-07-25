@@ -2,7 +2,8 @@ package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
@@ -96,6 +97,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         // Создаем начальную партию для синхронизации с stock.quantity
         Batch batch = new Batch();
         batch.setItem(item);
+        batch.setWarehouse(defaultWarehouse());
         batch.setQuantity(10);
         batch.setExpiryDate(LocalDateTime.now().plusDays(365));
         batchRepository.save(batch);
@@ -144,7 +146,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(
+        ReceiveStockRequest movementRequest = new ReceiveStockRequest(
                 itemId, 5, LocalDateTime.now().plusDays(1));
         stockMovementService.registerReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
@@ -159,7 +161,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Test
     void writeOffMovementShouldEvictItemCache() {
         // Сначала создаем партию через приход
-        ChangeQuantityMovementRequest receiptRequest = new ChangeQuantityMovementRequest(
+        ReceiveStockRequest receiptRequest = new ReceiveStockRequest(
                 itemId, 10, LocalDateTime.now().plusDays(1));
         stockMovementService.registerReceipt(receiptRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
@@ -169,8 +171,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         assertThat(response1.getCurrentStock()).isEqualTo(20);
 
         // Теперь списываем
-        ChangeQuantityMovementRequest writeOffRequest = new ChangeQuantityMovementRequest(
-                itemId, 3, LocalDateTime.now());
+        WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(itemId, 3);
         stockMovementService.writeOffReceipt(writeOffRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 

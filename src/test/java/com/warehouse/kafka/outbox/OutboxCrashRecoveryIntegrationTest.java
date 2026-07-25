@@ -2,7 +2,7 @@ package com.warehouse.kafka.outbox;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
@@ -147,6 +147,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         // Создаем партию для начального остатка (чтобы FEFO могла работать)
         com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
         batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
         batch.setQuantity(20);
         batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
         batchRepository.save(batch);
@@ -178,7 +179,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Should replay outbox event after simulated crash")
     void shouldReplayOutboxEventAfterSimulatedCrash() {
         // Arrange - списываем 16, чтобы остаток стал 4 (меньше minStock=10)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16, LocalDateTime.now());
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 16);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Act 1 - выполняем транзакцию (движение и outbox сохранены атомарно)
@@ -258,7 +259,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Should not lose event on repeated crash")
     void shouldNotLoseEventOnRepeatedCrash() {
         // Arrange - создаем событие вручную в статусе PENDING (симуляция краша до обновления статуса)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16, LocalDateTime.now());
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 16);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Выполняем транзакцию

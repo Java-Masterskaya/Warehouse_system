@@ -30,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -161,7 +162,8 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                         List.of(
                                 new ReceivePurchaseOrderItemRequest(
                                         purchaseOrderItemId,
-                                        5
+                                        5,
+                                        LocalDateTime.now().plusDays(30)
                                 )
                         )
                 );
@@ -195,7 +197,8 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                         List.of(
                                 new ReceivePurchaseOrderItemRequest(
                                         purchaseOrderItemId,
-                                        4
+                                        4,
+                                        LocalDateTime.now().plusDays(30)
                                 )
                         )
                 );
@@ -240,7 +243,8 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                         List.of(
                                 new ReceivePurchaseOrderItemRequest(
                                         purchaseOrderItemId,
-                                        10
+                                        10,
+                                        LocalDateTime.now().plusDays(30)
                                 )
                         )
                 );
@@ -274,7 +278,8 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                         List.of(
                                 new ReceivePurchaseOrderItemRequest(
                                         purchaseOrderItemId,
-                                        11
+                                        11,
+                                        LocalDateTime.now().plusDays(30)
                                 )
                         )
                 );

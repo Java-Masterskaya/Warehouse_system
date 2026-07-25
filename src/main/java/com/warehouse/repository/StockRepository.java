@@ -9,7 +9,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,54 +49,6 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             """)
     List<Stock> findAllByItemIdWithWarehouse(@Param("itemId") Long itemId);
 
-    @Modifying(flushAutomatically = true)
-    @Query(value = """
-            update stock
-            set quantity = quantity + :quantity,
-                updated_at = current_timestamp
-            where item_id = :itemId
-              and warehouse_id = (select id from warehouses where is_default = true)
-            """, nativeQuery = true)
-    int increaseQuantity(@Param("itemId") Long itemId, @Param("quantity") int quantity);
-
-    @Modifying(flushAutomatically = true)
-    @Query(value = """
-            update stock
-            set quantity = quantity - :quantity,
-                updated_at = current_timestamp
-            where item_id = :itemId
-              and warehouse_id = (select id from warehouses where is_default = true)
-              and quantity >= :quantity
-            """, nativeQuery = true)
-    int decreaseQuantityIfEnough(@Param("itemId") Long itemId, @Param("quantity") int quantity);
-
-    @Modifying(flushAutomatically = true)
-    @Query("""
-            update Stock s
-            set s.quantity = s.quantity - :quantity,
-                s.updatedAt = CURRENT_TIMESTAMP
-            where s.item.id = :itemId
-              and s.warehouse.id = :warehouseId
-              and s.quantity >= :quantity
-            """)
-    int decreaseQuantityIfEnoughAtWarehouse(
-            @Param("itemId") Long itemId,
-            @Param("warehouseId") Long warehouseId,
-            @Param("quantity") int quantity
-    );
-
-    // Обновление quantity напрямую (для FEFO списания)
-    // ВАЖНО: обновляет ВСЕ stock-строки для товара (для multi-warehouse).
-    // Для работы с конкретным складом используйте decreaseQuantityIfEnoughAtWarehouse().
-    @Modifying(flushAutomatically = true)
-    @Query("""
-            update Stock s
-            set s.quantity = :quantity,
-                s.updatedAt = CURRENT_TIMESTAMP
-            where s.item.id = :itemId
-            """)
-    int updateQuantity(@Param("itemId") Long itemId, @Param("quantity") int quantity);
-
     //Дополнительная операция не блокирующая операции чтения
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -107,6 +58,19 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
               and s.warehouse.defaultWarehouse = true
         """)
     Optional<Stock> findByItemIdForUpdate(@Param("itemId") Long itemId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select s
+            from Stock s
+            join fetch s.warehouse
+            where s.item.id = :itemId
+              and s.warehouse.id = :warehouseId
+            """)
+    Optional<Stock> findByItemIdAndWarehouseIdForUpdate(
+            @Param("itemId") Long itemId,
+            @Param("warehouseId") Long warehouseId
+    );
 
     @Modifying(flushAutomatically = true)
     @Query(value = """
@@ -132,20 +96,6 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             @Param("itemId") Long itemId,
             @Param("warehouseIds") List<Long> warehouseIds
     );
-
-    // Получает остаток без резервов с блокировкой для FEFO
-    // ВАЖНО: Возвращаем SUM(batches.quantity), а не stock.quantity!
-    // stock.quantity может не совпадать с суммой партий (это агрегатное поле)
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-        select coalesce(sum(b.quantity), 0)
-        from Stock s
-        join s.item i
-        left join Batch b on b.item.id = i.id and b.expiryDate > :now
-        where s.item.id = :itemId
-        """)
-    Optional<Integer> findAvailableQuantityFromBatchesForUpdate(@Param("itemId") Long itemId,
-                                                                @Param("now") LocalDateTime now);
 
     void deleteByItemId(Long itemId);
 }

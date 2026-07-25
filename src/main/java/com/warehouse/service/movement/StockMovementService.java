@@ -1,9 +1,10 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -27,7 +28,7 @@ public interface StockMovementService {
      * @param ctx     пользователь, выполняющий операцию
      * @return ответ с информацией о движении товара
      */
-    StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
+    StockMovementResponse registerReceipt(ReceiveStockRequest request, UserContext ctx);
 
     /**
      * Регистрирует списание товара со склада.
@@ -36,7 +37,7 @@ public interface StockMovementService {
      * @param ctx     пользователь, выполняющий операцию
      * @return ответ с информацией о движении товара
      */
-    StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
+    StockMovementResponse writeOffReceipt(WriteOffStockRequest request, UserContext ctx);
 
     /**
      * Возвращает историю движений товара с возможностью фильтрации по типу движения

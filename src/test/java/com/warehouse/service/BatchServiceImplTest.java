@@ -3,42 +3,40 @@ package com.warehouse.service;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
-import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
-import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.ExpiredBatchScope;
 import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.UserRepository;
-import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.batch.BatchServiceImpl;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit-тест для BatchServiceImpl.
- * Тестирует списание товара по FEFO и очистку просроченных партий.
- */
 @ExtendWith(MockitoExtension.class)
-public class BatchServiceImplTest {
+class BatchServiceImplTest {
+
+    private static final long ITEM_ID = 10L;
+    private static final long SOURCE_WAREHOUSE_ID = 20L;
+    private static final long DESTINATION_WAREHOUSE_ID = 30L;
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 7, 25, 12, 0);
 
     @Mock
     private BatchRepository batchRepository;
@@ -47,340 +45,249 @@ public class BatchServiceImplTest {
     private StockRepository stockRepository;
 
     @Mock
-    private ItemRepository itemRepository;
+    private StockAvailabilityService availabilityService;
 
     @Mock
-    private StockMovementRepository stockMovementRepository;
+    private ExpiredBatchScope sourceScope;
 
     @Mock
-    private UserRepository userRepository;
-
-    @Mock
-    private WarehouseRepository warehouseRepository;
+    private ExpiredBatchScope destinationScope;
 
     private BatchServiceImpl batchService;
+    private Item item;
+    private Warehouse sourceWarehouse;
+    private Warehouse destinationWarehouse;
 
     @BeforeEach
-    public void setUp() {
-        batchService = new BatchServiceImpl(batchRepository, stockRepository, warehouseRepository);
+    void setUp() {
+        batchService = new BatchServiceImpl(batchRepository, stockRepository, availabilityService);
+        item = Item.builder().id(ITEM_ID).build();
+        sourceWarehouse = Warehouse.builder().id(SOURCE_WAREHOUSE_ID).name("Source").build();
+        destinationWarehouse = Warehouse.builder()
+                .id(DESTINATION_WAREHOUSE_ID)
+                .name("Destination")
+                .build();
     }
 
-    /**
-     * FEFO списание: успешно списываем из одной партии.
-     */
     @Test
-    public void shouldWriteOffFromSingleBatch() {
-        // Given
-        Long itemId = 1L;
-        int requestedQuantity = 5;
-        int availableQuantity = 10;
-        int currentStock = 10;
-        int newStockQuantity = 5;
+    void shouldCreateBatchForWarehouseAndIncreaseItsStock() {
+        Stock stock = stock(sourceWarehouse, 7);
+        LocalDateTime expiryDate = LocalDateTime.now().plusYears(1);
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.save(any(Batch.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        Stock stock = new Stock();
-        stock.setQuantity(currentStock);
+        Batch result = batchService.createBatchAndIncreaseStock(
+                item,
+                sourceWarehouse,
+                5,
+                expiryDate
+        );
 
-        Batch batch = new Batch();
-        batch.setId(1L);
-        batch.setQuantity(availableQuantity);
-        Item item = new Item();
-        item.setId(itemId);
-        batch.setItem(item);
-
-        when(stockRepository.findAvailableQuantityFromBatchesForUpdate(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(availableQuantity));
-        when(stockRepository.findByItemIdForUpdate(eq(itemId))).thenReturn(Optional.of(stock));
-        when(batchRepository.findNonExpiredByItemIdOrderByExpiryDateAscForUpdate(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(List.of(batch));
-        when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
-        when(stockRepository.decreaseQuantityIfEnough(eq(itemId), eq(5))).thenReturn(1);
-        when(stockRepository.findQuantityByItemId(eq(itemId))).thenReturn(Optional.of(newStockQuantity));
-
-        // When
-        int result = batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now());
-
-        // Then
-        assertEquals(newStockQuantity, result);
-        verify(stockRepository).findByItemIdForUpdate(eq(itemId));
-        verify(batchRepository).save(batch);
-        verify(stockRepository).decreaseQuantityIfEnough(eq(itemId), eq(5));
-        verify(stockRepository).findQuantityByItemId(eq(itemId));
+        ArgumentCaptor<Batch> batchCaptor = ArgumentCaptor.forClass(Batch.class);
+        verify(stockRepository).createEmptyStockIfAbsent(ITEM_ID, SOURCE_WAREHOUSE_ID);
+        verify(batchRepository).save(batchCaptor.capture());
+        verify(stockRepository).save(stock);
+        Batch savedBatch = batchCaptor.getValue();
+        assertAll(
+                () -> assertSame(savedBatch, result),
+                () -> assertSame(item, savedBatch.getItem()),
+                () -> assertSame(sourceWarehouse, savedBatch.getWarehouse()),
+                () -> assertEquals(5, savedBatch.getQuantity()),
+                () -> assertEquals(expiryDate, savedBatch.getExpiryDate()),
+                () -> assertEquals(12, stock.getQuantity())
+        );
     }
 
-    /**
-     * FEFO списание: списываем из нескольких партий.
-     */
     @Test
-    public void shouldWriteOffFromMultipleBatches() {
-        // Given
-        Long itemId = 1L;
-        int requestedQuantity = 15;
-        int availableQuantity = 15;
-        int currentStock = 15;
-        int newStockQuantity = 0;
+    void shouldWriteOffByFefoOnlyAtRequestedWarehouse() {
+        Stock stock = stock(sourceWarehouse, 20);
+        Batch first = batch(sourceWarehouse, 5, NOW.plusDays(2));
+        Batch second = batch(sourceWarehouse, 10, NOW.plusDays(5));
+        List<Batch> sourceBatches = List.of(first, second);
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(sourceBatches);
+        when(availabilityService.getAvailable(stock)).thenReturn(12);
 
-        Batch batch1 = new Batch();
-        batch1.setId(1L);
-        batch1.setQuantity(5);
-        Item item1 = new Item();
-        item1.setId(itemId);
-        batch1.setItem(item1);
+        int remainingStock = batchService.writeOffByFEFO(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                12,
+                NOW
+        );
 
-        Batch batch2 = new Batch();
-        batch2.setId(2L);
-        batch2.setQuantity(10);
-        Item item2 = new Item();
-        item2.setId(itemId);
-        batch2.setItem(item2);
-
-        Stock stock = new Stock();
-        stock.setQuantity(currentStock);
-
-        when(stockRepository.findAvailableQuantityFromBatchesForUpdate(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(availableQuantity));
-        when(stockRepository.findByItemIdForUpdate(eq(itemId))).thenReturn(Optional.of(stock));
-        when(batchRepository.findNonExpiredByItemIdOrderByExpiryDateAscForUpdate(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(List.of(batch1, batch2));
-        when(batchRepository.save(any(Batch.class))).thenAnswer(i -> i.getArgument(0));
-        when(stockRepository.decreaseQuantityIfEnough(eq(itemId), eq(15))).thenReturn(1);
-        when(stockRepository.findQuantityByItemId(eq(itemId))).thenReturn(Optional.of(newStockQuantity));
-
-        // When
-        int result = batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now());
-
-        // Then
-        assertEquals(newStockQuantity, result);
-        // Проверяем, что batchRepository.save() вызывался для каждой партии
-        verify(batchRepository, Mockito.times(2)).save(any(Batch.class));
-        verify(stockRepository).findByItemIdForUpdate(eq(itemId));
-        verify(stockRepository).decreaseQuantityIfEnough(eq(itemId), eq(15));
-        verify(stockRepository).findQuantityByItemId(eq(itemId));
+        assertAll(
+                () -> assertEquals(8, remainingStock),
+                () -> assertEquals(0, first.getQuantity()),
+                () -> assertEquals(3, second.getQuantity()),
+                () -> assertEquals(8, stock.getQuantity())
+        );
+        verify(batchRepository).saveAll(sourceBatches);
+        verify(stockRepository).save(stock);
+        verify(batchRepository, never())
+                .findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                        ITEM_ID,
+                        DESTINATION_WAREHOUSE_ID,
+                        NOW
+            );
     }
 
-    /**
-     * FEFO списание: проверка консистентности stock.quantity = SUM(Batch.quantity).
-     * Проверяет, что после списания:
-     * 1. Партии обновляются правильно (полностью или частично)
-     * 2. Stock.quantity обновляется через decreaseQuantityIfEnough()
-     * 3. Консистентность между stock и партиями соблюдается
-     */
     @Test
-    public void shouldSyncStockQuantityAfterFEFOWriteOff() {
-        // Given
-        Long itemId = 1L;
-        int requestedQuantity = 25; // Списываем 25: гасим 10 полностью, 15 из 20
-        int availableQuantity = 30;
-        int currentStock = 30;
-        int expectedStockAfter = 5; // 30 - 25
+    void shouldRejectRegularWriteOffWhenFreeAvailabilityIsInsufficient() {
+        Stock stock = stock(sourceWarehouse, 20);
+        Batch batch = batch(sourceWarehouse, 20, NOW.plusDays(2));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(batch));
+        when(availabilityService.getAvailable(stock)).thenReturn(6);
 
-        Batch batch1 = new Batch();
-        batch1.setId(1L);
-        batch1.setQuantity(10);
-        Item item1 = new Item();
-        item1.setId(itemId);
-        batch1.setItem(item1);
+        assertThrows(
+                InsufficientStockException.class,
+                () -> batchService.writeOffByFEFO(ITEM_ID, SOURCE_WAREHOUSE_ID, 7, NOW)
+        );
 
-        Batch batch2 = new Batch();
-        batch2.setId(2L);
-        batch2.setQuantity(20);
-        Item item2 = new Item();
-        item2.setId(itemId);
-        batch2.setItem(item2);
-
-        Stock stock = new Stock();
-        stock.setQuantity(currentStock);
-
-        when(stockRepository.findAvailableQuantityFromBatchesForUpdate(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(availableQuantity));
-        when(stockRepository.findByItemIdForUpdate(eq(itemId))).thenReturn(Optional.of(stock));
-        when(batchRepository.findNonExpiredByItemIdOrderByExpiryDateAscForUpdate(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(List.of(batch1, batch2));
-        when(batchRepository.save(any(Batch.class))).thenAnswer(i -> {
-            // Симуляция сохранения: обновляем количество
-            Batch saved = i.getArgument(0);
-            return saved;
-        });
-        when(stockRepository.decreaseQuantityIfEnough(eq(itemId), eq(25))).thenReturn(1);
-        when(stockRepository.findQuantityByItemId(eq(itemId))).thenReturn(Optional.of(expectedStockAfter));
-
-        // When
-        int result = batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now());
-
-        // Then
-        assertEquals(expectedStockAfter, result);
-        
-        // Проверяем, что batchRepository.save() вызывался для каждой партии
-        verify(batchRepository, Mockito.times(2)).save(any(Batch.class));
-        
-        // Проверяем, что decreaseQuantityIfEnough вызывается для атомарного обновления
-        verify(stockRepository).decreaseQuantityIfEnough(eq(itemId), eq(25));
-        verify(stockRepository).findQuantityByItemId(eq(itemId));
+        assertAll(
+                () -> assertEquals(20, batch.getQuantity()),
+                () -> assertEquals(20, stock.getQuantity())
+        );
+        verify(batchRepository, never()).saveAll(any());
+        verify(stockRepository, never()).save(any(Stock.class));
     }
 
-    /**
-     * FEFO списание: недостаточно товара.
-     */
     @Test
-    public void shouldThrowExceptionWhenInsufficientStock() {
-        // Given
-        Long itemId = 1L;
-        int requestedQuantity = 20;
-        int availableQuantity = 10;
+    void shouldWriteOffReservedQuantityWithoutSubtractingReservationAgain() {
+        Stock stock = stock(sourceWarehouse, 10);
+        Batch batch = batch(sourceWarehouse, 10, NOW.plusDays(2));
+        List<Batch> batches = List.of(batch);
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(batches);
 
-        when(stockRepository.findAvailableQuantityFromBatchesForUpdate(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(Optional.of(availableQuantity));
+        int remainingStock = batchService.writeOffReservedByFEFO(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                7,
+                NOW
+        );
 
-        // When & Then
-        InsufficientStockException exception = assertThrows(InsufficientStockException.class,
-                () -> batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now()));
-
-        assertEquals("Insufficient stock for FEFO write-off: requested 20, available 10",
-                exception.getMessage());
+        assertAll(
+                () -> assertEquals(3, remainingStock),
+                () -> assertEquals(3, batch.getQuantity()),
+                () -> assertEquals(3, stock.getQuantity())
+        );
+        verify(availabilityService, never()).getAvailable(any(Stock.class));
+        verify(batchRepository).saveAll(batches);
+        verify(stockRepository).save(stock);
     }
 
-    /**
-     * FEFO списание: товар не найден.
-     */
     @Test
-    public void shouldThrowExceptionWhenStockNotFound() {
-        // Given
-        Long itemId = 1L;
-        int requestedQuantity = 5;
+    void shouldClearExpiredBatchesFromEachMatchingStockPair() {
+        Batch firstSourceBatch = batch(sourceWarehouse, 4, NOW.minusDays(3));
+        Batch secondSourceBatch = batch(sourceWarehouse, 3, NOW.minusDays(1));
+        Batch destinationBatch = batch(destinationWarehouse, 5, NOW.minusHours(1));
+        Stock sourceStock = stock(sourceWarehouse, 12);
+        Stock destinationStock = stock(destinationWarehouse, 9);
+        when(sourceScope.getItemId()).thenReturn(ITEM_ID);
+        when(sourceScope.getWarehouseId()).thenReturn(SOURCE_WAREHOUSE_ID);
+        when(destinationScope.getItemId()).thenReturn(ITEM_ID);
+        when(destinationScope.getWarehouseId()).thenReturn(DESTINATION_WAREHOUSE_ID);
+        when(batchRepository.findExpiredScopesWithQuantity(NOW))
+                .thenReturn(List.of(sourceScope, destinationScope));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(sourceStock));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(
+                ITEM_ID,
+                DESTINATION_WAREHOUSE_ID
+        )).thenReturn(Optional.of(destinationStock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(firstSourceBatch, secondSourceBatch));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                ITEM_ID,
+                DESTINATION_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(destinationBatch));
 
-        when(stockRepository.findAvailableQuantityFromBatchesForUpdate(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(Optional.empty());
+        int cleared = batchService.clearExpiredBatches(NOW);
 
-        // When & Then
-        EntityNotFoundException exception = assertThrows(EntityNotFoundException.class,
-                () -> batchService.writeOffByFEFO(itemId, requestedQuantity, LocalDateTime.now()));
-
-        assertEquals("Stock with id 1 not found", exception.getMessage());
+        assertAll(
+                () -> assertEquals(3, cleared),
+                () -> assertEquals(0, firstSourceBatch.getQuantity()),
+                () -> assertEquals(0, secondSourceBatch.getQuantity()),
+                () -> assertEquals(0, destinationBatch.getQuantity()),
+                () -> assertEquals(5, sourceStock.getQuantity()),
+                () -> assertEquals(4, destinationStock.getQuantity())
+        );
+        verify(stockRepository).save(sourceStock);
+        verify(stockRepository).save(destinationStock);
+        verify(batchRepository).saveAll(List.of(firstSourceBatch, secondSourceBatch));
+        verify(batchRepository).saveAll(List.of(destinationBatch));
     }
 
-    /**
-     * Очистка просроченных партий: успешно очищаем.
-     */
     @Test
-    public void shouldClearExpiredBatchesSuccessfully() {
-        // Given
-        Long itemId = 1L;
-        int totalQty = 15;
+    void shouldFailCleanupWithoutMutatingDataWhenBatchesExceedMatchingStock() {
+        Batch expiredBatch = batch(sourceWarehouse, 8, NOW.minusDays(1));
+        Stock stock = stock(sourceWarehouse, 7);
+        when(sourceScope.getItemId()).thenReturn(ITEM_ID);
+        when(sourceScope.getWarehouseId()).thenReturn(SOURCE_WAREHOUSE_ID);
+        when(batchRepository.findExpiredScopesWithQuantity(NOW))
+                .thenReturn(List.of(sourceScope));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(expiredBatch));
 
-        Item item = new Item();
-        item.setId(itemId);
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> batchService.clearExpiredBatches(NOW)
+        );
 
-        Batch expiredBatch = new Batch();
-        expiredBatch.setItem(item);
-        expiredBatch.setQuantity(totalQty);
-
-        Stock stock = new Stock();
-        stock.setQuantity(20);
-
-        when(batchRepository.findExpiredWithQuantity(any(LocalDateTime.class)))
-                .thenReturn(List.of(expiredBatch));
-        when(stockRepository.findByItemIdForUpdate(eq(itemId))).thenReturn(Optional.of(stock));
-        when(batchRepository.clearExpiredBatchesByItemId(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(1);
-        when(stockRepository.decreaseQuantityIfEnough(eq(itemId), eq(15))).thenReturn(1);
-
-        // When
-        int cleared = batchService.clearExpiredBatches(LocalDateTime.now());
-
-        // Then
-        assertEquals(1, cleared);
-        verify(stockRepository).findByItemIdForUpdate(eq(itemId));
-        verify(batchRepository).clearExpiredBatchesByItemId(eq(itemId), any(LocalDateTime.class));
-        verify(stockRepository).decreaseQuantityIfEnough(eq(itemId), eq(15));
+        assertAll(
+                () -> assertEquals(
+                        "Batch quantity exceeds stock for item 10 at warehouse 20",
+                        exception.getMessage()
+                ),
+                () -> assertEquals(8, expiredBatch.getQuantity()),
+                () -> assertEquals(7, stock.getQuantity())
+        );
+        verify(batchRepository, never()).saveAll(any());
+        verify(stockRepository, never()).save(any(Stock.class));
     }
 
-    /**
-     * Проверка консистентности: stock.quantity = SUM(Batch.quantity) после очистки просроченных.
-     * Проверяет, что:
-     * 1. decreaseQuantityIfEnough вызывается для окончательной синхронизации
-     * 2. stock.quantity после очистки = начальный остаток - количество просроченных
-     */
-    @Test
-    public void shouldSyncStockQuantityAfterClearExpired() {
-        // Given
-        Long itemId = 1L;
-        int expiredQty = 8;
-        int initialStock = 20;
-        int expectedStockAfter = 12; // 20 - 8
-
-        Item item = new Item();
-        item.setId(itemId);
-
-        Batch expiredBatch = new Batch();
-        expiredBatch.setItem(item);
-        expiredBatch.setQuantity(expiredQty);
-
-        Stock stock = new Stock();
-        stock.setQuantity(initialStock);
-
-        when(batchRepository.findExpiredWithQuantity(any(LocalDateTime.class)))
-                .thenReturn(List.of(expiredBatch));
-        when(stockRepository.findByItemIdForUpdate(eq(itemId))).thenReturn(Optional.of(stock));
-        when(batchRepository.clearExpiredBatchesByItemId(eq(itemId), any(LocalDateTime.class)))
-                .thenReturn(1);
-        when(stockRepository.decreaseQuantityIfEnough(eq(itemId), eq(8))).thenReturn(1);
-
-        // When
-        int cleared = batchService.clearExpiredBatches(LocalDateTime.now());
-
-        // Then
-        assertEquals(1, cleared);
-        verify(stockRepository).findByItemIdForUpdate(eq(itemId));
-        verify(batchRepository).clearExpiredBatchesByItemId(eq(itemId), any(LocalDateTime.class));
-        verify(stockRepository).decreaseQuantityIfEnough(eq(itemId), eq(8));
+    private Stock stock(Warehouse warehouse, int quantity) {
+        return Stock.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(quantity)
+                .build();
     }
 
-    /**
-     * Очистка просроченных партий: нет просроченных партий.
-     */
-    @Test
-    public void shouldReturnZeroWhenNoExpiredBatches() {
-        // Given
-        when(batchRepository.findExpiredWithQuantity(any(LocalDateTime.class)))
-                .thenReturn(List.of());
-
-        // When
-        int cleared = batchService.clearExpiredBatches(LocalDateTime.now());
-
-        // Then
-        assertEquals(0, cleared);
-        verify(stockRepository, never()).findByItemIdForUpdate(anyLong());
+    private Batch batch(Warehouse warehouse, int quantity, LocalDateTime expiryDate) {
+        return Batch.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(quantity)
+                .expiryDate(expiryDate)
+                .build();
     }
 
-    /**
-     * Очистка просроченных партий: недостаточно остатка на складе.
-     */
-    @Test
-    public void shouldSkipWhenInsufficientStock() {
-        // Given
-        Long itemId = 1L;
-        int totalQty = 20;
-        int currentStock = 15;
-
-        Item item = new Item();
-        item.setId(itemId);
-
-        Batch expiredBatch = new Batch();
-        expiredBatch.setItem(item);
-        expiredBatch.setQuantity(totalQty);
-
-        Stock stock = new Stock();
-        stock.setQuantity(currentStock);
-
-        when(batchRepository.findExpiredWithQuantity(any(LocalDateTime.class)))
-                .thenReturn(List.of(expiredBatch));
-        when(stockRepository.findByItemIdForUpdate(eq(itemId))).thenReturn(Optional.of(stock));
-
-        // When
-        int cleared = batchService.clearExpiredBatches(LocalDateTime.now());
-
-        // Then
-        assertEquals(0, cleared);
-        verify(batchRepository, never()).clearExpiredBatchesByItemId(anyLong(), any(LocalDateTime.class));
-        verify(stockRepository, never()).decreaseQuantityIfEnough(anyLong(), anyInt());
-    }
 }

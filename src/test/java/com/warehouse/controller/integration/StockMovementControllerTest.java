@@ -2,8 +2,9 @@ package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
@@ -100,6 +101,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         // Создаем партию для начального остатка (чтобы FEFO могла работать)
         com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
         batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
         batch.setQuantity(10);
         batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
         batchRepository.save(batch);
@@ -135,7 +137,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void adminTokenCanRegisterStockReceiptAndStockQuantityIncreases() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
+        ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/movements/receive")
@@ -158,7 +160,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void userTokenCannotRegisterStockReceiptReturns403() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
+        ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/movements/receive")
@@ -175,8 +177,8 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void noTokenCannotRegisterStockReceiptReturns401() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, 5, LocalDateTime.now());
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, 5, LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/movements/receive")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -190,7 +192,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void nonExistentItemReturns404() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
+        ReceiveStockRequest request = new ReceiveStockRequest(
                 999L, 5, LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/movements/receive")
@@ -209,7 +211,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         testItem.setActive(false);
         itemRepository.save(testItem);
 
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
+        ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/movements/receive")
@@ -225,8 +227,8 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void zeroQuantityValidationErrorReturns400() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, 0, LocalDateTime.now());
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, 0, LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
@@ -241,8 +243,8 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void negativeQuantityValidationErrorReturns400() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, -1, LocalDateTime.now());
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, -1, LocalDateTime.now().plusDays(1));
 
         mockMvc.perform(post("/api/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
@@ -270,8 +272,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void adminTokenCanWriteOffStockAndStockQuantityDecreases() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, 5, LocalDateTime.now().plusDays(1));
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
         mockMvc.perform(post("/api/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
@@ -293,8 +294,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void userTokenCannotWriteOffStockReturns403() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, 5, LocalDateTime.now().plusDays(1));
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
         mockMvc.perform(post("/api/movements/write-off")
                         .header("Authorization", "Bearer " + userToken)
@@ -310,8 +310,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void noTokenCannotWriteOffStockReturns401() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, 5, LocalDateTime.now());
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
         mockMvc.perform(post("/api/movements/write-off")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -325,8 +324,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void writeOffNonExistentItemReturns404() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                999L, 5, LocalDateTime.now().plusDays(1));
+        WriteOffStockRequest request = new WriteOffStockRequest(999L, 5);
 
         mockMvc.perform(post("/api/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
@@ -344,8 +342,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         testItem.setActive(false);
         itemRepository.save(testItem);
 
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, 5, LocalDateTime.now().plusDays(1));
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
         mockMvc.perform(post("/api/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
@@ -360,8 +357,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void writeOffInsufficientStockReturns422() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, 15, LocalDateTime.now().plusDays(1));
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 15);
 
         mockMvc.perform(post("/api/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
@@ -377,7 +373,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void adminStocktakeDecreasesStock() throws Exception {
-        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
         mockMvc.perform(post("/api/inventory/stocktake")
                         .header("Authorization", "Bearer " + adminToken)
@@ -399,7 +395,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
     @Test
     void userCannotStocktakeReturns403() throws Exception {
-        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
         mockMvc.perform(post("/api/inventory/stocktake")
                         .header("Authorization", "Bearer " + userToken)
@@ -415,7 +411,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void noTokenCannotStocktakeReturns401() throws Exception {
-        StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
         mockMvc.perform(post("/api/inventory/stocktake")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -429,8 +425,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void writeOffZeroQuantityValidationErrorReturns400() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, 0, LocalDateTime.now());
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 0);
 
         mockMvc.perform(post("/api/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
@@ -445,8 +440,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
      */
     @Test
     void writeOffNegativeQuantityValidationErrorReturns400() throws Exception {
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(
-                testItemId, -1, LocalDateTime.now());
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, -1);
 
         mockMvc.perform(post("/api/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)

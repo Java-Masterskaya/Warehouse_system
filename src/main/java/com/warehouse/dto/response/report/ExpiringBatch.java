@@ -7,6 +7,8 @@ public record ExpiringBatch(
         String sku,
         String name,
         String category,
+        Long warehouseId,
+        String warehouseName,
         int quantity,
         LocalDateTime expiryDate
 ) {}

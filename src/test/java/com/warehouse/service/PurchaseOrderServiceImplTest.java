@@ -28,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -178,7 +179,11 @@ class PurchaseOrderServiceImplTest {
         ReceivePurchaseOrderRequest request =
                 new ReceivePurchaseOrderRequest(
                         List.of(
-                                new ReceivePurchaseOrderItemRequest(1000L, 4)
+                                new ReceivePurchaseOrderItemRequest(
+                                        1000L,
+                                        4,
+                                        LocalDateTime.now().plusDays(30)
+                                )
                         )
                 );
 
@@ -226,7 +231,11 @@ class PurchaseOrderServiceImplTest {
         ReceivePurchaseOrderRequest request =
                 new ReceivePurchaseOrderRequest(
                         List.of(
-                                new ReceivePurchaseOrderItemRequest(1000L, 4)
+                                new ReceivePurchaseOrderItemRequest(
+                                        1000L,
+                                        4,
+                                        LocalDateTime.now().plusDays(30)
+                                )
                         )
                 );
 
@@ -278,7 +287,11 @@ class PurchaseOrderServiceImplTest {
         ReceivePurchaseOrderRequest request =
                 new ReceivePurchaseOrderRequest(
                         List.of(
-                                new ReceivePurchaseOrderItemRequest(1000L, 10)
+                                new ReceivePurchaseOrderItemRequest(
+                                        1000L,
+                                        10,
+                                        LocalDateTime.now().plusDays(30)
+                                )
                         )
                 );
 
@@ -330,7 +343,11 @@ class PurchaseOrderServiceImplTest {
         ReceivePurchaseOrderRequest request =
                 new ReceivePurchaseOrderRequest(
                         List.of(
-                                new ReceivePurchaseOrderItemRequest(1000L, 4)
+                                new ReceivePurchaseOrderItemRequest(
+                                        1000L,
+                                        4,
+                                        LocalDateTime.now().plusDays(30)
+                                )
                         )
                 );
 

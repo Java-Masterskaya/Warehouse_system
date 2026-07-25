@@ -176,6 +176,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // Создаем партию для начального остатка (чтобы FEFO могла работать)
         com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
         batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
         batch.setQuantity(5);
         batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
         batchRepository.save(batch);

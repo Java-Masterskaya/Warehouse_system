@@ -1,7 +1,7 @@
 package com.warehouse.service.purchaseorder;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderItemRequest;
 import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderItemRequest;
@@ -30,7 +30,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -226,11 +225,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             );
         }
 
-        ChangeQuantityMovementRequest movementRequest =
-                new ChangeQuantityMovementRequest(
+        ReceiveStockRequest movementRequest =
+                new ReceiveStockRequest(
                         orderItem.getItem().getId(),
                         request.quantity(),
-                        LocalDateTime.now()
+                        request.expiryDate()
                 );
 
         stockMovementService.registerReceipt(movementRequest, context);

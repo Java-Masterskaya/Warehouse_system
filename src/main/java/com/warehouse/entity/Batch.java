@@ -45,6 +45,13 @@ public class Batch {
     private Item item;
 
     /**
+     * Склад, на котором находится партия.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id", nullable = false)
+    private Warehouse warehouse;
+
+    /**
      * Количество единиц в партии.
      */
     @Column(nullable = false)

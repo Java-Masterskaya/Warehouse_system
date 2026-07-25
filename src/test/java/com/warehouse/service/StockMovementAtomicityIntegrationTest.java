@@ -2,8 +2,8 @@ package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
@@ -102,6 +102,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         // Создаем партию для начального остатка (чтобы FEFO могла работать)
         Batch batch = new Batch();
         batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
         batch.setQuantity(20);
         batch.setExpiryDate(LocalDateTime.now().plusDays(365));
         batchRepository.save(batch);
@@ -123,7 +124,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void bothMovementAndOutboxSavedOnSuccessfulTransaction() {
         // Arrange - списываем 16, чтобы остаток стал 4 (меньше minStock=10)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16, LocalDateTime.now());
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 16);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Act
@@ -159,7 +160,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void bothMovementAndOutboxRollbackOnError() {
         // Arrange
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5, LocalDateTime.now());
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Подсчитываем начальное количество
@@ -202,7 +203,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void neitherMovementNorOutboxSavedOnValidationFailure() {
         // Arrange - списываем больше, чем есть на складе
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 100, LocalDateTime.now());
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 100);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Подсчитываем начальное количество
@@ -240,7 +241,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         long initialOutboxCount = outboxEventRepository.count();
 
         // Act - проводим инвентаризацию с меньшим количеством (создаст ADJUSTMENT на -15)
-        StocktakeRequest request = new StocktakeRequest(testItemId, 5);
+        StocktakeRequest request = new StocktakeRequest(testItemId, 5, null);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);

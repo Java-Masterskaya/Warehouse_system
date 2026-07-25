@@ -5,7 +5,9 @@ import com.warehouse.dto.response.report.LowStockItem;
 import com.warehouse.dto.response.valuation.CategoryValuation;
 import com.warehouse.dto.response.valuation.StockValuationResponse;
 import com.warehouse.entity.Batch;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.projection.LowStockProjection;
@@ -192,13 +194,15 @@ public class ReportServiceImplTest {
         item.setId(1L);
         item.setSku("WH-001");
         item.setName("Ноутбук Dell XPS 15");
-        item.setCategory("Электроника");
+        item.setCategory(Category.builder().name("Электроника").build());
+        Warehouse warehouse = Warehouse.builder().id(7L).name("Основной").build();
 
         LocalDateTime expiryDate = LocalDateTime.now().plusDays(3);
 
         Batch batch = new Batch();
         batch.setId(1L);
         batch.setItem(item);
+        batch.setWarehouse(warehouse);
         batch.setQuantity(10);
         batch.setExpiryDate(expiryDate);
 
@@ -214,6 +218,8 @@ public class ReportServiceImplTest {
         assertEquals("WH-001", expiringBatch.sku());
         assertEquals("Ноутбук Dell XPS 15", expiringBatch.name());
         assertEquals("Электроника", expiringBatch.category());
+        assertEquals(7L, expiringBatch.warehouseId());
+        assertEquals("Основной", expiringBatch.warehouseName());
         assertEquals(10, expiringBatch.quantity());
         assertEquals(expiryDate, expiringBatch.expiryDate());
     }
@@ -227,13 +233,15 @@ public class ReportServiceImplTest {
         item.setId(1L);
         item.setSku("WH-001");
         item.setName("Товар");
-        item.setCategory("Категория");
+        item.setCategory(Category.builder().name("Категория").build());
+        Warehouse warehouse = Warehouse.builder().id(1L).name("Основной").build();
 
         LocalDateTime expiryDate = LocalDateTime.now().plusDays(3);
 
         Batch validBatch = new Batch();
         validBatch.setId(2L);
         validBatch.setItem(item);
+        validBatch.setWarehouse(warehouse);
         validBatch.setQuantity(20);
         validBatch.setExpiryDate(expiryDate);
 
@@ -255,13 +263,15 @@ public class ReportServiceImplTest {
         item.setId(1L);
         item.setSku("WH-001");
         item.setName("Товар");
-        item.setCategory("Категория");
+        item.setCategory(Category.builder().name("Категория").build());
+        Warehouse warehouse = Warehouse.builder().id(1L).name("Основной").build();
 
         LocalDateTime expiryDate = LocalDateTime.now().plusDays(3);
 
         Batch validBatch = new Batch();
         validBatch.setId(2L);
         validBatch.setItem(item);
+        validBatch.setWarehouse(warehouse);
         validBatch.setQuantity(20);
         validBatch.setExpiryDate(expiryDate);
 

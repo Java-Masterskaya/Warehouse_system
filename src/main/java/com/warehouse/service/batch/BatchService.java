@@ -2,71 +2,72 @@ package com.warehouse.service.batch;
 
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 public interface BatchService {
 
     /**
-     * Создать новую партию товара.
+     * Creates a batch and increases stock at the selected warehouse.
      *
-     * @param item       товар
-     * @param quantity   количество единиц
-     * @param expiryDate срок годности
-     * @return созданная партия
+     * @param item item being received
+     * @param warehouse destination warehouse
+     * @param quantity received quantity
+     * @param expiryDate batch expiry date
+     * @return persisted batch
      */
-    Batch createBatch(Item item, int quantity, LocalDateTime expiryDate);
+    Batch createBatchAndIncreaseStock(
+            Item item,
+            Warehouse warehouse,
+            int quantity,
+            LocalDateTime expiryDate
+    );
 
     /**
-     * Создать новую партию товара и обновить stock.quantity для default warehouse.
-     * Атомарная операция для сохранения консистентности.
+     * Finds item batches at a warehouse in FEFO order.
      *
-     * @param item       товар
-     * @param quantity   количество единиц
-     * @param expiryDate срок годности
-     * @return созданная партия
+     * @param itemId item identifier
+     * @param warehouseId warehouse identifier
+     * @return ordered batches
      */
-    Batch createBatchAndIncreaseStock(Item item, int quantity, LocalDateTime expiryDate);
+    List<Batch> findByItemAndWarehouseOrderByExpiryDate(Long itemId, Long warehouseId);
 
     /**
-     * Найти все партии товара, отсортированные по возрастанию срока годности (FEFO).
+     * Writes off available quantity at a warehouse in FEFO order.
      *
-     * @param itemId ID товара
-     * @return список партий
+     * @param itemId item identifier
+     * @param warehouseId warehouse identifier
+     * @param quantity quantity to write off
+     * @param now operation time
+     * @return stock quantity after write-off
+     * @throws InsufficientStockException when available quantity is insufficient
      */
-    List<Batch> findByItemIdOrderByExpiryDate(Long itemId);
+    int writeOffByFEFO(
+            Long itemId,
+            Long warehouseId,
+            int quantity,
+            LocalDateTime now
+    ) throws InsufficientStockException;
 
     /**
-     * Найти партию по ID.
+     * Writes off reserved quantity without subtracting the same reservation twice.
      *
-     * @param id ID партии
-     * @return опциональная партия
+     * @param itemId item identifier
+     * @param warehouseId warehouse identifier
+     * @param quantity quantity to write off
+     * @param now operation time
+     * @return stock quantity after write-off
+     * @throws InsufficientStockException when non-expired physical quantity is insufficient
      */
-    Optional<Batch> findById(Long id);
-
-    /**
-     * Найти все партии товара с подгрузкой item.
-     *
-     * @param itemId ID товара
-     * @return список партий товара
-     */
-    List<Batch> findAllWithItemByItemId(Long itemId);
-
-    /**
-     * Списание товара по алгоритму FEFO (First-Expire-First-Out).
-     * Гасим из партии с ближайшим сроком, при нехватке — добираем из следующих.
-     * Одно списание может затронуть несколько партий.
-     *
-     * @param itemId      ID товара
-     * @param quantity    количество для списания
-     * @param now         текущее время (для проверки срока годности)
-     * @return количество списанных единиц (может быть меньше запрошенного при нехватке)
-     * @throws InsufficientStockException если недостаточно товара во всех неистекших партиях
-     */
-    int writeOffByFEFO(Long itemId, int quantity, LocalDateTime now) throws InsufficientStockException;
+    int writeOffReservedByFEFO(
+            Long itemId,
+            Long warehouseId,
+            int quantity,
+            LocalDateTime now
+    ) throws InsufficientStockException;
 
     /**
      * Очистить протухшие партии (списать их количество в Stock).

@@ -2,17 +2,22 @@ package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Batch;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +65,10 @@ class BatchControllerTest extends AbstractIntegrationTest {
     private BatchRepository batchRepository;
 
     @Autowired
-    private WarehouseRepository warehouseRepository;
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private StockMovementRepository stockMovementRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -68,26 +76,41 @@ class BatchControllerTest extends AbstractIntegrationTest {
     private String adminToken;
     private Item testItem;
     private Long testItemId;
+    private Warehouse testWarehouse;
 
     @BeforeEach
     void setUp() throws Exception {
         String uniqueSku = "SKU-BATCH-" + System.currentTimeMillis();
+        Category category = categoryRepository.save(
+                Category.builder()
+                        .name("Категория " + uniqueSku)
+                        .build()
+        );
+
         testItem = new Item();
         testItem.setSku(uniqueSku);
         testItem.setName("Тестовый товар с партией");
-        testItem.setCategory("Категория");
+        testItem.setCategory(category);
         testItem.setMinStock(5);
         testItem.setActive(true);
         testItem.setPrice(BigDecimal.valueOf(500.00));
         testItem.setCost(BigDecimal.valueOf(300.00));
         testItem = itemRepository.save(testItem);
 
+        testWarehouse = defaultWarehouse();
+
         Stock stock = new Stock();
         stock.setItem(testItem);
-        stock.setWarehouse(warehouseRepository.findByDefaultWarehouseTrue()
-                .orElseThrow(() -> new IllegalStateException("Default warehouse not found")));
+        stock.setWarehouse(testWarehouse);
         stock.setQuantity(10);
         stockRepository.save(stock);
+
+        Batch initialBatch = new Batch();
+        initialBatch.setItem(testItem);
+        initialBatch.setWarehouse(testWarehouse);
+        initialBatch.setQuantity(10);
+        initialBatch.setExpiryDate(LocalDateTime.now().plusDays(365));
+        batchRepository.save(initialBatch);
 
         testItemId = testItem.getId();
 
@@ -111,7 +134,7 @@ class BatchControllerTest extends AbstractIntegrationTest {
     @Test
     void receiptCreatesBatchWithExpiryDate() throws Exception {
         LocalDateTime expiryDate = LocalDateTime.now().plusDays(30);
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5, expiryDate);
+        ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, expiryDate);
 
         mockMvc.perform(post("/api/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
@@ -124,17 +147,32 @@ class BatchControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.stockAfter").value(15));
 
         // Проверяем, что партия создана в базе данных
-        List<Batch> batches = batchRepository.findByItemIdOrderByExpiryDateAsc(testItemId);
-        assertThat(batches).hasSize(1);
+        List<Batch> batches = batchRepository.findByItemIdAndWarehouseIdOrderByExpiryDateAsc(
+                testItemId, testWarehouse.getId());
+        assertThat(batches).hasSize(2);
         Batch batch = batches.get(0);
         assertThat(batch.getItem().getId()).isEqualTo(testItemId);
+        assertThat(batch.getWarehouse().getId()).isEqualTo(testWarehouse.getId());
         assertThat(batch.getQuantity()).isEqualTo(5);
         assertThat(batch.getExpiryDate()).isBetween(expiryDate.minusSeconds(1), expiryDate.plusSeconds(1));
         assertThat(batch.getId()).isNotNull();
 
         // Проверяем, что stock_movement ссылается на партию
-        Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+        List<StockMovement> receiveMovements = stockMovementRepository.findAll().stream()
+                .filter(movement -> movement.getItem().getId().equals(testItemId))
+                .filter(movement -> movement.getType() == MovementType.RECEIVE)
+                .toList();
+        assertThat(receiveMovements).singleElement().satisfies(movement -> {
+            assertThat(movement.getBatch()).isNotNull();
+            assertThat(movement.getBatch().getId()).isEqualTo(batch.getId());
+            assertThat(movement.getWarehouse().getId()).isEqualTo(testWarehouse.getId());
+        });
+
+        Stock updatedStock = stockRepository.findByItemIdAndWarehouseId(
+                testItemId, testWarehouse.getId()).orElseThrow();
         assertThat(updatedStock.getQuantity()).isEqualTo(15);
+        assertThat(updatedStock.getQuantity())
+                .isEqualTo(batches.stream().mapToInt(Batch::getQuantity).sum());
     }
 
     /**
@@ -143,7 +181,7 @@ class BatchControllerTest extends AbstractIntegrationTest {
     @Test
     void receiptTwiceCreatesTwoBatches() throws Exception {
         LocalDateTime expiryDate1 = LocalDateTime.now().plusDays(30);
-        ChangeQuantityMovementRequest request1 = new ChangeQuantityMovementRequest(testItemId, 5, expiryDate1);
+        ReceiveStockRequest request1 = new ReceiveStockRequest(testItemId, 5, expiryDate1);
 
         mockMvc.perform(post("/api/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
@@ -152,7 +190,7 @@ class BatchControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         LocalDateTime expiryDate2 = LocalDateTime.now().plusDays(60);
-        ChangeQuantityMovementRequest request2 = new ChangeQuantityMovementRequest(testItemId, 3, expiryDate2);
+        ReceiveStockRequest request2 = new ReceiveStockRequest(testItemId, 3, expiryDate2);
 
         mockMvc.perform(post("/api/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
@@ -161,8 +199,11 @@ class BatchControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         // Проверяем, что создано две партии
-        List<Batch> batches = batchRepository.findByItemIdOrderByExpiryDateAsc(testItemId);
-        assertThat(batches).hasSize(2);
+        List<Batch> batches = batchRepository.findByItemIdAndWarehouseIdOrderByExpiryDateAsc(
+                testItemId, testWarehouse.getId());
+        assertThat(batches).hasSize(3);
+        assertThat(batches).allSatisfy(batch ->
+                assertThat(batch.getWarehouse().getId()).isEqualTo(testWarehouse.getId()));
 
         Batch batch1 = batches.get(0);
         assertThat(batch1.getExpiryDate()).isBetween(expiryDate1.minusSeconds(1), expiryDate1.plusSeconds(1));
@@ -171,6 +212,12 @@ class BatchControllerTest extends AbstractIntegrationTest {
         Batch batch2 = batches.get(1);
         assertThat(batch2.getExpiryDate()).isBetween(expiryDate2.minusSeconds(1), expiryDate2.plusSeconds(1));
         assertThat(batch2.getQuantity()).isEqualTo(3);
+
+        Stock updatedStock = stockRepository.findByItemIdAndWarehouseId(
+                testItemId, testWarehouse.getId()).orElseThrow();
+        assertThat(updatedStock.getQuantity()).isEqualTo(18);
+        assertThat(updatedStock.getQuantity())
+                .isEqualTo(batches.stream().mapToInt(Batch::getQuantity).sum());
     }
 
     private String obtainToken(String username, String password) throws Exception {

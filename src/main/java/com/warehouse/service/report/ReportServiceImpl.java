@@ -82,7 +82,9 @@ public class ReportServiceImpl implements ReportService {
                         batch.getId(),
                         batch.getItem().getSku(),
                         batch.getItem().getName(),
-                        batch.getItem().getCategory(),
+                        batch.getItem().getCategory().getName(),
+                        batch.getWarehouse().getId(),
+                        batch.getWarehouse().getName(),
                         batch.getQuantity(),
                         batch.getExpiryDate()
                 ))
