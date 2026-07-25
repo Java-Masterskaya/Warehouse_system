@@ -22,7 +22,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

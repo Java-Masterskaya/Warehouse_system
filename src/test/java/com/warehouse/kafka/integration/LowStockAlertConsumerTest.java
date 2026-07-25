@@ -84,7 +84,6 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
                         .build()
         );
 
-
         Item item = Item.builder()
                 .sku(TEST_SKU)
                 .name(TEST_ITEM_NAME)
