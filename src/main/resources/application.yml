@@ -111,9 +111,6 @@ management:
     readinessstate:
       enabled: true
   metrics:
-    enable:
-      http: true
-      web: true
     tags:
       application: warehouse-system
 
