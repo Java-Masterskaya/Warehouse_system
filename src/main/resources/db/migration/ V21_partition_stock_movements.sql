@@ -3,13 +3,26 @@
 -- =============================================
 -- V21: Migrate stock_movements to partitioned table
 -- =============================================
+-- Description:
+--   Transforms stock_movements into a range-partitioned table by created_at (monthly).
+--   Implements zero-downtime migration using batch processing with sync trigger.
+--
+-- Strategy:
+--   1. Create new partitioned table
+--   2. Create partitions for existing data (2024-2027)
+--   3. Create sync trigger to replicate new inserts during migration
+--   4. Migrate existing data in batches (10,000 rows)
+--   5. Switch tables with minimal locking (milliseconds)
+--   6. Copy remaining data in small batches (1,000 rows)
+--   7. Configure pg_partman for automatic partition management
+-- =============================================
 
--- Enable pg_partman extension for automated partition management
+-- Enable pg_partman extension
 -- noinspection SqlResolve
 CREATE EXTENSION IF NOT EXISTS pg_partman;
 
 -- =============================================
--- Step 1: Create new partitioned table
+-- 1. Create partitioned table
 -- =============================================
 CREATE TABLE stock_movements_new (
                                      id         BIGSERIAL,
@@ -22,7 +35,7 @@ CREATE TABLE stock_movements_new (
 ) PARTITION BY RANGE (created_at);
 
 -- =============================================
--- Step 2: Create partitions for existing data
+-- 2. Create partitions for existing data
 -- =============================================
 DO $$
     DECLARE
@@ -58,7 +71,7 @@ DO $$
     END $$;
 
 -- =============================================
--- Step 3: Create indexes on partitions
+-- 3. Create indexes on partitions
 -- =============================================
 DO $$
     DECLARE
@@ -85,52 +98,95 @@ DO $$
     END $$;
 
 -- =============================================
--- Step 4: Batch data migration
+-- 4. Setup sync trigger for new inserts during migration
 -- =============================================
+-- This ensures no data is lost during batch migration
+CREATE OR REPLACE FUNCTION sync_to_new_movements()
+    RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity, created_at)
+    VALUES (NEW.id, NEW.item_id, NEW.user_id, NEW.type, NEW.quantity, NEW.created_at)
+    ON CONFLICT (id, created_at) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER sync_to_new_movements_trigger
+    AFTER INSERT ON stock_movements
+    FOR EACH ROW EXECUTE FUNCTION sync_to_new_movements();
+
+-- =============================================
+-- 5. Batch migration (zero downtime)
+-- =============================================
+-- Migrates existing data in batches of 10,000 rows
 DO $$
     DECLARE
         batch_size INT := 10000;
         last_id BIGINT := 0;
         row_count INT;
-        total_count BIGINT := 0;
     BEGIN
         LOOP
-            WITH batch AS (
-                SELECT * FROM stock_movements
-                WHERE id > last_id
-                ORDER BY id
-                LIMIT batch_size
-            )
-            INSERT INTO stock_movements_new
-            SELECT * FROM batch
-            RETURNING id INTO last_id;
+            INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity, created_at)
+            SELECT id, item_id, user_id, type, quantity, created_at
+            FROM stock_movements
+            WHERE id > last_id
+            ORDER BY id
+            LIMIT batch_size;
 
             GET DIAGNOSTICS row_count = ROW_COUNT;
             EXIT WHEN row_count = 0;
 
-            total_count := total_count + row_count;
+            last_id := last_id + batch_size;
             COMMIT;
+
+            -- Small delay to prevent resource contention
+            PERFORM pg_sleep(0.1);
         END LOOP;
     END $$;
 
 -- =============================================
--- Step 5: Switch tables with sequence rename
+-- 6. Switch tables (sub-second lock)
 -- =============================================
-
-LOCK TABLE stock_movements IN ACCESS EXCLUSIVE MODE;
-
+-- Rename tables and sequence, remove trigger
 ALTER TABLE stock_movements RENAME TO stock_movements_old;
 ALTER TABLE stock_movements_new RENAME TO stock_movements;
-
--- CRITICAL: Rename the sequence too!
 ALTER SEQUENCE stock_movements_new_id_seq RENAME TO stock_movements_id_seq;
 
-INSERT INTO stock_movements
-SELECT * FROM stock_movements_old
-ON CONFLICT (id, created_at) DO NOTHING;
+DROP TRIGGER sync_to_new_movements_trigger ON stock_movements_old;
 
+-- =============================================
+-- 7. Copy remaining data (small batches)
+-- =============================================
+-- Only a few rows should be here (inserted during migration)
+DO $$
+    DECLARE
+        batch_size INT := 1000;
+        last_id BIGINT := 0;
+        row_count INT;
+    BEGIN
+        LOOP
+            INSERT INTO stock_movements (id, item_id, user_id, type, quantity, created_at)
+            SELECT id, item_id, user_id, type, quantity, created_at
+            FROM stock_movements_old
+            WHERE id > last_id
+            ORDER BY id
+            LIMIT batch_size
+            ON CONFLICT (id, created_at) DO NOTHING;
+
+            GET DIAGNOSTICS row_count = ROW_COUNT;
+            EXIT WHEN row_count = 0;
+
+            last_id := last_id + batch_size;
+            COMMIT;
+        END LOOP;
+    END $$;
+
+-- Update sequence
 SELECT setval('stock_movements_id_seq', (SELECT MAX(id) FROM stock_movements));
 
+-- =============================================
+-- 8. Restore foreign key constraints
+-- =============================================
 ALTER TABLE stock_movements
     ADD CONSTRAINT stock_movements_item_id_fkey
         FOREIGN KEY (item_id) REFERENCES items(id);
@@ -140,25 +196,31 @@ ALTER TABLE stock_movements
         FOREIGN KEY (user_id) REFERENCES users(id);
 
 -- =============================================
--- Step 6: Verify data integrity
+-- 9. Verify data integrity
 -- =============================================
 DO $$
     DECLARE
         old_count BIGINT;
         new_count BIGINT;
+        old_sum BIGINT;
+        new_sum BIGINT;
     BEGIN
-        EXECUTE 'SELECT COUNT(*) FROM stock_movements_old' INTO old_count;
-        EXECUTE 'SELECT COUNT(*) FROM stock_movements' INTO new_count;
+        EXECUTE 'SELECT COUNT(*), COALESCE(SUM(quantity), 0) FROM stock_movements_old'
+            INTO old_count, old_sum;
 
-        IF old_count = new_count THEN
-            RAISE NOTICE 'Migration successful: % rows migrated', new_count;
+        EXECUTE 'SELECT COUNT(*), COALESCE(SUM(quantity), 0) FROM stock_movements'
+            INTO new_count, new_sum;
+
+        IF old_count = new_count AND old_sum = new_sum THEN
+            RAISE NOTICE 'Migration successful: % rows migrated, total quantity: %', new_count, new_sum;
         ELSE
-            RAISE WARNING 'Data mismatch: old=%, new=%', old_count, new_count;
+            RAISE WARNING 'Data mismatch: old rows=%, new rows=%, old sum=%, new sum=%',
+                old_count, new_count, old_sum, new_sum;
         END IF;
     END $$;
 
 -- =============================================
--- Step 7: Configure pg_partman
+-- 10. Configure pg_partman
 -- =============================================
 -- noinspection SqlResolve
 SELECT partman.create_parent(
@@ -179,7 +241,7 @@ SET
 WHERE parent_table = 'public.stock_movements';
 
 -- =============================================
--- Step 8: Manual partition creation function (fallback)
+-- 11. Fallback: manual partition creation
 -- =============================================
 CREATE OR REPLACE FUNCTION create_stock_movement_partition(
     p_date DATE DEFAULT CURRENT_DATE
@@ -216,7 +278,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- =============================================
--- Step 9: Trigger-based partition creation (fallback)
+-- 12. Fallback: trigger-based partition creation
 -- =============================================
 CREATE OR REPLACE FUNCTION auto_create_partition_trigger()
     RETURNS TRIGGER AS $$
@@ -265,10 +327,10 @@ CREATE TRIGGER trigger_auto_create_partition
 EXECUTE FUNCTION auto_create_partition_trigger();
 
 -- =============================================
--- Verification: Partition Pruning
+-- 13. Verify partition pruning
 -- =============================================
 
--- Verify partition structure
+-- Show partition structure
 SELECT
     parent.relname AS parent_table,
     child.relname AS partition_name,
@@ -279,13 +341,13 @@ FROM pg_inherits
 WHERE parent.relname = 'stock_movements'
 ORDER BY partition_name;
 
--- Verify partition pruning for history query (#8)
+-- Verify pruning: history query (issue #8)
 EXPLAIN (ANALYZE, BUFFERS, COSTS)
 SELECT * FROM stock_movements
 WHERE item_id = 12345
   AND created_at BETWEEN '2026-01-01' AND '2026-03-31';
 
--- Verify partition pruning for low-stock report
+-- Verify pruning: low-stock report
 EXPLAIN (ANALYZE, BUFFERS, COSTS)
 SELECT
     item_id,
@@ -296,3 +358,37 @@ WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
 GROUP BY item_id
 HAVING SUM(quantity) < 10
 ORDER BY total_quantity ASC;
+
+-- =============================================
+-- 14. Verify indexes on all partitions
+-- =============================================
+SELECT
+    partition_name,
+    CASE WHEN has_item_index THEN '✅' ELSE '❌' END AS item_index,
+    CASE WHEN has_created_index THEN '✅' ELSE '❌' END AS created_index
+FROM (
+         SELECT
+             child.relname AS partition_name,
+             EXISTS (
+                 SELECT 1 FROM pg_indexes
+                 WHERE schemaname = 'public'
+                   AND tablename = child.relname
+                   AND indexname LIKE '%item_id_idx'
+             ) AS has_item_index,
+             EXISTS (
+                 SELECT 1 FROM pg_indexes
+                 WHERE schemaname = 'public'
+                   AND tablename = child.relname
+                   AND indexname LIKE '%created_at_idx'
+             ) AS has_created_index
+         FROM pg_inherits
+                  JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
+                  JOIN pg_class child ON pg_inherits.inhrelid = child.oid
+         WHERE parent.relname = 'stock_movements'
+     ) partitions
+ORDER BY partition_name;
+
+-- =============================================
+-- Cleanup (optional, after verification)
+-- =============================================
+-- DROP TABLE stock_movements_old;
