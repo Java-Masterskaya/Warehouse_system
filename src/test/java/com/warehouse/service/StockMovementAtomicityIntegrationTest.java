@@ -5,10 +5,12 @@ import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.OutboxEventRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -56,6 +58,9 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private Item testItem;
     private Long testItemId;
     private User testUser;
@@ -65,11 +70,18 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         // Очищаем outbox перед каждым тестом
         outboxEventRepository.deleteAll();
 
+        Category category = categoryRepository.findByNameIgnoreCase("Категория")
+                .orElseGet(() -> categoryRepository.save(
+                        Category.builder()
+                                .name("Категория")
+                                .build()
+                ));
+
         // Создаём тестовый товар
         testItem = new Item();
         testItem.setSku("SKU-ATOM-" + System.currentTimeMillis());
         testItem.setName("Тестовый товар для атомарности");
-        testItem.setCategory("Категория");
+        testItem.setCategory(category);
         testItem.setMinStock(10);
         testItem.setActive(true);
         testItem = itemRepository.save(testItem);

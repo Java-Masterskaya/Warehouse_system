@@ -2,6 +2,7 @@
 spring:
   application:
     name: warehouse-app
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -14,6 +15,7 @@ spring:
         order_updates: true
   flyway:
     enabled: true
+
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -83,13 +85,24 @@ app:
     refresh-retry-ttl-seconds: 60
 
 management:
+  server:
+    port: 8081 # Выделенный порт для Actuator (будет закрыт от внешних пользователей)
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.5}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
   endpoints:
     web:
       exposure:
         include: health,info,prometheus,metrics,env,refresh
+      base-path: /actuator
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
+      roles: "ADMIN" # Детали видны только авторизованным пользователям с ролью администратора
       probes:
         enabled: true
       group:
@@ -113,4 +126,8 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
+    com.warehouse.kafka.consumer: WARN
     com.warehouse.service.outbox: INFO
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId}] [spanId=%X{spanId}] %logger{36} - %msg%n"

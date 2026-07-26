@@ -6,6 +6,7 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.response.movement.StockTransferResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Reservation;
@@ -15,6 +16,7 @@ import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -53,6 +56,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Focused integration tests for atomic stock transfers between warehouses.
  */
+@SpringBootTest
 @AutoConfigureMockMvc
 class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
 
@@ -89,6 +93,9 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private StockMovementService stockMovementService;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private Warehouse sourceWarehouse;
     private Warehouse destinationWarehouse;
     private Item item;
@@ -107,10 +114,16 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
                 .defaultWarehouse(false)
                 .build());
 
+        Category category = categoryRepository.saveAndFlush(
+                Category.builder()
+                        .name("DOM4-" + suffix)
+                        .build()
+        );
+
         item = itemRepository.saveAndFlush(Item.builder()
                 .sku("DOM4-" + suffix)
                 .name("DOM4 transfer item")
-                .category("DOM4")
+                .category(category)
                 .minStock(1)
                 .price(BigDecimal.TEN)
                 .cost(BigDecimal.ONE)

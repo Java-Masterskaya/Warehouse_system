@@ -12,9 +12,9 @@ scrape_configs:
   - job_name: warehouse-app
     metrics_path: /actuator/prometheus
     static_configs:
-      # При запуске приложения (warehouse-app) в контейнере, нужно указать 'warehouse-app:8080'
-      # Если приложение вне докера - 'host.docker.internal:8080'
-      - targets: ['host.docker.internal:8080']
+      # При запуске приложения (warehouse-app) в контейнере, нужно указать 'warehouse-app:8081'
+      # Если приложение вне докера - 'host.docker.internal:8081'
+      - targets: ['host.docker.internal:8081']
 
 rule_files:
   - /etc/prometheus/prometheus-rules.yml

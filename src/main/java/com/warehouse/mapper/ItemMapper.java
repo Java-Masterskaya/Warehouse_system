@@ -16,15 +16,18 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface ItemMapper {
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "category", ignore = true)
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     Item toEntity(CreateItemRequest request);
 
+    @Mapping(target = "category", source = "category.name")
     ItemResponse toResponse(Item item);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "sku", ignore = true)
+    @Mapping(target = "category", ignore = true)
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)

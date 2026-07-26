@@ -1,5 +1,6 @@
 package com.warehouse.repository;
 
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Reservation;
 import com.warehouse.entity.ReservationStatus;
@@ -34,6 +35,9 @@ class ReservationExpirationRepositoryTest {
     @Autowired
     private TestEntityManager entityManager;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private User user;
 
     private Item item1;
@@ -45,6 +49,8 @@ class ReservationExpirationRepositoryTest {
     private Stock stock3;
     private Warehouse defaultWarehouse;
 
+    private Category category;
+
     @BeforeEach
     void setUp() {
         defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
@@ -52,6 +58,12 @@ class ReservationExpirationRepositoryTest {
         user = userRepository.save(
                 User.builder().username("name").password("passW@23d").role(Role.ROLE_ADMIN).active(true)
                         .createdAt(LocalDateTime.now()).build());
+
+        category = categoryRepository.save(
+                Category.builder()
+                        .name("category")
+                        .build()
+        );
 
         item1 = addItem(LocalDateTime.now());
         item2 = addItem(LocalDateTime.now());
@@ -96,7 +108,7 @@ class ReservationExpirationRepositoryTest {
 
     private Item addItem(LocalDateTime timestamp) {
         return itemRepository.save(
-                Item.builder().sku("someArt123" + timestamp).name("name" + timestamp).category("category").minStock(0)
+                Item.builder().sku("someArt123" + timestamp).name("name" + timestamp).category(category).minStock(0)
                         .active(true).createdAt(LocalDateTime.now().minusMonths(10)).build());
     }
 
