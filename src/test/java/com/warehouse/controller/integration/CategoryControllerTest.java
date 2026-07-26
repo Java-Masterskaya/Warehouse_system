@@ -72,7 +72,7 @@ class CategoryControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        userRepository.findByUsername("admin").orElseGet(() -> {
+        User adminUser = userRepository.findByUsername("admin").orElseGet(() -> {
             User admin = new User();
             admin.setUsername("admin");
             admin.setPassword(passwordEncoder.encode("secret"));
@@ -81,7 +81,8 @@ class CategoryControllerTest extends AbstractIntegrationTest {
             return userRepository.saveAndFlush(admin);
         });
 
-        adminToken = obtainToken("admin", "secret");
+//        adminToken = obtainToken("admin", "secret");
+        adminToken = jwtUtil.generateToken("admin", adminUser.getId(), List.of("ROLE_ADMIN"));
 
         User testUser = userRepository.findByUsername("category-test-user").orElseGet(() -> {
             User user = new User();
