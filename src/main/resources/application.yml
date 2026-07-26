@@ -2,12 +2,15 @@
 spring:
   application:
     name: warehouse-app
+
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: false
+
   flyway:
     enabled: true
+
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -84,6 +87,13 @@ app:
 management:
   server:
     port: 8081 # Выделенный порт для Actuator (будет закрыт от внешних пользователей)
+  tracing:
+    enabled: true
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.5}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
   endpoints:
     web:
       exposure:
@@ -116,4 +126,8 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
+    com.warehouse.kafka.consumer: WARN
     com.warehouse.service.outbox: INFO
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId}] [spanId=%X{spanId}] %logger{36} - %msg%n"
