@@ -5,7 +5,7 @@ public record LowStockItem(
         String sku,
         String name,
         String category,
-        int currentStock,
+        long currentStock,
         int minStock,
-        int deficit
+        long deficit
 ) {}

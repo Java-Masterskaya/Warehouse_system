@@ -3,14 +3,23 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
+import com.warehouse.exception.CategoryInUseException;
+import com.warehouse.exception.DuplicateCategoryException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
+import com.warehouse.exception.DuplicateWarehouseNameException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
-import com.warehouse.exception.LastAdminDeactivationException;
-import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.exception.InvalidMovementRequestException;
+import com.warehouse.exception.InvalidPurchaseOrderStatusException;
+import com.warehouse.exception.InvalidTokenException;
+import com.warehouse.exception.LastAdminDeactivationException;
+import com.warehouse.exception.PurchaseOrderOverReceiptException;
+import com.warehouse.exception.ReservationException;
+import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.exception.StockMovementInvariantException;
+import com.warehouse.exception.StocktakeConflictException;
+import com.warehouse.exception.TokenReuseException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -22,6 +31,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -48,6 +58,13 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("INSUFFICIENT_STOCK", ex.getMessage());
     }
 
+    @ExceptionHandler(PurchaseOrderOverReceiptException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    public ErrorResponse handlePurchaseOrderOverReceipt(
+            PurchaseOrderOverReceiptException ex) {
+        return new ErrorResponse("PURCHASE_ORDER_OVER_RECEIPT", ex.getMessage());
+    }
+
     @ExceptionHandler(DuplicateSkuException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDuplicateSku(DuplicateSkuException ex) {
@@ -72,10 +89,41 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("DUPLICATE_USERNAME", message);
     }
 
+    @ExceptionHandler(DuplicateWarehouseNameException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDuplicateWarehouseName(DuplicateWarehouseNameException ex) {
+        return new ErrorResponse("DUPLICATE_WAREHOUSE_NAME", ex.getMessage());
+    }
+
     @ExceptionHandler(LastAdminDeactivationException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleLastAdminDeactivation(LastAdminDeactivationException ex) {
         return new ErrorResponse("LAST_ADMIN", ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPurchaseOrderStatusException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleInvalidPurchaseOrderStatus(
+            InvalidPurchaseOrderStatusException ex) {
+        return new ErrorResponse("INVALID_PURCHASE_ORDER_STATUS", ex.getMessage());
+    }
+
+    @ExceptionHandler(StocktakeConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleStocktakeConflict(StocktakeConflictException ex) {
+        return new ErrorResponse("INVENTORY_RESULT_LESS_THAN_RESERVED", ex.getMessage());
+    }
+
+    @ExceptionHandler(CategoryInUseException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleCategoryInUse(CategoryInUseException ex) {
+        return new ErrorResponse("CATEGORY_IN_USE", ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateCategoryException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDuplicateCategory(DuplicateCategoryException ex) {
+        return new ErrorResponse("DUPLICATE_CATEGORY", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -94,6 +142,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("SELF_DEACTIVATION", ex.getMessage());
     }
 
+    @ExceptionHandler(ReservationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleUnexpectedReservationStatus(ReservationException ex) {
+        return new ErrorResponse("UNEXPECTED_RESERVATION_STATUS", ex.getMessage());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ErrorResponse handleAccessDenied(AccessDeniedException ex) {
@@ -104,6 +158,20 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleAuthentication(AuthenticationException ex) {
         return new ErrorResponse("UNAUTHORIZED", "Authentication failed");
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleInvalidTokenException(InvalidTokenException ex) {
+        log.warn("Invalid token: {}", ex.getMessage());
+        return new ErrorResponse("INVALID_TOKEN", ex.getMessage());
+    }
+
+    @ExceptionHandler(TokenReuseException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleTokenReuseException(TokenReuseException ex) {
+        log.warn("Token reuse detected: {}", ex.getMessage());
+        return new ErrorResponse("TOKEN_REUSE", ex.getMessage());
     }
 
     @ExceptionHandler(InvalidMovementRequestException.class)
@@ -126,6 +194,14 @@ public class GlobalExceptionHandler {
         log.warn("Concurrent stock modification detected: {}", ex.getMessage());
         return new ErrorResponse("CONCURRENT_MODIFICATION",
                 "Resource was modified by another transaction. Please retry.");
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNoResourceFound(NoResourceFoundException ex) {
+        log.warn("Invalid request: {}", ex.getMessage());
+        return new ErrorResponse("INVALID_REQUEST",
+                "Our server could not locate the specific resource you requested. Please check the URL.");
     }
 
     @ExceptionHandler(Exception.class)

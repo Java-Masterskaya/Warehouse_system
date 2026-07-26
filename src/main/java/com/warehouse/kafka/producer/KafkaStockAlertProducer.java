@@ -9,8 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -18,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 @Service
 @Slf4j
 public class KafkaStockAlertProducer implements KafkaProducerService {
+
     private static final String TOPIC_NAME = "low-stock-alerts";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -35,10 +34,6 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
         this.propagator = propagator;
     }
 
-    @Retryable(
-            retryFor = {Exception.class},
-            backoff = @Backoff(delay = 1000, multiplier = 2)
-    )
     public void sendLowStockAlert(LowStockAlertEvent alert) {
         Span span = tracer.currentSpan();
 
