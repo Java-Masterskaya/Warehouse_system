@@ -163,6 +163,8 @@ services:
         condition: service_completed_successfully
     networks:
       - app-network
+
+
     healthcheck:
       test: [ "CMD", "wget", "-qO-", "http://localhost:8081/actuator/health/readiness" ]
       interval: 10s
@@ -179,6 +181,9 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./monitoring/prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--enable-feature=exemplar-storage'
     networks:
       - app-network
 
@@ -206,6 +211,19 @@ services:
       - ./monitoring/grafana/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml
       - ./monitoring/grafana/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
       - ./monitoring/grafana/dashboards/warehouse.json:/etc/grafana/provisioning/dashboards/warehouse.json
+      - ./monitoring/grafana/datasources/tempo.yaml:/etc/grafana/provisioning/datasources/tempo.yaml
+    networks:
+      - app-network
+
+  # -- Tempo --
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./monitoring/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+      - "4318:4318"
     networks:
       - app-network
 
