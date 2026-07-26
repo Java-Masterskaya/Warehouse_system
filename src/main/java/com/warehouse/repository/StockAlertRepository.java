@@ -52,8 +52,8 @@ public interface StockAlertRepository extends JpaRepository<StockAlert, Long> {
             INSERT INTO stock_alerts 
                 (item_id, current_stock, min_stock, triggered_by, triggered_at, created_at)
             VALUES 
-                (:itemId, :currentStock, :minStock, :triggeredBy, :triggeredAt, NOW())
-            ON CONFLICT (item_id, triggered_at) DO NOTHING
+                (:itemId, :currentStock, :minStock, :triggeredBy, :triggeredAt, :triggeredAt)
+            ON CONFLICT (item_id, created_at) DO NOTHING
             """, nativeQuery = true)
     int insertIgnore(
             @Param("itemId") Long itemId,
