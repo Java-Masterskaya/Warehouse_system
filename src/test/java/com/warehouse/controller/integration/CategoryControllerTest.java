@@ -81,7 +81,6 @@ class CategoryControllerTest extends AbstractIntegrationTest {
             return userRepository.saveAndFlush(admin);
         });
 
-//        adminToken = obtainToken("admin", "secret");
         adminToken = jwtUtil.generateToken("admin", adminUser.getId(), List.of("ROLE_ADMIN"));
 
         User testUser = userRepository.findByUsername("category-test-user").orElseGet(() -> {
@@ -286,21 +285,5 @@ class CategoryControllerTest extends AbstractIntegrationTest {
         item.setActive(true);
 
         return itemRepository.save(item);
-    }
-
-    private String obtainToken(String username, String password)
-            throws Exception {
-
-        LoginRequest request = new LoginRequest(username, password);
-
-        String response = mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
-                                                                 .content(objectMapper.writeValueAsString(request)))
-                                 .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
-                                 .andExpect(status().isOk())
-                                 .andReturn()
-                                 .getResponse()
-                                 .getContentAsString();
-
-        return objectMapper.readTree(response).get("accessToken").asText();
     }
 }

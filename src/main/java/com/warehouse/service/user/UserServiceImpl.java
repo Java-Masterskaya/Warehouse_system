@@ -47,7 +47,6 @@ public class UserServiceImpl implements UserService {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         User saved = userRepository.save(user);
 
-//        auditContext.setOldValue(null);
         auditContext.setNewValue(userMapper.toAuditDto(saved));
         auditContext.setEntityId(saved.getId());
 
