@@ -111,11 +111,6 @@ management:
     readinessstate:
       enabled: true
   metrics:
-    web:
-      server:
-        request:
-          autotime:
-            enabled: true
     enable:
       http: true
       web: true
