@@ -65,9 +65,9 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
     void setUp() {
         testStartTime = System.currentTimeMillis();
         log.info("=== Starting test setup ===");
-        stockAlertRepository.deleteAll();
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
+        stockAlertRepository.deleteAllInBatch();
+        stockRepository.deleteAllInBatch();
+        itemRepository.deleteAllInBatch();
         clearDltTopic();
         log.info("=== Test setup completed ===");
     }

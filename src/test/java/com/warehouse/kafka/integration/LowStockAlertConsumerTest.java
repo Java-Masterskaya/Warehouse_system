@@ -61,10 +61,10 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        stockAlertRepository.deleteAll();
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
-        categoryRepository.deleteAll();
+        stockAlertRepository.deleteAllInBatch();
+        stockRepository.deleteAllInBatch();
+        itemRepository.deleteAllInBatch();
+        categoryRepository.deleteAllInBatch();
 
         Category category = categoryRepository.save(
                 Category.builder()
