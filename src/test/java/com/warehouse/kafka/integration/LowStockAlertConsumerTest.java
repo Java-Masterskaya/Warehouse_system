@@ -17,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -34,6 +35,7 @@ import static org.awaitility.Awaitility.await;
  * Интеграционный тест для проверки потребления alertов о низких остатках из Kafka.
  */
 @Tag("integration")
+@TestPropertySource(properties = "bucket4j.enabled=false")
 @Testcontainers
 @SpringBootTest(classes = WarehouseApp.class)
 class LowStockAlertConsumerTest {
