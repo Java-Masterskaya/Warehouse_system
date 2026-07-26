@@ -12,7 +12,6 @@ import com.warehouse.entity.User;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.security.UserPrincipal;
 import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,9 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -75,9 +71,16 @@ class CategoryControllerTest extends AbstractIntegrationTest {
     private String suffix;
 
     @BeforeEach
-    void setUp()
-            throws Exception {
-        SecurityContextHolder.clearContext();
+    void setUp() throws Exception {
+        userRepository.findByUsername("admin").orElseGet(() -> {
+            User admin = new User();
+            admin.setUsername("admin");
+            admin.setPassword(passwordEncoder.encode("secret"));
+            admin.setRole(Role.ROLE_ADMIN);
+            admin.setActive(true);
+            return userRepository.saveAndFlush(admin);
+        });
+
         adminToken = obtainToken("admin", "secret");
 
         User testUser = userRepository.findByUsername("category-test-user").orElseGet(() -> {
@@ -291,36 +294,12 @@ class CategoryControllerTest extends AbstractIntegrationTest {
 
         String response = mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                                                                  .content(objectMapper.writeValueAsString(request)))
+                                 .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
                                  .andExpect(status().isOk())
                                  .andReturn()
                                  .getResponse()
                                  .getContentAsString();
 
         return objectMapper.readTree(response).get("accessToken").asText();
-    }
-
-    private void setAuthentification() {
-        User admin = createActiveAdmin("admin");
-        SecurityContextHolder.getContext()
-                             .setAuthentication(new UsernamePasswordAuthenticationToken(
-                                     new UserPrincipal(admin.getId(), admin.getUsername(), admin.getPassword(),
-                                             admin.isActive(), List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))),
-                                     null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
-    }
-
-    private User createActiveAdmin(String username) {
-        return userRepository.findByUsername(username).map(user -> {
-            user.setPassword(passwordEncoder.encode("password"));
-            user.setRole(Role.ROLE_ADMIN);
-            user.setActive(true);
-            return userRepository.save(user);
-        }).orElseGet(() -> {
-            User user = new User();
-            user.setUsername(username);
-            user.setPassword(passwordEncoder.encode("password"));
-            user.setRole(Role.ROLE_ADMIN);
-            user.setActive(true);
-            return userRepository.save(user);
-        });
     }
 }
