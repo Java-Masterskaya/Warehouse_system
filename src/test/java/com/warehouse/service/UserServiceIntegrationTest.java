@@ -4,17 +4,25 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.security.util.JwtUtil;
+import com.warehouse.security.service.TokenService;
 import com.warehouse.service.user.UserService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SpringBootTest
+@DisplayName("UserService Integration Tests")
 class UserServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -26,7 +34,37 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private TokenService tokenService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    private User testUser;
+    private String accessToken;
+    private String refreshToken;
+
+    @BeforeEach
+    void setUp() {
+        // Create test user for token tests
+        testUser = new User();
+        testUser.setUsername("testuser_deactivation_" + System.currentTimeMillis());
+        testUser.setPassword(passwordEncoder.encode("password"));
+        testUser.setRole(Role.ROLE_USER);
+        testUser.setActive(true);
+        testUser = userRepository.save(testUser);
+
+        // Generate and store tokens using public method
+        List<String> roles = List.of("ROLE_USER");
+        var tokenPair = tokenService.generateTokenPair(testUser.getUsername(), testUser.getId(), roles);
+        accessToken = tokenPair.accessToken();
+        refreshToken = tokenPair.refreshToken();
+    }
+
+    // ==================== EXISTING TEST ====================
+
     @Test
+    @DisplayName("Concurrent deactivation of two last admins leaves at least one active admin")
     void concurrentDeactivationOfTwoLastAdminsLeavesAtLeastOneActiveAdmin() throws Exception {
         User firstAdmin = createActiveAdmin("concurrent-admin-1");
         User secondAdmin = createActiveAdmin("concurrent-admin-2");
@@ -75,6 +113,161 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
             executor.shutdownNow();
         }
     }
+
+    // ==================== NEW DEACTIVATION TESTS ====================
+
+    @Test
+    @DisplayName("Deactivation should revoke all tokens in Redis")
+    void deactivationShouldRevokeAllTokensInRedis() {
+        // 1. Verify tokens are stored and valid
+        assertThat(tokenService.validateRefreshToken(refreshToken))
+                .as("Refresh token should be valid before deactivation")
+                .isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken))
+                .as("Access token should not be blacklisted before deactivation")
+                .isFalse();
+
+        // 2. Deactivate user
+        userService.deactivateUser(testUser.getId(), 999L); // 999 = admin id
+
+        // 3. Verify tokens are revoked
+        assertThat(tokenService.validateRefreshToken(refreshToken))
+                .as("Refresh token should be revoked after deactivation")
+                .isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken))
+                .as("Access token should be blacklisted after deactivation")
+                .isTrue();
+
+        // 4. Verify user is deactivated in DB
+        User deactivatedUser = userRepository.findById(testUser.getId()).orElseThrow();
+        assertThat(deactivatedUser.isActive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("All user tokens should be revoked on deactivation")
+    void deactivationShouldRevokeAllUserTokens() {
+        // 1. Generate multiple tokens for the same user using public method
+        List<String> roles = List.of("ROLE_USER");
+
+        // Generate first pair
+        var pair1 = tokenService.generateTokenPair(testUser.getUsername(), testUser.getId(), roles);
+        String accessToken1 = pair1.accessToken();
+        String refreshToken1 = pair1.refreshToken();
+
+        // Generate second pair
+        var pair2 = tokenService.generateTokenPair(testUser.getUsername(), testUser.getId(), roles);
+        String accessToken2 = pair2.accessToken();
+        String refreshToken2 = pair2.refreshToken();
+
+        // 2. Verify tokens are valid before deactivation
+        assertThat(tokenService.validateRefreshToken(refreshToken1))
+                .as("First refresh token should be valid")
+                .isTrue();
+        assertThat(tokenService.validateRefreshToken(refreshToken2))
+                .as("Second refresh token should be valid")
+                .isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken1))
+                .as("First access token should not be blacklisted")
+                .isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken2))
+                .as("Second access token should not be blacklisted")
+                .isFalse();
+
+        // 3. Deactivate user
+        userService.deactivateUser(testUser.getId(), 999L);
+
+        // 4. Verify ALL tokens are revoked
+        assertThat(tokenService.validateRefreshToken(refreshToken1))
+                .as("First refresh token should be revoked")
+                .isFalse();
+        assertThat(tokenService.validateRefreshToken(refreshToken2))
+                .as("Second refresh token should be revoked")
+                .isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken1))
+                .as("First access token should be blacklisted")
+                .isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken2))
+                .as("Second access token should be blacklisted")
+                .isTrue();
+
+        // 5. Verify user is deactivated in DB
+        User deactivatedUser = userRepository.findById(testUser.getId()).orElseThrow();
+        assertThat(deactivatedUser.isActive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Deactivation should remove refresh tokens from Redis")
+    void deactivationShouldRemoveRefreshTokensFromRedis() {
+        // 1. Verify refresh token exists in Redis
+        assertThat(tokenService.validateRefreshToken(refreshToken)).isTrue();
+
+        // 2. Deactivate user
+        userService.deactivateUser(testUser.getId(), 999L);
+
+        // 3. Verify refresh token is removed from Redis
+        assertThat(tokenService.validateRefreshToken(refreshToken)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Deactivation should not affect other users' tokens")
+    void deactivationShouldNotAffectOtherUsersTokens() {
+        // 1. Create another user with tokens
+        User otherUser = new User();
+        otherUser.setUsername("other_user_" + System.currentTimeMillis());
+        otherUser.setPassword(passwordEncoder.encode("password"));
+        otherUser.setRole(Role.ROLE_USER);
+        otherUser.setActive(true);
+        otherUser = userRepository.save(otherUser);
+
+        List<String> roles = List.of("ROLE_USER");
+        var otherPair = tokenService.generateTokenPair(otherUser.getUsername(), otherUser.getId(), roles);
+        String otherAccessToken = otherPair.accessToken();
+        String otherRefreshToken = otherPair.refreshToken();
+
+        // 2. Verify both users' tokens are valid
+        assertThat(tokenService.validateRefreshToken(refreshToken)).isTrue();
+        assertThat(tokenService.validateRefreshToken(otherRefreshToken)).isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken)).isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(otherAccessToken)).isFalse();
+
+        // 3. Deactivate first user
+        userService.deactivateUser(testUser.getId(), 999L);
+
+        // 4. Verify only first user's tokens are revoked
+        assertThat(tokenService.validateRefreshToken(refreshToken))
+                .as("First user's refresh token should be revoked")
+                .isFalse();
+        assertThat(tokenService.validateRefreshToken(otherRefreshToken))
+                .as("Other user's refresh token should still be valid")
+                .isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken))
+                .as("First user's access token should be blacklisted")
+                .isTrue();
+        assertThat(tokenService.isAccessTokenBlacklisted(otherAccessToken))
+                .as("Other user's access token should not be blacklisted")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("Deactivating already inactive user should still revoke tokens")
+    void deactivatingAlreadyInactiveUserShouldStillRevokeTokens() {
+        // 1. Deactivate user first time
+        userService.deactivateUser(testUser.getId(), 999L);
+
+        // 2. Verify tokens are revoked
+        assertThat(tokenService.validateRefreshToken(refreshToken)).isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken)).isTrue();
+        assertThat(userRepository.findById(testUser.getId()).orElseThrow().isActive()).isFalse();
+
+        // 3. Try to deactivate again (should not throw)
+        userService.deactivateUser(testUser.getId(), 999L);
+
+        // 4. Verify still revoked
+        assertThat(tokenService.validateRefreshToken(refreshToken)).isFalse();
+        assertThat(tokenService.isAccessTokenBlacklisted(accessToken)).isTrue();
+    }
+
+    // ==================== HELPER METHODS ====================
 
     private User createActiveAdmin(String username) {
         return userRepository.findByUsername(username)

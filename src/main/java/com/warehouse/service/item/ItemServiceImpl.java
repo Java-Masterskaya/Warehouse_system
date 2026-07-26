@@ -3,21 +3,27 @@ package com.warehouse.service.item;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
+import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
+import com.warehouse.entity.Category;
+import com.warehouse.dto.response.item.WarehouseStockResponse;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.WarehouseRepository;
+import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.specification.ItemSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -35,11 +41,13 @@ public class ItemServiceImpl implements ItemService {
 
     private final ItemRepository itemRepository;
     private final StockRepository stockRepository;
+    private final WarehouseRepository warehouseRepository;
     private final ItemMapper itemMapper;
+    private final StockAvailabilityService availabilityService;
+    private final CategoryRepository categoryRepository;
 
     @Transactional
     @Override
-    @CacheEvict(value = "categories", allEntries = true)
     public ItemResponse createItem(CreateItemRequest request) {
         log.debug("Creating item with SKU '{}'", request.sku());
 
@@ -49,12 +57,17 @@ public class ItemServiceImpl implements ItemService {
         }
 
         Item item = itemMapper.toEntity(request);
+        item.setCategory(getCategory(request.category()));
         item.setPrice(confirmPrice(request.price()));
         item.setCost(confirmCost(request.cost()));
         itemRepository.save(item);
 
+        Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
+                .orElseThrow(() -> new IllegalStateException("Default warehouse is not configured"));
+
         Stock stock = new Stock();
         stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
         stock.setQuantity(0);
         stockRepository.save(stock);
 
@@ -64,10 +77,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Transactional
     @Override
-    @Caching(evict = {
-        @CacheEvict(value = "item", key = "#itemId"),
-        @CacheEvict(value = "categories", allEntries = true)
-    })
+    @CacheEvict(value = "item", key = "#itemId")
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
         log.debug("Updating item with id={}", itemId);
 
@@ -83,7 +93,7 @@ public class ItemServiceImpl implements ItemService {
         }
 
         item.setName(request.name());
-        item.setCategory(request.category());
+        item.setCategory(getCategory(request.category()));
         item.setMinStock(request.minStock());
         item.setPrice(confirmPrice(request.price()));
         item.setCost(confirmCost(request.cost()));
@@ -134,18 +144,23 @@ public class ItemServiceImpl implements ItemService {
     @Cacheable(value = "item", key = "#itemId")
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
-        ItemDetailsResponse item = itemRepository.findWithStock(itemId)
+        ItemDetailsProjection item = itemRepository.findWithStock(itemId)
                 .orElseThrow(() -> {
                     log.warn("Item not found: id={}", itemId);
                     return new EntityNotFoundException("Товар не найден");
                 });
-
         if (!item.active()) {
             log.warn("Item inactive: id={}", itemId);
             throw new EntityNotFoundException("Товар неактивен");
         }
+        long reserved = availabilityService.getTotalReserved(itemId);
+        long available = item.currentStock() - reserved;
 
-        return item;
+        List<WarehouseStockResponse> warehouseStocks = stockRepository.findAllByItemIdWithWarehouse(itemId).stream()
+                .map(this::toWarehouseStockResponse)
+                .toList();
+
+        return itemMapper.mapProjectionToDetailsResponse(item, available, reserved, warehouseStocks);
     }
 
     @Transactional
@@ -166,16 +181,6 @@ public class ItemServiceImpl implements ItemService {
         log.info("Item c id={} успешно деактивирован", itemId);
     }
 
-    @Cacheable(value = "categories")
-    @Transactional(readOnly = true)
-    @Override
-    public List<String> getCategories() {
-        log.debug("Getting all active categories");
-        List<String> categories = itemRepository.findDistinctCategories();
-        log.info("Found {} categories: {}", categories.size(), categories);
-        return categories;
-    }
-
     @Override
     public BigDecimal confirmPrice(BigDecimal price) {
         if (price == null) {
@@ -190,5 +195,23 @@ public class ItemServiceImpl implements ItemService {
             return BigDecimal.ZERO;
         }
         return cost.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private Category getCategory(String categoryName) {
+        String name = categoryName.trim();
+        return categoryRepository.findByNameIgnoreCase(name)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Категория " + name + " не найдена"));
+    }
+
+    private WarehouseStockResponse toWarehouseStockResponse(Stock stock) {
+        long reserved = availabilityService.getReserved(stock);
+        return new WarehouseStockResponse(
+                stock.getWarehouse().getId(),
+                stock.getWarehouse().getName(),
+                stock.getQuantity(),
+                reserved,
+                (long) stock.getQuantity() - reserved
+        );
     }
 }

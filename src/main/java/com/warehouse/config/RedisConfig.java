@@ -1,6 +1,7 @@
 package com.warehouse.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -43,6 +45,10 @@ public class RedisConfig {
                         )
                 )
                 .disableCachingNullValues();
+        
+        var categoriesListType = objectMapper
+                .getTypeFactory()
+                .constructCollectionType(List.class, CategoryResponse.class);
 
         RedisCacheConfiguration categoriesConfig = baseConfig
                 .entryTtl(Duration.ofMinutes(categoriesTtlMinutes))
@@ -50,7 +56,7 @@ public class RedisConfig {
                         RedisSerializationContext.SerializationPair.fromSerializer(
                                 new Jackson2JsonRedisSerializer<>(
                                         objectMapper,
-                                        List.class
+                                        categoriesListType
                                 )
                         )
                 );
@@ -74,5 +80,17 @@ public class RedisConfig {
                 .cacheDefaults(baseConfig)
                 .withInitialCacheConfigurations(configs)
                 .build();
+    }
+
+    @Bean
+    public RedisTemplate<String, String> redisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, String> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
+        template.setValueSerializer(new StringRedisSerializer());
+        template.setHashKeySerializer(new StringRedisSerializer());
+        template.setHashValueSerializer(new StringRedisSerializer());
+        template.afterPropertiesSet();
+        return template;
     }
 }

@@ -48,7 +48,8 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.OK).body(user);
     }
 
-    @Operation(summary = "Деактивировать пользователя")
+    @Operation(summary = "Деактивировать пользователя",
+            description = "Деактивирует пользователя и отзывает все его токены")
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deactivateUser(

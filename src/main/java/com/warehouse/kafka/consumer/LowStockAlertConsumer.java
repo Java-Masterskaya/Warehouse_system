@@ -1,8 +1,7 @@
 package com.warehouse.kafka.consumer;
 
 import com.warehouse.dto.event.LowStockAlertEvent;
-import com.warehouse.entity.StockAlert;
-import com.warehouse.mapper.StockAlertMapper;
+import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import io.micrometer.tracing.Span;
@@ -18,6 +17,7 @@ import org.apache.kafka.common.header.Headers;
 import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 
@@ -32,7 +32,7 @@ import java.nio.charset.StandardCharsets;
  * </p>
  *
  * @see LowStockAlertEvent
- * @see StockAlert
+ * @see com.warehouse.entity.StockAlert
  */
 @Slf4j
 @Component
@@ -41,7 +41,6 @@ import java.nio.charset.StandardCharsets;
 public class LowStockAlertConsumer {
 
     StockAlertRepository stockAlertRepository;
-    StockAlertMapper stockAlertMapper;
     ItemRepository itemRepository;
     Tracer tracer;
     Propagator propagator;
@@ -63,6 +62,7 @@ public class LowStockAlertConsumer {
      * creates a new span as a child of the producer span, and persists the alert
      * to the database. Uses {@code kafkaListenerContainerFactory} with built-in
      * errorHandler and DLT support. Duplicate alerts are skipped gracefully.
+     * Uses {@code insertIgnore} to handle duplicates efficiently at database level.
      * </p>
      *
      * @param record the incoming Kafka consumer record containing the alert event
@@ -72,6 +72,7 @@ public class LowStockAlertConsumer {
             groupId = "warehouse-alerts",
             containerFactory = "kafkaListenerContainerFactory"
     )
+    @Transactional
     public void consume(ConsumerRecord<String, LowStockAlertEvent> record) {
         Span span = null;
         try {
@@ -158,10 +159,11 @@ public class LowStockAlertConsumer {
     /**
      * Processes the alert event and persists it to the database.
      * <p>
-     * Duplicate alerts (unique index violation on {@code idx_stock_alerts_unique})
-     * are logged and skipped. Other {@code DataIntegrityViolationException} types
-     * and general errors are re-thrown to the container's errorHandler, which
-     * routes them to the Dead Letter Topic after configured retries.
+     * Uses {@code insertIgnore} to handle duplicate alerts efficiently.
+     * If insert returns 1 - record was inserted, if 0 - duplicate skipped.
+     * Throws {@code EntityNotFoundException} if item doesn't exist.
+     * Other errors are re-thrown to the container's errorHandler,
+     * which routes them to the Dead Letter Topic after configured retries.
      * </p>
      *
      * @param event the low stock alert event
@@ -172,50 +174,36 @@ public class LowStockAlertConsumer {
                 event.itemId(), event.currentStock(), event.minStock());
 
         var item = itemRepository.findById(event.itemId())
-                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(
-                        "Item not found: " + event.itemId()));
+                .orElseThrow(() -> new EntityNotFoundException("Item not found: " + event.itemId()));
 
         try {
-            log.info("Mapping event to StockAlert entity...");
-            StockAlert alert = stockAlertMapper.toEntity(event, item);
-            log.info("StockAlert mapped");
+            log.info("Saving StockAlert to database using insertIgnore...");
 
-            log.info("Saving StockAlert to database...");
-            StockAlert savedAlert = stockAlertRepository.save(alert);
-            log.info("StockAlert saved with id={}", savedAlert.getId());
+            int inserted = stockAlertRepository.insertIgnore(
+                    event.itemId(),
+                    event.currentStock(),
+                    event.minStock(),
+                    event.triggeredBy(),
+                    event.triggeredAt()
+            );
 
-            span.tag("alert.id", String.valueOf(savedAlert.getId()));
-            log.info("=== CONSUMER PROCESSING COMPLETED SUCCESSFULLY ===");
-
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            if (isDuplicateViolation(e)) {
-                log.warn("Duplicate alert skipped (unique index violation): itemId={}, triggeredAt={}",
+            if (inserted == 1) {
+                log.info("StockAlert saved for itemId={}", event.itemId());
+                span.tag("alert.status", "saved");
+            } else {
+                log.warn("Duplicate alert skipped (insertIgnore returned 0): itemId={}, triggeredAt={}",
                         event.itemId(), event.triggeredAt());
                 span.tag("alert.status", "duplicate_skipped");
                 // Не пробрасываем — дубликат не идёт в DLT
-            } else {
-                log.error("Data integrity violation while processing alert for itemId={}", event.itemId(), e);
-                span.error(e);
-                throw e; // Пробрасываем в errorHandler → DLT
             }
+
+            log.info("=== CONSUMER PROCESSING COMPLETED SUCCESSFULLY ===");
+
         } catch (Exception e) {
             log.error("Error while processing low stock alert for itemId={}", event.itemId(), e);
             span.error(e);
             throw e; // Пробрасываем в errorHandler → DLT
         }
-    }
-
-    /**
-     * Checks if the exception is a unique index violation (duplicate alert).
-     * Other integrity violations (NOT NULL, FOREIGN KEY, CHECK) are re-thrown.
-     *
-     * @param e the DataIntegrityViolationException
-     * @return true if it's a duplicate key violation
-     */
-    private boolean isDuplicateViolation(org.springframework.dao.DataIntegrityViolationException e) {
-        String message = e.getMessage();
-        return message != null && (message.contains("idx_stock_alerts_unique")
-                || message.contains("duplicate key"));
     }
 
     private java.util.Optional<String> extractHeaderValue(Headers headers, String key) {

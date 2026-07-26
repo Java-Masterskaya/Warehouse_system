@@ -2,24 +2,41 @@
 spring:
   application:
     name: warehouse-app
-  
+
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: false
-  
+
   flyway:
     enabled: true
-  
+
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      retries: 3
       properties:
         allow.auto.create.topics: false
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+        retry.backoff.ms: 500
     consumer:
       group-id: warehouse-alerts
-
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.warehouse.dto.event"
+    # Настройки для outbox pattern
+    outbox:
+      polling:
+        # Максимальное количество событий для обработки за один вызов
+        limit: 100
+        # Интервал между опросами в миллисекундах
+        interval-ms: 5000
+      # Настройки ретраев
+      max-retries: 3
+      retry-backoff-ms: 5000
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -59,8 +76,12 @@ app:
       multiplier: 2.0
       max-interval-ms: 10000
       max-attempts: 3
+  jwt:
+    refresh-retry-ttl-seconds: 60
 
 management:
+  server:
+    port: 8081 # Выделенный порт для Actuator (будет закрыт от внешних пользователей)
   tracing:
     enabled: true
     sampling:
@@ -72,9 +93,11 @@ management:
     web:
       exposure:
         include: health,info,prometheus,metrics,env,refresh
+      base-path: /actuator
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
+      roles: "ADMIN" # Детали видны только авторизованным пользователям с ролью администратора
       probes:
         enabled: true
       group:
@@ -88,11 +111,6 @@ management:
     readinessstate:
       enabled: true
   metrics:
-    web:
-      server:
-        request:
-          autotime:
-            enabled: true
     enable:
       http: true
       web: true
@@ -107,5 +125,7 @@ logging:
     root: WARN
     com.warehouse: INFO
     com.warehouse.kafka.consumer: WARN
+    com.warehouse.service.outbox: INFO
+
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId}] [spanId=%X{spanId}] %logger{36} - %msg%n"
