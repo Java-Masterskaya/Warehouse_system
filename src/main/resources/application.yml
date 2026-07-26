@@ -85,7 +85,7 @@ management:
   tracing:
     enabled: true
     sampling:
-      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.5}
   otlp:
     tracing:
       endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
@@ -111,9 +111,6 @@ management:
     readinessstate:
       enabled: true
   metrics:
-    enable:
-      http: true
-      web: true
     tags:
       application: warehouse-system
 
@@ -124,6 +121,7 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
+    com.warehouse.kafka.consumer: WARN
     com.warehouse.service.outbox: INFO
 
   pattern:
