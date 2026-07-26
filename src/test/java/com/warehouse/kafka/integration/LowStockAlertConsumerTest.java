@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -33,6 +34,7 @@ import static org.awaitility.Awaitility.await;
 @Tag("integration")
 @TestPropertySource(properties = "bucket4j.enabled=false")
 @SpringBootTest(classes = WarehouseApp.class)
+@Transactional
 class LowStockAlertConsumerTest extends AbstractIntegrationTest {
 
     private static final String TEST_SKU = "SKU-001";
@@ -61,11 +63,6 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        stockAlertRepository.deleteAllInBatch();
-        stockRepository.deleteAllInBatch();
-        itemRepository.deleteAllInBatch();
-        categoryRepository.deleteAllInBatch();
-
         Category category = categoryRepository.save(
                 Category.builder()
                         .name(TEST_CATEGORY)
