@@ -178,7 +178,9 @@ services:
       - "3100"
     networks:
       - app-network
-    command: -config.file=/etc/loki/loki-config.yaml
+    command:
+      -config.file=/etc/loki/loki-config.yaml
+      -config.expand-env=true
     volumes:
       - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki
@@ -197,7 +199,7 @@ services:
       - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./monitoring/promtail/positions.yaml:/tmp/positions.yaml
+      - promtail_positions:/tmp/positions.yaml
     command: -config.file=/etc/promtail/config.yml
     networks:
       - app-network
@@ -209,6 +211,7 @@ volumes:
   redis_data:
   consul_data:
   loki-data:
+  promtail_positions:
 
 networks:
   app-network:
