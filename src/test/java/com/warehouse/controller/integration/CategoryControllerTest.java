@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.category.CreateCategoryRequest;
 import com.warehouse.dto.request.category.UpdateCategoryRequest;
-import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Role;
