@@ -15,6 +15,8 @@ Backend-сервис учёта товарных запасов на склад�
 | Code Quality | Checkstyle                              |
 | Infra        | Docker, Docker Compose                  |
 | Config       | Consul (Centralized Configuration)      |
+| Monitoring   | Prometheus, Alertmanager, Grafana       |
+| Webhook      | Custom webhook-server for alerts        |
 
 ## Быстрый старт
 
@@ -58,7 +60,7 @@ make up
 | PostgreSQL       | postgres:16        | 5432 |
 | Redis            | redis:7-alpine     | 6379 |
 | Redpanda (Kafka) | redpanda:v23.2.11  | 9092 (внутри Docker: 29092) |
-| Schema Registry  | встроен в Redpanda | 8081 |
+| Schema Registry  | встроен в Redpanda | 18081 (внутри Docker: 8081) |
 | Consul           | hashicorp/consul:1.16 | 8500 (UI) |
 
 ## Бэкап и восстановление БД
@@ -95,9 +97,17 @@ make up
 | `POST`   | `/api/items`                                     | Создать товар                       |
 | `PUT`    | `/api/items/{id}`                                | Редактировать товар                 |
 | `DELETE` | `/api/items/{id}`                                | Удалить товар                       |
-| `GET`    | `/api/items/{id}/stock`                          | Текущий остаток                     |
+| `GET`    | `/api/items/{itemId}`                            | Карточка и остатки по складам       |
+| `GET`    | `/api/items/categories`                          | Список категорий                    |
+| `POST`   | `/api/categories`                                | Создать категорию                   |
+| `GET`    | `/api/categories/{categoryId}`                   | Получить категорию по ID            |
+| `PUT`    | `/api/categories/{categoryId}`                   | Обновить категорию                  |
+| `DELETE` | `/api/categories/{categoryId}`                   | Удалить категорию                   |
+| `GET`    | `/api/warehouses`                                | Список складов                      |
+| `POST`   | `/api/warehouses`                                | Создать склад                       |
 | `POST`   | `/api/movements/receive`                         | Зарегистрировать поступление        |
 | `POST`   | `/api/movements/write-off`                       | Списать товар                       |
+| `POST`   | `/api/movements/transfer`                        | Перевести товар между складами      |
 | `GET`    | `/api/movements/{itemId}/history`                | История движения                    |
 | `POST`   | `/api/inventory/stocktake`                       | Инвентаризация                      |
 | `POST`   | `/api/purchase-orders`                           | Создать заказ поставщику            |
@@ -109,7 +119,54 @@ make up
 | `POST`   | `/api/stock/{itemId}/reserve`                    | Резервирование остатков             |
 | `POST`   | `/api/stock/{itemId}/release`                    | Отмена резервирования               |
 | `POST`   | `/api/stock/{itemId}/write-off`                  | Выкуп резерва                       |
+| `GET`    | `/api/reports/low-stock`                         | Товары ниже общего минимума         |
+| `GET`    | `/api/reports/stock-valuation`                   | Общая стоимость остатков            |
+| `GET`    | `/api/reports/expiring?days=N`                   | Партии с истекающим сроком          |
 
+## Партии и сроки годности
+
+DOM-5 хранит физический остаток как набор партий конкретного товара на конкретном складе.
+Для каждой пары `item + warehouse` количество в `stock` поддерживается равным сумме количеств ее партий.
+
+- Поступление создает новую партию с обязательным будущим `expiryDate`.
+- Списание и выкуп резерва используют FEFO: сначала расходуется партия с ближайшим сроком.
+- Просроченные партии не участвуют в доступном остатке, резервировании, списании и переводе.
+- Перевод между складами сохраняет срок годности каждой перенесенной части партии.
+- Положительная разница инвентаризации требует `surplusExpiryDate` и создает отдельную партию.
+- Ежедневная задача обнуляет просроченные партии и уменьшает остаток именно их склада.
+- Отчет `/api/reports/expiring?days=N` показывает истекающие партии с товаром и складом.
+
+## Несколько складов
+
+Миграция V19 создает склад `Default Warehouse` и связывает с ним все старые остатки и движения.
+Идентификаторы строк, количества, история и ссылки резервов при этом сохраняются.
+
+- Остаток хранится отдельно для каждой пары `item + warehouse`.
+- Старые операции receive, write-off, stocktake, reserve и приемка заказа работают со складом по умолчанию.
+- Карточка товара возвращает общий остаток и массив `warehouseStocks` с разбивкой по складам.
+- Low-stock и valuation отчеты считают сумму по всем складам.
+- История движения содержит склад и `transferId` для двух частей перевода.
+
+Пример перевода, доступного только роли `ADMIN`:
+
+```http
+POST /api/movements/transfer
+Authorization: Bearer <access-token>
+Content-Type: application/json
+```
+
+```json
+{
+  "itemId": 42,
+  "fromWarehouseId": 1,
+  "toWarehouseId": 2,
+  "quantity": 7
+}
+```
+
+Операция блокирует оба остатка в стабильном порядке, проверяет доступное количество на складе-источнике,
+уменьшает источник, увеличивает приемник и сохраняет две записи движения с общим `transferId`.
+При нехватке возвращается `422 INSUFFICIENT_STOCK`, а вся транзакция откатывается.
 
 Полная спецификация: `docs/warehouse_openapi.yaml`
 
@@ -177,7 +234,7 @@ http://localhost:8500/v1/kv/config/warehouse-system/data
 "@warehouse-config.yaml"
 * Приложение автоматически применит изменения (в течение 1 секунды, благодаря ConfigWatch), либо:
 ```bash
-  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8080/actuator/refresh
+  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8081/actuator/refresh
 ```
 Способ 2. Через Consul UI
 Откройте http://localhost:8500
@@ -258,6 +315,92 @@ make checkstyle
 - `./gradlew build`
 - `./gradlew check`
 - CI/CD (GitHub Actions)
+
+## Алертинг и мониторинг
+
+Проект использует стек Prometheus + Alertmanager + Grafana для мониторинга и алертинга.
+
+### Prometheus
+
+**Что делает:** сбор метрик приложения и оценка правил алертинга.
+
+**Конфигурация:**
+- `scrape_interval: 10s` - сбор метрик каждые 10 секунд
+- `evaluation_interval: 10s` - проверка правил алертинга каждые 10 секунд
+- Подключается к Alertmanager на `alertmanager:9093` для отправки алертов
+
+**Важно:** Для запуска через `docker-compose up` или `make up` **обязательно** должен быть запущен контейнер `warehouse-app`, так как Prometheus собирает метрики с приложения через `/actuator/prometheus`. Если приложение не запущено - алерты не будут работать.
+
+**Настройка цели (target):**
+- В Docker-сети: `['warehouse-app:8081']`
+- При локальном запуске: `['host.docker.internal:8081']`
+
+### Alertmanager
+
+**Что делает:** получает алерты от Prometheus и отправляет их на webhook-сервер.
+
+**Настроенные алерты:**
+
+| Алерт | Уровень | Описание |
+|-------|---------|----------|
+| `Brute-force login` | warning | Высокая частота неудачных попыток входа (>5/мин) |
+| `Rejected write-off rate high` | warning | Высокая частота отклонённых списаний (>2 за 5мин) |
+| `Low-stock alert spike` | info | Пики алертов о низких остатках (>3 за 5мин) |
+| `App down` | critical | Приложение недоступно (>1 минута) |
+| `JVM heap > 90%` | warning | Использование heap памяти >90% |
+
+### Webhook Server
+
+**Что делает:** простой сервер для приёма алертов в dev-среде. При получении алерта выводит его в консоль.
+
+**Зачем нужен:** позволяет тестировать алертинг без настройки внешних интеграций (Telegram, Slack и т.д.).
+
+**Пример вывода:**
+```
+============================================================
+WEBHOOK ALERT RECEIVED
+============================================================
+Headers: {...}
+Body: {...}
+============================================================
+```
+
+### Grafana
+
+**Что делает:** визуализация метрик приложения.
+
+**Предустановленные дашборды:** метрики приложения, JVM, Kafka и т.д.
+
+**Доступ:**
+- URL: `http://localhost:3000`
+- Username: `admin`
+- Password: `admin`
+
+**Порты мониторинга:**
+
+| Сервис | Порт |
+|--------|------|
+| Prometheus | 9090 |
+| Alertmanager | 9093 |
+| Grafana | 3000 |
+| Webhook Server | 8082 |
+
+**Настройка мониторинга:**
+
+```bash
+# Запуск мониторинга
+make monitor-up
+```
+
+```bash
+# Остановка мониторинга
+make monitor-down
+```
+
+**Конфигурационные файлы:**
+- `monitoring/prometheus.yml` — настройки Prometheus
+- `monitoring/alertmanager/alertmanager.yml` — настройки Alertmanager
+- `monitoring/grafana/` — дашборды и дата-источники
 
 ## Аутентификация и авторизация (JWT)
 
@@ -394,4 +537,4 @@ Authorization: Bearer ваш_access_token
 
 - Хранение в Redis — все токены хранятся в Redis для быстрой проверки и отзыва.
 
-- Автоматическое обновление — клиент должен автоматически обновлять access токен при получении 401 Unauthorized, используя refresh токен.
+- Автоматическое обновление - клиент должен автоматически обновлять access токен при получении 401 Unauthorized, используя refresh токен.

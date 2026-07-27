@@ -21,6 +21,7 @@ import lombok.Setter;
 import com.warehouse.exception.StockMovementInvariantException;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Запись движения товара на складе.
@@ -40,6 +41,11 @@ public class StockMovement {
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
 
+    /** Склад, к которому относится движение. */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "warehouse_id", nullable = false)
+    private Warehouse warehouse;
+
     /** Пользователь, выполнивший операцию. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -58,9 +64,20 @@ public class StockMovement {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** Партия, с которой связано движение (для поступлений). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    private Batch batch;
+
+    /** Общий идентификатор двух движений одного перевода между складами. */
+    @Column(name = "transfer_id")
+    private UUID transferId;
+
     @PrePersist
     private void prePersist() {
-        createdAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
         validateQuantity();
     }
 

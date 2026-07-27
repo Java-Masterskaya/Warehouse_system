@@ -71,7 +71,7 @@ services:
     ports:
       - "9092:9092"   # OUTSIDE: для хоста/IDE
       - "29092:29092" # PLAINTEXT: для других контейнеров
-      - "8081:8081"   # Schema Registry
+      - "18081:8081"  # Schema Registry
     command: >
       redpanda start
       --smp 1
@@ -133,12 +133,22 @@ services:
         condition: service_healthy
     restart: "no"  # Запускается один раз и завершается
 
+  # -- Webhook server (для алертов в dev) --
+  webhook-server:
+    build: ./monitoring/webhook-server
+    container_name: webhook-server
+    ports:
+      - "8082:8082"
+    networks:
+      - app-network
+
   # -- Приложение --
   warehouse-app:
     build: .
     container_name: warehouse-app
     ports:
       - "${SERVER_PORT}:8080"
+      - "127.0.0.1:8081:8081"
     env_file:
       - .env
     depends_on:
@@ -155,8 +165,9 @@ services:
     networks:
       - app-network
 
+
     healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness" ]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8081/actuator/health/readiness" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -164,18 +175,33 @@ services:
 
   # -- Prometheus --
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.0.0
     container_name: prometheus
     ports:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--enable-feature=exemplar-storage'
+    networks:
+      - app-network
+
+  # -- Alertmanager --
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager
     networks:
       - app-network
 
   # -- Grafana --
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.1.0
     container_name: grafana
     ports:
       - "3000:3000"
@@ -186,14 +212,66 @@ services:
       - ./monitoring/grafana/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml
       - ./monitoring/grafana/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
       - ./monitoring/grafana/dashboards/warehouse.json:/etc/grafana/provisioning/dashboards/warehouse.json
+      - ./monitoring/grafana/datasources/tempo.yaml:/etc/grafana/provisioning/datasources/tempo.yaml
+      - ./monitoring/grafana/datasources/loki.yml:/etc/grafana/provisioning/datasources/loki.yml
     networks:
       - app-network
+
+  # -- Tempo --
+  tempo:
+    image: grafana/tempo:latest
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./monitoring/tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+      - "4318:4318"
+    networks:
+      - app-network
+
+  # --- Loki ---
+  loki:
+    image: grafana/loki:3.7.3
+    container_name: loki
+    expose:
+      - "3100"
+    networks:
+      - app-network
+    command:
+      -config.file=/etc/loki/loki-config.yaml
+      -config.expand-env=true
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    healthcheck:
+      test: [ "CMD", "/usr/bin/loki", "-health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # --- Promtail ---
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail_positions:/tmp/positions.yaml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - app-network
+    depends_on:
+      - loki
 
 volumes:
   postgres_data:
   redis_data:
   consul_data:
   postgres_backups:
+  loki-data:
+  promtail_positions:
 
 networks:
   app-network:

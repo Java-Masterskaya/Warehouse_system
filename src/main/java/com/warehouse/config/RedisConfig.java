@@ -1,6 +1,7 @@
 package com.warehouse.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
@@ -46,6 +47,10 @@ public class RedisConfig {
                         )
                 )
                 .disableCachingNullValues();
+        
+        var categoriesListType = objectMapper
+                .getTypeFactory()
+                .constructCollectionType(List.class, CategoryResponse.class);
 
         RedisCacheConfiguration categoriesConfig = baseConfig
                 .entryTtl(Duration.ofMinutes(categoriesTtlMinutes))
@@ -53,7 +58,7 @@ public class RedisConfig {
                         RedisSerializationContext.SerializationPair.fromSerializer(
                                 new Jackson2JsonRedisSerializer<>(
                                         objectMapper,
-                                        List.class
+                                        categoriesListType
                                 )
                         )
                 );

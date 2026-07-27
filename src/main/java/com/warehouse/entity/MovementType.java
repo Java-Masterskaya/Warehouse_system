@@ -11,5 +11,11 @@ public enum MovementType {
     WRITE_OFF,
 
     /** Корректировка остатков. */
-    ADJUSTMENT
+    ADJUSTMENT,
+
+    /** Перевод товара со склада-источника. */
+    TRANSFER_OUT,
+
+    /** Перевод товара на склад-получатель. */
+    TRANSFER_IN
 }

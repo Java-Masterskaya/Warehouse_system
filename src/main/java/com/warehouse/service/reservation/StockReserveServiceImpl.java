@@ -21,6 +21,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.movement.StockMovementService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class StockReserveServiceImpl implements StockReserveService {
     ItemRepository itemRepository;
     StockReserveRepository stockReserveRepository;
     StockMovementService stockMovementService;
+    BatchService batchService;
     MetricService metricService;
     StockReservationMapper mapper;
     KafkaStockAlertProducer kafkaProducer;
@@ -60,7 +62,7 @@ public class StockReserveServiceImpl implements StockReserveService {
 
         Stock stock = lockStock(itemId);
 
-        int available = availabilityService.getAvailable(itemId);
+        int available = availabilityService.getAvailable(stock);
         if (available < quantity) {
             log.warn("Reservation quantity is more then now available: available = {}, quantity = {}", available,
                     quantity);
@@ -97,21 +99,23 @@ public class StockReserveServiceImpl implements StockReserveService {
         Stock stock = lockStock(itemId);
 
         Reservation reservation = getActiveReservation(request.reservationId(), itemId);
-        //write-off
-        int updatedRows = stockRepository.decreaseQuantityIfEnough(itemId, reservation.getQuantity());
-        if (updatedRows == 0) {
-            throw InsufficientStockException.of(
-                    itemId,
-                    reservation.getQuantity(),
-                    stock.getQuantity()
-            );
-        }
+        int stockAfter = batchService.writeOffReservedByFEFO(
+                itemId,
+                stock.getWarehouse().getId(),
+                reservation.getQuantity(),
+                LocalDateTime.now()
+        );
         updateReservationStatus(reservation, ReservationStatus.CONSUMED);
-        //for alert
-        stock.setQuantity(stockRepository.findQuantityByItemId(itemId).get());
+        stock.setQuantity(stockAfter);
 
         //make movement and alert
-        stockMovementService.newStockMovement(getItem(itemId), reservation.getQuantity(), ctx, MovementType.WRITE_OFF);
+        stockMovementService.newStockMovement(
+                getItem(itemId),
+                stock.getWarehouse(),
+                reservation.getQuantity(),
+                ctx,
+                MovementType.WRITE_OFF
+        );
         sendAlert(stock, ctx);
 
         metricService.increment("warehouse.reservation.writeOff.total");
@@ -181,11 +185,12 @@ public class StockReserveServiceImpl implements StockReserveService {
     }
 
     private void sendAlert(Stock stock, UserContext ctx) {
-        if (stock.getQuantity() < stock.getItem().getMinStock()) {
+        long totalQuantity = stockRepository.findTotalQuantityByItemId(stock.getItem().getId());
+        if (totalQuantity < stock.getItem().getMinStock()) {
             long itemId = stock.getItem().getId();
             String sku = stock.getItem().getSku();
             String name = stock.getItem().getName();
-            int quantity = stock.getQuantity();
+            int quantity = Math.toIntExact(totalQuantity);
             int minStock = stock.getItem().getMinStock();
 
             LowStockAlertEvent event = new LowStockAlertEvent(itemId, sku, name, quantity, minStock, ctx.username(),

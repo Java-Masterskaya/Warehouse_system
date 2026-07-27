@@ -9,4 +9,15 @@ public class InsufficientStockException extends RuntimeException {
         return new InsufficientStockException(
                 "Insufficient stock for item " + itemId + ": requested " + requested + ", available " + available);
     }
+
+    public static InsufficientStockException atWarehouse(
+            Long itemId,
+            Long warehouseId,
+            int requested,
+            int available
+    ) {
+        return new InsufficientStockException(
+                "Insufficient stock for item " + itemId + " at warehouse " + warehouseId
+                        + ": requested " + requested + ", available " + available);
+    }
 }

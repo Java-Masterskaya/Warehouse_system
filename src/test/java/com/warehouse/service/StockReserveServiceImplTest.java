@@ -9,15 +9,18 @@ import com.warehouse.entity.Reservation;
 import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.ReservationException;
+import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.mapper.StockReservationMapper;
 import com.warehouse.metric.MetricService;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.movement.StockMovementService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.reservation.StockReserveServiceImpl;
@@ -38,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -70,10 +74,17 @@ public class StockReserveServiceImplTest {
     @Mock
     StockMovementService movementService;
 
+    @Mock
+    BatchService batchService;
+
+    @Mock
+    KafkaStockAlertProducer kafkaProducer;
+
     @InjectMocks
     StockReserveServiceImpl service;
 
     private Item item;
+    private Warehouse warehouse;
     private Stock stock;
     private Reservation reservation;
     private UserContext ctx;
@@ -82,7 +93,9 @@ public class StockReserveServiceImplTest {
     void setUp() {
         item = Item.builder().id(10L).build();
 
-        stock = Stock.builder().id(1L).quantity(10).item(item).build();
+        warehouse = Warehouse.builder().id(1L).name("Default Warehouse").defaultWarehouse(true).build();
+
+        stock = Stock.builder().id(1L).quantity(10).item(item).warehouse(warehouse).build();
 
         reservation = Reservation.builder().id(5L).stock(stock).quantity(5).status(ReservationStatus.ACTIVE)
                 .expiredAt(LocalDateTime.now().plusDays(1)).build();
@@ -103,7 +116,7 @@ public class StockReserveServiceImplTest {
 
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
 
-        when(availabilityService.getAvailable(item.getId())).thenReturn(10);
+        when(availabilityService.getAvailable(stock)).thenReturn(10);
 
         when(userRepository.getReferenceById(ctx.userId())).thenReturn(user);
 
@@ -140,9 +153,8 @@ public class StockReserveServiceImplTest {
     void shouldThrowExceptionWhenNotEnoughAvailableStock() {
         ReserveRequest request = new ReserveRequest(5, 3);
 
-        Reservation oldReservation = Reservation.builder().quantity(10).status(ReservationStatus.ACTIVE).build();
-
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
+        when(availabilityService.getAvailable(stock)).thenReturn(4);
 
         assertThrows(InsufficientStockException.class, () -> service.reserve(item.getId(), request, ctx));
 
@@ -158,9 +170,8 @@ public class StockReserveServiceImplTest {
     void shouldConsiderExistingReservations() {
         ReserveRequest request = new ReserveRequest(11, 2);
 
-        Reservation reservation1 = Reservation.builder().quantity(6).status(ReservationStatus.ACTIVE).build();
-
         when(stockRepository.findByItemIdForUpdate(item.getId())).thenReturn(Optional.of(stock));
+        when(availabilityService.getAvailable(stock)).thenReturn(4);
 
         assertThrows(InsufficientStockException.class, () -> service.reserve(item.getId(), request, ctx));
     }
@@ -263,8 +274,13 @@ public class StockReserveServiceImplTest {
 
         when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
 
-        when(stockRepository.decreaseQuantityIfEnough(item.getId(), reservation.getQuantity())).thenReturn(1);
-        when(stockRepository.findQuantityByItemId(item.getId())).thenReturn(Optional.of(5));
+        when(batchService.writeOffReservedByFEFO(
+                eq(item.getId()),
+                eq(warehouse.getId()),
+                eq(reservation.getQuantity()),
+                any(LocalDateTime.class)
+        )).thenReturn(5);
+        when(stockRepository.findTotalQuantityByItemId(item.getId())).thenReturn(5L);
 
         service.writeOff(item.getId(), request, ctx);
 
@@ -272,7 +288,13 @@ public class StockReserveServiceImplTest {
 
         assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CONSUMED);
 
-        verify(movementService).newStockMovement(item, reservation.getQuantity(), ctx, MovementType.WRITE_OFF);
+        verify(movementService).newStockMovement(
+                item,
+                warehouse,
+                reservation.getQuantity(),
+                ctx,
+                MovementType.WRITE_OFF
+        );
 
         verify(stockReserveRepository).save(reservation);
 
@@ -354,13 +376,29 @@ public class StockReserveServiceImplTest {
 
         when(stockReserveRepository.findById(reservation.getId())).thenReturn(Optional.of(reservation));
 
-        when(stockRepository.decreaseQuantityIfEnough(item.getId(), reservation.getQuantity())).thenReturn(0);
+        when(batchService.writeOffReservedByFEFO(
+                eq(item.getId()),
+                eq(warehouse.getId()),
+                eq(reservation.getQuantity()),
+                any(LocalDateTime.class)
+        )).thenThrow(InsufficientStockException.atWarehouse(
+                item.getId(),
+                warehouse.getId(),
+                reservation.getQuantity(),
+                stock.getQuantity()
+        ));
 
         assertThatThrownBy(() -> service.writeOff(item.getId(), request, ctx)).isInstanceOf(
                 InsufficientStockException.class);
 
         assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE);
 
-        verify(movementService, never()).newStockMovement(any(), anyInt(), any(), any());
+        verify(movementService, never()).newStockMovement(
+                any(Item.class),
+                any(Warehouse.class),
+                anyInt(),
+                any(),
+                any()
+        );
     }
 }
