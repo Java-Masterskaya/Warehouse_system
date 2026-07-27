@@ -2,6 +2,7 @@ package com.warehouse.kafka.producer;
 
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.metric.MetricService;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -21,6 +22,7 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
         this.metricService = metricService;
     }
 
+    @CircuitBreaker(name = "kafkaProducer", fallbackMethod = "sendLowStockAlertFallback")
     public void sendLowStockAlert(LowStockAlertEvent alert) {
         log.debug("Received low stock alert: {}", alert);
         try {
@@ -38,5 +40,17 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
             log.error("Error while sending low stock alert to Kafka", e);
             throw new RuntimeException("Error while sending message to Kafka", e);
         }
+    }
+
+    @SuppressWarnings("unused")
+    public void sendLowStockAlertFallback(LowStockAlertEvent alert, Throwable t) {
+        log.warn("CircuitBreaker kafkaProducer is open, alert not sent to Kafka. " +
+                "Event will be retried by outbox relay. Error: {}", t.getMessage());
+        metricService.increment("warehouse.kafka.producer.circuit_open");
+
+        if (t instanceof RuntimeException) {
+            throw (RuntimeException) t;
+        }
+        throw new RuntimeException(t);
     }
 }

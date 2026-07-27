@@ -8,6 +8,9 @@ spring:
     show-sql: false
   flyway:
     enabled: true
+  data:
+    redis:
+      timeout: 500ms
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -75,6 +78,23 @@ app:
       max-attempts: 3
   jwt:
     refresh-retry-ttl-seconds: 60
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      itemCache:
+        base-config: default
+      kafkaProducer:
+        base-config: default
+        wait-duration-in-open-state: 10s
 
 management:
   endpoints:

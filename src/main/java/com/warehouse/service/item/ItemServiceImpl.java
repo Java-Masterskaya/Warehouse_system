@@ -15,6 +15,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.specification.ItemSpecification;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -68,8 +69,8 @@ public class ItemServiceImpl implements ItemService {
     @Transactional
     @Override
     @Caching(evict = {
-        @CacheEvict(value = "item", key = "#itemId"),
-        @CacheEvict(value = "categories", allEntries = true)
+            @CacheEvict(value = "item", key = "#itemId"),
+            @CacheEvict(value = "categories", allEntries = true)
     })
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
         log.debug("Updating item with id={}", itemId);
@@ -135,21 +136,16 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "item", key = "#itemId")
+    @CircuitBreaker(name = "itemCache", fallbackMethod = "getItemFallback")
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
-        ItemDetailsProjection item = itemRepository.findWithStock(itemId)
-                .orElseThrow(() -> {
-                    log.warn("Item not found: id={}", itemId);
-                    return new EntityNotFoundException("Товар не найден");
-                });
-        if (!item.active()) {
-            log.warn("Item inactive: id={}", itemId);
-            throw new EntityNotFoundException("Товар неактивен");
-        }
-        int available = availabilityService.getAvailable(itemId);
-        int reserved = availabilityService.getReserved(itemId);
+        return getItemFromDb(itemId);
+    }
 
-        return itemMapper.mapProjectionToDetailsResponse(item, available, reserved);
+    @SuppressWarnings("unused")
+    public ItemDetailsResponse getItemFallback(Long itemId, Throwable t) {
+        log.warn("CircuitBreaker itemCache is open, fallback to DB. Error: {}", t.getMessage());
+        return getItemFromDb(itemId);
     }
 
     @Transactional
@@ -194,5 +190,20 @@ public class ItemServiceImpl implements ItemService {
             return BigDecimal.ZERO;
         }
         return cost.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private ItemDetailsResponse getItemFromDb(Long itemId) {
+        ItemDetailsProjection item = itemRepository.findWithStock(itemId)
+                .orElseThrow(() -> {
+                    log.warn("Item not found: id={}", itemId);
+                    return new EntityNotFoundException("Товар не найден");
+                });
+        if (!item.active()) {
+            log.warn("Item inactive: id={}", itemId);
+            throw new EntityNotFoundException("Товар неактивен");
+        }
+        int available = availabilityService.getAvailable(itemId);
+        int reserved = availabilityService.getReserved(itemId);
+        return itemMapper.mapProjectionToDetailsResponse(item, available, reserved);
     }
 }
