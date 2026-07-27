@@ -3,7 +3,6 @@ package com.warehouse.security.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.security.JwtAuthFilter;
-import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

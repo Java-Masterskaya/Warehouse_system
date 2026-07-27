@@ -119,7 +119,7 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 select new com.warehouse.dto.response.item.ItemExportDto(
                     i.sku,
                     i.name,
-                    i.category,
+                    i.category.name,
                     coalesce(sum(s.quantity), 0L),
                     i.price
                 )

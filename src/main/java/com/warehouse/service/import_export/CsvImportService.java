@@ -3,10 +3,11 @@ package com.warehouse.service.import_export;
 import com.warehouse.dto.request.item.ItemImportRowDto;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -28,11 +30,11 @@ public class CsvImportService {
 
     private final CsvItemParser csvItemParser;
 
-    private final ItemRepository itemRepository;
+    private final ItemRepository     itemRepository;
+    private final CategoryRepository categoryRepository;
 
     private static final int BATCH_SIZE = 500;
 
-    @PersistenceContext
     private final EntityManager entityManager;
 
     @Transactional
@@ -49,8 +51,16 @@ public class CsvImportService {
             }
 
             Set<String> candidateSkus = candidateRows.stream().map(row -> row.dto().sku()).collect(Collectors.toSet());
+            Set<String> categoryNames =
+                    candidateRows.stream().map(row -> row.dto().category()).collect(Collectors.toSet());
 
             Set<String> existingSkus = new HashSet<>(itemRepository.findAllSkusIn(candidateSkus));
+            Map<String, Category> categoryMap = categoryRepository.findAllByNameIgnoreCaseIn(categoryNames)
+                                                                  .stream()
+                                                                  .collect(Collectors.toMap(
+                                                                          cat -> cat.getName().toLowerCase(),
+                                                                          cat -> cat,
+                                                                          (existing, replacement) -> existing));
 
             List<Item> itemsToSave = new ArrayList<>();
 
@@ -61,7 +71,14 @@ public class CsvImportService {
                     allErrors.add(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
                             "Товар с SKU '" + dto.sku() + "' уже существует в базе данных"));
                 } else {
-                    Item item = mapDtoToEntity(dto);
+                    Category category = categoryMap.get(dto.category().toLowerCase());
+                    if (category == null) {
+                        allErrors.add(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
+                                "Category with name " + dto.category() + " not found"));
+                        continue;
+                    }
+
+                    Item item = mapDtoToEntity(dto, category);
                     itemsToSave.add(item);
                 }
             }
@@ -86,9 +103,14 @@ public class CsvImportService {
         }
     }
 
-    private Item mapDtoToEntity(ItemImportRowDto dto) {
-        return Item.builder().sku(dto.sku()).name(dto.name()).category(dto.category()).price(dto.price())
-                   .cost(dto.cost()).build();
+    private Item mapDtoToEntity(ItemImportRowDto dto, Category category) {
+        return Item.builder()
+                   .sku(dto.sku())
+                   .name(dto.name())
+                   .category(category)
+                   .price(dto.price())
+                   .cost(dto.cost())
+                   .build();
     }
 
     private void validateFile(MultipartFile file) {

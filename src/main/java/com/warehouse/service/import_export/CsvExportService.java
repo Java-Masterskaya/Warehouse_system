@@ -71,7 +71,6 @@ public class CsvExportService {
                                     movement.movementType(), movement.quantity(), movement.userName(),
                                     movement.createdAt(), movement.transferId());
                         } catch (IOException e) {
-                            // Если клиент разорвал соединение — бросаем специальное исключение
                             throw new UncheckedIOException(e);
                         }
                     });

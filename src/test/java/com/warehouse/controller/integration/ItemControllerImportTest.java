@@ -7,6 +7,7 @@ import com.warehouse.service.import_export.CsvImportService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@SpringBootTest
 class ItemControllerImportTest extends AbstractIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
@@ -33,18 +35,21 @@ class ItemControllerImportTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     @DisplayName("POST /api/items/import — Успешная передача MultipartFile и возврат результата 200 OK")
-    void importItems_Success() throws Exception {
+    void importItemsSuccess()
+            throws Exception {
         String csvContent = "sku,name,category,price,cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00";
         MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", csvContent.getBytes());
 
         ItemImportResultDto expectedResponse = ItemImportResultDto.of(1, 1, List.of());
         when(csvImportService.importItems(any())).thenReturn(expectedResponse);
 
-        // Act & Assert
         mockMvc.perform(
-                       multipart("/api/items/import").file(file).contentType(MediaType.MULTIPART_FORM_DATA).with(csrf()))
-               .andExpect(status().isOk()).andExpect(jsonPath("$.totalRows").value(1))
-               .andExpect(jsonPath("$.imported").value(1)).andExpect(jsonPath("$.errors").isEmpty());
+                       multipart("/api/items/import").file(file)
+                                                     .contentType(MediaType.MULTIPART_FORM_DATA).with(csrf()))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.totalRows").value(1))
+               .andExpect(jsonPath("$.imported").value(1))
+               .andExpect(jsonPath("$.errors").isEmpty());
 
         verify(csvImportService).importItems(any());
     }
@@ -52,8 +57,8 @@ class ItemControllerImportTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     @DisplayName("POST /api/items/import — Частичный импорт с ошибками дубликатов")
-    void importItems_WithErrors_Returns200WithErrorsList() throws Exception {
-        // Arrange
+    void importItemsWithErrorsReturns200WithErrorsList()
+            throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv",
                 "sku,name,category,price,cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00".getBytes());
 
@@ -62,12 +67,14 @@ class ItemControllerImportTest extends AbstractIntegrationTest {
 
         when(csvImportService.importItems(any())).thenReturn(expectedResponse);
 
-        // Act & Assert
         mockMvc.perform(
-                       multipart("/api/items/import").file(file).contentType(MediaType.MULTIPART_FORM_DATA).with(csrf()))
+                       multipart("/api/items/import").file(file)
+                                                     .contentType(MediaType.MULTIPART_FORM_DATA).with(csrf()))
                .andExpect(status().isOk()).andExpect(jsonPath("$.totalRows").value(2))
-               .andExpect(jsonPath("$.imported").value(1)).andExpect(jsonPath("$.errors[0].rowNumber").value(2))
+               .andExpect(jsonPath("$.imported").value(1))
+               .andExpect(jsonPath("$.errors[0].rowNumber").value(2))
                .andExpect(jsonPath("$.errors[0].sku").value("SKU-EXISTS"))
-               .andExpect(jsonPath("$.errors[0].errorMessage").value("Товар с SKU 'SKU-EXISTS' уже существует"));
+               .andExpect(jsonPath("$.errors[0].errorMessage")
+                       .value("Товар с SKU 'SKU-EXISTS' уже существует"));
     }
 }
