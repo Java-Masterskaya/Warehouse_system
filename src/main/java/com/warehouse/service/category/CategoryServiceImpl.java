@@ -10,6 +10,7 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.CategoryMapper;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -60,6 +61,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "categories")
+    @CircuitBreaker(name = "itemCache", fallbackMethod = "getCategoriesFallback")
     public List<CategoryResponse> getCategories() {
         log.debug("Getting all categories");
 
@@ -72,6 +74,15 @@ public class CategoryServiceImpl implements CategoryService {
         log.info("Found {} categories", categories.size());
 
         return categories;
+    }
+
+    @SuppressWarnings("unused")
+    public List<CategoryResponse> getCategoriesFallback(Throwable t) {
+        log.warn("CircuitBreaker itemCache is open for categories, fallback to DB");
+        return categoryRepository.findAllByOrderByNameAsc()
+                .stream()
+                .map(categoryMapper::toResponse)
+                .toList();
     }
 
     @Override
@@ -87,8 +98,8 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional
     @Caching(evict = {
-        @CacheEvict(value = "categories", allEntries = true),
-        @CacheEvict(value = "item", allEntries = true)
+            @CacheEvict(value = "categories", allEntries = true),
+            @CacheEvict(value = "item", allEntries = true)
     })
     public CategoryResponse updateCategory(
             Long categoryId,
