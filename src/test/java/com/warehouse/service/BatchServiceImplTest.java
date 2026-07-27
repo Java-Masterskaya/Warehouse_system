@@ -1,0 +1,293 @@
+package com.warehouse.service;
+
+import com.warehouse.entity.Batch;
+import com.warehouse.entity.Item;
+import com.warehouse.entity.Stock;
+import com.warehouse.entity.Warehouse;
+import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.ExpiredBatchScope;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.service.batch.BatchServiceImpl;
+import com.warehouse.service.reservation.StockAvailabilityService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class BatchServiceImplTest {
+
+    private static final long ITEM_ID = 10L;
+    private static final long SOURCE_WAREHOUSE_ID = 20L;
+    private static final long DESTINATION_WAREHOUSE_ID = 30L;
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 7, 25, 12, 0);
+
+    @Mock
+    private BatchRepository batchRepository;
+
+    @Mock
+    private StockRepository stockRepository;
+
+    @Mock
+    private StockAvailabilityService availabilityService;
+
+    @Mock
+    private ExpiredBatchScope sourceScope;
+
+    @Mock
+    private ExpiredBatchScope destinationScope;
+
+    private BatchServiceImpl batchService;
+    private Item item;
+    private Warehouse sourceWarehouse;
+    private Warehouse destinationWarehouse;
+
+    @BeforeEach
+    void setUp() {
+        batchService = new BatchServiceImpl(batchRepository, stockRepository, availabilityService);
+        item = Item.builder().id(ITEM_ID).build();
+        sourceWarehouse = Warehouse.builder().id(SOURCE_WAREHOUSE_ID).name("Source").build();
+        destinationWarehouse = Warehouse.builder()
+                .id(DESTINATION_WAREHOUSE_ID)
+                .name("Destination")
+                .build();
+    }
+
+    @Test
+    void shouldCreateBatchForWarehouseAndIncreaseItsStock() {
+        Stock stock = stock(sourceWarehouse, 7);
+        LocalDateTime expiryDate = LocalDateTime.now().plusYears(1);
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.save(any(Batch.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Batch result = batchService.createBatchAndIncreaseStock(
+                item,
+                sourceWarehouse,
+                5,
+                expiryDate
+        );
+
+        ArgumentCaptor<Batch> batchCaptor = ArgumentCaptor.forClass(Batch.class);
+        verify(stockRepository).createEmptyStockIfAbsent(ITEM_ID, SOURCE_WAREHOUSE_ID);
+        verify(batchRepository).save(batchCaptor.capture());
+        verify(stockRepository).save(stock);
+        Batch savedBatch = batchCaptor.getValue();
+        assertAll(
+                () -> assertSame(savedBatch, result),
+                () -> assertSame(item, savedBatch.getItem()),
+                () -> assertSame(sourceWarehouse, savedBatch.getWarehouse()),
+                () -> assertEquals(5, savedBatch.getQuantity()),
+                () -> assertEquals(expiryDate, savedBatch.getExpiryDate()),
+                () -> assertEquals(12, stock.getQuantity())
+        );
+    }
+
+    @Test
+    void shouldWriteOffByFefoOnlyAtRequestedWarehouse() {
+        Stock stock = stock(sourceWarehouse, 20);
+        Batch first = batch(sourceWarehouse, 5, NOW.plusDays(2));
+        Batch second = batch(sourceWarehouse, 10, NOW.plusDays(5));
+        List<Batch> sourceBatches = List.of(first, second);
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(sourceBatches);
+        when(availabilityService.getAvailable(stock)).thenReturn(12);
+
+        int remainingStock = batchService.writeOffByFEFO(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                12,
+                NOW
+        );
+
+        assertAll(
+                () -> assertEquals(8, remainingStock),
+                () -> assertEquals(0, first.getQuantity()),
+                () -> assertEquals(3, second.getQuantity()),
+                () -> assertEquals(8, stock.getQuantity())
+        );
+        verify(batchRepository).saveAll(sourceBatches);
+        verify(stockRepository).save(stock);
+        verify(batchRepository, never())
+                .findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                        ITEM_ID,
+                        DESTINATION_WAREHOUSE_ID,
+                        NOW
+            );
+    }
+
+    @Test
+    void shouldRejectRegularWriteOffWhenFreeAvailabilityIsInsufficient() {
+        Stock stock = stock(sourceWarehouse, 20);
+        Batch batch = batch(sourceWarehouse, 20, NOW.plusDays(2));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(batch));
+        when(availabilityService.getAvailable(stock)).thenReturn(6);
+
+        assertThrows(
+                InsufficientStockException.class,
+                () -> batchService.writeOffByFEFO(ITEM_ID, SOURCE_WAREHOUSE_ID, 7, NOW)
+        );
+
+        assertAll(
+                () -> assertEquals(20, batch.getQuantity()),
+                () -> assertEquals(20, stock.getQuantity())
+        );
+        verify(batchRepository, never()).saveAll(any());
+        verify(stockRepository, never()).save(any(Stock.class));
+    }
+
+    @Test
+    void shouldWriteOffReservedQuantityWithoutSubtractingReservationAgain() {
+        Stock stock = stock(sourceWarehouse, 10);
+        Batch batch = batch(sourceWarehouse, 10, NOW.plusDays(2));
+        List<Batch> batches = List.of(batch);
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(batches);
+
+        int remainingStock = batchService.writeOffReservedByFEFO(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                7,
+                NOW
+        );
+
+        assertAll(
+                () -> assertEquals(3, remainingStock),
+                () -> assertEquals(3, batch.getQuantity()),
+                () -> assertEquals(3, stock.getQuantity())
+        );
+        verify(availabilityService, never()).getAvailable(any(Stock.class));
+        verify(batchRepository).saveAll(batches);
+        verify(stockRepository).save(stock);
+    }
+
+    @Test
+    void shouldClearExpiredBatchesFromEachMatchingStockPair() {
+        Batch firstSourceBatch = batch(sourceWarehouse, 4, NOW.minusDays(3));
+        Batch secondSourceBatch = batch(sourceWarehouse, 3, NOW.minusDays(1));
+        Batch destinationBatch = batch(destinationWarehouse, 5, NOW.minusHours(1));
+        Stock sourceStock = stock(sourceWarehouse, 12);
+        Stock destinationStock = stock(destinationWarehouse, 9);
+        when(sourceScope.getItemId()).thenReturn(ITEM_ID);
+        when(sourceScope.getWarehouseId()).thenReturn(SOURCE_WAREHOUSE_ID);
+        when(destinationScope.getItemId()).thenReturn(ITEM_ID);
+        when(destinationScope.getWarehouseId()).thenReturn(DESTINATION_WAREHOUSE_ID);
+        when(batchRepository.findExpiredScopesWithQuantity(NOW))
+                .thenReturn(List.of(sourceScope, destinationScope));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(sourceStock));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(
+                ITEM_ID,
+                DESTINATION_WAREHOUSE_ID
+        )).thenReturn(Optional.of(destinationStock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(firstSourceBatch, secondSourceBatch));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                ITEM_ID,
+                DESTINATION_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(destinationBatch));
+
+        int cleared = batchService.clearExpiredBatches(NOW);
+
+        assertAll(
+                () -> assertEquals(3, cleared),
+                () -> assertEquals(0, firstSourceBatch.getQuantity()),
+                () -> assertEquals(0, secondSourceBatch.getQuantity()),
+                () -> assertEquals(0, destinationBatch.getQuantity()),
+                () -> assertEquals(5, sourceStock.getQuantity()),
+                () -> assertEquals(4, destinationStock.getQuantity())
+        );
+        verify(stockRepository).save(sourceStock);
+        verify(stockRepository).save(destinationStock);
+        verify(batchRepository).saveAll(List.of(firstSourceBatch, secondSourceBatch));
+        verify(batchRepository).saveAll(List.of(destinationBatch));
+    }
+
+    @Test
+    void shouldFailCleanupWithoutMutatingDataWhenBatchesExceedMatchingStock() {
+        Batch expiredBatch = batch(sourceWarehouse, 8, NOW.minusDays(1));
+        Stock stock = stock(sourceWarehouse, 7);
+        when(sourceScope.getItemId()).thenReturn(ITEM_ID);
+        when(sourceScope.getWarehouseId()).thenReturn(SOURCE_WAREHOUSE_ID);
+        when(batchRepository.findExpiredScopesWithQuantity(NOW))
+                .thenReturn(List.of(sourceScope));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(expiredBatch));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> batchService.clearExpiredBatches(NOW)
+        );
+
+        assertAll(
+                () -> assertEquals(
+                        "Batch quantity exceeds stock for item 10 at warehouse 20",
+                        exception.getMessage()
+                ),
+                () -> assertEquals(8, expiredBatch.getQuantity()),
+                () -> assertEquals(7, stock.getQuantity())
+        );
+        verify(batchRepository, never()).saveAll(any());
+        verify(stockRepository, never()).save(any(Stock.class));
+    }
+
+    private Stock stock(Warehouse warehouse, int quantity) {
+        return Stock.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(quantity)
+                .build();
+    }
+
+    private Batch batch(Warehouse warehouse, int quantity, LocalDateTime expiryDate) {
+        return Batch.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(quantity)
+                .expiryDate(expiryDate)
+                .build();
+    }
+
+}

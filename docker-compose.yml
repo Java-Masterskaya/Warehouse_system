@@ -71,7 +71,7 @@ services:
     ports:
       - "9092:9092"   # OUTSIDE: для хоста/IDE
       - "29092:29092" # PLAINTEXT: для других контейнеров
-      - "8081:8081"   # Schema Registry
+      - "18081:8081"  # Schema Registry
     command: >
       redpanda start
       --smp 1
@@ -148,6 +148,7 @@ services:
     container_name: warehouse-app
     ports:
       - "${SERVER_PORT}:8080"
+      - "127.0.0.1:8081:8081"
     env_file:
       - .env
     depends_on:

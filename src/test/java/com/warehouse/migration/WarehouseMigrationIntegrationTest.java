@@ -41,26 +41,28 @@ class WarehouseMigrationIntegrationTest {
         long movementCountBefore = countRows("stock_movements");
         long reserveCountBefore = countRows("reserves");
 
-        migrateToLatest();
-
+        migrateToV20();
         assertDefaultWarehouse();
-        assertLegacyStock(legacy);
-        assertLegacyMovement(legacy);
-        assertLegacyReservation(legacy);
-        assertThat(countRows("stock")).isEqualTo(stockCountBefore);
-        assertThat(countRows("stock_movements")).isEqualTo(movementCountBefore);
-        assertThat(countRows("reserves")).isEqualTo(reserveCountBefore);
-        assertRequiredWarehouseColumns();
-        assertWarehouseIdsMustBeExplicit(legacy);
-
         long secondWarehouseId = insertWarehouse("Secondary Warehouse");
         assertThat(secondWarehouseId).isEqualTo(2L);
         assertThatThrownBy(() -> insertWarehouse("secondary warehouse"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("uq_warehouses_name_ci");
-
         long secondStockId = insertStock(legacy.itemId(), secondWarehouseId, 11);
         assertThat(secondStockId).isPositive();
+
+        migrateToLatest();
+
+        assertLegacyStock(legacy);
+        assertLegacyMovement(legacy);
+        assertLegacyReservation(legacy);
+        assertBatchBackfill(legacy.itemId(), secondWarehouseId);
+        assertThat(countRows("stock")).isEqualTo(stockCountBefore + 1);
+        assertThat(countRows("stock_movements")).isEqualTo(movementCountBefore);
+        assertThat(countRows("reserves")).isEqualTo(reserveCountBefore);
+        assertRequiredWarehouseColumns();
+        assertWarehouseIdsMustBeExplicit(legacy);
+
         assertThat(sumStock(legacy.itemId())).isEqualTo(LEGACY_QUANTITY + 11L);
         assertTransferMovementTypesAccepted(legacy, secondWarehouseId);
 
@@ -87,7 +89,16 @@ class WarehouseMigrationIntegrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("20");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("24");
+    }
+
+    private void migrateToV20() {
+        Flyway.configure()
+                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .locations("classpath:db/migration")
+                .target(MigrationVersion.fromVersion("20"))
+                .load()
+                .migrate();
     }
 
     private LegacyData seedLegacyData() throws SQLException {
@@ -177,7 +188,7 @@ class WarehouseMigrationIntegrationTest {
     private void assertLegacyMovement(LegacyData legacy) throws SQLException {
         try (Connection connection = connection();
              PreparedStatement statement = connection.prepareStatement("""
-                     SELECT item_id, user_id, type, quantity, created_at, warehouse_id, transfer_id
+                     SELECT item_id, user_id, type, quantity, created_at, warehouse_id, transfer_id, batch_id
                      FROM stock_movements
                      WHERE id = ?
                      """)) {
@@ -191,6 +202,7 @@ class WarehouseMigrationIntegrationTest {
                 assertThat(result.getTimestamp("created_at")).isEqualTo(legacy.movementCreatedAt());
                 assertThat(result.getLong("warehouse_id")).isEqualTo(DEFAULT_WAREHOUSE_ID);
                 assertThat(result.getObject("transfer_id")).isNull();
+                assertThat(result.getObject("batch_id")).isNull();
                 assertThat(result.next()).isFalse();
             }
         }
@@ -217,6 +229,13 @@ class WarehouseMigrationIntegrationTest {
 
     private void assertRequiredWarehouseColumns() throws SQLException {
         try (Connection connection = connection()) {
+            assertThat(queryString(connection, """
+                    SELECT is_nullable
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'batches'
+                      AND column_name = 'warehouse_id'
+                    """)).isEqualTo("NO");
             assertThat(queryString(connection, """
                     SELECT is_nullable
                     FROM information_schema.columns
@@ -248,6 +267,32 @@ class WarehouseMigrationIntegrationTest {
                       AND table_name = 'stock_movements'
                       AND column_name = 'transfer_id'
                     """)).isEqualTo("uuid");
+        }
+    }
+
+    private void assertBatchBackfill(long itemId, long secondWarehouseId) throws SQLException {
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT warehouse_id, quantity, expiry_date
+                     FROM batches
+                     WHERE item_id = ?
+                     ORDER BY warehouse_id
+                     """)) {
+            statement.setLong(1, itemId);
+            try (ResultSet result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getLong("warehouse_id")).isEqualTo(DEFAULT_WAREHOUSE_ID);
+                assertThat(result.getInt("quantity")).isEqualTo(LEGACY_QUANTITY);
+                assertThat(result.getTimestamp("expiry_date"))
+                        .isEqualTo(Timestamp.valueOf("9999-12-31 23:59:59"));
+
+                assertThat(result.next()).isTrue();
+                assertThat(result.getLong("warehouse_id")).isEqualTo(secondWarehouseId);
+                assertThat(result.getInt("quantity")).isEqualTo(11);
+                assertThat(result.getTimestamp("expiry_date"))
+                        .isEqualTo(Timestamp.valueOf("9999-12-31 23:59:59"));
+                assertThat(result.next()).isFalse();
+            }
         }
     }
 

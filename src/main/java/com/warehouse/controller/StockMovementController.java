@@ -1,8 +1,9 @@
 package com.warehouse.controller;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -50,7 +51,7 @@ public class StockMovementController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
     public StockMovementResponse registerReceipt(
-            @Valid @RequestBody ChangeQuantityMovementRequest request,
+            @Valid @RequestBody ReceiveStockRequest request,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Received stock movement request: itemId={}, quantity={}", request.itemId(), request.quantity());
         return stockMovementService.registerReceipt(
@@ -61,7 +62,7 @@ public class StockMovementController {
     @PostMapping("/write-off")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public StockMovementResponse writeOffReceipt(@Valid @RequestBody ChangeQuantityMovementRequest request,
+    public StockMovementResponse writeOffReceipt(@Valid @RequestBody WriteOffStockRequest request,
                                                  @AuthenticationPrincipal UserPrincipal currentUser) {
         log.debug("Received stock movement writeOff request: itemId={}, quantity={}", request.itemId(),
                 request.quantity());
