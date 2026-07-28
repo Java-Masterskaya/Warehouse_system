@@ -22,11 +22,14 @@ import com.warehouse.exception.PurchaseOrderOverReceiptException;
 import com.warehouse.exception.ReservationException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.exception.StockMovementInvariantException;
+import com.warehouse.exception.TooManyAttemptLoginException;
 import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.exception.TokenReuseException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -198,6 +201,13 @@ public class GlobalExceptionHandler {
         log.warn("Concurrent stock modification detected: {}", ex.getMessage());
         return new ErrorResponse("CONCURRENT_MODIFICATION",
                 "Resource was modified by another transaction. Please retry.");
+    }
+
+    @ExceptionHandler(TooManyAttemptLoginException.class)
+    public ResponseEntity<ErrorResponse> handleTooManyAttemptLogin(TooManyAttemptLoginException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getWaitTime()))
+                .body(new ErrorResponse("SECURITY_LOCKOUT_ERROR", ex.getMessage()));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
