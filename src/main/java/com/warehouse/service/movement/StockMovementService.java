@@ -1,9 +1,10 @@
 package com.warehouse.service.movement;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -12,6 +13,7 @@ import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.Warehouse;
+import com.warehouse.entity.Batch;
 
 /**
  * Сервис для управления движениями товаров на складе.
@@ -26,7 +28,7 @@ public interface StockMovementService {
      * @param ctx     пользователь, выполняющий операцию
      * @return ответ с информацией о движении товара
      */
-    StockMovementResponse registerReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
+    StockMovementResponse registerReceipt(ReceiveStockRequest request, UserContext ctx);
 
     /**
      * Регистрирует списание товара со склада.
@@ -35,7 +37,7 @@ public interface StockMovementService {
      * @param ctx     пользователь, выполняющий операцию
      * @return ответ с информацией о движении товара
      */
-    StockMovementResponse writeOffReceipt(ChangeQuantityMovementRequest request, UserContext ctx);
+    StockMovementResponse writeOffReceipt(WriteOffStockRequest request, UserContext ctx);
 
     /**
      * Возвращает историю движений товара с возможностью фильтрации по типу движения
@@ -46,7 +48,6 @@ public interface StockMovementService {
      * @param page   номер страницы
      * @param size   количество записей на странице
      * @return страница с историей движений товара
-     * @throws com.warehouse.exception.EntityNotFoundException если товар не найден
      */
     PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId, MovementType type, int page,
             int size);
@@ -98,5 +99,44 @@ public interface StockMovementService {
             int quantity,
             UserContext ctx,
             MovementType type
+    );
+
+    /**
+     * Persists a stock movement for a specific warehouse.
+     *
+     * @param item moved item
+     * @param warehouse movement warehouse
+     * @param quantity movement quantity
+     * @param ctx user performing the operation
+     * @param type movement type
+     * @param batch batch reference (optional)
+     * @return persisted movement
+     */
+    StockMovement newStockMovement(
+            Item item,
+            Warehouse warehouse,
+            int quantity,
+            UserContext ctx,
+            MovementType type,
+            Batch batch
+    );
+
+    /**
+     * Persists a stock movement using default warehouse.
+     * Uses default warehouse from repository.
+     *
+     * @param item moved item
+     * @param quantity movement quantity
+     * @param ctx user performing the operation
+     * @param type movement type
+     * @param batch batch reference (optional)
+     * @return persisted movement
+     */
+    StockMovement newStockMovement(
+            Item item,
+            int quantity,
+            UserContext ctx,
+            MovementType type,
+            Batch batch
     );
 }

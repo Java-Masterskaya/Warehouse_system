@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Reservation;
@@ -11,6 +12,7 @@ import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -53,6 +55,9 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
     StockRepository stockRepository;
 
     @Autowired
+    BatchRepository batchRepository;
+
+    @Autowired
     StockReserveRepository reservationRepository;
 
     @Autowired
@@ -93,6 +98,13 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
         stock.setQuantity(10);
 
         stockRepository.save(stock);
+
+        batchRepository.save(Batch.builder()
+                .item(item)
+                .warehouse(defaultWarehouse())
+                .quantity(10)
+                .expiryDate(LocalDateTime.now().plusDays(30))
+                .build());
 
         User admin = userRepository.findByUsername("admin").orElseThrow();
 

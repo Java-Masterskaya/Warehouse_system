@@ -122,7 +122,7 @@ docker compose up -d warehouse-app
 ### Шаг 8. Проверить работоспособность
 ```bash
 # Health check
-curl -s http://localhost:8080/actuator/health/readiness | jq
+curl -s http://localhost:8081/actuator/health/readiness | jq
 
 # Данные на месте
 docker compose exec postgres psql -U warehouse_user -d warehouse \

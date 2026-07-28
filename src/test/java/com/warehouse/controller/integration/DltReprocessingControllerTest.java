@@ -11,6 +11,7 @@ import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
@@ -108,6 +109,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
     private CategoryRepository categoryRepository;
 
     private String adminToken;
@@ -120,7 +124,11 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         log.info("Test setup...");
 
+        // Удаляем в правильном порядке, чтобы избежать ошибок внешних ключей
         jdbcTemplate.update("DELETE FROM stock_alerts");
+        jdbcTemplate.update("DELETE FROM stock_movements");
+        jdbcTemplate.update("DELETE FROM batches");
+
         jdbcTemplate.update("DELETE FROM stock");
         jdbcTemplate.update("DELETE FROM items");
         jdbcTemplate.update("DELETE FROM categories");
@@ -164,6 +172,14 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .quantity(5)
                 .build();
         stockRepository.save(stock);
+
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
+        batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
+        batch.setQuantity(5);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
+        batchRepository.save(batch);
 
         adminToken = obtainToken("admin", "secret");
         userToken = obtainToken("testuser", "password");

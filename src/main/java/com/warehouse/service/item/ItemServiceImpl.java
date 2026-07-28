@@ -154,7 +154,7 @@ public class ItemServiceImpl implements ItemService {
             throw new EntityNotFoundException("Товар неактивен");
         }
         long reserved = availabilityService.getTotalReserved(itemId);
-        long available = item.currentStock() - reserved;
+        long available = availabilityService.getTotalAvailable(itemId);
 
         List<WarehouseStockResponse> warehouseStocks = stockRepository.findAllByItemIdWithWarehouse(itemId).stream()
                 .map(this::toWarehouseStockResponse)
@@ -211,7 +211,7 @@ public class ItemServiceImpl implements ItemService {
                 stock.getWarehouse().getName(),
                 stock.getQuantity(),
                 reserved,
-                (long) stock.getQuantity() - reserved
+                availabilityService.getAvailable(stock)
         );
     }
 }
