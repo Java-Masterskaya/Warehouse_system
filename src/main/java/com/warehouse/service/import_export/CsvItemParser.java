@@ -14,9 +14,9 @@ import org.springframework.stereotype.Service;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -24,60 +24,105 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CsvItemParser {
 
-    private final Validator validator;
+    private final        Validator validator;
+    private static final int       CHUNK_SIZE = 1000;
 
-    public ParsedCsvResult parseAndValidate(InputStream inputStream) {
-        List<ValidRowHolder> validRows = new ArrayList<>();
-        List<ItemImportErrorDto> errors = new ArrayList<>();
-        Set<String> seenSkusInFile = new HashSet<>();
+    public Iterable<CsvChunk> parseInChunks(InputStream inputStream) {
+        return () -> new Iterator<CsvChunk>() {
+            private final BOMInputStream      bomInputStream = new BOMInputStream(inputStream);
+            private final InputStreamReader   reader         = new InputStreamReader(bomInputStream);
+            private final CSVParser           csvParser;
+            private final Iterator<CSVRecord> recordIterator;
 
-        CSVFormat format =
-                CSVFormat.DEFAULT.builder().setHeader("SKU", "Name", "Category", "Price", "Cost")
-                                 .setSkipHeaderRecord(true).setIgnoreSurroundingSpaces(true).setTrim(true)
-                                 .setIgnoreHeaderCase(true).build();
+            private final Set<String> seenSkusInFile     = new HashSet<>();
+            private       int         totalRowsProcessed = 0;
+            private       boolean     hasMore            = true;
 
-        try (BOMInputStream bomStream = new BOMInputStream(inputStream);
-             InputStreamReader reader = new InputStreamReader(bomStream, StandardCharsets.UTF_8);
-             CSVParser csvParser = new CSVParser(reader, format)) {
-
-            int totalRows = 0;
-
-            for (CSVRecord record : csvParser) {
-                int fileRowNumber = (int) record.getRecordNumber() + 1;
-                totalRows++;
-
-                String rawSku = safeGetField(record, "SKU");
-
+            {
                 try {
-                    ItemImportRowDto dto = mapRecordToDto(record);
+                    CSVFormat format = CSVFormat.DEFAULT.builder()
+                                                        .setHeader("SKU", "Name", "Category", "Price", "Cost")
+                                                        .setSkipHeaderRecord(true)
+                                                        .setIgnoreSurroundingSpaces(true)
+                                                        .setTrim(true)
+                                                        .setIgnoreHeaderCase(true)
+                                                        .build();
 
-                    if (dto.sku() != null && !seenSkusInFile.add(dto.sku())) {
-                        errors.add(new ItemImportErrorDto(fileRowNumber, dto.sku(),
-                                "Дубликат SKU '" + dto.sku() + "' внутри импортируемого файла"));
-                        continue;
-                    }
-
-                    Set<ConstraintViolation<ItemImportRowDto>> violations = validator.validate(dto);
-
-                    if (!violations.isEmpty()) {
-                        String errorMessage = violations.stream().map(ConstraintViolation::getMessage)
-                                                        .reduce((m1, m2) -> m1 + "; " + m2).orElse("Ошибка валидации");
-                        errors.add(new ItemImportErrorDto(fileRowNumber, dto.sku(), errorMessage));
-                    } else {
-                        validRows.add(new ValidRowHolder(fileRowNumber, dto));
-                    }
-
+                    this.csvParser      = new CSVParser(reader, format);
+                    this.recordIterator = csvParser.iterator();
                 } catch (Exception e) {
-                    errors.add(new ItemImportErrorDto(fileRowNumber, rawSku,
-                            "Некорректный формат данных: " + getReadableErrorMessage(e)));
+                    throw new IllegalArgumentException("Ошибка инициализации чтения CSV файла", e);
                 }
             }
 
-            return new ParsedCsvResult(totalRows, validRows, errors);
+            @Override
+            public boolean hasNext() {
+                if (!hasMore) {
+                    closeResources();
+                }
+                return hasMore;
+            }
 
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Ошибка чтения CSV файла. Проверьте структуру и заголовки", e);
-        }
+            @Override
+            public CsvChunk next() {
+                List<ValidRowHolder> validRows = new ArrayList<>();
+                List<ItemImportErrorDto> chunkErrors = new ArrayList<>();
+                int currentChunkRows = 0;
+
+                while (recordIterator.hasNext() && currentChunkRows < CHUNK_SIZE) {
+                    CSVRecord record = recordIterator.next();
+                    int fileRowNumber = (int) record.getRecordNumber() + 1;
+                    totalRowsProcessed++;
+                    currentChunkRows++;
+
+                    String rawSku = safeGetField(record, "SKU");
+
+                    try {
+                        ItemImportRowDto dto = mapRecordToDto(record);
+
+                        if (dto.sku() != null && !seenSkusInFile.add(dto.sku())) {
+                            chunkErrors.add(new ItemImportErrorDto(fileRowNumber,
+                                    dto.sku(),
+                                    "Дубликат SKU '" + dto.sku() + "' внутри импортируемого файла"));
+                            continue;
+                        }
+
+                        Set<ConstraintViolation<ItemImportRowDto>> violations = validator.validate(dto);
+
+                        if (!violations.isEmpty()) {
+                            String errorMessage = violations.stream()
+                                                            .map(ConstraintViolation::getMessage)
+                                                            .reduce((m1, m2) -> m1 + "; " + m2)
+                                                            .orElse("Ошибка валидации");
+                            chunkErrors.add(new ItemImportErrorDto(fileRowNumber, dto.sku(), errorMessage));
+                        } else {
+                            validRows.add(new ValidRowHolder(fileRowNumber, dto));
+                        }
+                    } catch (Exception e) {
+                        chunkErrors.add(new ItemImportErrorDto(fileRowNumber, rawSku,
+                                "Некорректный формат данных: " + getReadableErrorMessage(e)));
+                    }
+                }
+
+                if (!recordIterator.hasNext()) {
+                    hasMore = false;
+                }
+
+                return new CsvChunk(validRows, chunkErrors, totalRowsProcessed);
+            }
+
+            private void closeResources() {
+                try {
+                    csvParser.close();
+                    reader.close();
+                    bomInputStream.close();
+                } catch (Exception ignored) {
+                }
+            }
+        };
+    }
+
+    public record CsvChunk(List<ValidRowHolder> validRows, List<ItemImportErrorDto> errors, int processedRowsCount) {
     }
 
     private ItemImportRowDto mapRecordToDto(CSVRecord record) {

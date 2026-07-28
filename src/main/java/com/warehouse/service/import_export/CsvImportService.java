@@ -39,38 +39,54 @@ public class CsvImportService {
 
     @Transactional
     public ItemImportResultDto importItems(MultipartFile file) {
+
         validateFile(file);
+
+        List<ItemImportErrorDto> allErrors = new ArrayList<>();
+        int totalRows = 0;
+        int totalImported = 0;
+
         try (InputStream inputStream = file.getInputStream()) {
-            CsvItemParser.ParsedCsvResult parseResult = csvItemParser.parseAndValidate(inputStream);
+            Iterable<CsvItemParser.CsvChunk> chunks = csvItemParser.parseInChunks(inputStream);
 
-            List<ItemImportErrorDto> allErrors = new ArrayList<>(parseResult.errors());
-            List<CsvItemParser.ValidRowHolder> candidateRows = parseResult.validRows();
+            for (CsvItemParser.CsvChunk chunk : chunks) {
+                totalRows = chunk.processedRowsCount();
+                allErrors.addAll(chunk.errors());
 
-            if (candidateRows.isEmpty()) {
-                return ItemImportResultDto.of(parseResult.totalRows(), 0, allErrors);
-            }
+                List<CsvItemParser.ValidRowHolder> candidateRows = chunk.validRows();
+                if (candidateRows.isEmpty()) {
+                    continue;
+                }
 
-            Set<String> candidateSkus = candidateRows.stream().map(row -> row.dto().sku()).collect(Collectors.toSet());
-            Set<String> categoryNames =
-                    candidateRows.stream().map(row -> row.dto().category()).collect(Collectors.toSet());
+                // Пакетная проверка SKU для текущей пачки
+                Set<String> candidateSkus = candidateRows.stream()
+                                                         .map(row -> row.dto().sku())
+                                                         .collect(Collectors.toSet());
+                Set<String> existingSkus = new HashSet<>(itemRepository.findAllSkusIn(candidateSkus));
 
-            Set<String> existingSkus = new HashSet<>(itemRepository.findAllSkusIn(candidateSkus));
-            Map<String, Category> categoryMap = categoryRepository.findAllByNameIgnoreCaseIn(categoryNames)
-                                                                  .stream()
-                                                                  .collect(Collectors.toMap(
-                                                                          cat -> cat.getName().toLowerCase(),
-                                                                          cat -> cat,
-                                                                          (existing, replacement) -> existing));
+                // Пакетный поиск категорий для текущей пачки
+                Set<String> categoryNames = candidateRows.stream()
+                                                         .map(row -> row.dto().category())
+                                                         .collect(Collectors.toSet());
+                Map<String, Category> categoryMap = categoryRepository.findAllByNameIgnoreCaseIn(categoryNames)
+                                                                      .stream()
+                                                                      .collect(Collectors.toMap(
+                                                                              cat -> cat.getName().toLowerCase(),
+                                                                              cat -> cat,
+                                                                              (existing, replacement) -> existing
+                                                                      ));
 
-            List<Item> itemsToSave = new ArrayList<>();
+                List<Item> itemsToSave = new ArrayList<>();
 
-            for (CsvItemParser.ValidRowHolder holder : candidateRows) {
-                ItemImportRowDto dto = holder.dto();
+                for (CsvItemParser.ValidRowHolder holder : candidateRows) {
+                    ItemImportRowDto dto = holder.dto();
 
-                if (existingSkus.contains(dto.sku())) {
-                    allErrors.add(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
-                            "Товар с SKU '" + dto.sku() + "' уже существует в базе данных"));
-                } else {
+                    if (existingSkus.contains(dto.sku())) {
+                        allErrors.add(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
+                                "Товар с SKU '" + dto.sku() + "' уже существует в базе данных"));
+                        continue;
+                    }
+
                     Category category = categoryMap.get(dto.category().toLowerCase());
                     if (category == null) {
                         allErrors.add(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
@@ -81,16 +97,17 @@ public class CsvImportService {
                     Item item = mapDtoToEntity(dto, category);
                     itemsToSave.add(item);
                 }
+                // Сохраняем пачку товаров батчами
+                if (!itemsToSave.isEmpty()) {
+                    saveInBatches(itemsToSave);
+                    totalImported += itemsToSave.size();
+                }
             }
+            log.info("Успешно импортировано {} товаров из CSV", totalImported);
+            return ItemImportResultDto.of(totalRows, totalImported, allErrors);
 
-            if (!itemsToSave.isEmpty()) {
-                saveInBatches(itemsToSave);
-                log.info("Успешно импортировано {} товаров из CSV", itemsToSave.size());
-            }
-
-            return ItemImportResultDto.of(parseResult.totalRows(), itemsToSave.size(), allErrors);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Ошибка чтения файла при импорте", e);
         }
     }
 

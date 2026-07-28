@@ -70,10 +70,10 @@ class CsvImportServiceTest {
         CsvItemParser.ValidRowHolder row2 =
                 createValidRowHolder(2, "SKU-002", "Мышь", categoryName2, "20.00", "10.00");
 
-        CsvItemParser.ParsedCsvResult parseResult =
-                new CsvItemParser.ParsedCsvResult(2, List.of(row1, row2), Collections.emptyList());
+        CsvItemParser.CsvChunk chunk =
+                new CsvItemParser.CsvChunk(List.of(row1, row2), Collections.emptyList(), 2);
 
-        when(csvItemParser.parseAndValidate(any(InputStream.class))).thenReturn(parseResult);
+        when(csvItemParser.parseInChunks(any(InputStream.class))).thenReturn(List.of(chunk));
         when(itemRepository.findAllSkusIn(Set.of("SKU-001", "SKU-002"))).thenReturn(Collections.emptyList());
         when(categoryRepository.findAllByNameIgnoreCaseIn(Set.of(categoryName1, categoryName2))).thenReturn(List.of(
                 category1,
@@ -102,7 +102,7 @@ class CsvImportServiceTest {
         assertThatThrownBy(() -> csvImportService.importItems(emptyFile)).isInstanceOf(IllegalArgumentException.class)
                                                                          .hasMessageContaining("не может быть пустым");
 
-        verify(csvItemParser, never()).parseAndValidate(any());
+        verify(csvItemParser, never()).parseInChunks(any());
         verify(itemRepository, never()).saveAll(any());
     }
 
@@ -115,7 +115,7 @@ class CsvImportServiceTest {
         assertThatThrownBy(() -> csvImportService.importItems(txtFile)).isInstanceOf(IllegalArgumentException.class)
                                                                        .hasMessageContaining("CSV");
 
-        verify(csvItemParser, never()).parseAndValidate(any());
+        verify(csvItemParser, never()).parseInChunks(any());
     }
 
     @Test
@@ -138,10 +138,10 @@ class CsvImportServiceTest {
         CsvItemParser.ValidRowHolder row3 =
                 createValidRowHolder(3, "SKU-ANOTHER", "Стол", "Неизвестная", "150.00", "100.00");
 
-        CsvItemParser.ParsedCsvResult parseResult =
-                new CsvItemParser.ParsedCsvResult(3, List.of(row1, row2, row3), Collections.emptyList());
+        CsvItemParser.CsvChunk chunk =
+                new CsvItemParser.CsvChunk(List.of(row1, row2, row3), Collections.emptyList(), 3);
 
-        when(csvItemParser.parseAndValidate(any(InputStream.class))).thenReturn(parseResult);
+        when(csvItemParser.parseInChunks(any(InputStream.class))).thenReturn(List.of(chunk));
         when(itemRepository.findAllSkusIn(any())).thenReturn(List.of("SKU-EXISTS"));
         when(categoryRepository.findAllByNameIgnoreCaseIn(any())).thenReturn(List.of(existingCategory));
 
