@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.idempotency.IdempotentRequestContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.IdempotencyKey;
 import com.warehouse.entity.MovementType;
@@ -66,7 +66,7 @@ class IdempotencyServiceImplTest {
     private static final String KEY_HASH = TokenHashUtil.hashToken(IDEMPOTENCY_KEY);
 
     private UserContext userContext;
-    private ChangeQuantityMovementRequest requestBody;
+    private ReceiveStockRequest requestBody;
     private IdempotentRequestContext context;
     private StockMovementResponse response;
     private User user;
@@ -74,11 +74,12 @@ class IdempotencyServiceImplTest {
     @BeforeEach
     void setUp() {
         userContext = new UserContext(USER_ID, USERNAME);
-        requestBody = new ChangeQuantityMovementRequest(1L, 5);
+        requestBody = new ReceiveStockRequest(1L, 5, LocalDateTime.now());
         context = new IdempotentRequestContext(IDEMPOTENCY_KEY, ENDPOINT, userContext);
         response = new StockMovementResponse(
-                1L, 100L, MovementType.RECEIVE, 5, 10,
-                LocalDateTime.now(), false
+                1L, 100L, MovementType.RECEIVE, 5, 10, 1L,
+                LocalDateTime.now().plusDays(365), LocalDateTime.now(), false, 1L,
+                "main", UUID.randomUUID()
         );
         user = User.builder()
                 .id(USER_ID)
@@ -360,7 +361,7 @@ class IdempotencyServiceImplTest {
                     eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
             )).thenReturn(Optional.of(existingKey));
 
-            ChangeQuantityMovementRequest differentBody = new ChangeQuantityMovementRequest(1L, 10);
+            ReceiveStockRequest differentBody = new ReceiveStockRequest(1L, 10, LocalDateTime.now());
             Supplier<StockMovementResponse> operation = () -> response;
 
             // when & then

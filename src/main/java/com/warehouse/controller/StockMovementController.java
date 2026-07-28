@@ -2,7 +2,6 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.idempotency.IdempotentRequestContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;

@@ -155,20 +155,20 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.itemId").value(testItemId))
-                    .andExpect(jsonPath("$.quantity").value(5))
-                    .andExpect(jsonPath("$.type").value("RECEIVE"))
-                    .andExpect(jsonPath("$.stockAfter").value(15));
+        mockMvc.perform(post("/api/movements/receive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itemId").value(testItemId))
+                .andExpect(jsonPath("$.quantity").value(5))
+                .andExpect(jsonPath("$.type").value("RECEIVE"))
+                .andExpect(jsonPath("$.stockAfter").value(15));
 
-            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
-            assertThat(updatedStock.getQuantity()).isEqualTo(15);
-        }
+        Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+        assertThat(updatedStock.getQuantity()).isEqualTo(15);
+    }
 
     /**
      * USER токен не может зарегистрировать приход товара,
@@ -179,14 +179,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
-                            .header("Authorization", "Bearer " + userToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
-        }
+        mockMvc.perform(post("/api/movements/receive")
+                        .header("Authorization", "Bearer " + userToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+    }
 
     /**
      * Запрос без токена не может зарегистрировать приход товара,
@@ -197,13 +197,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
-        }
+        mockMvc.perform(post("/api/movements/receive")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
 
     /**
      * Приход товара для несуществующего item_id возвращает статус 404 Not Found.
@@ -213,14 +213,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 999L, 5, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
-        }
+        mockMvc.perform(post("/api/movements/receive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+    }
 
     /**
      * Приход товара для неактивного товара возвращает статус 404 Not Found.
@@ -233,14 +233,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
-        }
+        mockMvc.perform(post("/api/movements/receive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+    }
 
     /**
      * Валидация: количество = 0 возвращает статус 400 Bad Request.
@@ -250,14 +250,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 0, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
-        }
+        mockMvc.perform(post("/api/movements/receive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
 
     /**
      * Валидация: отрицательное количество возвращает статус 400 Bad Request.
@@ -267,14 +267,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, -1, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
-        }
+        mockMvc.perform(post("/api/movements/receive")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
 
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
@@ -296,20 +296,20 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void adminTokenCanWriteOffStockAndStockQuantityDecreases() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
-            mockMvc.perform(post("/api/movements/write-off")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.itemId").value(testItemId))
-                    .andExpect(jsonPath("$.quantity").value(5))
-                    .andExpect(jsonPath("$.type").value("WRITE_OFF"))
-                    .andExpect(jsonPath("$.stockAfter").value(5));
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itemId").value(testItemId))
+                .andExpect(jsonPath("$.quantity").value(5))
+                .andExpect(jsonPath("$.type").value("WRITE_OFF"))
+                .andExpect(jsonPath("$.stockAfter").value(5));
 
-            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
-            assertThat(updatedStock.getQuantity()).isEqualTo(5);
-        }
+        Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+        assertThat(updatedStock.getQuantity()).isEqualTo(5);
+    }
 
     /**
      * USER токен не может списать товар,
@@ -319,14 +319,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void userTokenCannotWriteOffStockReturns403() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
-            mockMvc.perform(post("/api/movements/write-off")
-                            .header("Authorization", "Bearer " + userToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
-        }
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + userToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+    }
 
     /**
      * Запрос без токена не может списать товар,
@@ -336,13 +336,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void noTokenCannotWriteOffStockReturns401() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
-            mockMvc.perform(post("/api/movements/write-off")
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
-        }
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
 
     /**
      * Списание товара для несуществующего item_id возвращает статус 404 Not Found.
@@ -351,14 +351,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void writeOffNonExistentItemReturns404() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(999L, 5);
 
-            mockMvc.perform(post("/api/movements/write-off")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
-        }
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+    }
 
     /**
      * Списание товара для неактивного товара возвращает статус 404 Not Found.
@@ -370,14 +370,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
-            mockMvc.perform(post("/api/movements/write-off")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
-        }
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
+    }
 
     /**
      * Списание товара при недостаточном остатке возвращает статус 422 Unprocessable Entity.
@@ -386,14 +386,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void writeOffInsufficientStockReturns422() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 15);
 
-            mockMvc.perform(post("/api/movements/write-off")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isUnprocessableEntity())
-                    .andExpect(jsonPath("$.error").value("INSUFFICIENT_STOCK"));
-        }
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("INSUFFICIENT_STOCK"));
+    }
 
     /**
      * ADMIN проводит инвентаризацию: фактический остаток (7) меньше учётного (10).
@@ -403,14 +403,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void adminStocktakeDecreasesStock() throws Exception {
         StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
-            mockMvc.perform(post("/api/inventory/stocktake")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(req)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.type").value("ADJUSTMENT"))
-                    .andExpect(jsonPath("$.quantity").value(-3))
-                    .andExpect(jsonPath("$.stockAfter").value(7));
+        mockMvc.perform(post("/api/inventory/stocktake")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("ADJUSTMENT"))
+                .andExpect(jsonPath("$.quantity").value(-3))
+                .andExpect(jsonPath("$.stockAfter").value(7));
 
         assertThat(stockRepository.findByItemId(testItemId).orElseThrow().getQuantity())
                 .isEqualTo(7);
@@ -425,13 +425,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void userCannotStocktakeReturns403() throws Exception {
         StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
-            mockMvc.perform(post("/api/inventory/stocktake")
-                            .header("Authorization", "Bearer " + userToken)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(req)))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
-        }
+        mockMvc.perform(post("/api/inventory/stocktake")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
+    }
 
     /**
      * Запрос без токена не может проводить инвентаризацию,
@@ -455,14 +455,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void writeOffZeroQuantityValidationErrorReturns400() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 0);
 
-            mockMvc.perform(post("/api/movements/write-off")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
-        }
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
 
     /**
      * Валидация: отрицательное количество возвращает статус 400 Bad Request.
@@ -471,14 +471,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void writeOffNegativeQuantityValidationErrorReturns400() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, -1);
 
-            mockMvc.perform(post("/api/movements/write-off")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .header("Idempotency-Key", UUID.randomUUID().toString())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
-        }
+        mockMvc.perform(post("/api/movements/write-off")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
     }
 
     @Nested
@@ -496,7 +495,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Первый запрос с ключом - создает движение и возвращает 200")
         void firstRequestWithKeyCreatesMovement() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
             MvcResult result = mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -522,7 +521,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Повторный запрос с тем же ключом и телом - возвращает кешированный ответ, движение не создается")
         void duplicateRequestWithSameKeyReturnsCachedResponse() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
             // Первый запрос
             MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
@@ -565,7 +564,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @DisplayName("Тот же ключ, но измененное тело - возвращает 409 Conflict")
         void sameKeyDifferentBodyReturnsConflict() throws Exception {
             // Первый запрос с quantity=5
-            ChangeQuantityMovementRequest firstRequest = new ChangeQuantityMovementRequest(testItemId, 5);
+            ReceiveStockRequest firstRequest = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -575,7 +574,8 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(status().isOk());
 
             // Второй запрос с тем же ключом, но quantity=10
-            ChangeQuantityMovementRequest secondRequest = new ChangeQuantityMovementRequest(testItemId, 10);
+            ReceiveStockRequest secondRequest = new ReceiveStockRequest(testItemId,
+                    10, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -596,7 +596,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             String key1 = UUID.randomUUID().toString();
             String key2 = UUID.randomUUID().toString();
 
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
 
             // Первый запрос с key1
             MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
@@ -636,7 +636,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Запрос без Idempotency-Key (если ключ обязателен) - возвращает 400")
         void requestWithoutKeyReturnsBadRequest() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -650,7 +650,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @DisplayName("Параллельные запросы с одинаковым ключом не создают дубль")
         void concurrentRequestsWithSameKeyDoNotCreateDuplicate() throws Exception {
             String key = UUID.randomUUID().toString();
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
             int threadCount = 10;
             ExecutorService executor = Executors.newFixedThreadPool(threadCount);
             CountDownLatch latch = new CountDownLatch(1);
@@ -711,7 +711,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Первый запрос с ключом - создает движение списания")
         void firstWriteOffRequestWithKeyCreatesMovement() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+            WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 3);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
@@ -731,7 +731,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Повторный запрос с тем же ключом - возвращает кеш, остаток не меняется")
         void duplicateWriteOffRequestReturnsCachedResponse() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+            WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 3);
 
             // Первый запрос
             MvcResult firstResult = mockMvc.perform(post("/api/movements/write-off")
@@ -799,7 +799,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Один ключ для разных пользователей - создает разные движения")
         void sameKeyDifferentUsersCreateDifferentMovements() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
 
             // Первый пользователь с ключом
             MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
@@ -840,7 +840,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Один ключ для разных эндпоинтов - создает разные движения")
         void sameKeyDifferentEndpointsCreateDifferentMovements() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
 
             // POST /receive с ключом
             MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
@@ -854,12 +854,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             String firstMovementId = objectMapper.readTree(firstResult.getResponse().getContentAsString())
                     .get("movementId").asText();
 
+            WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(testItemId, 3);
+
             // POST /write-off с тем же ключом
             MvcResult secondResult = mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
+                            .content(objectMapper.writeValueAsString(writeOffRequest)))
                     .andExpect(status().isOk())
                     .andReturn();
 
@@ -881,7 +883,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Чужой пользователь с тем же ключом - не получает чужой кеш")
         void differentUserWithSameKeyDoesNotGetCachedResponse() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
             // Первый пользователь создает движение с ключом
             MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
@@ -923,7 +925,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("Повторный запрос от другого пользователя с тем же ключом - не возвращает кеш первого")
         void differentUserDuplicateRequestDoesNotReturnFirstUsersCache() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+            ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
 
             // Первый пользователь создает движение
             mockMvc.perform(post("/api/movements/receive")
@@ -955,7 +957,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andReturn();
 
             String secondDuplicateMovementId = objectMapper.readTree(secondDuplicateResult.getResponse()
-                            .getContentAsString()).get("movementId").asText();
+                    .getContentAsString()).get("movementId").asText();
 
             // Повторный запрос второго пользователя вернул тот же movementId
             assertThat(secondDuplicateMovementId).isEqualTo(secondFirstMovementId);
@@ -968,17 +970,5 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
             assertThat(updatedStock.getQuantity()).isEqualTo(16);
         }
-    }
-
-    private String obtainToken(String username, String password) throws Exception {
-        LoginRequest request = new LoginRequest(username, password);
-        String response = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        return objectMapper.readTree(response).get("accessToken").asText();
     }
 }

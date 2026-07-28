@@ -1,7 +1,6 @@
 package com.warehouse.service.idempotency;
 
 import com.warehouse.dto.request.idempotency.IdempotentRequestContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 
 import java.util.function.Supplier;
@@ -35,7 +34,7 @@ public interface IdempotencyService {
      */
     StockMovementResponse processIdempotentRequest(
             IdempotentRequestContext context,
-            ChangeQuantityMovementRequest requestBody,
+            Object requestBody,
             Supplier<StockMovementResponse> operation
     );
 

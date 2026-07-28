@@ -4,7 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.idempotency.IdempotentRequestContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.IdempotencyKey;
 import com.warehouse.entity.User;
@@ -62,7 +63,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
     )
     public StockMovementResponse processIdempotentRequest(
             IdempotentRequestContext context,
-            ChangeQuantityMovementRequest requestBody,
+            Object requestBody,
             Supplier<StockMovementResponse> operation
     ) {
         String key = context.idempotencyKey();
@@ -104,7 +105,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             IdempotencyKey idempotencyKey,
             String key,
             String endpoint,
-            ChangeQuantityMovementRequest requestBody
+            Object requestBody
     ) {
         validateRequestBodyHash(idempotencyKey, requestBody, key, endpoint);
         validateKeyStatus(idempotencyKey, endpoint);
@@ -113,7 +114,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
 
     private void validateRequestBodyHash(
             IdempotencyKey idempotencyKey,
-            ChangeQuantityMovementRequest requestBody,
+            Object requestBody,
             String key,
             String endpoint
     ) {
@@ -161,7 +162,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             String keyHash,
             UserContext ctx,
             String endpoint,
-            ChangeQuantityMovementRequest requestBody,
+            Object requestBody,
             Supplier<StockMovementResponse> operation
     ) {
         String bodyHash = hashRequestBody(requestBody);
@@ -252,10 +253,18 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         );
     }
 
-    private String hashRequestBody(ChangeQuantityMovementRequest request) {
-        return TokenHashUtil.hashToken(
-                request.itemId() + ":" + request.quantity()
-        );
+    private String hashRequestBody(Object request) {
+        if (request instanceof ReceiveStockRequest receiveRequest) {
+            return TokenHashUtil.hashToken(
+                    receiveRequest.itemId() + ":" + receiveRequest.quantity()
+            );
+        } else if (request instanceof WriteOffStockRequest writeOffRequest) {
+            return TokenHashUtil.hashToken(
+                    writeOffRequest.itemId() + ":" + writeOffRequest.quantity()
+            );
+        }
+        throw new IllegalArgumentException("Unsupported request body type: "
+                + request.getClass().getName());
     }
 
     private boolean shouldEnforceIdempotency() {
