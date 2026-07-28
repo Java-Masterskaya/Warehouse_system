@@ -114,6 +114,26 @@ management:
     tags:
       application: warehouse-system
 
+rate-limiting:
+  login:
+    ip:
+      capacity: 10
+      refill-tokens: 2
+      duration: 1m
+    username:
+      capacity: 5
+      refill-tokens: 1
+      duration: 2m
+  movements:
+    ip:
+      capacity: 100
+      refill-tokens: 50
+      duration: 1m
+    username:
+      capacity: 40
+      refill-tokens: 10
+      duration: 10s
+
 server:
   shutdown: graceful
 

@@ -10,6 +10,7 @@ import com.warehouse.exception.TokenReuseException;
 import com.warehouse.metric.MetricService;
 import com.warehouse.security.util.JwtUtil;
 import com.warehouse.security.UserPrincipal;
+import com.warehouse.exception.TooManyAttemptLoginException;
 import com.warehouse.security.model.TokenPair;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -30,8 +32,9 @@ public class AuthServiceImpl implements AuthService {
 
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
-    private final TokenService tokenService;
     private final MetricService metricService;
+    private final LoginAttemptService loginAttemptService;
+    private final TokenService tokenService;
 
     /**
      * {@inheritDoc}
@@ -51,10 +54,20 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
         log.debug("Attempting login for user: {}", request.username());
 
+        // Проверяем лимит по Username (списывает 1 токен авансом)
+        long waitTime = loginAttemptService.checkAndConsume(request.username());
+        if (waitTime > 0) {
+            String message = "Too many failed login attempts. Try again later.";
+            throw new TooManyAttemptLoginException(message, waitTime);
+        }
+
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.username(), request.password())
             );
+
+            // при успехе аутентификации возвращаем токен обратно в корзину
+            loginAttemptService.registerSuccess(request.username());
 
             UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
