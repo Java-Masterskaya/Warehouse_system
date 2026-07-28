@@ -6,17 +6,22 @@ import com.warehouse.dto.request.security.RefreshRequest;
 import com.warehouse.dto.response.security.LoginResponse;
 import com.warehouse.dto.response.security.RefreshResponse;
 import com.warehouse.exception.InvalidTokenException;
+import com.warehouse.exception.RefreshInProgressException;
 import com.warehouse.exception.TokenReuseException;
+import com.warehouse.lock.DistributedLock;
+import com.warehouse.lock.DistributedLockManager;
 import com.warehouse.metric.MetricService;
-import com.warehouse.security.util.JwtUtil;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.security.model.TokenPair;
+import com.warehouse.security.util.JwtUtil;
+import com.warehouse.security.util.TokenHashUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -24,7 +29,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -53,6 +62,12 @@ class AuthServiceImplTest {
 
     @Mock
     private MetricService metricService;
+
+    @Mock
+    private DistributedLockManager distributedLockManager;
+
+    @Mock
+    private DistributedLock distributedLock;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -76,6 +91,8 @@ class AuthServiceImplTest {
                 true,
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
+        lenient().when(distributedLockManager.tryAcquire(anyString(), any(Duration.class)))
+                .thenReturn(Optional.of(distributedLock));
     }
 
     @Nested
@@ -163,17 +180,10 @@ class AuthServiceImplTest {
             String oldRefreshToken = "old-refresh-token";
             String newAccessToken = "new-access-token";
             String newRefreshToken = "new-refresh-token";
+            TokenPair newTokenPair = new TokenPair(newAccessToken, newRefreshToken);
 
             RefreshRequest request = new RefreshRequest(oldRefreshToken);
-            JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(
-                    TEST_USER_ID, TEST_USERNAME, TEST_ROLES
-            );
-
-            when(tokenService.validateRefreshToken(oldRefreshToken)).thenReturn(true);
-            when(tokenService.isRefreshTokenReused(oldRefreshToken)).thenReturn(false);
-            when(jwtUtil.parseRefreshToken(oldRefreshToken)).thenReturn(Optional.of(payload));
-            when(tokenService.generateTokenPair(TEST_USERNAME, TEST_USER_ID, TEST_ROLES))
-                    .thenReturn(new TokenPair(newAccessToken, newRefreshToken));
+            when(tokenService.rotateRefreshToken(oldRefreshToken)).thenReturn(newTokenPair);
             when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
 
             // Act
@@ -186,9 +196,21 @@ class AuthServiceImplTest {
             assertThat(response.expiresIn()).isEqualTo(EXPIRATION_MS);
 
             // Verify rotation
-            verify(tokenService).blacklistAllUserAccessTokens(TEST_USER_ID);
-            verify(tokenService).generateTokenPair(TEST_USERNAME, TEST_USER_ID, TEST_ROLES);
             verify(tokenService).rotateRefreshToken(oldRefreshToken);
+            verify(tokenService, never()).blacklistAllUserAccessTokens(TEST_USER_ID);
+            verify(tokenService, never()).isRefreshTokenReused(oldRefreshToken);
+            verify(tokenService, never()).validateRefreshToken(oldRefreshToken);
+            verify(jwtUtil, never()).parseRefreshToken(oldRefreshToken);
+
+            ArgumentCaptor<String> lockNameCaptor = ArgumentCaptor.forClass(String.class);
+            verify(distributedLockManager).tryAcquire(
+                    lockNameCaptor.capture(),
+                    eq(Duration.ofSeconds(30))
+            );
+            assertThat(lockNameCaptor.getValue())
+                    .doesNotContain(oldRefreshToken)
+                    .contains(TokenHashUtil.hashToken(oldRefreshToken));
+            verify(distributedLock).close();
         }
 
         @Test
@@ -198,7 +220,8 @@ class AuthServiceImplTest {
             String invalidRefreshToken = "invalid-token";
             RefreshRequest request = new RefreshRequest(invalidRefreshToken);
 
-            when(tokenService.validateRefreshToken(invalidRefreshToken)).thenReturn(false);
+            when(tokenService.rotateRefreshToken(invalidRefreshToken))
+                    .thenThrow(new InvalidTokenException("Invalid or expired refresh token"));
 
             // Act & Assert
             assertThatThrownBy(() -> authService.refresh(request))
@@ -212,21 +235,15 @@ class AuthServiceImplTest {
             // Arrange
             String reusedRefreshToken = "reused-refresh-token";
             RefreshRequest request = new RefreshRequest(reusedRefreshToken);
-            JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(
-                    TEST_USER_ID, TEST_USERNAME, TEST_ROLES
-            );
-
-            when(tokenService.isRefreshTokenReused(reusedRefreshToken)).thenReturn(true);
-            when(jwtUtil.parseRefreshToken(reusedRefreshToken)).thenReturn(Optional.of(payload));
+            when(tokenService.rotateRefreshToken(reusedRefreshToken))
+                    .thenThrow(new TokenReuseException("Token reuse detected - all tokens revoked"));
 
             // Act & Assert
             assertThatThrownBy(() -> authService.refresh(request))
                     .isInstanceOf(TokenReuseException.class)
                     .hasMessageContaining("Token reuse detected");
 
-            // Verify all tokens revoked
-            verify(tokenService).blacklistAllUserAccessTokens(TEST_USER_ID);
-            verify(tokenService).revokeAllUserTokens(TEST_USER_ID);
+            verify(tokenService).rotateRefreshToken(reusedRefreshToken);
         }
 
         @Test
@@ -254,6 +271,42 @@ class AuthServiceImplTest {
             // Проверяем, что reuse НЕ проверялся
             verify(tokenService, never()).isRefreshTokenReused(anyString());
             verify(tokenService, never()).validateRefreshToken(anyString());
+            verify(distributedLockManager, never()).tryAcquire(anyString(), any(Duration.class));
+        }
+
+        @Test
+        @DisplayName("Should recheck retry cache after acquiring distributed lock")
+        void refreshShouldRecheckRetryCacheUnderLock() {
+            String oldRefreshToken = "old-refresh-token";
+            TokenPair cachedPair = new TokenPair("cached-access-token", "cached-refresh-token");
+            RefreshRequest request = new RefreshRequest(oldRefreshToken);
+
+            when(tokenService.getRefreshRetryResult(oldRefreshToken))
+                    .thenReturn(Optional.empty(), Optional.of(cachedPair));
+            when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
+
+            RefreshResponse response = authService.refresh(request);
+
+            assertThat(response.accessToken()).isEqualTo(cachedPair.accessToken());
+            assertThat(response.refreshToken()).isEqualTo(cachedPair.refreshToken());
+            verify(tokenService, never()).rotateRefreshToken(anyString());
+            verify(distributedLock).close();
+        }
+
+        @Test
+        @DisplayName("Should stop waiting when refresh lock timeout is reached")
+        void refreshShouldStopWaitingAtConfiguredTimeout() {
+            String oldRefreshToken = "old-refresh-token";
+            RefreshRequest request = new RefreshRequest(oldRefreshToken);
+            ReflectionTestUtils.setField(authService, "refreshLockWaitTimeoutMs", 0L);
+            when(distributedLockManager.tryAcquire(anyString(), any(Duration.class)))
+                    .thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(RefreshInProgressException.class)
+                    .hasMessageContaining("already in progress");
+
+            verify(tokenService, never()).rotateRefreshToken(anyString());
         }
     }
 
@@ -278,8 +331,7 @@ class AuthServiceImplTest {
             authService.logout(request);
 
             // Assert
-            verify(tokenService).revokeRefreshToken(refreshToken);
-            verify(tokenService).blacklistAccessToken(accessToken);
+            verify(tokenService).revokeTokenPair(refreshToken, accessToken);
         }
     }
 

@@ -16,6 +16,7 @@ Backend-сервис учёта товарных запасов на склад�
 | Infra        | Docker, Docker Compose                  |
 | Config       | Consul (Centralized Configuration)      |
 | Monitoring   | Prometheus, Alertmanager, Grafana       |
+| Proxy        | nginx (round-robin)                     |
 | Webhook      | Custom webhook-server for alerts        |
 
 ## Быстрый старт
@@ -62,6 +63,10 @@ make up
 | Redpanda (Kafka) | redpanda:v23.2.11  | 9092 (внутри Docker: 29092) |
 | Schema Registry  | встроен в Redpanda | 18081 (внутри Docker: 8081) |
 | Consul           | hashicorp/consul:1.16 | 8500 (UI) |
+| nginx            | nginx:1.27.5-alpine | `${PUBLIC_HTTP_PORT:-8080}` |
+| Blackbox Exporter | prom/blackbox-exporter:v0.27.0 | 9115 (только Docker network) |
+| App replica 1 management | warehouse-system:local | `127.0.0.1:${APP1_MANAGEMENT_PORT:-18082}` |
+| App replica 2 management | warehouse-system:local | `127.0.0.1:${APP2_MANAGEMENT_PORT:-18083}` |
 
 ## Бэкап и восстановление БД
 
@@ -174,23 +179,31 @@ Content-Type: application/json
 
 ```
 HTTP Request
-    │
-    ▼
-Spring Security (JWT + роли)
-    │
-    ▼
-Controller → Service → Repository (JPA)
-                │              │
-                │         PostgreSQL
-                │
-         ┌──────┴──────┐
-         │             │
-       Redis          Kafka
-    (кэш карточек)  (LowStockAlertEvent)
-         │
-         ▼
-       Consul (Centralized Config)
+    |
+    v
+nginx (round-robin)
+    |
+    +--> warehouse-app-1 --+
+    |                      |
+    +--> warehouse-app-2 --+
+                           |
+                           v
+              Spring Security (stateless JWT)
+                           |
+                           v
+              Controller -> Service -> Repository (JPA)
+                              |              |
+                              |         PostgreSQL
+                              |
+                           Redis + Kafka + Consul
 ```
+
+Docker Compose запускает две stateless-реплики без sticky sessions. Подробная схема, порты,
+healthchecks, мониторинг и smoke-проверка JWT между репликами описаны в
+[`docs/OPS-6-horizontal-scaling.md`](docs/OPS-6-horizontal-scaling.md).
+
+После старта стека проверку можно запустить командой `make ops6-smoke`. Скрипт запросит
+credentials без вывода пароля и JWT.
 
 ## Kafka события
 
@@ -234,7 +247,8 @@ http://localhost:8500/v1/kv/config/warehouse-system/data
 "@warehouse-config.yaml"
 * Приложение автоматически применит изменения (в течение 1 секунды, благодаря ConfigWatch), либо:
 ```bash
-  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8081/actuator/refresh
+  curl -X POST -H "Authorization: Bearer <токен>" \
+    http://localhost:${APP1_MANAGEMENT_PORT:-18082}/actuator/refresh
 ```
 Способ 2. Через Consul UI
 Откройте http://localhost:8500
@@ -329,11 +343,12 @@ make checkstyle
 - `evaluation_interval: 10s` - проверка правил алертинга каждые 10 секунд
 - Подключается к Alertmanager на `alertmanager:9093` для отправки алертов
 
-**Важно:** Для запуска через `docker-compose up` или `make up` **обязательно** должен быть запущен контейнер `warehouse-app`, так как Prometheus собирает метрики с приложения через `/actuator/prometheus`. Если приложение не запущено - алерты не будут работать.
+**Важно:** Prometheus собирает `/actuator/prometheus` с обеих app-реплик. Если обе реплики
+остановлены, сработает общий critical alert; падение одной реплики дает отдельный warning.
 
 **Настройка цели (target):**
-- В Docker-сети: `['warehouse-app:8081']`
-- При локальном запуске: `['host.docker.internal:8081']`
+- В Docker-сети: `warehouse-app-1:8081` и `warehouse-app-2:8081`
+- С host: `127.0.0.1:${APP1_MANAGEMENT_PORT:-18082}` и `127.0.0.1:${APP2_MANAGEMENT_PORT:-18083}`
 
 ### Alertmanager
 
@@ -346,7 +361,9 @@ make checkstyle
 | `Brute-force login` | warning | Высокая частота неудачных попыток входа (>5/мин) |
 | `Rejected write-off rate high` | warning | Высокая частота отклонённых списаний (>2 за 5мин) |
 | `Low-stock alert spike` | info | Пики алертов о низких остатках (>3 за 5мин) |
-| `App down` | critical | Приложение недоступно (>1 минута) |
+| `Warehouse app replica down` | warning | Одна реплика недоступна (>1 минута) |
+| `Warehouse app all replicas down` | critical | Обе реплики недоступны (>1 минута) |
+| `Warehouse public endpoint down` | critical | Публичный nginx endpoint недоступен (>1 минута) |
 | `JVM heap > 90%` | warning | Использование heap памяти >90% |
 
 ### Webhook Server

@@ -62,6 +62,7 @@ spring:
     timeout-per-shutdown-phase: 20s
 
 app:
+  instance-id: ${INSTANCE_ID:${HOSTNAME:local}}
   kafka:
     topics:
       low-stock:
@@ -78,6 +79,11 @@ app:
       max-attempts: 3
   jwt:
     refresh-retry-ttl-seconds: 60
+    max-active-token-pairs-per-user: ${JWT_MAX_ACTIVE_TOKEN_PAIRS_PER_USER:100}
+    refresh-lock:
+      wait-timeout-ms: ${JWT_REFRESH_LOCK_WAIT_TIMEOUT_MS:5000}
+      ttl-ms: ${JWT_REFRESH_LOCK_TTL_MS:30000}
+      retry-interval-ms: ${JWT_REFRESH_LOCK_RETRY_INTERVAL_MS:50}
 
 management:
   server:
@@ -102,7 +108,7 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState,db
+          include: readinessState,db,redis
     refresh:
       enabled: true
   health:
@@ -113,6 +119,7 @@ management:
   metrics:
     tags:
       application: warehouse-system
+      application_instance: ${app.instance-id}
 
 server:
   shutdown: graceful
@@ -125,4 +132,4 @@ logging:
     com.warehouse.service.outbox: INFO
 
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId}] [spanId=%X{spanId}] %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [instance=${app.instance-id}] [traceId=%X{traceId}] [spanId=%X{spanId}] %logger{36} - %msg%n"

@@ -1,26 +1,31 @@
 package com.warehouse.security.service;
 
+import com.warehouse.exception.ActiveTokenLimitExceededException;
+import com.warehouse.exception.InvalidTokenException;
 import com.warehouse.security.util.JwtUtil;
 import com.warehouse.security.model.TokenPair;
+import com.warehouse.security.util.TokenHashUtil;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -42,9 +47,6 @@ class TokenServiceImplTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
-    @Mock
-    private SetOperations<String, String> setOperations;
-
     @InjectMocks
     private TokenServiceImpl tokenService;
 
@@ -59,55 +61,65 @@ class TokenServiceImplTest {
     @Test
     @DisplayName("Should generate token pair and store in Redis")
     void generateTokenPairShouldGenerateAndStoreTokens() {
-        // Arrange
         when(jwtUtil.generateToken(USERNAME, USER_ID, ROLES)).thenReturn(ACCESS_TOKEN);
         when(jwtUtil.generateRefreshToken(USERNAME, USER_ID, ROLES)).thenReturn(REFRESH_TOKEN);
-        when(jwtUtil.getRefreshExpirationMs()).thenReturn(REFRESH_EXPIRATION_MS);
-        when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
+        when(jwtUtil.getTokenRemainingTime(REFRESH_TOKEN)).thenReturn(REFRESH_EXPIRATION_MS);
+        when(jwtUtil.getTokenRemainingTime(ACCESS_TOKEN)).thenReturn(EXPIRATION_MS);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(1L);
 
-        // Мокаем opsForValue
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-
-        // Мокаем opsForSet
-        when(redisTemplate.opsForSet()).thenReturn(setOperations);
-
-        // Act
         TokenPair result = tokenService.generateTokenPair(USERNAME, USER_ID, ROLES);
 
-        // Assert
-        assertThat(result).isNotNull();
-        assertThat(result.accessToken()).isEqualTo(ACCESS_TOKEN);
-        assertThat(result.refreshToken()).isEqualTo(REFRESH_TOKEN);
-
-        // Проверяем сохранение refresh
-        verify(valueOperations).set(
-                argThat(key -> key.startsWith("refresh:")),
+        assertThat(result).isEqualTo(new TokenPair(ACCESS_TOKEN, REFRESH_TOKEN));
+        String refreshHash = TokenHashUtil.hashToken(REFRESH_TOKEN);
+        String accessHash = TokenHashUtil.hashToken(ACCESS_TOKEN);
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                eq(List.of(
+                        "refresh:" + refreshHash,
+                        "user:tokens:" + USER_ID + ":" + refreshHash,
+                        "user:refresh:set:" + USER_ID,
+                        "user:access:" + USER_ID + ":" + accessHash,
+                        "user:access:set:" + USER_ID
+                )),
                 eq(USER_ID.toString()),
-                eq(REFRESH_EXPIRATION_MS),
-                eq(TimeUnit.MILLISECONDS)
+                eq(refreshHash),
+                eq(accessHash),
+                eq(Long.toString(REFRESH_EXPIRATION_MS)),
+                eq(Long.toString(EXPIRATION_MS)),
+                eq("100")
         );
-        verify(valueOperations).set(
-                argThat(key -> key.startsWith("user:tokens:" + USER_ID + ":")),
-                eq("active"),
-                eq(REFRESH_EXPIRATION_MS),
-                eq(TimeUnit.MILLISECONDS)
-        );
-        verify(valueOperations).set(
-                argThat(key -> key.startsWith("user:access:" + USER_ID + ":")),
-                eq("active"),
-                eq(EXPIRATION_MS),
-                eq(TimeUnit.MILLISECONDS)
-        );
+    }
 
-        // Проверяем добавление в SET-индексы
-        verify(setOperations).add(
-                eq("user:refresh:set:" + USER_ID),
+    @Test
+    @DisplayName("Should reject a new login when the active token pair limit is reached")
+    void generateTokenPairShouldRejectActiveTokenLimit() {
+        when(jwtUtil.generateToken(USERNAME, USER_ID, ROLES)).thenReturn(ACCESS_TOKEN);
+        when(jwtUtil.generateRefreshToken(USERNAME, USER_ID, ROLES)).thenReturn(REFRESH_TOKEN);
+        when(jwtUtil.getTokenRemainingTime(REFRESH_TOKEN)).thenReturn(REFRESH_EXPIRATION_MS);
+        when(jwtUtil.getTokenRemainingTime(ACCESS_TOKEN)).thenReturn(EXPIRATION_MS);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
                 anyString()
-        );
-        verify(setOperations).add(
-                eq("user:access:set:" + USER_ID),
-                anyString()
-        );
+        )).thenReturn(-3L);
+
+        assertThatThrownBy(() -> tokenService.generateTokenPair(USERNAME, USER_ID, ROLES))
+                .isInstanceOf(ActiveTokenLimitExceededException.class)
+                .hasMessage("Maximum active token pairs per user has been reached");
     }
 
     @Test
@@ -193,99 +205,273 @@ class TokenServiceImplTest {
     }
 
     @Test
+    @DisplayName("Should revoke a valid token pair with one Redis script")
+    void revokeTokenPairShouldExecuteAtomically() {
+        JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
+        when(jwtUtil.parseRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.of(payload));
+        when(jwtUtil.parseAccessToken(ACCESS_TOKEN)).thenReturn(Optional.of(payload));
+        when(jwtUtil.getTokenRemainingTime(ACCESS_TOKEN)).thenReturn(EXPIRATION_MS);
+        when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(1L);
+
+        tokenService.revokeTokenPair(REFRESH_TOKEN, ACCESS_TOKEN);
+
+        String refreshHash = TokenHashUtil.hashToken(REFRESH_TOKEN);
+        String accessHash = TokenHashUtil.hashToken(ACCESS_TOKEN);
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                eq(List.of(
+                        "refresh:" + refreshHash,
+                        "user:tokens:" + USER_ID + ":" + refreshHash,
+                        "user:refresh:set:" + USER_ID,
+                        "refresh:retry:owner:" + refreshHash,
+                        "user:refresh:retry:set:" + USER_ID,
+                        "rotation:" + refreshHash,
+                        "user:access:set:" + USER_ID,
+                        "blacklist:" + accessHash,
+                        "user:access:" + USER_ID + ":" + accessHash
+                )),
+                eq(USER_ID.toString()),
+                eq(refreshHash),
+                eq(Long.toString(EXPIRATION_MS)),
+                eq(accessHash),
+                eq(Long.toString(EXPIRATION_MS))
+        );
+    }
+
+    @Test
+    @DisplayName("Should reject logout tokens that belong to different users")
+    void revokeTokenPairShouldRejectDifferentUsers() {
+        JwtUtil.JwtPayload refreshPayload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
+        JwtUtil.JwtPayload accessPayload = new JwtUtil.JwtPayload(2L, "other-user", ROLES);
+        when(jwtUtil.parseRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.of(refreshPayload));
+        when(jwtUtil.parseAccessToken(ACCESS_TOKEN)).thenReturn(Optional.of(accessPayload));
+
+        assertThatThrownBy(() -> tokenService.revokeTokenPair(REFRESH_TOKEN, ACCESS_TOKEN))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessage("Access and refresh tokens belong to different users");
+
+        verify(redisTemplate, never()).execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString()
+        );
+    }
+
+    @Test
     @DisplayName("Should revoke all user tokens")
     void revokeAllUserTokensShouldDeleteAllTokens() {
-        // Arrange
-        Set<String> refreshHashes = new HashSet<>();
-        refreshHashes.add("hash1");
-        refreshHashes.add("hash2");
-
-        Set<String> accessHashes = new HashSet<>();
-        accessHashes.add("hash3");
-        accessHashes.add("hash4");
-
-        // Мокаем opsForSet
-        when(redisTemplate.opsForSet()).thenReturn(setOperations);
-        when(setOperations.members("user:refresh:set:" + USER_ID))
-                .thenReturn(refreshHashes);
-        when(setOperations.members("user:access:set:" + USER_ID))
-                .thenReturn(accessHashes);
-
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString()
+        )).thenReturn(1L);
 
-        // Act
         tokenService.revokeAllUserTokens(USER_ID);
 
-        // Assert
-        // Проверяем удаление refresh токенов
-        verify(redisTemplate).delete(argThat((List<String> keys) ->
-                keys.stream().allMatch(k -> k.startsWith("refresh:"))));
-        verify(redisTemplate).delete(argThat((List<String> keys) ->
-                keys.stream().allMatch(k -> k.startsWith("user:tokens:" + USER_ID + ":"))));
-        verify(redisTemplate).delete("user:refresh:set:" + USER_ID);
-
-        // Проверяем удаление access токенов
-        verify(redisTemplate).delete(argThat((List<String> keys) ->
-                keys.stream().allMatch(k -> k.startsWith("user:access:" + USER_ID + ":"))));
-        verify(valueOperations, times(2)).set(
-                argThat(key -> key.startsWith("blacklist:")),
-                eq("blacklisted"),
-                eq(EXPIRATION_MS),
-                eq(TimeUnit.MILLISECONDS)
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                eq(List.of(
+                        "user:refresh:set:" + USER_ID,
+                        "user:access:set:" + USER_ID,
+                        "user:refresh:retry:set:" + USER_ID
+                )),
+                eq(USER_ID.toString()),
+                eq(Long.toString(EXPIRATION_MS))
         );
-        verify(redisTemplate).delete("user:access:set:" + USER_ID);
     }
 
     @Test
     @DisplayName("Should revoke all user tokens when no tokens exist")
     void revokeAllUserTokensWhenNoTokensShouldDoNothing() {
-        // Arrange
-        // Мокаем opsForSet
-        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString()
+        )).thenReturn(0L);
 
-        // Мокаем members чтобы возвращал null
-        when(setOperations.members("user:refresh:set:" + USER_ID))
-                .thenReturn(null);
-        when(setOperations.members("user:access:set:" + USER_ID))
-                .thenReturn(null);
-
-        // Act
         tokenService.revokeAllUserTokens(USER_ID);
 
-        // Assert
-        verify(redisTemplate, never()).delete(anyString());
-        verify(redisTemplate, never()).delete(any(List.class));
-        verify(valueOperations, never()).set(anyString(), anyString(), anyLong(), any(TimeUnit.class));
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                anyList(),
+                eq(USER_ID.toString()),
+                eq(Long.toString(EXPIRATION_MS))
+        );
     }
 
     @Test
-    @DisplayName("Should rotate refresh token correctly")
-    void rotateRefreshTokenShouldRotateCorrectly() {
+    @DisplayName("Should generate and commit refresh rotation with one Redis script")
+    void rotateRefreshTokenShouldExecuteAtomicScript() {
         // Arrange
         String oldRefresh = "old-refresh-token";
+        TokenPair newTokenPair = new TokenPair("new-access-token", "new-refresh-token");
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
         long remainingTtl = 604800000L;
+        long retryTtlSeconds = 60L;
+        String oldTokenHash = TokenHashUtil.hashToken(oldRefresh);
+        String newRefreshHash = TokenHashUtil.hashToken(newTokenPair.refreshToken());
+        String newAccessHash = TokenHashUtil.hashToken(newTokenPair.accessToken());
 
         when(jwtUtil.parseRefreshToken(oldRefresh)).thenReturn(Optional.of(payload));
         when(jwtUtil.getTokenRemainingTime(oldRefresh)).thenReturn(remainingTtl);
+        when(jwtUtil.generateToken(USERNAME, USER_ID, ROLES)).thenReturn(newTokenPair.accessToken());
+        when(jwtUtil.generateRefreshToken(USERNAME, USER_ID, ROLES)).thenReturn(newTokenPair.refreshToken());
+        when(jwtUtil.getTokenRemainingTime(newTokenPair.refreshToken()))
+                .thenReturn(REFRESH_EXPIRATION_MS);
+        when(jwtUtil.getTokenRemainingTime(newTokenPair.accessToken())).thenReturn(EXPIRATION_MS);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(1L);
+        ReflectionTestUtils.setField(tokenService, "refreshRetryTtlSeconds", retryTtlSeconds);
 
         // Act
-        tokenService.rotateRefreshToken(oldRefresh);
+        TokenPair result = tokenService.rotateRefreshToken(oldRefresh);
 
         // Assert
-        // 1. Старый refresh помечается как использованный
-        verify(valueOperations).set(
-                argThat(key -> key.startsWith("rotation:")),
+        assertThat(result).isEqualTo(newTokenPair);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> keysCaptor = ArgumentCaptor.forClass(List.class);
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                keysCaptor.capture(),
                 eq(USER_ID.toString()),
-                eq(remainingTtl),
-                eq(TimeUnit.MILLISECONDS)
+                eq(Long.toString(remainingTtl)),
+                eq(newTokenPair.accessToken() + "|" + newTokenPair.refreshToken()),
+                eq(Long.toString(TimeUnit.SECONDS.toMillis(retryTtlSeconds))),
+                eq(oldTokenHash),
+                eq(newRefreshHash),
+                eq(newAccessHash),
+                eq(Long.toString(REFRESH_EXPIRATION_MS)),
+                eq(Long.toString(EXPIRATION_MS))
         );
+        assertThat(keysCaptor.getValue()).containsExactly(
+                "refresh:" + oldTokenHash,
+                "rotation:" + oldTokenHash,
+                "refresh:retry:" + oldTokenHash,
+                "user:tokens:" + USER_ID + ":" + oldTokenHash,
+                "user:refresh:set:" + USER_ID,
+                "refresh:" + newRefreshHash,
+                "user:tokens:" + USER_ID + ":" + newRefreshHash,
+                "user:access:" + USER_ID + ":" + newAccessHash,
+                "user:access:set:" + USER_ID,
+                "user:refresh:retry:set:" + USER_ID,
+                "refresh:retry:owner:" + newRefreshHash,
+                "refresh:retry:owner:" + oldTokenHash
+        );
+    }
 
-        // 2. Старый refresh удаляется
-        verify(redisTemplate).delete(argThat((String k) -> k.startsWith("refresh:")));
+    @Test
+    @DisplayName("Retry result TTL must not outlive the old refresh token")
+    void rotateRefreshTokenShouldCapRetryTtlAtRemainingLifetime() {
+        String oldRefresh = "near-expiry-refresh-token";
+        TokenPair newTokenPair = new TokenPair("new-access-token", "new-refresh-token");
+        JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
+        long remainingTtl = 500L;
+        String oldTokenHash = TokenHashUtil.hashToken(oldRefresh);
+        String newRefreshHash = TokenHashUtil.hashToken(newTokenPair.refreshToken());
+        String newAccessHash = TokenHashUtil.hashToken(newTokenPair.accessToken());
 
+        when(jwtUtil.parseRefreshToken(oldRefresh)).thenReturn(Optional.of(payload));
+        when(jwtUtil.getTokenRemainingTime(oldRefresh)).thenReturn(remainingTtl);
+        when(jwtUtil.generateToken(USERNAME, USER_ID, ROLES)).thenReturn(newTokenPair.accessToken());
+        when(jwtUtil.generateRefreshToken(USERNAME, USER_ID, ROLES)).thenReturn(newTokenPair.refreshToken());
+        when(jwtUtil.getTokenRemainingTime(newTokenPair.refreshToken()))
+                .thenReturn(REFRESH_EXPIRATION_MS);
+        when(jwtUtil.getTokenRemainingTime(newTokenPair.accessToken())).thenReturn(EXPIRATION_MS);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(1L);
+        ReflectionTestUtils.setField(tokenService, "refreshRetryTtlSeconds", 60L);
+
+        tokenService.rotateRefreshToken(oldRefresh);
+
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                anyList(),
+                eq(USER_ID.toString()),
+                eq(Long.toString(remainingTtl)),
+                eq(newTokenPair.accessToken() + "|" + newTokenPair.refreshToken()),
+                eq(Long.toString(remainingTtl)),
+                eq(oldTokenHash),
+                eq(newRefreshHash),
+                eq(newAccessHash),
+                eq(Long.toString(REFRESH_EXPIRATION_MS)),
+                eq(Long.toString(EXPIRATION_MS))
+        );
+    }
+
+    @Test
+    @DisplayName("Should fail closed when atomic refresh rotation is rejected")
+    void rotateRefreshTokenWhenOldTokenIsMissingShouldThrow() {
+        String oldRefresh = "missing-refresh-token";
+        TokenPair newTokenPair = new TokenPair("new-access-token", "new-refresh-token");
+        JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
+
+        when(jwtUtil.parseRefreshToken(oldRefresh)).thenReturn(Optional.of(payload));
+        when(jwtUtil.getTokenRemainingTime(oldRefresh)).thenReturn(REFRESH_EXPIRATION_MS);
+        when(jwtUtil.generateToken(USERNAME, USER_ID, ROLES)).thenReturn(newTokenPair.accessToken());
+        when(jwtUtil.generateRefreshToken(USERNAME, USER_ID, ROLES)).thenReturn(newTokenPair.refreshToken());
+        when(jwtUtil.getTokenRemainingTime(newTokenPair.refreshToken()))
+                .thenReturn(REFRESH_EXPIRATION_MS);
+        when(jwtUtil.getTokenRemainingTime(newTokenPair.accessToken())).thenReturn(EXPIRATION_MS);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn(0L);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        ReflectionTestUtils.setField(tokenService, "refreshRetryTtlSeconds", 60L);
+
+        assertThatThrownBy(() -> tokenService.rotateRefreshToken(oldRefresh))
+                .isInstanceOf(InvalidTokenException.class)
+                .hasMessage("Invalid or expired refresh token");
     }
 
     @Test
@@ -305,55 +491,49 @@ class TokenServiceImplTest {
     @Test
     @DisplayName("Should blacklist access token with correct TTL")
     void blacklistAccessTokenShouldSetWithCorrectTTL() {
-        // Arrange
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);
         when(jwtUtil.parseAccessToken(ACCESS_TOKEN)).thenReturn(Optional.of(payload));
         when(jwtUtil.getTokenRemainingTime(ACCESS_TOKEN)).thenReturn(EXPIRATION_MS);
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString()
+        )).thenReturn(1L);
 
-        // Act
         tokenService.blacklistAccessToken(ACCESS_TOKEN);
 
-        // Assert
-        verify(valueOperations).set(
-                argThat(key -> key.startsWith("blacklist:")),
-                eq("blacklisted"),
-                eq(EXPIRATION_MS),
-                eq(TimeUnit.MILLISECONDS)
-        );
-        verify(valueOperations).set(
-                argThat(key -> key.startsWith("user:access:" + USER_ID + ":")),
-                eq("blacklisted"),
-                eq(EXPIRATION_MS),
-                eq(TimeUnit.MILLISECONDS)
+        String accessHash = TokenHashUtil.hashToken(ACCESS_TOKEN);
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                eq(List.of(
+                        "blacklist:" + accessHash,
+                        "user:access:" + USER_ID + ":" + accessHash,
+                        "user:access:set:" + USER_ID
+                )),
+                eq(accessHash),
+                eq(Long.toString(EXPIRATION_MS))
         );
     }
 
     @Test
     @DisplayName("Should blacklist all user access tokens")
     void blacklistAllUserAccessTokensShouldBlacklistAll() {
-        // Arrange
-        Set<String> accessHashes = new HashSet<>();
-        accessHashes.add("hash1");
-        accessHashes.add("hash2");
-
-        // Мокаем opsForSet
-        when(redisTemplate.opsForSet()).thenReturn(setOperations);
-        when(setOperations.members("user:access:set:" + USER_ID))
-                .thenReturn(accessHashes);
-
         when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString()
+        )).thenReturn(1L);
 
-        // Act
         tokenService.blacklistAllUserAccessTokens(USER_ID);
 
-        // Assert
-        verify(valueOperations, times(2)).set(
-                argThat((String key) -> key.startsWith("blacklist:")),
-                eq("blacklisted"),
-                eq(EXPIRATION_MS),
-                eq(TimeUnit.MILLISECONDS)
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                eq(List.of("user:access:set:" + USER_ID)),
+                eq(USER_ID.toString()),
+                eq(Long.toString(EXPIRATION_MS))
         );
         verify(jwtUtil, times(1)).getExpirationMs();
     }
@@ -405,31 +585,33 @@ class TokenServiceImplTest {
     }
 
     @Test
-    @DisplayName("Should handle exception during blacklist")
-    void blacklistAccessTokenWhenExceptionShouldNotThrow() {
-        // Arrange
+    @DisplayName("Should propagate infrastructure failure during blacklist")
+    void blacklistAccessTokenWhenExceptionShouldPropagate() {
         when(jwtUtil.parseAccessToken(ACCESS_TOKEN)).thenThrow(new RuntimeException("Test exception"));
 
-        // Act & Assert - should not throw
-        tokenService.blacklistAccessToken(ACCESS_TOKEN);
-
-        // No assertion needed, just verify no exception
+        assertThatThrownBy(() -> tokenService.blacklistAccessToken(ACCESS_TOKEN))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Test exception");
     }
 
     @Test
     @DisplayName("Should handle empty keys in blacklistAllUserAccessTokens")
     void blacklistAllUserAccessTokensWhenNoKeysShouldDoNothing() {
-        // Arrange
-        // Мокаем opsForSet
-        when(redisTemplate.opsForSet()).thenReturn(setOperations);
-        when(setOperations.members("user:access:set:" + USER_ID))
-                .thenReturn(null);
+        when(jwtUtil.getExpirationMs()).thenReturn(EXPIRATION_MS);
+        when(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                anyString(),
+                anyString()
+        )).thenReturn(0L);
 
-        // Act
         tokenService.blacklistAllUserAccessTokens(USER_ID);
 
-        // Assert
-        verify(setOperations).members("user:access:set:" + USER_ID);
-        verify(redisTemplate, never()).opsForValue();
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                eq(List.of("user:access:set:" + USER_ID)),
+                eq(USER_ID.toString()),
+                eq(Long.toString(EXPIRATION_MS))
+        );
     }
 }
