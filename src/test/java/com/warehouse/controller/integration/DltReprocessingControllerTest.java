@@ -127,6 +127,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // Удаляем в правильном порядке, чтобы избежать ошибок внешних ключей
         jdbcTemplate.update("DELETE FROM stock_alerts");
         jdbcTemplate.update("DELETE FROM stock_movements");
+        jdbcTemplate.update("DELETE FROM idempotency_keys");
         jdbcTemplate.update("DELETE FROM batches");
 
         jdbcTemplate.update("DELETE FROM stock");
