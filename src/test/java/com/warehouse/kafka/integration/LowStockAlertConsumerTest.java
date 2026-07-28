@@ -7,8 +7,14 @@ import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.OutboxEventRepository;
+import com.warehouse.repository.PurchaseOrderItemRepository;
+import com.warehouse.repository.PurchaseOrderRepository;
 import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.StockRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -34,7 +40,6 @@ import static org.awaitility.Awaitility.await;
 @Tag("integration")
 @TestPropertySource(properties = "bucket4j.enabled=false")
 @SpringBootTest(classes = WarehouseApp.class)
-@Transactional
 class LowStockAlertConsumerTest extends AbstractIntegrationTest {
 
     private static final String TEST_SKU = "SKU-001";
@@ -51,7 +56,22 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     StockAlertRepository stockAlertRepository;
 
     @Autowired
+    StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    BatchRepository batchRepository;
+
+    @Autowired
     ItemRepository itemRepository;
+
+    @Autowired
+    StockReserveRepository stockReserveRepository;
+
+    @Autowired
+    PurchaseOrderItemRepository purchaseOrderItemRepository;
+
+    @Autowired
+    PurchaseOrderRepository purchaseOrderRepository;
 
     @Autowired
     StockRepository stockRepository;
@@ -59,10 +79,25 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     @Autowired
     CategoryRepository categoryRepository;
 
+    @Autowired
+    OutboxEventRepository outboxEventRepository;
+
     private Long testItemId;
 
     @BeforeEach
     void setUp() {
+        // Порядок важен: сначала зависимости (FK), потом родительские таблицы
+        outboxEventRepository.deleteAll();
+        stockAlertRepository.deleteAll();
+        stockMovementRepository.deleteAll();
+        stockReserveRepository.deleteAll();
+        purchaseOrderItemRepository.deleteAll();
+        purchaseOrderRepository.deleteAll();
+        batchRepository.deleteAll();
+        stockRepository.deleteAll();
+        itemRepository.deleteAll();
+        categoryRepository.deleteAll();
+
         Category category = categoryRepository.save(
                 Category.builder()
                         .name(TEST_CATEGORY)
@@ -96,10 +131,9 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
 
         await().atMost(Duration.ofSeconds(15))
                 .untilAsserted(() -> {
-                    Optional<StockAlert> saved = stockAlertRepository.findAll().stream().findFirst();
-                    assertThat(saved).isPresent();
-                    StockAlert alert = saved.get();
-                    assertThat(alert.getItem().getId()).isEqualTo(testItemId);
+                    List<StockAlert> alerts = stockAlertRepository.findByItemId(testItemId);
+                    assertThat(alerts).isNotEmpty();
+                    StockAlert alert = alerts.get(0);
                     assertThat(alert.getCurrentStock()).isEqualTo(TEST_CURRENT_STOCK);
                     assertThat(alert.getMinStock()).isEqualTo(TEST_MIN_STOCK);
                     assertThat(alert.getTriggeredBy()).isEqualTo(TEST_TRIGGERED_BY);

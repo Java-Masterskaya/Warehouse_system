@@ -110,7 +110,8 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
         String movementJson = """
             {
                 "itemId": 1,
-                "quantity": 5
+                "quantity": 5,
+                "expiryDate": "2099-12-31T23:59:59"
             }
             """;
 
@@ -149,7 +150,7 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return objectMapper.readTree(response).get("token").asText();
+        return objectMapper.readTree(response).get("accessToken").asText();
     }
 
     // --- КРИТЕРИЙ 5: Конфигурируемость, срабатывание и СБРОС окна ---

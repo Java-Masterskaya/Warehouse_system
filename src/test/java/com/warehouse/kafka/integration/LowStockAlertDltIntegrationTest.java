@@ -5,7 +5,12 @@ import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.PurchaseOrderItemRepository;
+import com.warehouse.repository.PurchaseOrderRepository;
 import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.StockRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -54,6 +59,21 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
     private StockAlertRepository stockAlertRepository;
 
     @Autowired
+    private StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
+    private StockReserveRepository stockReserveRepository;
+
+    @Autowired
+    private PurchaseOrderItemRepository purchaseOrderItemRepository;
+
+    @Autowired
+    private PurchaseOrderRepository purchaseOrderRepository;
+
+    @Autowired
     private StockRepository stockRepository;
 
     @Autowired
@@ -65,7 +85,13 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
     void setUp() {
         testStartTime = System.currentTimeMillis();
         log.info("=== Starting test setup ===");
+        // Порядок важен: сначала зависимости (FK), потом родительские таблицы
         stockAlertRepository.deleteAllInBatch();
+        stockMovementRepository.deleteAllInBatch();
+        stockReserveRepository.deleteAllInBatch();
+        purchaseOrderItemRepository.deleteAllInBatch();
+        purchaseOrderRepository.deleteAllInBatch();
+        batchRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
         clearDltTopic();

@@ -447,20 +447,6 @@ public class StockMovementServiceImpl implements StockMovementService {
         return newStockMovement(item, warehouse, quantity, ctx, type, null);
     }
 
-    /**
-     * Сохраняет новое движение товара с опциональной партией.
-     *
-     * @param item     перемещаемый товар
-     * @param quantity количество перемещаемых товаров
-     * @param ctx      пользователь, выполняющий операцию
-     * @param type     тип выполняемой операции
-     * @param batch    партия (опционально)
-     * @return сохраненное движение товара
-     */
-    public StockMovement newStockMovement(Item item, int quantity, UserContext ctx, MovementType type, Batch batch) {
-        return newStockMovement(item, defaultWarehouse(), quantity, ctx, type, batch);
-    }
-
     @Override
     public StockMovement newStockMovement(
             Item item,
