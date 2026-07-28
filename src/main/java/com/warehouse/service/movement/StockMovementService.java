@@ -109,6 +109,4 @@ public interface StockMovementService {
             MovementType type,
             Batch batch
     );
-
-
 }
