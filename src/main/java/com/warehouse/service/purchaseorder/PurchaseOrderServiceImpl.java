@@ -1,7 +1,7 @@
 package com.warehouse.service.purchaseorder;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderItemRequest;
 import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderItemRequest;
@@ -225,10 +225,11 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             );
         }
 
-        ChangeQuantityMovementRequest movementRequest =
-                new ChangeQuantityMovementRequest(
+        ReceiveStockRequest movementRequest =
+                new ReceiveStockRequest(
                         orderItem.getItem().getId(),
-                        request.quantity()
+                        request.quantity(),
+                        request.expiryDate()
                 );
 
         stockMovementService.registerReceipt(movementRequest, context);

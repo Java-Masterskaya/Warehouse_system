@@ -5,6 +5,7 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.WarehouseStockResponse;
 import com.warehouse.dto.response.report.LowStockItem;
 import com.warehouse.dto.response.valuation.StockValuationResponse;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Reservation;
@@ -13,6 +14,7 @@ import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
@@ -23,6 +25,7 @@ import com.warehouse.service.report.ReportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -32,6 +35,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SpringBootTest
 @Transactional
 class MultiWarehouseAggregationIntegrationTest extends AbstractIntegrationTest {
 
@@ -40,6 +44,9 @@ class MultiWarehouseAggregationIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockRepository stockRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
 
     @Autowired
     private StockReserveRepository reservationRepository;
@@ -103,6 +110,20 @@ class MultiWarehouseAggregationIntegrationTest extends AbstractIntegrationTest {
                 .quantity(15)
                 .build();
         stockRepository.saveAllAndFlush(List.of(defaultStock, secondaryStock));
+        batchRepository.saveAllAndFlush(List.of(
+                Batch.builder()
+                        .item(item)
+                        .warehouse(defaultWarehouse)
+                        .quantity(10)
+                        .expiryDate(LocalDateTime.now().plusDays(30))
+                        .build(),
+                Batch.builder()
+                        .item(item)
+                        .warehouse(secondaryWarehouse)
+                        .quantity(15)
+                        .expiryDate(LocalDateTime.now().plusDays(30))
+                        .build()
+        ));
 
         User admin = userRepository.findByUsername("admin").orElseThrow();
         reservationRepository.saveAndFlush(Reservation.builder()

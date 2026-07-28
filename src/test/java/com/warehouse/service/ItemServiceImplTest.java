@@ -397,6 +397,7 @@ class ItemServiceImplTest {
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(projection));
         when(availabilityService.getTotalReserved(1L)).thenReturn(3L);
+        when(availabilityService.getTotalAvailable(1L)).thenReturn(20L);
         when(stockRepository.findAllByItemIdWithWarehouse(1L)).thenReturn(List.of());
 
         ItemDetailsResponse result = itemService.getItem(1L);
@@ -418,6 +419,7 @@ class ItemServiceImplTest {
 
         verify(itemRepository).findWithStock(1L);
         verify(availabilityService).getTotalReserved(1L);
+        verify(availabilityService).getTotalAvailable(1L);
         verify(stockRepository).findAllByItemIdWithWarehouse(1L);
     }
 

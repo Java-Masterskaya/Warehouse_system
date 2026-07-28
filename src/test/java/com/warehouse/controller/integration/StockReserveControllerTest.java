@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.reservation.ReservationActionRequest;
 import com.warehouse.dto.request.reservation.ReserveRequest;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Reservation;
@@ -11,6 +12,7 @@ import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -32,6 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@SpringBootTest
 @AutoConfigureMockMvc
 class StockReserveControllerTest extends AbstractIntegrationTest {
 
@@ -49,6 +53,9 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     StockRepository stockRepository;
+
+    @Autowired
+    BatchRepository batchRepository;
 
     @Autowired
     StockReserveRepository reservationRepository;
@@ -91,6 +98,13 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
         stock.setQuantity(10);
 
         stockRepository.save(stock);
+
+        batchRepository.save(Batch.builder()
+                .item(item)
+                .warehouse(defaultWarehouse())
+                .quantity(10)
+                .expiryDate(LocalDateTime.now().plusDays(30))
+                .build());
 
         User admin = userRepository.findByUsername("admin").orElseThrow();
 

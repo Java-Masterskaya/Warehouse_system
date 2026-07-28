@@ -2,11 +2,14 @@ package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
@@ -18,14 +21,17 @@ import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Интеграционный тест для проверки инвалидации кэша.
  */
+@SpringBootTest
 class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -45,19 +51,25 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockMovementService stockMovementService;
+
     @Autowired
     private StockAlertRepository stockAlertRepository;
+
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
 
     private Long itemId;
 
     @BeforeEach
     void setUp() {
         // Очищаем таблицы в правильном порядке, учитывая внешние ключи
+        stockMovementRepository.deleteAllInBatch();
+        batchRepository.deleteAll();
         stockAlertRepository.deleteAll();
         reserveRepository.deleteAll();
-        stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
         categoryRepository.deleteAllInBatch();
@@ -83,6 +95,14 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(10);
         stockRepository.save(stock);
+
+        // Создаем начальную партию для синхронизации с stock.quantity
+        Batch batch = new Batch();
+        batch.setItem(item);
+        batch.setWarehouse(defaultWarehouse());
+        batch.setQuantity(10);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365));
+        batchRepository.save(batch);
 
         itemId = item.getId();
     }
@@ -128,7 +148,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5);
+        ReceiveStockRequest movementRequest = new ReceiveStockRequest(
+                itemId, 5, LocalDateTime.now().plusDays(1));
         stockMovementService.registerReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
@@ -141,15 +162,23 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
      */
     @Test
     void writeOffMovementShouldEvictItemCache() {
-        ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.getCurrentStock()).isEqualTo(10);
-
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 3);
-        stockMovementService.writeOffReceipt(movementRequest,
+        // Сначала создаем партию через приход
+        ReceiveStockRequest receiptRequest = new ReceiveStockRequest(
+                itemId, 10, LocalDateTime.now().plusDays(1));
+        stockMovementService.registerReceipt(receiptRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
-        ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.getCurrentStock()).isEqualTo(7);
+        // Проверяем, что приход сработал
+        ItemDetailsResponse response1 = itemService.getItem(itemId);
+        assertThat(response1.getCurrentStock()).isEqualTo(20);
+
+        // Теперь списываем
+        WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(itemId, 3);
+        stockMovementService.writeOffReceipt(writeOffRequest,
+                new com.warehouse.dto.UserContext(1L, "admin"));
+
+        ItemDetailsResponse response2 = itemService.getItem(itemId);
+        assertThat(response2.getCurrentStock()).isEqualTo(17);
     }
 
 }

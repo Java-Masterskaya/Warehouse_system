@@ -3,12 +3,14 @@ package com.warehouse.service;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.reservation.ReserveRequest;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
@@ -17,6 +19,7 @@ import com.warehouse.repository.UserRepository;
 import com.warehouse.service.reservation.StockReserveService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDateTime;
@@ -28,12 +31,15 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@SpringBootTest
 @Testcontainers
 class StockReserveConcurrencyTest extends AbstractIntegrationTest {
     @Autowired
     StockReserveService service;
     @Autowired
     StockRepository stockRepository;
+    @Autowired
+    BatchRepository batchRepository;
     @Autowired
     StockReserveRepository reserveRepository;
     @Autowired
@@ -60,6 +66,12 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
                 .item(item)
                 .warehouse(defaultWarehouse())
                 .quantity(10)
+                .build());
+        batchRepository.saveAndFlush(Batch.builder()
+                .item(item)
+                .warehouse(defaultWarehouse())
+                .quantity(10)
+                .expiryDate(LocalDateTime.now().plusDays(30))
                 .build());
         User user = userRepository.save(
                 User.builder().username("name").password("sOme1@@@").role(Role.ROLE_ADMIN).build());

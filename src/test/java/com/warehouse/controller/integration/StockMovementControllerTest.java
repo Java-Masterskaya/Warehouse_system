@@ -2,13 +2,15 @@ package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.IdempotencyKeyRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
@@ -21,12 +23,14 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -44,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Интеграционный тест для проверки эндпоинта управления движениями товаров.
  * Тестирует API для регистрации прихода товара на склад.
  */
+@SpringBootTest
 @AutoConfigureMockMvc
 class StockMovementControllerTest extends AbstractIntegrationTest {
 
@@ -61,6 +66,9 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockRepository stockRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -105,6 +113,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         stock.setQuantity(10);
         stockRepository.save(stock);
 
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
+        batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
+        batch.setQuantity(10);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
+        batchRepository.save(batch);
+
         testItemId = testItem.getId();
 
         // Создаём пользователей только если их нет
@@ -130,13 +146,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         userToken = jwtUtil.generateToken(testUser.getUsername(), testUser.getId(), List.of("ROLE_USER"));
     }
 
-    @Nested
-    @DisplayName("Тесты бизнес-логики")
-    class BusinessLogicTest {
-
-        @Test
-        void adminTokenCanRegisterStockReceiptAndStockQuantityIncreases() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    /**
+     * ADMIN может зарегистрировать приход товара,
+     * остаток на складе увеличивается на указанное количество.
+     */
+    @Test
+    void adminTokenCanRegisterStockReceiptAndStockQuantityIncreases() throws Exception {
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, 5, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -153,9 +170,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             assertThat(updatedStock.getQuantity()).isEqualTo(15);
         }
 
-        @Test
-        void userTokenCannotRegisterStockReceiptReturns403() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    /**
+     * USER токен не может зарегистрировать приход товара,
+     * возвращает статус 403 Forbidden.
+     */
+    @Test
+    void userTokenCannotRegisterStockReceiptReturns403() throws Exception {
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, 5, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + userToken)
@@ -166,9 +188,14 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
         }
 
-        @Test
-        void noTokenCannotRegisterStockReceiptReturns401() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    /**
+     * Запрос без токена не может зарегистрировать приход товара,
+     * возвращает статус 401 Unauthorized.
+     */
+    @Test
+    void noTokenCannotRegisterStockReceiptReturns401() throws Exception {
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, 5, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Idempotency-Key", UUID.randomUUID().toString())
@@ -178,9 +205,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
         }
 
-        @Test
-        void nonExistentItemReturns404() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(999L, 5);
+    /**
+     * Приход товара для несуществующего item_id возвращает статус 404 Not Found.
+     */
+    @Test
+    void nonExistentItemReturns404() throws Exception {
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                999L, 5, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -191,12 +222,16 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
         }
 
-        @Test
-        void inactiveItemReturns404() throws Exception {
-            testItem.setActive(false);
-            itemRepository.save(testItem);
+    /**
+     * Приход товара для неактивного товара возвращает статус 404 Not Found.
+     */
+    @Test
+    void inactiveItemReturns404() throws Exception {
+        testItem.setActive(false);
+        itemRepository.save(testItem);
 
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, 5, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -207,9 +242,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
         }
 
-        @Test
-        void zeroQuantityValidationErrorReturns400() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 0);
+    /**
+     * Валидация: количество = 0 возвращает статус 400 Bad Request.
+     */
+    @Test
+    void zeroQuantityValidationErrorReturns400() throws Exception {
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, 0, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -220,9 +259,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
         }
 
-        @Test
-        void negativeQuantityValidationErrorReturns400() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, -1);
+    /**
+     * Валидация: отрицательное количество возвращает статус 400 Bad Request.
+     */
+    @Test
+    void negativeQuantityValidationErrorReturns400() throws Exception {
+        ReceiveStockRequest request = new ReceiveStockRequest(
+                testItemId, -1, LocalDateTime.now().plusDays(1));
 
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
@@ -233,9 +276,25 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
         }
 
-        @Test
-        void adminTokenCanWriteOffStockAndStockQuantityDecreases() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    private String obtainToken(String username, String password) throws Exception {
+        LoginRequest request = new LoginRequest(username, password);
+        String response = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(response).get("accessToken").asText();
+    }
+
+    /**
+     * ADMIN может списать товар со склада,
+     * остаток на складе уменьшается на указанное количество.
+     */
+    @Test
+    void adminTokenCanWriteOffStockAndStockQuantityDecreases() throws Exception {
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
@@ -252,9 +311,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             assertThat(updatedStock.getQuantity()).isEqualTo(5);
         }
 
-        @Test
-        void userTokenCannotWriteOffStockReturns403() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    /**
+     * USER токен не может списать товар,
+     * возвращает статус 403 Forbidden.
+     */
+    @Test
+    void userTokenCannotWriteOffStockReturns403() throws Exception {
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + userToken)
@@ -265,9 +328,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
         }
 
-        @Test
-        void noTokenCannotWriteOffStockReturns401() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+    /**
+     * Запрос без токена не может списать товар,
+     * возвращает статус 401 Unauthorized.
+     */
+    @Test
+    void noTokenCannotWriteOffStockReturns401() throws Exception {
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Idempotency-Key", UUID.randomUUID().toString())
@@ -277,9 +344,12 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
         }
 
-        @Test
-        void writeOffNonExistentItemReturns404() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(999L, 5);
+    /**
+     * Списание товара для несуществующего item_id возвращает статус 404 Not Found.
+     */
+    @Test
+    void writeOffNonExistentItemReturns404() throws Exception {
+        WriteOffStockRequest request = new WriteOffStockRequest(999L, 5);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
@@ -290,12 +360,15 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
         }
 
-        @Test
-        void writeOffInactiveItemReturns404() throws Exception {
-            testItem.setActive(false);
-            itemRepository.save(testItem);
+    /**
+     * Списание товара для неактивного товара возвращает статус 404 Not Found.
+     */
+    @Test
+    void writeOffInactiveItemReturns404() throws Exception {
+        testItem.setActive(false);
+        itemRepository.save(testItem);
 
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
@@ -306,9 +379,12 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
         }
 
-        @Test
-        void writeOffInsufficientStockReturns422() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 15);
+    /**
+     * Списание товара при недостаточном остатке возвращает статус 422 Unprocessable Entity.
+     */
+    @Test
+    void writeOffInsufficientStockReturns422() throws Exception {
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 15);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
@@ -319,9 +395,13 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("INSUFFICIENT_STOCK"));
         }
 
-        @Test
-        void adminStocktakeDecreasesStock() throws Exception {
-            StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+    /**
+     * ADMIN проводит инвентаризацию: фактический остаток (7) меньше учётного (10).
+     * Создаётся движение ADJUSTMENT на -3, остаток обновляется до 7.
+     */
+    @Test
+    void adminStocktakeDecreasesStock() throws Exception {
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
             mockMvc.perform(post("/api/inventory/stocktake")
                             .header("Authorization", "Bearer " + adminToken)
@@ -332,12 +412,18 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.quantity").value(-3))
                     .andExpect(jsonPath("$.stockAfter").value(7));
 
-            assertThat(stockRepository.findByItemId(testItemId).orElseThrow().getQuantity()).isEqualTo(7);
-        }
+        assertThat(stockRepository.findByItemId(testItemId).orElseThrow().getQuantity())
+                .isEqualTo(7);
+    }
 
-        @Test
-        void userCannotStocktakeReturns403() throws Exception {
-            StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+    /**
+     * USER токен не может проводить инвентаризацию,
+     * возвращает статус 403 Forbidden.
+     */
+
+    @Test
+    void userCannotStocktakeReturns403() throws Exception {
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
             mockMvc.perform(post("/api/inventory/stocktake")
                             .header("Authorization", "Bearer " + userToken)
@@ -347,20 +433,27 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
         }
 
-        @Test
-        void noTokenCannotStocktakeReturns401() throws Exception {
-            StocktakeRequest req = new StocktakeRequest(testItemId, 7);
+    /**
+     * Запрос без токена не может проводить инвентаризацию,
+     * возвращает статус 401 Unauthorized.
+     */
+    @Test
+    void noTokenCannotStocktakeReturns401() throws Exception {
+        StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
-            mockMvc.perform(post("/api/inventory/stocktake")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(req)))
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
-        }
+        mockMvc.perform(post("/api/inventory/stocktake")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
 
-        @Test
-        void writeOffZeroQuantityValidationErrorReturns400() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 0);
+    /**
+     * Валидация: количество = 0 возвращает статус 400 Bad Request.
+     */
+    @Test
+    void writeOffZeroQuantityValidationErrorReturns400() throws Exception {
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 0);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
@@ -371,9 +464,12 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
         }
 
-        @Test
-        void writeOffNegativeQuantityValidationErrorReturns400() throws Exception {
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, -1);
+    /**
+     * Валидация: отрицательное количество возвращает статус 400 Bad Request.
+     */
+    @Test
+    void writeOffNegativeQuantityValidationErrorReturns400() throws Exception {
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, -1);
 
             mockMvc.perform(post("/api/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)

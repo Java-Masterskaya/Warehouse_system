@@ -3,6 +3,7 @@ package com.warehouse.cache.integration;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.entity.Category;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -11,6 +12,7 @@ import com.warehouse.service.category.CategoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
 
 import java.util.List;
@@ -20,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Интеграционный тест для проверки кэширования категорий товаров.
  */
+@SpringBootTest
 class CategoryCacheTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -27,6 +30,9 @@ class CategoryCacheTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockRepository stockRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
 
     @Autowired
     private StockMovementRepository stockMovementRepository;
@@ -43,6 +49,7 @@ class CategoryCacheTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() {
         stockMovementRepository.deleteAllInBatch();
+        batchRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
         categoryRepository.deleteAllInBatch();
