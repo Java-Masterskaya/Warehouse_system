@@ -50,7 +50,7 @@ public class CsvImportService {
             Iterable<CsvItemParser.CsvChunk> chunks = csvItemParser.parseInChunks(inputStream);
 
             for (CsvItemParser.CsvChunk chunk : chunks) {
-                totalRows = chunk.processedRowsCount();
+                totalRows += chunk.processedRowsCount();
                 allErrors.addAll(chunk.errors());
 
                 List<CsvItemParser.ValidRowHolder> candidateRows = chunk.validRows();
