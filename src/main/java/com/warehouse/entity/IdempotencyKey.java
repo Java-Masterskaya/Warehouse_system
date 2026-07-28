@@ -31,7 +31,7 @@ public class IdempotencyKey {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "key_hash", nullable = false, unique = true, length = 64)
+    @Column(name = "key_hash", nullable = false, length = 64)
     private String keyHash;
 
     @ManyToOne(fetch = FetchType.LAZY)

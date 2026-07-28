@@ -123,7 +123,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
         if (!storedBodyHash.equals(currentBodyHash)) {
             log.warn("Idempotency conflict: same key but different body for user {}, endpoint {}",
                     idempotencyKey.getUser().getId(), endpoint);
-            throw IdempotencyConflictException.of(key, endpoint);
+            throw IdempotencyConflictException.of(endpoint);
         }
     }
 

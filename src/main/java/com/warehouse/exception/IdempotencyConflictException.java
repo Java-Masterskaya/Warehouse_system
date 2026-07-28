@@ -8,9 +8,9 @@ public class IdempotencyConflictException extends RuntimeException {
         super(message);
     }
 
-    public static IdempotencyConflictException of(String key, String endpoint) {
+    public static IdempotencyConflictException of(String endpoint) {
         return new IdempotencyConflictException(
-                "Idempotency key '%s' is already used with different request body for endpoint '%s'"
-                        .formatted(key, endpoint));
+                "Idempotency key is already used with different request body for endpoint '%s'"
+                        .formatted(endpoint));
     }
 }

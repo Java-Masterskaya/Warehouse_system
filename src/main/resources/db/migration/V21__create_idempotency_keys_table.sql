@@ -1,7 +1,7 @@
 -- Таблица для хранения идемпотентных ключей и результатов операций
 CREATE TABLE idempotency_keys (
     id BIGSERIAL PRIMARY KEY,
-    key_hash VARCHAR(64) NOT NULL UNIQUE,  -- SHA-256 хеш ключа для эффективного поиска
+    key_hash VARCHAR(64) NOT NULL,  -- SHA-256 хеш ключа для эффективного поиска
     user_id BIGINT NOT NULL REFERENCES users(id),
     endpoint VARCHAR(255) NOT NULL,  -- /api/movements/receive или /api/movements/write-off
     request_body_hash VARCHAR(64) NOT NULL,  -- SHA-256 хеш тела запроса для проверки конфликтов
@@ -13,10 +13,8 @@ CREATE TABLE idempotency_keys (
 );
 
 -- Индексы для быстрого поиска
-CREATE INDEX idx_idempotency_keys_key_hash ON idempotency_keys(key_hash);
 CREATE INDEX idx_idempotency_keys_user_id ON idempotency_keys(user_id);
 CREATE INDEX idx_idempotency_keys_expires_at ON idempotency_keys(expires_at);
-CREATE INDEX idx_idempotency_keys_lookup ON idempotency_keys(key_hash, user_id, endpoint);
 
 -- Комментарии к таблице и колонкам
 COMMENT ON TABLE idempotency_keys IS 'Хранит идемпотентные ключи для API запросов';

@@ -671,6 +671,209 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         }
     }
 
+    @Nested
+    @DisplayName("Кросс-контекстные сценарии (разные пользователи/эндпоинты)")
+    class CrossContextTests {
+
+        private String testIdempotencyKey;
+        private String secondUserToken;
+
+        @BeforeEach
+        void setUp() throws Exception {
+            testIdempotencyKey = UUID.randomUUID().toString();
+            idempotencyKeyRepository.deleteAll();
+
+            // Создаем второго пользователя
+            User secondUser = userRepository.findByUsername("second_admin").orElseGet(() -> {
+                User user = new User();
+                user.setUsername("second_admin");
+                user.setPassword(passwordEncoder.encode("secret"));
+                user.setRole(com.warehouse.entity.Role.ROLE_ADMIN);
+                user.setActive(true);
+                return userRepository.save(user);
+            });
+
+            secondUserToken = jwtUtil.generateToken(
+                    secondUser.getUsername(),
+                    secondUser.getId(),
+                    List.of("ROLE_ADMIN")
+            );
+        }
+
+        @Test
+        @DisplayName("Один ключ для разных пользователей - создает разные движения")
+        void sameKeyDifferentUsersCreateDifferentMovements() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+
+            // Первый пользователь с ключом
+            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String firstMovementId = objectMapper.readTree(firstResult.getResponse().getContentAsString())
+                    .get("movementId").asText();
+
+            // Второй пользователь с тем же ключом
+            MvcResult secondResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + secondUserToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String secondMovementId = objectMapper.readTree(secondResult.getResponse().getContentAsString())
+                    .get("movementId").asText();
+
+            // Движения должны быть разные
+            assertThat(firstMovementId).isNotEqualTo(secondMovementId);
+
+            // В БД две записи (по одной на пользователя)
+            long keyCount = idempotencyKeyRepository.count();
+            assertThat(keyCount).isEqualTo(2);
+
+            // Остаток увеличился на 6 (3+3)
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(16);
+        }
+
+        @Test
+        @DisplayName("Один ключ для разных эндпоинтов - создает разные движения")
+        void sameKeyDifferentEndpointsCreateDifferentMovements() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+
+            // POST /receive с ключом
+            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String firstMovementId = objectMapper.readTree(firstResult.getResponse().getContentAsString())
+                    .get("movementId").asText();
+
+            // POST /write-off с тем же ключом
+            MvcResult secondResult = mockMvc.perform(post("/api/movements/write-off")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String secondMovementId = objectMapper.readTree(secondResult.getResponse().getContentAsString())
+                    .get("movementId").asText();
+
+            // Движения должны быть разные
+            assertThat(firstMovementId).isNotEqualTo(secondMovementId);
+
+            // В БД две записи (по одной на эндпоинт)
+            long keyCount = idempotencyKeyRepository.count();
+            assertThat(keyCount).isEqualTo(2);
+
+            // Остаток: сначала +3, потом -3 → вернулся к 10
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(10);
+        }
+
+        @Test
+        @DisplayName("Чужой пользователь с тем же ключом - не получает чужой кеш")
+        void differentUserWithSameKeyDoesNotGetCachedResponse() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+
+            // Первый пользователь создает движение с ключом
+            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String firstResponse = firstResult.getResponse().getContentAsString();
+            String firstMovementId = objectMapper.readTree(firstResponse).get("movementId").asText();
+
+            // Второй пользователь с тем же ключом — должен создать СВОЕ движение,
+            // а не получить кеш первого
+            MvcResult secondResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + secondUserToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String secondResponse = secondResult.getResponse().getContentAsString();
+            String secondMovementId = objectMapper.readTree(secondResponse).get("movementId").asText();
+
+            // Движения разные → значит второй не получил кеш первого
+            assertThat(firstMovementId).isNotEqualTo(secondMovementId);
+
+            // В БД две записи
+            long keyCount = idempotencyKeyRepository.count();
+            assertThat(keyCount).isEqualTo(2);
+
+            // Остаток увеличился на 10 (5+5)
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(20);
+        }
+
+        @Test
+        @DisplayName("Повторный запрос от другого пользователя с тем же ключом - не возвращает кеш первого")
+        void differentUserDuplicateRequestDoesNotReturnFirstUsersCache() throws Exception {
+            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 3);
+
+            // Первый пользователь создает движение
+            mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk());
+
+            // Второй пользователь с тем же ключом — создает свое движение
+            MvcResult secondFirstResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + secondUserToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String secondFirstMovementId = objectMapper.readTree(secondFirstResult.getResponse().getContentAsString())
+                    .get("movementId").asText();
+
+            // Второй пользователь повторяет запрос с тем же ключом
+            MvcResult secondDuplicateResult = mockMvc.perform(post("/api/movements/receive")
+                            .header("Authorization", "Bearer " + secondUserToken)
+                            .header("Idempotency-Key", testIdempotencyKey)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String secondDuplicateMovementId = objectMapper.readTree(secondDuplicateResult.getResponse()
+                            .getContentAsString()).get("movementId").asText();
+
+            // Повторный запрос второго пользователя вернул тот же movementId
+            assertThat(secondDuplicateMovementId).isEqualTo(secondFirstMovementId);
+
+            // В БД две записи (по одной на пользователя)
+            long keyCount = idempotencyKeyRepository.count();
+            assertThat(keyCount).isEqualTo(2);
+
+            // Остаток увеличился на 6 (3+3)
+            Stock updatedStock = stockRepository.findByItemId(testItemId).orElseThrow();
+            assertThat(updatedStock.getQuantity()).isEqualTo(16);
+        }
+    }
+
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
         String response = mockMvc.perform(post("/api/auth/login")

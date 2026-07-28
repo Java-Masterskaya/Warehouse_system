@@ -513,4 +513,175 @@ class IdempotencyServiceImplTest {
             verify(idempotencyKeyRepository).deleteExpiredKeys(any(LocalDateTime.class));
         }
     }
+
+    @Nested
+    @DisplayName("6. Кросс-контекстные сценарии (разные пользователи/эндпоинты)")
+    class CrossContextTests {
+
+        @Test
+        @DisplayName("Один и тот же ключ для разных пользователей - должен создавать разные движения")
+        void sameKeyDifferentUsersShouldCreateDifferentMovements() throws Exception {
+            // given
+            Long secondUserId = 2L;
+            String secondUsername = "another_admin";
+            UserContext secondUserContext = new UserContext(secondUserId, secondUsername);
+            User secondUser = User.builder()
+                    .id(secondUserId)
+                    .username(secondUsername)
+                    .build();
+
+            IdempotentRequestContext firstUserRequestContext = new IdempotentRequestContext(
+                    IDEMPOTENCY_KEY, ENDPOINT, userContext
+            );
+            IdempotentRequestContext secondUserRequestContext = new IdempotentRequestContext(
+                    IDEMPOTENCY_KEY, ENDPOINT, secondUserContext
+            );
+
+            String secondKeyHash = TokenHashUtil.hashToken(IDEMPOTENCY_KEY);
+
+            // Первый пользователь — ключа нет
+            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
+            )).thenReturn(Optional.empty());
+
+            // Второй пользователь — ключа нет
+            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
+                    eq(secondKeyHash), eq(secondUserId), eq(ENDPOINT), any(LocalDateTime.class)
+            )).thenReturn(Optional.empty());
+
+            when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
+            when(userRepository.getReferenceById(secondUserId)).thenReturn(secondUser);
+            when(objectMapper.writeValueAsString(any(StockMovementResponse.class)))
+                    .thenReturn("{}");
+
+            Supplier<StockMovementResponse> operation = () -> response;
+
+            // when
+            StockMovementResponse result1 = idempotencyService.processIdempotentRequest(
+                    firstUserRequestContext, requestBody, operation
+            );
+            StockMovementResponse result2 = idempotencyService.processIdempotentRequest(
+                    secondUserRequestContext, requestBody, operation
+            );
+
+            // then
+            assertThat(result1).isEqualTo(response);
+            assertThat(result2).isEqualTo(response);
+            verify(idempotencyKeyRepository, times(2)).save(any());
+        }
+
+        @Test
+        @DisplayName("Один и тот же ключ для разных эндпоинтов - должен создавать разные движения")
+        void sameKeyDifferentEndpointsShouldCreateDifferentMovements() throws Exception {
+            // given
+            String secondEndpoint = "/api/movements/write-off";
+            IdempotentRequestContext firstContext = new IdempotentRequestContext(
+                    IDEMPOTENCY_KEY, ENDPOINT, userContext
+            );
+            IdempotentRequestContext secondContext = new IdempotentRequestContext(
+                    IDEMPOTENCY_KEY, secondEndpoint, userContext
+            );
+
+            // Первый эндпоинт — ключа нет
+            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
+                    eq(KEY_HASH), eq(USER_ID), eq(ENDPOINT), any(LocalDateTime.class)
+            )).thenReturn(Optional.empty());
+
+            // Второй эндпоинт — ключа нет
+            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
+                    eq(KEY_HASH), eq(USER_ID), eq(secondEndpoint), any(LocalDateTime.class)
+            )).thenReturn(Optional.empty());
+
+            when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
+            when(objectMapper.writeValueAsString(any(StockMovementResponse.class)))
+                    .thenReturn("{}");
+
+            Supplier<StockMovementResponse> operation = () -> response;
+
+            // when
+            StockMovementResponse result1 = idempotencyService.processIdempotentRequest(
+                    firstContext, requestBody, operation
+            );
+            StockMovementResponse result2 = idempotencyService.processIdempotentRequest(
+                    secondContext, requestBody, operation
+            );
+
+            // then
+            assertThat(result1).isEqualTo(response);
+            assertThat(result2).isEqualTo(response);
+            verify(idempotencyKeyRepository, times(2)).save(any());
+        }
+
+        @Test
+        @DisplayName("Чужой пользователь с тем же ключом - не должен получить чужой результат")
+        void differentUserWithSameKeyShouldNotGetCachedResult() throws Exception {
+            // given
+            Long firstUserId = 1L;
+            Long secondUserId = 2L;
+            User firstUser = User.builder().id(firstUserId).username("user1").build();
+            User secondUser = User.builder().id(secondUserId).username("user2").build();
+
+            UserContext firstUserCtx = new UserContext(firstUserId, "user1");
+            UserContext secondUserCtx = new UserContext(secondUserId, "user2");
+
+            IdempotentRequestContext firstContext = new IdempotentRequestContext(
+                    IDEMPOTENCY_KEY, ENDPOINT, firstUserCtx
+            );
+            IdempotentRequestContext secondContext = new IdempotentRequestContext(
+                    IDEMPOTENCY_KEY, ENDPOINT, secondUserCtx
+            );
+
+            String requestBodyHash = TokenHashUtil.hashToken("1:5");
+            String responseJson = "{\"itemId\":1,\"movementId\":100,\"type\":\"RECEIVE\","
+                    + "\"quantity\":5,\"stockAfter\":10,\"lowStockAlert\":false}";
+
+            // Первый пользователь создает ключ
+            IdempotencyKey existingKey = IdempotencyKey.builder()
+                    .keyHash(KEY_HASH)
+                    .user(firstUser)
+                    .endpoint(ENDPOINT)
+                    .requestBodyHash(requestBodyHash)
+                    .responseBody(responseJson)
+                    .statusCode(200)
+                    .expiresAt(LocalDateTime.now().plusHours(24))
+                    .build();
+
+            // Первый запрос — создает ключ
+            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
+                    eq(KEY_HASH), eq(firstUserId), eq(ENDPOINT), any(LocalDateTime.class)
+            )).thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(existingKey));
+
+            // Второй пользователь — ключа нет (это другой пользователь)
+            when(idempotencyKeyRepository.findByKeyHashAndUserIdAndEndpoint(
+                    eq(KEY_HASH), eq(secondUserId), eq(ENDPOINT), any(LocalDateTime.class)
+            )).thenReturn(Optional.empty());
+
+            when(userRepository.getReferenceById(firstUserId)).thenReturn(firstUser);
+            when(userRepository.getReferenceById(secondUserId)).thenReturn(secondUser);
+
+            // Мокаем сохранение для первого
+            when(idempotencyKeyRepository.save(any(IdempotencyKey.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+            when(objectMapper.writeValueAsString(any(StockMovementResponse.class)))
+                    .thenReturn(responseJson);
+
+            Supplier<StockMovementResponse> operation = () -> response;
+
+            // Первый запрос — создает ключ
+            StockMovementResponse firstResult = idempotencyService.processIdempotentRequest(
+                    firstContext, requestBody, operation
+            );
+
+            // Второй запрос от другого пользователя — должен создать свой ключ
+            StockMovementResponse secondResult = idempotencyService.processIdempotentRequest(
+                    secondContext, requestBody, operation
+            );
+
+            // then
+            assertThat(firstResult).isEqualTo(response);
+            assertThat(secondResult).isEqualTo(response);
+            verify(idempotencyKeyRepository, times(2)).save(any());
+        }
+    }
 }
