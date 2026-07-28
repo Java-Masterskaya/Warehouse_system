@@ -6,6 +6,8 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.response.movement.StockTransferResponse;
+import com.warehouse.entity.Batch;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Reservation;
@@ -15,6 +17,8 @@ import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
@@ -26,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -53,6 +58,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Focused integration tests for atomic stock transfers between warehouses.
  */
+@SpringBootTest
 @AutoConfigureMockMvc
 class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
 
@@ -78,6 +84,9 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
     private StockReserveRepository stockReserveRepository;
 
     @Autowired
@@ -88,6 +97,9 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockMovementService stockMovementService;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     private Warehouse sourceWarehouse;
     private Warehouse destinationWarehouse;
@@ -107,10 +119,16 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
                 .defaultWarehouse(false)
                 .build());
 
+        Category category = categoryRepository.saveAndFlush(
+                Category.builder()
+                        .name("DOM4-" + suffix)
+                        .build()
+        );
+
         item = itemRepository.saveAndFlush(Item.builder()
                 .sku("DOM4-" + suffix)
                 .name("DOM4 transfer item")
-                .category("DOM4")
+                .category(category)
                 .minStock(1)
                 .price(BigDecimal.TEN)
                 .cost(BigDecimal.ONE)
@@ -121,6 +139,12 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
                 .item(item)
                 .warehouse(sourceWarehouse)
                 .quantity(INITIAL_SOURCE_QUANTITY)
+                .build());
+        batchRepository.saveAndFlush(Batch.builder()
+                .item(item)
+                .warehouse(sourceWarehouse)
+                .quantity(INITIAL_SOURCE_QUANTITY)
+                .expiryDate(LocalDateTime.now().plusDays(30))
                 .build());
 
         admin = createUser("dom4-admin-" + suffix, Role.ROLE_ADMIN);
@@ -165,6 +189,9 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
         assertThat(updatedSource.getQuantity()).isEqualTo(INITIAL_SOURCE_QUANTITY - quantity);
         assertThat(createdDestination.getQuantity()).isEqualTo(quantity);
         assertThat(stockRepository.findTotalQuantityByItemId(item.getId())).isEqualTo(totalBefore);
+        assertThat(batchQuantity(sourceWarehouse))
+                .isEqualTo(INITIAL_SOURCE_QUANTITY - quantity);
+        assertThat(batchQuantity(destinationWarehouse)).isEqualTo(quantity);
 
         List<MovementRow> movements = findMovements(transferId);
         assertThat(movements).hasSize(2);
@@ -405,11 +432,20 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Stock createDestinationStock(int quantity) {
-        return stockRepository.saveAndFlush(Stock.builder()
+        Stock stock = stockRepository.saveAndFlush(Stock.builder()
                 .item(item)
                 .warehouse(destinationWarehouse)
                 .quantity(quantity)
                 .build());
+        if (quantity > 0) {
+            batchRepository.saveAndFlush(Batch.builder()
+                    .item(item)
+                    .warehouse(destinationWarehouse)
+                    .quantity(quantity)
+                    .expiryDate(LocalDateTime.now().plusDays(60))
+                    .build());
+        }
+        return stock;
     }
 
     private Stock findStock(Warehouse warehouse) {
@@ -422,6 +458,15 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
                 Long.class,
                 item.getId()
         );
+    }
+
+    private int batchQuantity(Warehouse warehouse) {
+        return batchRepository.findByItemIdAndWarehouseIdOrderByExpiryDateAsc(
+                        item.getId(),
+                        warehouse.getId()
+                ).stream()
+                .mapToInt(Batch::getQuantity)
+                .sum();
     }
 
     private List<MovementRow> findMovements(UUID transferId) {

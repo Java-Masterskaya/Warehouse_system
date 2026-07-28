@@ -36,6 +36,16 @@ dependencies {
     implementation 'org.mapstruct:mapstruct:1.5.+'
     implementation 'org.springframework.retry:spring-retry'
     implementation 'org.springframework.cloud:spring-cloud-starter-consul-config'
+    implementation 'com.bucket4j:bucket4j_jdk17-lettuce:8.19.0'
+
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.micrometer:micrometer-tracing'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'io.prometheus:prometheus-metrics-tracer-initializer:1.3.7'
+
+    // Logs in JSON format
+    implementation 'net.logstash.logback:logstash-logback-encoder:9.0'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'

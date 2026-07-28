@@ -49,42 +49,6 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
             """)
     List<Stock> findAllByItemIdWithWarehouse(@Param("itemId") Long itemId);
 
-    @Modifying(flushAutomatically = true)
-    @Query(value = """
-            update stock
-            set quantity = quantity + :quantity,
-                updated_at = current_timestamp
-            where item_id = :itemId
-              and warehouse_id = (select id from warehouses where is_default = true)
-            """, nativeQuery = true)
-    int increaseQuantity(@Param("itemId") Long itemId, @Param("quantity") int quantity);
-
-    @Modifying(flushAutomatically = true)
-    @Query(value = """
-            update stock
-            set quantity = quantity - :quantity,
-                updated_at = current_timestamp
-            where item_id = :itemId
-              and warehouse_id = (select id from warehouses where is_default = true)
-              and quantity >= :quantity
-            """, nativeQuery = true)
-    int decreaseQuantityIfEnough(@Param("itemId") Long itemId, @Param("quantity") int quantity);
-
-    @Modifying(flushAutomatically = true)
-    @Query("""
-            update Stock s
-            set s.quantity = s.quantity - :quantity,
-                s.updatedAt = CURRENT_TIMESTAMP
-            where s.item.id = :itemId
-              and s.warehouse.id = :warehouseId
-              and s.quantity >= :quantity
-            """)
-    int decreaseQuantityIfEnoughAtWarehouse(
-            @Param("itemId") Long itemId,
-            @Param("warehouseId") Long warehouseId,
-            @Param("quantity") int quantity
-    );
-
     //Дополнительная операция не блокирующая операции чтения
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -94,6 +58,19 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
               and s.warehouse.defaultWarehouse = true
         """)
     Optional<Stock> findByItemIdForUpdate(@Param("itemId") Long itemId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select s
+            from Stock s
+            join fetch s.warehouse
+            where s.item.id = :itemId
+              and s.warehouse.id = :warehouseId
+            """)
+    Optional<Stock> findByItemIdAndWarehouseIdForUpdate(
+            @Param("itemId") Long itemId,
+            @Param("warehouseId") Long warehouseId
+    );
 
     @Modifying(flushAutomatically = true)
     @Query(value = """

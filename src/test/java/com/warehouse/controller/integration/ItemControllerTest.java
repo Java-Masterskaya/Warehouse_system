@@ -6,8 +6,10 @@ import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.util.JwtUtil;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Интеграционный тест для проверки эндпоинтов управления товарами.
  * Тестирует POST /api/items (создание) и GET /api/items (список с фильтрацией, сортировкой, пагинацией).
  */
+@SpringBootTest
 @AutoConfigureMockMvc
 class ItemControllerTest extends AbstractIntegrationTest {
 
@@ -62,6 +66,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Autowired
     private ItemService itemService;
 
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private String adminToken;
     private String userToken;
 
@@ -79,6 +86,12 @@ class ItemControllerTest extends AbstractIntegrationTest {
         });
 
         userToken = jwtUtil.generateToken(testUser.getUsername(), testUser.getId(), List.of("ROLE_USER"));
+
+        createCategoryIfAbsent("Электроника");
+        createCategoryIfAbsent("Компьютеры");
+        createCategoryIfAbsent("Тест");
+        createCategoryIfAbsent("Категория");
+        createCategoryIfAbsent("Обновленная категория");
 
         String suffix = String.valueOf(System.currentTimeMillis());
         createItem("SKU-SORT-A-" + suffix, "Альфа", "Электроника");
@@ -663,5 +676,15 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .getResponse()
                 .getContentAsString();
         return objectMapper.readTree(response).get("accessToken").asText();
+    }
+
+    private void createCategoryIfAbsent(String name) {
+        if (!categoryRepository.existsByNameIgnoreCase(name)) {
+            categoryRepository.save(
+                    Category.builder()
+                            .name(name)
+                            .build()
+            );
+        }
     }
 }

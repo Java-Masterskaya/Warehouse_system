@@ -2,26 +2,29 @@ package com.warehouse.kafka.outbox;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
-
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.OutboxDltEventRepository;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockReserveRepository;
+import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.OutboxEventRepository;
+import com.warehouse.repository.OutboxDltEventRepository;
 import com.warehouse.repository.PurchaseOrderItemRepository;
 import com.warehouse.repository.PurchaseOrderRepository;
-import com.warehouse.repository.StockAlertRepository;
-import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.SupplierRepository;
-import com.warehouse.repository.UserRepository;
+import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.movement.StockMovementService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,6 +93,14 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private OutboxEventRelay outboxEventRelay;
+    @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
+    private BatchService batchService;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     private Item testItem;
     private Long testItemId;
@@ -101,32 +113,48 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         reserveRepository.deleteAll();
         stockAlertRepository.deleteAll();
         stockMovementRepository.deleteAll();
+        batchRepository.deleteAll();
         purchaseOrderItemRepository.deleteAll();
         purchaseOrderRepository.deleteAll();
         stockRepository.deleteAll();
         outboxEventRepository.deleteAll();
         itemRepository.deleteAll();
         supplierRepository.deleteAll();
+        categoryRepository.deleteAll();
+
+        Category category = categoryRepository.save(
+                Category.builder()
+                        .name("Категория")
+                        .build()
+        );
 
         // Создаём тестовый товар
         testItem = new Item();
         testItem.setSku("SKU-CRASH-" + System.currentTimeMillis());
         testItem.setName("Тестовый товар для краш-теста");
-        testItem.setCategory("Категория");
+        testItem.setCategory(category);
         testItem.setMinStock(10);
         testItem.setActive(true);
         testItem = itemRepository.save(testItem);
 
-        // Создаём остаток
+        // Создаём остаток и партию вручную (чтобы FEFO могла работать)
         Stock stock = new Stock();
         stock.setItem(testItem);
         stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(20);
         stockRepository.save(stock);
 
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
+        batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
+        batch.setQuantity(20);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
+        batchRepository.save(batch);
+
         testItemId = testItem.getId();
 
-        // Создаём пользователя
+        // Создаём пользователя для write-off операций
         testUser = new User();
         testUser.setUsername("crash-test-" + System.currentTimeMillis());
         testUser.setPassword("password");
@@ -151,7 +179,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Should replay outbox event after simulated crash")
     void shouldReplayOutboxEventAfterSimulatedCrash() {
         // Arrange - списываем 16, чтобы остаток стал 4 (меньше minStock=10)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16);
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 16);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Act 1 - выполняем транзакцию (движение и outbox сохранены атомарно)
@@ -231,7 +259,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Should not lose event on repeated crash")
     void shouldNotLoseEventOnRepeatedCrash() {
         // Arrange - создаем событие вручную в статусе PENDING (симуляция краша до обновления статуса)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16);
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 16);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Выполняем транзакцию

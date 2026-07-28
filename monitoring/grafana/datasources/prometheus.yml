@@ -2,7 +2,14 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
     isDefault: true
+    jsonData:
+      exemplarTraceIdDestinations:
+        - name: trace_id      # имя поля, в котором передаётся trace ID
+          datasourceUid: tempo   # ссылаемся на UID датасорса Tempo
+        - name: traceID       # альтернативное имя поля (для совместимости)
+          datasourceUid: tempo

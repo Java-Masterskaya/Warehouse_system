@@ -13,6 +13,8 @@ import java.util.UUID;
  * @param type Тип движения товара
  * @param quantity Количество изменённых единиц
  * @param stockAfter Остаток после операции
+ * @param batchId ID партии (для поступлений)
+ * @param expiryDate Срок годности партии (для поступлений)
  * @param createdAt Время операции
  * @param lowStockAlert true, если остаток опустился ниже минимального
  * @param warehouseId ID склада
@@ -25,21 +27,12 @@ public record StockMovementResponse(
         MovementType type,
         int quantity,
         int stockAfter,
+        Long batchId,
+        LocalDateTime expiryDate,
         LocalDateTime createdAt,
         boolean lowStockAlert,
         Long warehouseId,
         String warehouseName,
         UUID transferId
 ) {
-    public StockMovementResponse(
-            Long itemId,
-            Long movementId,
-            MovementType type,
-            int quantity,
-            int stockAfter,
-            LocalDateTime createdAt,
-            boolean lowStockAlert
-    ) {
-        this(itemId, movementId, type, quantity, stockAfter, createdAt, lowStockAlert, null, null, null);
-    }
 }

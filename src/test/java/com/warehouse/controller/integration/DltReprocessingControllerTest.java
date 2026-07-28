@@ -5,11 +5,14 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockRepository;
@@ -105,19 +108,41 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
     private String adminToken;
     private String userToken;
     private Item testItem;
     private Long testItemId;
+    private Category testCategory;
 
     @BeforeEach
     void setUp() throws Exception {
         log.info("Test setup...");
 
+        // Удаляем в правильном порядке (сначала зависимые таблицы), чтобы избежать ошибок внешних ключей
+        // Важно: static Testcontainers живут между запусками, поэтому leftover data
+        // из предыдущих тестов нарушает ассерты и уникальные индексы
         jdbcTemplate.update("DELETE FROM stock_alerts");
+        jdbcTemplate.update("DELETE FROM stock_movements");
+        jdbcTemplate.update("DELETE FROM batches");
+        jdbcTemplate.update("DELETE FROM outbox");
+
         jdbcTemplate.update("DELETE FROM stock");
         jdbcTemplate.update("DELETE FROM items");
+        jdbcTemplate.update("DELETE FROM categories");
         jdbcTemplate.update("DELETE FROM users");
+        jdbcTemplate.update("DELETE FROM reserves");
+
+        // Очищаем последовательно, чтобы убрать дубликаты (DELETE + INSERT работает быстрее)
+        jdbcTemplate.update("ALTER SEQUENCE stock_alerts_id_seq RESTART WITH 1");
+        jdbcTemplate.update("ALTER SEQUENCE items_id_seq RESTART WITH 1");
+        jdbcTemplate.update("ALTER SEQUENCE categories_id_seq RESTART WITH 1");
+        jdbcTemplate.update("ALTER SEQUENCE users_id_seq RESTART WITH 1");
 
         resetConsumerGroupOffsets();
 
@@ -135,10 +160,16 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         user.setActive(true);
         userRepository.save(user);
 
+        testCategory = categoryRepository.save(
+                Category.builder()
+                        .name("Категория")
+                        .build()
+        );
+
         testItem = Item.builder()
                 .sku("SKU-DLT-" + System.currentTimeMillis())
                 .name("Тестовый товар DLT")
-                .category("Категория")
+                .category(testCategory)
                 .minStock(10)
                 .active(true)
                 .build();
@@ -151,6 +182,14 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .quantity(5)
                 .build();
         stockRepository.save(stock);
+
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        com.warehouse.entity.Batch batch = new com.warehouse.entity.Batch();
+        batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
+        batch.setQuantity(5);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
+        batchRepository.save(batch);
 
         adminToken = obtainToken("admin", "secret");
         userToken = obtainToken("testuser", "password");
@@ -471,9 +510,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         LocalDateTime now = LocalDateTime.now();
         jdbcTemplate.update(
-                "INSERT INTO items (id, sku, name, category, min_stock, is_active, created_at, updated_at) "
+                "INSERT INTO items (id, sku, name, category_id, min_stock, is_active, created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                invalidItemId, uniqueSku, itemName, "TestCategory", minStock, true, now, now
+                invalidItemId, uniqueSku, itemName, testCategory.getId(), minStock, true, now, now
         );
         assertThat(itemRepository.findById(invalidItemId)).isPresent();
         log.info("Item created");
@@ -570,9 +609,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
             long invalidItemId = 888888L + i;
             String uniqueSku = uniqueSkuPrefix + "-" + i;
             jdbcTemplate.update(
-                    "INSERT INTO items (id, sku, name, category, min_stock, is_active, created_at, updated_at) "
+                    "INSERT INTO items (id, sku, name, category_id, min_stock, is_active, created_at, updated_at) "
                             + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    invalidItemId, uniqueSku, "Товар для батча " + i, "TestCategory", 10, true, now, now
+                    invalidItemId, uniqueSku, "Товар для батча " + i, testCategory.getId(), 10, true, now, now
             );
         }
         log.info("Created {} items", totalMessages);
@@ -662,9 +701,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // Создаем item ДО отправки события
         LocalDateTime now = LocalDateTime.now();
         jdbcTemplate.update(
-                "INSERT INTO items (id, sku, name, category, min_stock, is_active, created_at, updated_at) "
+                "INSERT INTO items (id, sku, name, category_id, min_stock, is_active, created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                itemId, uniqueSku, itemName, "TestCategory", minStock, true, now, now
+                itemId, uniqueSku, itemName, testCategory.getId(), minStock, true, now, now
         );
         log.info("Item created with id={}", itemId);
 
@@ -743,9 +782,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
             long itemId = baseItemId + i;
             String sku = uniqueSkuPrefix + "-" + i;
             jdbcTemplate.update(
-                    "INSERT INTO items (id, sku, name, category, min_stock, is_active, created_at, updated_at) "
+                    "INSERT INTO items (id, sku, name, category_id, min_stock, is_active, created_at, updated_at) "
                             + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    itemId, sku, "Batch item " + i, "TestCategory", 10, true, now, now
+                    itemId, sku, "Batch item " + i, testCategory.getId(), 10, true, now, now
             );
         }
         log.info("Created 4 items");
@@ -856,9 +895,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // Создаем item
         LocalDateTime now = LocalDateTime.now();
         jdbcTemplate.update(
-                "INSERT INTO items (id, sku, name, category, min_stock, is_active, created_at, updated_at) "
+                "INSERT INTO items (id, sku, name, category_id, min_stock, is_active, created_at, updated_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                itemId, uniqueSku, itemName, "TestCategory", minStock, true, now, now
+                itemId, uniqueSku, itemName, testCategory.getId(), minStock, true, now, now
         );
         log.info("Item created");
 

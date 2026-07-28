@@ -2,29 +2,38 @@ package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Batch;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
-import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
-import java.util.List;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Интеграционный тест для проверки инвалидации кэша.
  */
+@TestPropertySource(properties = "bucket4j.enabled=false")
+@SpringBootTest
 class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -44,24 +53,39 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockMovementService stockMovementService;
+
     @Autowired
     private StockAlertRepository stockAlertRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
 
     private Long itemId;
 
     @BeforeEach
     void setUp() {
         // Очищаем таблицы в правильном порядке, учитывая внешние ключи
+        stockMovementRepository.deleteAllInBatch();
+        batchRepository.deleteAll();
         stockAlertRepository.deleteAll();
         reserveRepository.deleteAll();
-        stockMovementRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
+        categoryRepository.deleteAllInBatch();
+
+        Category electronics = categoryRepository.save(
+                Category.builder()
+                        .name("Электроника")
+                        .build()
+        );
 
         Item item = new Item();
         item.setSku("SKU-001");
         item.setName("Ноутбук");
-        item.setCategory("Электроника");
+        item.setCategory(electronics);
         item.setMinStock(5);
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));
@@ -74,6 +98,14 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         stock.setQuantity(10);
         stockRepository.save(stock);
 
+        // Создаем начальную партию для синхронизации с stock.quantity
+        Batch batch = new Batch();
+        batch.setItem(item);
+        batch.setWarehouse(defaultWarehouse());
+        batch.setQuantity(10);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365));
+        batchRepository.save(batch);
+
         itemId = item.getId();
     }
 
@@ -85,7 +117,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         itemService.getItem(itemId);
 
         UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук Pro", "Электроника",
-                10, BigDecimal.valueOf(1700.00), BigDecimal.valueOf(1100.00), null);
+                10, BigDecimal.valueOf(1700.00), BigDecimal.valueOf(1100.00));
         itemService.updateItem(itemId, updateRequest);
 
         ItemDetailsResponse response = itemService.getItem(itemId);
@@ -118,7 +150,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
         assertThat(firstCall.getCurrentStock()).isEqualTo(10);
 
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 5);
+        ReceiveStockRequest movementRequest = new ReceiveStockRequest(
+                itemId, 5, LocalDateTime.now().plusDays(1));
         stockMovementService.registerReceipt(movementRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
@@ -131,52 +164,23 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
      */
     @Test
     void writeOffMovementShouldEvictItemCache() {
-        ItemDetailsResponse firstCall = itemService.getItem(itemId);
-        assertThat(firstCall.getCurrentStock()).isEqualTo(10);
-
-        ChangeQuantityMovementRequest movementRequest = new ChangeQuantityMovementRequest(itemId, 3);
-        stockMovementService.writeOffReceipt(movementRequest,
+        // Сначала создаем партию через приход
+        ReceiveStockRequest receiptRequest = new ReceiveStockRequest(
+                itemId, 10, LocalDateTime.now().plusDays(1));
+        stockMovementService.registerReceipt(receiptRequest,
                 new com.warehouse.dto.UserContext(1L, "admin"));
 
-        ItemDetailsResponse response = itemService.getItem(itemId);
-        assertThat(response.getCurrentStock()).isEqualTo(7);
+        // Проверяем, что приход сработал
+        ItemDetailsResponse response1 = itemService.getItem(itemId);
+        assertThat(response1.getCurrentStock()).isEqualTo(20);
+
+        // Теперь списываем
+        WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(itemId, 3);
+        stockMovementService.writeOffReceipt(writeOffRequest,
+                new com.warehouse.dto.UserContext(1L, "admin"));
+
+        ItemDetailsResponse response2 = itemService.getItem(itemId);
+        assertThat(response2.getCurrentStock()).isEqualTo(17);
     }
 
-    /**
-     * createItem с новой категорией очищает кэш категорий.
-     */
-    @Test
-    void createItemWithNewCategoryShouldEvictCategoriesCache() {
-        List<String> firstCall = itemService.getCategories();
-        assertThat(firstCall).contains("Электроника");
-
-        com.warehouse.dto.request.item.CreateItemRequest createRequest =
-                new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель",
-                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00), null);
-        itemService.createItem(createRequest);
-
-        List<String> secondCall = itemService.getCategories();
-        assertThat(secondCall).contains("Электроника", "Мебель");
-    }
-
-    /**
-     * updateItem с изменением категории очищает кэш категорий.
-     */
-    @Test
-    void updateItemWithCategoryChangeShouldEvictCategoriesCache() {
-        com.warehouse.dto.request.item.CreateItemRequest createRequest =
-                new com.warehouse.dto.request.item.CreateItemRequest("SKU-002", "Стол", "Мебель",
-                        3, BigDecimal.valueOf(500.00), BigDecimal.valueOf(300.00), null);
-        itemService.createItem(createRequest);
-
-        List<String> firstCall = itemService.getCategories();
-        assertThat(firstCall).contains("Электроника", "Мебель");
-
-        UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук", "Мебель", 5,
-                BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00), null);
-        itemService.updateItem(itemId, updateRequest);
-
-        List<String> secondCall = itemService.getCategories();
-        assertThat(secondCall).doesNotHaveDuplicates();
-    }
 }

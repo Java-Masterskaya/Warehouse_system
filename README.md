@@ -60,7 +60,7 @@ make up
 | PostgreSQL       | postgres:16        | 5432 |
 | Redis            | redis:7-alpine     | 6379 |
 | Redpanda (Kafka) | redpanda:v23.2.11  | 9092 (внутри Docker: 29092) |
-| Schema Registry  | встроен в Redpanda | 8081 |
+| Schema Registry  | встроен в Redpanda | 18081 (внутри Docker: 8081) |
 | Consul           | hashicorp/consul:1.16 | 8500 (UI) |
 
 ## Бэкап и восстановление БД
@@ -98,8 +98,13 @@ make up
 | `PUT`    | `/api/items/{id}`                                | Редактировать товар                 |
 | `DELETE` | `/api/items/{id}`                                | Удалить товар                       |
 | `GET`    | `/api/items/{itemId}`                            | Карточка и остатки по складам       |
-| `GET`    | `/api/warehouses`                               | Список складов                      |
-| `POST`   | `/api/warehouses`                               | Создать склад                       |
+| `GET`    | `/api/items/categories`                          | Список категорий                    |
+| `POST`   | `/api/categories`                                | Создать категорию                   |
+| `GET`    | `/api/categories/{categoryId}`                   | Получить категорию по ID            |
+| `PUT`    | `/api/categories/{categoryId}`                   | Обновить категорию                  |
+| `DELETE` | `/api/categories/{categoryId}`                   | Удалить категорию                   |
+| `GET`    | `/api/warehouses`                                | Список складов                      |
+| `POST`   | `/api/warehouses`                                | Создать склад                       |
 | `POST`   | `/api/movements/receive`                         | Зарегистрировать поступление        |
 | `POST`   | `/api/movements/write-off`                       | Списать товар                       |
 | `POST`   | `/api/movements/transfer`                        | Перевести товар между складами      |
@@ -116,6 +121,20 @@ make up
 | `POST`   | `/api/stock/{itemId}/write-off`                  | Выкуп резерва                       |
 | `GET`    | `/api/reports/low-stock`                         | Товары ниже общего минимума         |
 | `GET`    | `/api/reports/stock-valuation`                   | Общая стоимость остатков            |
+| `GET`    | `/api/reports/expiring?days=N`                   | Партии с истекающим сроком          |
+
+## Партии и сроки годности
+
+DOM-5 хранит физический остаток как набор партий конкретного товара на конкретном складе.
+Для каждой пары `item + warehouse` количество в `stock` поддерживается равным сумме количеств ее партий.
+
+- Поступление создает новую партию с обязательным будущим `expiryDate`.
+- Списание и выкуп резерва используют FEFO: сначала расходуется партия с ближайшим сроком.
+- Просроченные партии не участвуют в доступном остатке, резервировании, списании и переводе.
+- Перевод между складами сохраняет срок годности каждой перенесенной части партии.
+- Положительная разница инвентаризации требует `surplusExpiryDate` и создает отдельную партию.
+- Ежедневная задача обнуляет просроченные партии и уменьшает остаток именно их склада.
+- Отчет `/api/reports/expiring?days=N` показывает истекающие партии с товаром и складом.
 
 ## Несколько складов
 
@@ -215,7 +234,7 @@ http://localhost:8500/v1/kv/config/warehouse-system/data
 "@warehouse-config.yaml"
 * Приложение автоматически применит изменения (в течение 1 секунды, благодаря ConfigWatch), либо:
 ```bash
-  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8080/actuator/refresh
+  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8081/actuator/refresh
 ```
 Способ 2. Через Consul UI
 Откройте http://localhost:8500
@@ -313,8 +332,8 @@ make checkstyle
 **Важно:** Для запуска через `docker-compose up` или `make up` **обязательно** должен быть запущен контейнер `warehouse-app`, так как Prometheus собирает метрики с приложения через `/actuator/prometheus`. Если приложение не запущено - алерты не будут работать.
 
 **Настройка цели (target):**
-- В Docker-сети: `['warehouse-app:8080']`
-- При локальном запуске: `['host.docker.internal:8080']`
+- В Docker-сети: `['warehouse-app:8081']`
+- При локальном запуске: `['host.docker.internal:8081']`
 
 ### Alertmanager
 

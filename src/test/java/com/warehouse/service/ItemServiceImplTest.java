@@ -6,6 +6,7 @@ import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.item.ItemDetailsProjection;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.Warehouse;
@@ -13,6 +14,7 @@ import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.ItemMapper;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.WarehouseRepository;
@@ -34,8 +36,6 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -73,6 +73,9 @@ class ItemServiceImplTest {
     @Mock
     private StockAvailabilityService availabilityService;
 
+    @Mock
+    private CategoryRepository categoryRepository;
+
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 
     private ItemService itemService;
@@ -84,7 +87,8 @@ class ItemServiceImplTest {
                 stockRepository,
                 warehouseRepository,
                 itemMapper,
-                availabilityService
+                availabilityService,
+                categoryRepository
         );
     }
 
@@ -97,14 +101,12 @@ class ItemServiceImplTest {
         CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
                 5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), null);
 
-        Item item = new Item();
-        item.setId(1L);
-        item.setSku("SKU-001");
-        item.setCreatedAt(LocalDateTime.now());
-        item.setPrice(BigDecimal.valueOf(100.50));
-        item.setCost(BigDecimal.valueOf(75.25));
+        Category category = createCategory("Электроника");
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(false);
+
+        when(categoryRepository.findByNameIgnoreCase("Электроника"))
+                .thenReturn(Optional.of(category));
         when(warehouseRepository.findByDefaultWarehouseTrue()).thenReturn(Optional.of(
                 Warehouse.builder().id(1L).name("Default Warehouse").defaultWarehouse(true).build()
         ));
@@ -128,6 +130,7 @@ class ItemServiceImplTest {
         assertThat(result.createdAt()).isNotNull();
         verify(itemRepository, times(2)).save(any(Item.class)); // 2 saves: item + barcode update
         verify(stockRepository).save(any(Stock.class));
+        verify(categoryRepository).findByNameIgnoreCase("Электроника");
     }
 
     /**
@@ -205,7 +208,7 @@ class ItemServiceImplTest {
         Item existingItem = new Item();
         existingItem.setId(itemId);
         existingItem.setName("Старое название");
-        existingItem.setCategory("Старая категория");
+        existingItem.setCategory(createCategory("Старая категория"));
         existingItem.setMinStock(5);
         existingItem.setActive(true);
         existingItem.setPrice(BigDecimal.valueOf(100.50));
@@ -215,6 +218,8 @@ class ItemServiceImplTest {
                 10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(categoryRepository.findByNameIgnoreCase("Новая категория"))
+                .thenReturn(Optional.of(createCategory("Новая категория")));
         when(itemRepository.save(any(Item.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -222,7 +227,7 @@ class ItemServiceImplTest {
 
         assertNotNull(result);
         assertEquals("Новое название", existingItem.getName());
-        assertEquals("Новая категория", existingItem.getCategory());
+        assertEquals("Новая категория", existingItem.getCategory().getName());
         assertEquals(10, existingItem.getMinStock());
         assertThat(existingItem.getPrice().compareTo(BigDecimal.valueOf(120.00))).isEqualTo(0);
         assertThat(existingItem.getCost().compareTo(BigDecimal.valueOf(85.00))).isEqualTo(0);
@@ -240,7 +245,7 @@ class ItemServiceImplTest {
         Item existingItem = new Item();
         existingItem.setId(itemId);
         existingItem.setName("Товар");
-        existingItem.setCategory("Категория");
+        existingItem.setCategory(createCategory("Категория"));
         existingItem.setMinStock(5);
         existingItem.setActive(true);
         existingItem.setPrice(BigDecimal.valueOf(100.00));
@@ -250,6 +255,8 @@ class ItemServiceImplTest {
                 10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(categoryRepository.findByNameIgnoreCase("Обновленная категория"))
+                .thenReturn(Optional.of(createCategory("Обновленная категория")));
         when(itemRepository.save(any(Item.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -259,7 +266,7 @@ class ItemServiceImplTest {
         assertThat(existingItem.getPrice().compareTo(BigDecimal.valueOf(150.00))).isEqualTo(0);
         assertThat(existingItem.getCost().compareTo(BigDecimal.valueOf(80.00))).isEqualTo(0);
         assertEquals("Обновленный товар", existingItem.getName());
-        assertEquals("Обновленная категория", existingItem.getCategory());
+        assertEquals("Обновленная категория", existingItem.getCategory().getName());
     }
 
     /**
@@ -271,7 +278,7 @@ class ItemServiceImplTest {
         Item existingItem = new Item();
         existingItem.setId(itemId);
         existingItem.setName("Товар");
-        existingItem.setCategory("Категория");
+        existingItem.setCategory(createCategory("Категория"));
         existingItem.setMinStock(5);
         existingItem.setActive(true);
         existingItem.setPrice(BigDecimal.valueOf(100.00));
@@ -281,6 +288,8 @@ class ItemServiceImplTest {
                 "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO, null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(categoryRepository.findByNameIgnoreCase("Категория"))
+                .thenReturn(Optional.of(createCategory("Категория")));
         when(itemRepository.save(any(Item.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -300,7 +309,7 @@ class ItemServiceImplTest {
         Item existingItem = new Item();
         existingItem.setId(itemId);
         existingItem.setName("Товар");
-        existingItem.setCategory("Категория");
+        existingItem.setCategory(createCategory("Категория"));
         existingItem.setMinStock(5);
         existingItem.setActive(true);
         existingItem.setPrice(BigDecimal.valueOf(100.00));
@@ -310,6 +319,8 @@ class ItemServiceImplTest {
                 5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(categoryRepository.findByNameIgnoreCase("Категория"))
+                .thenReturn(Optional.of(createCategory("Категория")));
         when(itemRepository.save(any(Item.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -436,6 +447,7 @@ class ItemServiceImplTest {
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(projection));
         when(availabilityService.getTotalReserved(1L)).thenReturn(3L);
+        when(availabilityService.getTotalAvailable(1L)).thenReturn(20L);
         when(stockRepository.findAllByItemIdWithWarehouse(1L)).thenReturn(List.of());
 
         ItemDetailsResponse result = itemService.getItem(1L);
@@ -457,6 +469,7 @@ class ItemServiceImplTest {
 
         verify(itemRepository).findWithStock(1L);
         verify(availabilityService).getTotalReserved(1L);
+        verify(availabilityService).getTotalAvailable(1L);
         verify(stockRepository).findAllByItemIdWithWarehouse(1L);
     }
 
@@ -504,7 +517,7 @@ class ItemServiceImplTest {
         item.setId(1L);
         item.setSku("SKU-1");
         item.setName("Ноутбук");
-        item.setCategory("Электроника");
+        item.setCategory(createCategory("Электроника"));
         item.setMinStock(5);
         item.setActive(true);
 
@@ -576,42 +589,6 @@ class ItemServiceImplTest {
     }
 
     /**
-     * getCategories возвращает списокdistinct категорий.
-     */
-    @Test
-    void getCategoriesShouldReturnDistinctList() {
-        when(itemRepository.findDistinctCategories())
-                .thenReturn(List.of("Электроника", "Мебель", "Инструменты"));
-
-        List<String> categories = itemService.getCategories();
-
-        assertNotNull(categories);
-        assertEquals(3, categories.size());
-        assertTrue(categories.contains("Электроника"));
-        assertTrue(categories.contains("Мебель"));
-        assertTrue(categories.contains("Инструменты"));
-        assertEquals(3, new HashSet<>(categories).size());
-
-        verify(itemRepository, times(1)).findDistinctCategories();
-    }
-
-    /**
-     * getCategories возвращает пустой список, если нет активных товаров.
-     */
-    @Test
-    void getCategoriesShouldReturnEmptyListWhenNoActiveItems() {
-        when(itemRepository.findDistinctCategories())
-                .thenReturn(Collections.emptyList());
-
-        List<String> categories = itemService.getCategories();
-
-        assertNotNull(categories);
-        assertTrue(categories.isEmpty());
-
-        verify(itemRepository, times(1)).findDistinctCategories();
-    }
-
-    /**
      * price и cost отображаются корректно в карточке товара.
      */
     @Test
@@ -635,7 +612,7 @@ class ItemServiceImplTest {
         Item item = new Item();
         item.setSku("SKU-TEST");
         item.setName("Тест");
-        item.setCategory("Тест");
+        item.setCategory(createCategory("Тест"));
         item.setMinStock(0);
         item.setActive(true);
 
@@ -660,7 +637,7 @@ class ItemServiceImplTest {
         Item item = new Item();
         item.setSku("SKU-ROUNDING");
         item.setName("Тест");
-        item.setCategory("Тест");
+        item.setCategory(createCategory("Тест"));
         item.setMinStock(0);
         item.setActive(true);
 
@@ -675,5 +652,11 @@ class ItemServiceImplTest {
 
         assertThat(item.getPrice().compareTo(BigDecimal.valueOf(100.01))).isEqualTo(0);
         assertThat(item.getCost().compareTo(BigDecimal.valueOf(50.01))).isEqualTo(0);
+    }
+
+    private Category createCategory(String name) {
+        return Category.builder()
+                .name(name)
+                .build();
     }
 }

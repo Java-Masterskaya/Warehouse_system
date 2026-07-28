@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Интеграционный тест для проверки различий в детализации ошибок между ADMIN и USER ролями.
  * Тестирует, что полный стек-трейс (через детализированное сообщение об ошибке) виден только админу.
  */
+@SpringBootTest
 @AutoConfigureMockMvc
 class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
 

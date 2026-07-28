@@ -21,6 +21,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.movement.StockMovementService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class StockReserveServiceImpl implements StockReserveService {
     ItemRepository itemRepository;
     StockReserveRepository stockReserveRepository;
     StockMovementService stockMovementService;
+    BatchService batchService;
     MetricService metricService;
     StockReservationMapper mapper;
     KafkaStockAlertProducer kafkaProducer;
@@ -97,22 +99,14 @@ public class StockReserveServiceImpl implements StockReserveService {
         Stock stock = lockStock(itemId);
 
         Reservation reservation = getActiveReservation(request.reservationId(), itemId);
-        //write-off
-        int updatedRows = stockRepository.decreaseQuantityIfEnoughAtWarehouse(
+        int stockAfter = batchService.writeOffReservedByFEFO(
                 itemId,
                 stock.getWarehouse().getId(),
-                reservation.getQuantity()
+                reservation.getQuantity(),
+                LocalDateTime.now()
         );
-        if (updatedRows == 0) {
-            throw InsufficientStockException.of(
-                    itemId,
-                    reservation.getQuantity(),
-                    stock.getQuantity()
-            );
-        }
         updateReservationStatus(reservation, ReservationStatus.CONSUMED);
-        //for alert
-        stock.setQuantity(stock.getQuantity() - reservation.getQuantity());
+        stock.setQuantity(stockAfter);
 
         //make movement and alert
         stockMovementService.newStockMovement(

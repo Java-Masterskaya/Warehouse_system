@@ -29,6 +29,11 @@ spring:
   cache:
     type: none
 
+  bucket4j:
+    enabled: true
+    cache:
+      type: redis
+
 redis:
   cache:
     categories-ttl-minutes: 10
