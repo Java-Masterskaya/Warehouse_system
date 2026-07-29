@@ -7,6 +7,7 @@ import com.warehouse.entity.Item;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.service.import_export.CsvImportService;
+import com.warehouse.service.import_export.CsvItemParser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,6 +33,9 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ItemRepository itemRepository;
+
+    @Autowired
+    private CsvItemParser csvItemParser;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -56,5 +64,27 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         );
 
         assertThat(stockCount).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Корректный подсчет строк для большого количества чанков")
+    void shouldCorrectlySumProcessedRowsForMultipleChunks() {
+        StringBuilder csvBuilder = new StringBuilder("SKU,Name,Category,Price,Cost\n");
+
+        for (int i = 1; i <= 2500; i++) {
+            csvBuilder.append("SKU-").append(i)
+                      .append(",Товар ").append(i)
+                      .append(",Категория,100.00,50.00\n");
+        }
+
+        InputStream inputStream = new ByteArrayInputStream(csvBuilder.toString().getBytes(StandardCharsets.UTF_8));
+        Iterable<CsvItemParser.CsvChunk> chunks = csvItemParser.parseInChunks(inputStream);
+
+        int totalProcessedRows = 0;
+        for (CsvItemParser.CsvChunk chunk : chunks) {
+            totalProcessedRows += chunk.processedRowsCount();
+        }
+
+        assertThat(totalProcessedRows).isEqualTo(2500);
     }
 }

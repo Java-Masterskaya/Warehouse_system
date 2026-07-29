@@ -36,7 +36,6 @@ public class CsvItemParser {
             private final Iterator<CSVRecord> recordIterator;
 
             private final Set<String> seenSkusInFile     = new HashSet<>();
-            private       int         totalRowsProcessed = 0;
             private       boolean     hasMore            = true;
 
             {
@@ -73,7 +72,6 @@ public class CsvItemParser {
                 while (recordIterator.hasNext() && currentChunkRows < CHUNK_SIZE) {
                     CSVRecord record = recordIterator.next();
                     int fileRowNumber = (int) record.getRecordNumber() + 1;
-                    totalRowsProcessed++;
                     currentChunkRows++;
 
                     String rawSku = safeGetField(record, "SKU");
@@ -110,7 +108,7 @@ public class CsvItemParser {
                     hasMore = false;
                 }
 
-                return new CsvChunk(validRows, chunkErrors, totalRowsProcessed);
+                return new CsvChunk(validRows, chunkErrors, currentChunkRows);
             }
 
             private void closeResources() {
