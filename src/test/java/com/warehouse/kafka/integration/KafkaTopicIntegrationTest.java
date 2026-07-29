@@ -1,5 +1,6 @@
 package com.warehouse.kafka.integration;
 
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.config.KafkaTopicProperties;
@@ -10,8 +11,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.redpanda.RedpandaContainer;
@@ -34,8 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
  */
 @Tag("integration")
 @Testcontainers
+@DirtiesContext
 @SpringBootTest(classes = WarehouseApp.class)
-class KafkaTopicIntegrationTest {
+class KafkaTopicIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private KafkaTopicProperties topicProperties;
@@ -55,30 +56,29 @@ class KafkaTopicIntegrationTest {
             DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1")
     );
 
-    @DynamicPropertySource
-    static void kafkaProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.kafka.bootstrap-servers", redpanda::getBootstrapServers);
-        registry.add("spring.kafka.producer.key-serializer",
-                () -> "org.apache.kafka.common.serialization.StringSerializer");
-        registry.add("spring.kafka.producer.value-serializer",
-                () -> "org.springframework.kafka.support.serializer.JsonSerializer");
-    }
 
+    /**
+     * Топик создается с тремя партициями при старте приложения.
+     */
     @Test
     void topicShouldBeCreatedWithThreePartitionsOnStartup() throws Exception {
         final String topicName = topicProperties.getName();
         final int partitions = topicProperties.getPartitions();
         final short replicas = topicProperties.getReplicas();
 
+        // Arrange
         Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers());
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getRedpanda().getBootstrapServers());
 
         try (AdminClient adminClient = AdminClient.create(props)) {
+            // Act & Assert
+            // Ждем пока топик будет создан (максимум 10 секунд)
             await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
                 Set<String> topics = adminClient.listTopics().names().get(5, TimeUnit.SECONDS);
                 assertThat(topics).contains(topicName);
             });
 
+            // Проверяем конфигурацию топика
             var topicDescriptions = adminClient.describeTopics(Set.of(topicName))
                     .allTopicNames()
                     .get(5, TimeUnit.SECONDS);
@@ -91,8 +91,12 @@ class KafkaTopicIntegrationTest {
         }
     }
 
+    /**
+     * Отправка сообщения через KafkaTemplate не выбрасывает исключений.
+     */
     @Test
     void kafkaTemplateSendShouldNotThrowException() {
+        // Arrange
         LowStockAlertEvent alert = new LowStockAlertEvent(
                 ITEM_ID,
                 ITEM_SKU,
@@ -102,6 +106,7 @@ class KafkaTopicIntegrationTest {
                 TRIGGERED_BY,
                 LocalDateTime.now());
 
+        // Act & Assert
         assertDoesNotThrow(() -> kafkaStockAlertProducer.sendLowStockAlert(alert));
     }
 }

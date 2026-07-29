@@ -37,6 +37,7 @@ dependencies {
     implementation 'org.springframework.retry:spring-retry'
     implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
     implementation 'org.springframework.cloud:spring-cloud-starter-consul-config'
+    implementation 'com.bucket4j:bucket4j_jdk17-lettuce:8.19.0'
 
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.micrometer:micrometer-tracing'
