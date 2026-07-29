@@ -24,8 +24,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CsvItemParser {
 
-    private final        Validator validator;
-    private static final int       CHUNK_SIZE = 1000;
+    private final        Validator   validator;
+    private static final int         CHUNK_SIZE       = 1000;
+    private static final Set<String> REQUIRED_HEADERS = Set.of("sku", "name", "category", "price", "cost", "warehouse");
 
     public Iterable<CsvChunk> parseInChunks(InputStream inputStream) {
         return () -> new Iterator<CsvChunk>() {
@@ -41,7 +42,7 @@ public class CsvItemParser {
             {
                 try {
                     CSVFormat format = CSVFormat.DEFAULT.builder()
-                                                        .setHeader("SKU", "Name", "Category", "Price", "Cost")
+                                                        .setHeader()
                                                         .setSkipHeaderRecord(true)
                                                         .setIgnoreSurroundingSpaces(true)
                                                         .setTrim(true)

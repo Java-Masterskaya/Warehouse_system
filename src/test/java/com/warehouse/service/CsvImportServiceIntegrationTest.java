@@ -40,7 +40,7 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         category.setName("Бытовая техника");
         Category savedCategory = categoryRepository.save(category);
 
-        String csvContent = "SKU,Name,Category,Price,Cost\nTEST-SKU-999,Чайник,Бытовая техника,3000.00,2000.00";
+        String csvContent = "Name,Category,SKU,Price,Cost\nЧайник,Бытовая техника,TEST-SKU-999,3000.00,2000.00";
         MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", csvContent.getBytes());
 
         ItemImportResultDto result = csvImportService.importItems(file);
