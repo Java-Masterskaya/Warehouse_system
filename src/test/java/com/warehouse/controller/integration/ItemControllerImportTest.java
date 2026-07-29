@@ -4,6 +4,7 @@ import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.service.import_export.CsvImportService;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -24,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Slf4j
 @SpringBootTest
 class ItemControllerImportTest extends AbstractIntegrationTest {
     @Autowired
@@ -76,5 +79,38 @@ class ItemControllerImportTest extends AbstractIntegrationTest {
                .andExpect(jsonPath("$.errors[0].sku").value("SKU-EXISTS"))
                .andExpect(jsonPath("$.errors[0].errorMessage")
                        .value("Товар с SKU 'SKU-EXISTS' уже существует"));
+    }
+
+    @WithMockUser(roles = "ADMIN")
+    @Test
+    void shouldAcceptLargeCsvFile()
+            throws Exception {
+        // Генерируем CSV-контент размером больше 1 MB (например, ~2 MB)
+        StringBuilder csvContent = new StringBuilder("sku,name,category_id,price,cost\n");
+
+        // Сделаем 70 000 строк (~2.5 MB)
+        for (int i = 1; i <= 70_000; i++) {
+            csvContent.append("SKU-").append(i)
+                      .append(",TestItem").append(i)
+                      .append(",1,100.00,50.00\n");
+        }
+
+        byte[] fileBytes = csvContent.toString().getBytes(StandardCharsets.UTF_8);
+
+        // Создаем MockMultipartFile с весом больше 1 MB
+        MockMultipartFile file = new MockMultipartFile(
+                "file",         // имя параметра в контроллере (@RequestParam("file") MultipartFile file)
+                "large-items.csv",    // имя файла
+                "text/csv",           // content type
+                fileBytes             // массив байтов (> 1 MB)
+        );
+        // Логируем размер в килобайтах или мегабайтах
+        double fileSizeMb = (double) file.getSize() / (1024 * 1024);
+        System.out.println(String.format("=== TEST: Uploading CSV file, size: %.2f MB (%d bytes) ===",
+                fileSizeMb,
+                file.getSize()));
+        // Выполняем запрос на твой эндпоинт импорта (путь укажи свой, например /api/items/import)
+        mockMvc.perform(multipart("/api/items/import").file(file))
+               .andExpect(status().isOk()); // Ожидаем, что сервер принял файл и не отклонил по размеру
     }
 }
