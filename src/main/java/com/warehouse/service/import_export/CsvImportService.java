@@ -11,12 +11,14 @@ import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 public class CsvImportService {
 
     private final CsvItemParser csvItemParser;
+    private final JdbcTemplate  jdbcTemplate;
 
     private final ItemRepository     itemRepository;
     private final CategoryRepository categoryRepository;
@@ -112,11 +115,62 @@ public class CsvImportService {
     }
 
     private void saveInBatches(List<Item> items) {
-        for (int i = 0; i < items.size(); i += BATCH_SIZE) {
-            int end = Math.min(i + BATCH_SIZE, items.size());
-            itemRepository.saveAll(items.subList(i, end));
-            itemRepository.flush();
-            entityManager.clear();
+        if (items.isEmpty()) {
+            return;
+        }
+
+        String insertItemsSql = """
+                    INSERT INTO items (sku, name, category_id, price, cost)
+                    VALUES (?, ?, ?, ?, ?)
+                """;
+
+        // Превращаем список сущностей Item в массив параметров для batchUpdate
+        List<Object[]> itemArgs = items.stream()
+                                       .map(item -> new Object[]{
+                                               item.getSku(),
+                                               item.getName(),
+                                               item.getCategory().getId(),
+                                               item.getPrice(),
+                                               item.getCost()
+                                       })
+                                       .toList();
+
+        // 1. Быстро вставляем пачку новых товаров нативным батчем
+        jdbcTemplate.batchUpdate(insertItemsSql, itemArgs);
+
+        // 2. Собираем SKU только что вставленных товаров, чтобы узнать их новые сгенерированные ID
+        List<String> skus = items.stream().map(Item::getSku).toList();
+        String placeholders = String.join(",", skus.stream().map(s -> "?").toList());
+        String selectIdsSql = "SELECT id, sku FROM items WHERE sku IN (" + placeholders + ")";
+
+        Map<String, Long> skuToIdMap = jdbcTemplate.query(
+                selectIdsSql,
+                ps -> {
+                    for (int i = 0; i < skus.size(); i++) {
+                        ps.setString(i + 1, skus.get(i));
+                    }
+                },
+                rs -> {
+                    Map<String, Long> map = new HashMap<>();
+                    while (rs.next()) {
+                        map.put(rs.getString("sku"), rs.getLong("id"));
+                    }
+                    return map;
+                }
+        );
+
+        // 3. Пакетно создаем пустые стоки (quantity = 0) строго для этих новых товаров
+        String insertStockSql = """
+                    INSERT INTO stocks (item_id, quantity)
+                    VALUES (?, 0)
+                """;
+
+        List<Object[]> stockArgs = skuToIdMap.values().stream()
+                                             .map(itemId -> new Object[]{itemId})
+                                             .toList();
+
+        if (!stockArgs.isEmpty()) {
+            jdbcTemplate.batchUpdate(insertStockSql, stockArgs);
         }
     }
 

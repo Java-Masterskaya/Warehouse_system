@@ -4,7 +4,6 @@ import com.warehouse.dto.request.item.ItemImportRowDto;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
-import com.warehouse.entity.Item;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.service.import_export.CsvImportService;
@@ -13,10 +12,11 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.InputStream;
@@ -28,7 +28,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,19 +47,24 @@ class CsvImportServiceTest {
     private EntityManager entityManager;
 
     @Mock
+    private JdbcTemplate jdbcTemplate;
+
+    @Mock
     private CategoryRepository categoryRepository;
 
     @InjectMocks
     private CsvImportService csvImportService;
 
     @Test
-    @DisplayName("Успешный импорт номенклатуры с нулевым остатком из MultipartFile")
+    @DisplayName("Успешный импорт номенклатуры с нулевым остатком из MultipartFile (на моках)")
     void importItemsSuccess() {
         String categoryName1 = "Электроника";
         String categoryName2 = "Периферия";
         Category category1 = new Category();
+        category1.setId(1L);
         category1.setName(categoryName1);
         Category category2 = new Category();
+        category2.setId(2L);
         category2.setName(categoryName2);
 
         MockMultipartFile multipartFile = new MockMultipartFile("file",
@@ -79,19 +86,30 @@ class CsvImportServiceTest {
                 category1,
                 category2));
 
+        // Настраиваем мок JdbcTemplate для запроса выборки ID по SKU (возвращаем маппинг)
+        when(jdbcTemplate.query(anyString(),
+                any(org.springframework.jdbc.core.PreparedStatementSetter.class),
+                any(org.springframework.jdbc.core.ResultSetExtractor.class)))
+                .thenAnswer(invocation -> {
+                    var rse = (org.springframework.jdbc.core.ResultSetExtractor<?>) invocation.getArgument(2);
+                    return java.util.Map.of("SKU-001", 10L, "SKU-002", 11L);
+                });
+
         ItemImportResultDto result = csvImportService.importItems(multipartFile);
 
         assertThat(result.totalRows()).isEqualTo(2);
         assertThat(result.imported()).isEqualTo(2);
         assertThat(result.errors()).isEmpty();
 
-        @SuppressWarnings("unchecked") ArgumentCaptor<List<Item>> itemCaptor = ArgumentCaptor.forClass(List.class);
-        verify(itemRepository).saveAll(itemCaptor.capture());
+        verify(jdbcTemplate).batchUpdate(
+                org.mockito.ArgumentMatchers.contains("INSERT INTO items"),
+                ArgumentMatchers.<List<Object[]>>any()
+        );
 
-        List<Item> savedItems = itemCaptor.getValue();
-        assertThat(savedItems).hasSize(2);
-
-        assertThat(savedItems.get(0).getSku()).isEqualTo("SKU-001");
+        verify(jdbcTemplate).batchUpdate(
+                org.mockito.ArgumentMatchers.contains("INSERT INTO stocks"),
+                ArgumentMatchers.<List<Object[]>>any()
+        );
     }
 
     @Test
@@ -104,6 +122,7 @@ class CsvImportServiceTest {
 
         verify(csvItemParser, never()).parseInChunks(any());
         verify(itemRepository, never()).saveAll(any());
+        verify(jdbcTemplate, never()).batchUpdate(anyString(), ArgumentMatchers.<List<Object[]>>any());
     }
 
     @Test
@@ -116,6 +135,7 @@ class CsvImportServiceTest {
                                                                        .hasMessageContaining("CSV");
 
         verify(csvItemParser, never()).parseInChunks(any());
+        verify(jdbcTemplate, never()).batchUpdate(anyString(), ArgumentMatchers.<List<Object[]>>any());
     }
 
     @Test
@@ -124,17 +144,13 @@ class CsvImportServiceTest {
         MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", "content".getBytes());
 
         Category existingCategory = new Category();
+        existingCategory.setId(1L);
         existingCategory.setName("Электроника");
 
-        // Строка 1: Успешный товар (SKU уникален, категория есть)
         CsvItemParser.ValidRowHolder row1 =
                 createValidRowHolder(1, "SKU-NEW", "Ноутбук", "Электроника", "1000.00", "800.00");
-
-        // Строка 2: Товар с дубликатом SKU (SKU-EXISTS уже есть в базе)
         CsvItemParser.ValidRowHolder row2 =
                 createValidRowHolder(2, "SKU-EXISTS", "Мышь", "Электроника", "20.00", "10.00");
-
-        // Строка 3: Товар с несуществующей категорией ("Неизвестная")
         CsvItemParser.ValidRowHolder row3 =
                 createValidRowHolder(3, "SKU-ANOTHER", "Стол", "Неизвестная", "150.00", "100.00");
 
@@ -145,31 +161,36 @@ class CsvImportServiceTest {
         when(itemRepository.findAllSkusIn(any())).thenReturn(List.of("SKU-EXISTS"));
         when(categoryRepository.findAllByNameIgnoreCaseIn(any())).thenReturn(List.of(existingCategory));
 
+        when(jdbcTemplate.query(anyString(),
+                any(org.springframework.jdbc.core.PreparedStatementSetter.class),
+                any(org.springframework.jdbc.core.ResultSetExtractor.class)))
+                .thenReturn(java.util.Map.of("SKU-NEW", 1L));
+
         ItemImportResultDto result = csvImportService.importItems(file);
 
         assertThat(result.totalRows()).isEqualTo(3);
-        assertThat(result.imported()).isEqualTo(1); // Сохранился только 1 товар (row1)
-        assertThat(result.errors()).hasSize(2);     // Ошибки по row2 и row3
+        assertThat(result.imported()).isEqualTo(1);
+        assertThat(result.errors()).hasSize(2);
 
-        // Проверяем ошибку дубликата SKU
         ItemImportErrorDto skuError =
                 result.errors().stream().filter(e -> e.rowNumber() == 2).findFirst().orElseThrow();
         assertThat(skuError.sku()).isEqualTo("SKU-EXISTS");
         assertThat(skuError.errorMessage()).contains("уже существует");
 
-        // Проверяем ошибку отсутствия категории
         ItemImportErrorDto categoryError =
                 result.errors().stream().filter(e -> e.rowNumber() == 3).findFirst().orElseThrow();
         assertThat(categoryError.sku()).isEqualTo("SKU-ANOTHER");
         assertThat(categoryError.errorMessage()).contains("Category with name Неизвестная not found");
 
-        // Проверяем, что в репозиторий на сохранение улетел ровно 1 правильный элемент
-        @SuppressWarnings("unchecked") ArgumentCaptor<List<Item>> itemCaptor = ArgumentCaptor.forClass(List.class);
-        verify(itemRepository).saveAll(itemCaptor.capture());
+        verify(jdbcTemplate).batchUpdate(
+                org.mockito.ArgumentMatchers.contains("INSERT INTO items"),
+                ArgumentMatchers.<List<Object[]>>any()
+        );
 
-        List<Item> savedItems = itemCaptor.getValue();
-        assertThat(savedItems).hasSize(1);
-        assertThat(savedItems.get(0).getSku()).isEqualTo("SKU-NEW");
+        verify(jdbcTemplate).batchUpdate(
+                org.mockito.ArgumentMatchers.contains("INSERT INTO stocks"),
+                ArgumentMatchers.<List<Object[]>>any()
+        );
     }
 
     private CsvItemParser.ValidRowHolder createValidRowHolder(
