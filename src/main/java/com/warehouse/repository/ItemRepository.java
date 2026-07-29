@@ -125,9 +125,10 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 )
                 from Item i
                 left join Stock s on s.item = i
+                where (:active is null or i.active = :active)
                 group by i.id, i.sku, i.name, i.category, i.price
             """)
-    Stream<ItemExportDto> streamAllForExport();
+    Stream<ItemExportDto> streamAllForExport(@Param("active") Boolean active);
 
     @Query("select i.sku from Item i where i.sku in :skus")
     List<String> findAllSkusIn(@Param("skus") Set<String> skus);

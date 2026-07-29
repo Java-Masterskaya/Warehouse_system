@@ -40,7 +40,7 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
             Writer writer = invocation.getArgument(0);
             writer.write("\uFEFFSKU,Name\nSKU-100,Товар 1");
             return null;
-        }).when(csvExportService).exportItems(Mockito.any(Writer.class));
+        }).when(csvExportService).exportItems(Mockito.any(Writer.class), true);
 
         // 1. Выполняем асинхронный запрос
         MvcResult mvcResult = mockMvc.perform(get("/api/items/export")).andExpect(

@@ -24,7 +24,7 @@ public class CsvExportServiceImpl implements CsvExportService {
 
     // --- ЭКСПОРТ ТОВАРОВ ---
     @Override
-    public void exportItems(Writer writer) {
+    public void exportItems(Writer writer, Boolean isActive) {
         transactionTemplate.executeWithoutResult(status -> {
             try {
                 writer.write('\uFEFF'); // BOM для Excel
@@ -33,7 +33,7 @@ public class CsvExportServiceImpl implements CsvExportService {
                                                     .setHeader("SKU", "Name", "Category", "Quantity", "Price").build();
 
                 try (CSVPrinter printer = new CSVPrinter(writer,
-                        format); Stream<ItemExportDto> itemStream = itemRepository.streamAllForExport()) {
+                        format); Stream<ItemExportDto> itemStream = itemRepository.streamAllForExport(isActive)) {
 
                     itemStream.forEach(item -> {
                         try {

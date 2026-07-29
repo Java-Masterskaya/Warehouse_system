@@ -27,6 +27,8 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,12 +55,12 @@ class CsvExportServiceTest {
                 new ItemExportDto("SKU-001", "Молоко", "Молочные продукты", 10L, new BigDecimal("89.90"));
         ItemExportDto item2 = new ItemExportDto("SKU-002", "Хлеб, \"Ржаной\"", "Выпечка", 5L, new BigDecimal("45.00"));
 
-        when(itemRepository.streamAllForExport()).thenReturn(Stream.of(item1, item2));
+        when(itemRepository.streamAllForExport(true)).thenReturn(Stream.of(item1, item2));
 
         StringWriter writer = new StringWriter();
 
         // Act
-        csvExportService.exportItems(writer);
+        csvExportService.exportItems(writer, true);
 
         // Assert
         String csvOutput = writer.toString();
@@ -155,11 +157,11 @@ class CsvExportServiceTest {
                 new BigDecimal("1000.00")
         );
 
-        when(itemRepository.streamAllForExport()).thenReturn(Stream.of(dangerousItem));
+        when(itemRepository.streamAllForExport(true)).thenReturn(Stream.of(dangerousItem));
 
         StringWriter writer = new StringWriter();
 
-        csvExportService.exportItems(writer);
+        csvExportService.exportItems(writer, true);
 
         String csvResult = writer.toString();
 
@@ -167,5 +169,47 @@ class CsvExportServiceTest {
                 .contains("'=SKU-001")
                 .contains("'+Ноутбук")
                 .contains("'@Электроника");
+    }
+
+    @Test
+    @DisplayName("Экспорт всех товаров при active = null")
+    void shouldExportAllItemsWhenActiveIsNull() {
+        ItemExportDto item = new ItemExportDto("SKU-1", "Товар 1", "Категория", 10L, new BigDecimal("100.00"));
+        when(itemRepository.streamAllForExport(isNull())).thenReturn(Stream.of(item));
+
+        StringWriter writer = new StringWriter();
+        csvExportService.exportItems(writer, null);
+
+        String result = writer.toString();
+        assertThat(result).contains("SKU-1", "Товар 1");
+        Mockito.verify(itemRepository).streamAllForExport(isNull());
+    }
+
+    @Test
+    @DisplayName("Экспорт только активных товаров при active = true")
+    void shouldExportOnlyActiveItemsWhenActiveIsTrue() {
+        ItemExportDto item = new ItemExportDto("SKU-2", "Активный товар", "Категория", 5L, new BigDecimal("200.00"));
+        when(itemRepository.streamAllForExport(eq(true))).thenReturn(Stream.of(item));
+
+        StringWriter writer = new StringWriter();
+        csvExportService.exportItems(writer, true);
+
+        String result = writer.toString();
+        assertThat(result).contains("SKU-2", "Активный товар");
+        Mockito.verify(itemRepository).streamAllForExport(eq(true));
+    }
+
+    @Test
+    @DisplayName("Экспорт только неактивных товаров при active = false")
+    void shouldExportOnlyInactiveItemsWhenActiveIsFalse() {
+        ItemExportDto item = new ItemExportDto("SKU-3", "Неактивный товар", "Категория", 0L, new BigDecimal("50.00"));
+        when(itemRepository.streamAllForExport(eq(false))).thenReturn(Stream.of(item));
+
+        StringWriter writer = new StringWriter();
+        csvExportService.exportItems(writer, false);
+
+        String result = writer.toString();
+        assertThat(result).contains("SKU-3", "Неактивный товар");
+        Mockito.verify(itemRepository).streamAllForExport(eq(false));
     }
 }

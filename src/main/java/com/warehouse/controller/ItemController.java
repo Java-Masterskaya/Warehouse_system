@@ -125,12 +125,12 @@ public class ItemController {
     @GetMapping("/export")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StreamingResponseBody> exportItems(Authentication authentication) {
+    public ResponseEntity<StreamingResponseBody> exportItems(Authentication authentication, @RequestParam(required = true) Boolean active) {
         SecurityContext context = SecurityContextHolder.getContext();
         StreamingResponseBody responseBody = outputStream -> {
             SecurityContextHolder.setContext(context);
             try (OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
-                csvExportService.exportItems(writer);
+                csvExportService.exportItems(writer, active);
             } catch (UncheckedIOException e) {
                 log.warn("Экспорт CSV был прерван клиентом: {}", e.getMessage());
             } finally {
