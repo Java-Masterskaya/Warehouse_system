@@ -4,7 +4,7 @@ package com.warehouse.exception;
  * Попытка запустить backfill-джобу, пока уже выполняется другой её запуск.
  * <p>
  * Без этой проверки второй {@code POST /admin/backfill/barcode} сбрасывал бы
- * флаг остановки первого запуска и портил метрики прогресса (OPS-5).
+ * флаг остановки первого запуска и портил метрики прогресса.
  */
 public class BackfillAlreadyRunningException extends RuntimeException {
     public BackfillAlreadyRunningException(String message) {

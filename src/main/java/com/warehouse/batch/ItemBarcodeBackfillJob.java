@@ -232,7 +232,10 @@ public class ItemBarcodeBackfillJob {
                 }
                 return count;
             });
-            return updated == null ? 0 : updated;
+            if (updated == null) {
+                return 0;
+            }
+            return updated;
         } catch (DataIntegrityViolationException e) {
             log.warn("Коллизия barcode внутри батча (первый id={}, размер={}), "
                             + "переключаюсь на построчную обработку: {}",
@@ -247,7 +250,9 @@ public class ItemBarcodeBackfillJob {
             String barcode = barcodeGenerator.generate();
             try {
                 Integer rows = txTemplate.execute(status -> itemRepository.updateBarcodeIfNull(id, barcode));
-                updated += rows == null ? 0 : rows;
+                if (rows != null) {
+                    updated += rows;
+                }
             } catch (DataIntegrityViolationException e) {
                 log.error("Не удалось сохранить barcode для item id={} даже построчно: {}. "
                                 + "Строка остаётся NULL, её подхватит следующий запуск джобы (идемпотентность).",

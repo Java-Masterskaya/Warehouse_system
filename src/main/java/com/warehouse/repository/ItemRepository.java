@@ -158,7 +158,7 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
     boolean existsByBarcodeIsNull();
 
     /**
-     * Получить следующее значение независимого sequence для номера barcode
+     * Получить следующее значение независимого sequence для номера barcode.
      *
      * @return следующее значение items_barcode_seq
      */
