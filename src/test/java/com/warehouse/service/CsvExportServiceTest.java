@@ -5,7 +5,7 @@ import com.warehouse.dto.response.movement.StockMovementExportDto;
 import com.warehouse.entity.MovementType;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.service.import_export.CsvExportService;
+import com.warehouse.service.import_export.CsvExportServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CsvExportServiceTest {
@@ -42,7 +43,7 @@ class CsvExportServiceTest {
             new TransactionTemplate((PlatformTransactionManager) new PseudoTransactionManager());
 
     @InjectMocks
-    private CsvExportService csvExportService;
+    private CsvExportServiceImpl csvExportService;
 
     @Test
     @DisplayName("Должен корректно формировать CSV со всеми полями и BOM")
@@ -52,7 +53,7 @@ class CsvExportServiceTest {
                 new ItemExportDto("SKU-001", "Молоко", "Молочные продукты", 10L, new BigDecimal("89.90"));
         ItemExportDto item2 = new ItemExportDto("SKU-002", "Хлеб, \"Ржаной\"", "Выпечка", 5L, new BigDecimal("45.00"));
 
-        Mockito.when(itemRepository.streamAllForExport()).thenReturn(Stream.of(item1, item2));
+        when(itemRepository.streamAllForExport()).thenReturn(Stream.of(item1, item2));
 
         StringWriter writer = new StringWriter();
 
@@ -111,7 +112,7 @@ class CsvExportServiceTest {
                         "operator_petr", now.plusHours(1), transferUuid // Перевод между складами
                 );
 
-        Mockito.when(movementRepository.streamAllForExport()).thenReturn(Stream.of(movement1, movement2));
+        when(movementRepository.streamAllForExport()).thenReturn(Stream.of(movement1, movement2));
 
         StringWriter writer = new StringWriter();
 
@@ -134,5 +135,37 @@ class CsvExportServiceTest {
         // 4. Проверяем вторую строку (с эскейпингом кавычек в названии и заполнением transferId)
         assertThat(csvOutput).contains("SKU-200,\"Хлеб, \"\"Ржаной\"\"\",Склад №2,TRANSFER_OUT,-10,operator_petr,"
                 + "2026-07-23T15:30,123e4567-e89b-12d3-a456-426614174000");
+    }
+
+    @Test
+    @DisplayName("Экспорт товаров экранирует опасные префиксы формул (CSV Formula Injection)")
+    void shouldSanitizeDangerousPrefixesOnItemExport() {
+        Mockito.doAnswer(invocation -> {
+            java.util.function.Consumer<org.springframework.transaction.TransactionStatus> action =
+                    invocation.getArgument(0);
+            action.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(Mockito.any());
+
+        ItemExportDto dangerousItem = new ItemExportDto(
+                "=SKU-001",
+                "+Ноутбук",
+                "@Электроника",
+                10L,
+                new BigDecimal("1000.00")
+        );
+
+        when(itemRepository.streamAllForExport()).thenReturn(Stream.of(dangerousItem));
+
+        StringWriter writer = new StringWriter();
+
+        csvExportService.exportItems(writer);
+
+        String csvResult = writer.toString();
+
+        assertThat(csvResult)
+                .contains("'=SKU-001")
+                .contains("'+Ноутбук")
+                .contains("'@Электроника");
     }
 }
