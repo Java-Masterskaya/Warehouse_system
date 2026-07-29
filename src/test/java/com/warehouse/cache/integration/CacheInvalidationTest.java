@@ -90,6 +90,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));
         item.setCost(BigDecimal.valueOf(1000.00));
+        item.setBarcode("ITEM-TEST-CACHEINV-001");
         itemRepository.save(item);
 
         Stock stock = new Stock();
@@ -117,7 +118,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         itemService.getItem(itemId);
 
         UpdateItemRequest updateRequest = new UpdateItemRequest("Ноутбук Pro", "Электроника",
-                10, BigDecimal.valueOf(1700.00), BigDecimal.valueOf(1100.00));
+                10, BigDecimal.valueOf(1700.00), BigDecimal.valueOf(1100.00), null);
         itemService.updateItem(itemId, updateRequest);
 
         ItemDetailsResponse response = itemService.getItem(itemId);

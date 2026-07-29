@@ -1,14 +1,19 @@
 package com.warehouse.batch;
 
-import com.warehouse.entity.Item;
+import com.warehouse.exception.BackfillAlreadyRunningException;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.service.item.ItemBarcodeGenerator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,6 +37,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>
  * Джоба <strong>идемпотентна</strong>: повторный запуск безопасен, т.к. трогает только
  * строки, где {@code barcode IS NULL}.
+ * <p>
+ * <strong>Конкурентность:</strong> одновременно может выполняться только один {@link #run}.
+ * Повторный вызов, пока джоба уже работает, кидает {@link BackfillAlreadyRunningException}
+ * вместо того, чтобы молча сбросить флаг остановки первого запуска.
  */
 @Slf4j
 @Component
@@ -49,27 +58,67 @@ public class ItemBarcodeBackfillJob {
     private static final int LOG_INTERVAL = 10;
 
     private final ItemRepository itemRepository;
-    private final AtomicBoolean stopped = new AtomicBoolean(false);
+    private final ItemBarcodeGenerator barcodeGenerator;
+    private final TransactionTemplate txTemplate;
 
-    public ItemBarcodeBackfillJob(ItemRepository itemRepository) {
+    private final AtomicBoolean stopped = new AtomicBoolean(false);
+    private final AtomicBoolean running = new AtomicBoolean(false);
+
+    private volatile Result lastResult;
+
+    public ItemBarcodeBackfillJob(ItemRepository itemRepository,
+                                   ItemBarcodeGenerator barcodeGenerator,
+                                   PlatformTransactionManager transactionManager) {
         this.itemRepository = itemRepository;
+        this.barcodeGenerator = barcodeGenerator;
+        this.txTemplate = new TransactionTemplate(transactionManager);
     }
 
     /**
      * Мягко запросить остановку после завершения текущего батча.
      */
     public void stop() {
+        if (!running.get()) {
+            log.warn("Запрошена остановка backfill, но джоба сейчас не выполняется.");
+            return;
+        }
         stopped.set(true);
         log.info("Запрошена остановка backfill. Завершу текущий батч и выйду.");
     }
 
     /**
-     * Запустить backfill до конца (или до остановки).
+     * Выполняется в отдельном потоке (пул {@code @Async}), не блокируя HTTP-поток
+     * вызывающего контроллера. Прогресс/результат доступны через {@link #isRunning()}
+     * и {@link #getLastResult()}.
+     *
+     * @param batchSize сколько строк обрабатывать за одну транзакцию
+     * @return future с результатом (полезно для тестов; контроллер его не ждёт)
+     */
+    @Async
+    public CompletableFuture<Result> runAsync(int batchSize) {
+        return CompletableFuture.completedFuture(run(batchSize));
+    }
+
+    /**
+     * Запустить backfill до конца (или до остановки). Блокирующий вызов —
+     * снаружи ожидается запуск через {@link #runAsync}, а не напрямую из HTTP-потока.
      *
      * @param batchSize сколько строк обрабатывать за одну транзакцию
      * @return сводка по выполнению
+     * @throws BackfillAlreadyRunningException если джоба уже выполняется в другом потоке
      */
     public Result run(int batchSize) {
+        if (!running.compareAndSet(false, true)) {
+            throw BackfillAlreadyRunningException.forJob("ItemBarcodeBackfillJob");
+        }
+        try {
+            return doRun(batchSize);
+        } finally {
+            running.set(false);
+        }
+    }
+
+    private Result doRun(int batchSize) {
         stopped.set(false);
         AtomicLong totalProcessed = new AtomicLong(0);
         long lastId = 0L;
@@ -78,7 +127,7 @@ public class ItemBarcodeBackfillJob {
         log.info("Старт backfill barcode с batchSize={}", batchSize);
 
         while (!stopped.get()) {
-            List<Item> batch = fetchNextBatch(lastId, batchSize);
+            List<Long> batch = fetchNextBatch(lastId, batchSize);
 
             if (batch.isEmpty()) {
                 log.info("Больше нет строк для backfill. Всего обработано: {}", totalProcessed.get());
@@ -89,8 +138,7 @@ public class ItemBarcodeBackfillJob {
             totalProcessed.addAndGet(processed);
             iterations++;
 
-            // Следующая итерация начинается после максимального id в текущем батче
-            lastId = batch.get(batch.size() - 1).getId();
+            lastId = batch.get(batch.size() - 1);
 
             if (iterations % LOG_INTERVAL == 0) {
                 log.info("Прогресс backfill: {} строк обработано, lastId={}", totalProcessed.get(), lastId);
@@ -111,6 +159,7 @@ public class ItemBarcodeBackfillJob {
         }
 
         Result result = new Result(status, totalProcessed.get(), lastId, iterations);
+        lastResult = result;
         log.info("Backfill завершён: {}", result);
         return result;
     }
@@ -125,41 +174,87 @@ public class ItemBarcodeBackfillJob {
     }
 
     /**
-     * Получить следующий батч товаров, нуждающихся в barcode.
+     * @return выполняется ли джоба прямо сейчас
+     */
+    public boolean isRunning() {
+        return running.get();
+    }
+
+    /**
+     * @return результат последнего завершённого запуска, либо {@code null}, если джоба
+     * ещё ни разу не запускалась (с момента старта приложения)
+     */
+    public Result getLastResult() {
+        return lastResult;
+    }
+
+    /**
+     * Получить id следующего батча товаров, нуждающихся в barcode.
      * <p>
-     * Не аннотирован @Transactional, т.к. вызывается из {@link #run}
+     * Не аннотирован @Transactional, т.к. вызывается из {@link #doRun}
      * (самовызов внутри бина обходит Spring-прокси). Нижележащий
      * Spring Data репозиторий сам управляет границами транзакций для чтения.
      *
      * @param lastProcessedId id последнего обработанного товара
      * @param batchSize       размер батча
-     * @return список товаров без barcode
+     * @return список id товаров без barcode
      */
-    public List<Item> fetchNextBatch(long lastProcessedId, int batchSize) {
+    public List<Long> fetchNextBatch(long lastProcessedId, int batchSize) {
         Pageable pageable = PageRequest.of(0, batchSize);
-        return itemRepository.findByBarcodeIsNullAndIdGreaterThanOrderByIdAsc(lastProcessedId, pageable);
-    }
-
-    @Transactional
-    public int processBatch(List<Item> batch) {
-        for (Item item : batch) {
-            // Идемпотентная генерация: детерминированная и уникальная для каждой строки
-            String barcode = generateBarcode(item);
-            item.setBarcode(barcode);
-        }
-        itemRepository.saveAll(batch);
-        return batch.size();
+        return itemRepository.findIdsByBarcodeIsNullAndIdGreaterThanOrderByIdAsc(lastProcessedId, pageable);
     }
 
     /**
-     * Детерминированная генерация barcode. Использование id гарантирует
-     * уникальность и делает операцию идемпотентной (один вход → один выход).
+     * Проставить barcode каждой строке батча точечным UPDATE в одной короткой транзакции.
+     * <p>
+     * Транзакция открывается явно через {@link TransactionTemplate}, а не через
+     * {@code @Transactional} — этот метод вызывается из {@link #doRun} того же бина
+     * (self-invocation), Spring AOP-прокси на таком вызове не участвует.
+     * <p>
+     * Обновляется только колонка barcode (см. {@link ItemRepository#updateBarcodeIfNull}) —
+     * не читаем и не переписываем остальные поля строки, и UPDATE атомарно перепроверяет
+     * {@code barcode IS NULL}, так что строку, которой barcode уже выставили конкурентно
+     * (вручную через API или другим запуском джобы), мы не тронем — просто пропустим (0
+     * затронутых строк).
+     * <p>
+     * Если сама генерация bаrcode коллизирует с чужим значением (UNIQUE), откатываем
+     * батч и обрабатываем строки по одной, чтобы одна плохая строка не блокировала весь батч.
      *
-     * @param item товар
-     * @return сгенерированный barcode
+     * @param batch список id товаров без barcode
+     * @return сколько строк реально обновлено
      */
-    private String generateBarcode(Item item) {
-        return String.format("ITEM-%010d", item.getId());
+    public int processBatch(List<Long> batch) {
+        try {
+            Integer updated = txTemplate.execute(status -> {
+                int count = 0;
+                for (Long id : batch) {
+                    count += itemRepository.updateBarcodeIfNull(id, barcodeGenerator.generate());
+                }
+                return count;
+            });
+            return updated == null ? 0 : updated;
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Коллизия barcode внутри батча (первый id={}, размер={}), "
+                            + "переключаюсь на построчную обработку: {}",
+                    batch.get(0), batch.size(), e.getMessage());
+            return processBatchItemByItem(batch);
+        }
+    }
+
+    private int processBatchItemByItem(List<Long> batch) {
+        int updated = 0;
+        for (Long id : batch) {
+            String barcode = barcodeGenerator.generate();
+            try {
+                Integer rows = txTemplate.execute(status -> itemRepository.updateBarcodeIfNull(id, barcode));
+                updated += rows == null ? 0 : rows;
+            } catch (DataIntegrityViolationException e) {
+                log.error("Не удалось сохранить barcode для item id={} даже построчно: {}. "
+                                + "Строка остаётся NULL, её подхватит следующий запуск джобы (идемпотентность).",
+                        id, e.getMessage());
+            }
+        }
+        return updated;
     }
 
     // -------------------------------------------------------------------------

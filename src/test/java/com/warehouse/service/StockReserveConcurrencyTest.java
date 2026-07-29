@@ -61,7 +61,8 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
         );
 
         Item item = itemRepository.save(
-                Item.builder().sku("12345676").name("name").category(category).minStock(0).active(true).build());
+                Item.builder().sku("12345676").name("name").category(category).minStock(0).active(true)
+                        .barcode("ITEM-TEST-RESERVECONC-001").build());
         Stock stock = stockRepository.save(Stock.builder()
                 .item(item)
                 .warehouse(defaultWarehouse())

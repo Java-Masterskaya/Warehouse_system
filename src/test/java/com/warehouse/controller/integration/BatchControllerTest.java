@@ -97,6 +97,7 @@ class BatchControllerTest extends AbstractIntegrationTest {
         testItem.setActive(true);
         testItem.setPrice(BigDecimal.valueOf(500.00));
         testItem.setCost(BigDecimal.valueOf(300.00));
+        testItem.setBarcode("ITEM-TEST-BATCH-" + uniqueSku);
         testItem = itemRepository.save(testItem);
 
         testWarehouse = defaultWarehouse();

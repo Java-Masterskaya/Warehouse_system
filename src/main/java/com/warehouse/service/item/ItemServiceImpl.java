@@ -14,6 +14,7 @@ import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.ReservedBarcodeFormatException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
@@ -46,6 +47,7 @@ public class ItemServiceImpl implements ItemService {
     private final ItemMapper itemMapper;
     private final StockAvailabilityService availabilityService;
     private final CategoryRepository categoryRepository;
+    private final ItemBarcodeGenerator barcodeGenerator;
 
     @Transactional
     @Override
@@ -62,25 +64,26 @@ public class ItemServiceImpl implements ItemService {
         item.setPrice(confirmPrice(request.price()));
         item.setCost(confirmCost(request.cost()));
 
-        // Проверка уникальности пользовательского barcode (OPS-5)
+        // Проверка уникальности пользовательского barcode
         if (request.barcode() != null && !request.barcode().isBlank()) {
+            if (barcodeGenerator.matchesReservedFormat(request.barcode())) {
+                log.warn("Manual barcode '{}' uses reserved auto-generation format — rejected", request.barcode());
+                throw ReservedBarcodeFormatException.forBarcode(request.barcode());
+            }
             if (itemRepository.existsByBarcode(request.barcode())) {
                 log.warn("Duplicate barcode '{}' — item already exists", request.barcode());
                 throw DuplicateBarcodeException.forBarcode(request.barcode());
             }
             item.setBarcode(request.barcode());
         }
+        if (item.getBarcode() == null || item.getBarcode().isBlank()) {
+            item.setBarcode(barcodeGenerator.generate());
+        }
 
         itemRepository.save(item);
 
         Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
                 .orElseThrow(() -> new IllegalStateException("Default warehouse is not configured"));
-
-        // Генерируем штрихкод на основе id, если не задан в запросе
-        if (item.getBarcode() == null || item.getBarcode().isBlank()) {
-            item.setBarcode(String.format("ITEM-%010d", item.getId()));
-            itemRepository.save(item);
-        }
 
         Stock stock = new Stock();
         stock.setItem(item);
@@ -115,9 +118,15 @@ public class ItemServiceImpl implements ItemService {
         item.setPrice(confirmPrice(request.price()));
         item.setCost(confirmCost(request.cost()));
 
-        // Проверка уникальности barcode при обновлении (OPS-5)
+        // Проверка уникальности barcode при обновлении
         if (request.barcode() != null && !request.barcode().isBlank()
                 && !request.barcode().equals(item.getBarcode())) {
+
+            if (barcodeGenerator.matchesReservedFormat(request.barcode())) {
+                log.warn("Manual barcode '{}' uses reserved auto-generation format — "
+                        + "cannot update item id={}", request.barcode(), itemId);
+                throw ReservedBarcodeFormatException.forBarcode(request.barcode());
+            }
             if (itemRepository.existsByBarcode(request.barcode())) {
                 log.warn("Duplicate barcode '{}' — cannot update item id={}", request.barcode(), itemId);
                 throw DuplicateBarcodeException.forBarcode(request.barcode());

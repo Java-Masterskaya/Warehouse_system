@@ -7,9 +7,11 @@ import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -20,9 +22,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Проверяет авторизацию (только ADMIN) и корректность ответов
  * для {@link com.warehouse.controller.BackfillAdminController}.
  */
+@SpringBootTest
 class BackfillAdminControllerTest extends AbstractIntegrationTest {
 
     private static final String BACKFILL_URL = "/admin/backfill/barcode";
+    private static final String BACKFILL_STATUS_URL = "/admin/backfill/barcode/status";
     private static final String BACKFILL_STOP_URL = "/admin/backfill/barcode/stop";
 
     @Autowired
@@ -46,19 +50,41 @@ class BackfillAdminControllerTest extends AbstractIntegrationTest {
     }
 
     /**
-     * ADMIN может запустить backfill и получить сводку выполнения.
+     * ADMIN может запустить backfill: эндпоинт асинхронный — сразу отдаёт 202
+     * и не ждёт завершения джобы (OPS-5, чтобы не держать HTTP-поток на больших таблицах).
      */
     @Test
-    void runBackfillAsAdminReturns200WithSummary() throws Exception {
+    void runBackfillAsAdminReturns202Accepted() throws Exception {
         mockMvc.perform(post(BACKFILL_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .param("batchSize", "100")
                         .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("STARTED"))
+                .andExpect(jsonPath("$.batchSize").value(100));
+    }
+
+    /**
+     * batchSize=0 отклоняется валидацией (400), а не падает 500-кой из PageRequest.
+     */
+    @Test
+    void runBackfillWithInvalidBatchSizeReturns400() throws Exception {
+        mockMvc.perform(post(BACKFILL_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("batchSize", "0")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * ADMIN может посмотреть статус backfill-джобы.
+     */
+    @Test
+    void backfillStatusAsAdminReturns200() throws Exception {
+        mockMvc.perform(get(BACKFILL_STATUS_URL)
+                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").isString())
-                .andExpect(jsonPath("$.rowsProcessed").isNumber())
-                .andExpect(jsonPath("$.lastId").isNumber())
-                .andExpect(jsonPath("$.iterations").isNumber());
+                .andExpect(jsonPath("$.running").isBoolean());
     }
 
     /**

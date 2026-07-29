@@ -306,6 +306,7 @@ class CategoryControllerTest extends AbstractIntegrationTest {
         item.setPrice(BigDecimal.valueOf(100.00));
         item.setCost(BigDecimal.valueOf(50.00));
         item.setActive(true);
+        item.setBarcode("ITEM-TEST-CATEGORY-" + suffix);
 
         return itemRepository.save(item);
     }

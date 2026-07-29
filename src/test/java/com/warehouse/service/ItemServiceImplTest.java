@@ -13,11 +13,13 @@ import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.ReservedBarcodeFormatException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.WarehouseRepository;
+import com.warehouse.service.item.ItemBarcodeGenerator;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.item.ItemServiceImpl;
 import com.warehouse.service.reservation.StockAvailabilityService;
@@ -76,6 +78,9 @@ class ItemServiceImplTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private ItemBarcodeGenerator barcodeGenerator;
+
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 
     private ItemService itemService;
@@ -88,7 +93,8 @@ class ItemServiceImplTest {
                 warehouseRepository,
                 itemMapper,
                 availabilityService,
-                categoryRepository
+                categoryRepository,
+                barcodeGenerator
         );
     }
 
@@ -118,6 +124,7 @@ class ItemServiceImplTest {
         });
         when(stockRepository.save(any(Stock.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(barcodeGenerator.generate()).thenReturn("ITEM-0000000001");
 
         ItemResponse result = itemService.createItem(request);
 
@@ -128,9 +135,12 @@ class ItemServiceImplTest {
         assertThat(result.minStock()).isEqualTo(5);
         assertThat(result.active()).isTrue();
         assertThat(result.createdAt()).isNotNull();
-        verify(itemRepository, times(2)).save(any(Item.class)); // 2 saves: item + barcode update
+        assertThat(result.barcode()).isEqualTo("ITEM-0000000001");
+        // Один save(): barcode не зависит от id, поэтому готов ещё до INSERT (OPS-5).
+        verify(itemRepository, times(1)).save(any(Item.class));
         verify(stockRepository).save(any(Stock.class));
         verify(categoryRepository).findByNameIgnoreCase("Электроника");
+        verify(barcodeGenerator).generate();
     }
 
     /**
@@ -160,6 +170,8 @@ class ItemServiceImplTest {
                 5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), "EXIST-BARCODE");
 
         when(itemRepository.existsBySku("SKU-BAR-001")).thenReturn(false);
+        when(categoryRepository.findByNameIgnoreCase("Электроника"))
+                .thenReturn(Optional.of(createCategory("Электроника")));
         when(itemRepository.existsByBarcode("EXIST-BARCODE")).thenReturn(true);
 
         assertThatThrownBy(() -> itemService.createItem(request))
@@ -167,6 +179,30 @@ class ItemServiceImplTest {
                 .hasMessageContaining("EXIST-BARCODE");
 
         verify(itemRepository, never()).save(any());
+        verify(stockRepository, never()).save(any());
+    }
+
+    /**
+     * Попытка создать товар с ручным barcode в формате автогенерации
+     * выбрасывает ReservedBarcodeFormatException — id ещё не существует,
+     * поэтому "свой" id подтвердить невозможно, формат отклоняется целиком.
+     */
+    @Test
+    void createItemWithReservedFormatBarcodeThrowsReservedBarcodeFormatException() {
+        CreateItemRequest request = new CreateItemRequest("SKU-RESERVED-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), "ITEM-0000000042");
+
+        when(itemRepository.existsBySku("SKU-RESERVED-001")).thenReturn(false);
+        when(categoryRepository.findByNameIgnoreCase("Электроника"))
+                .thenReturn(Optional.of(createCategory("Электроника")));
+        when(barcodeGenerator.matchesReservedFormat("ITEM-0000000042")).thenReturn(true);
+
+        assertThatThrownBy(() -> itemService.createItem(request))
+                .isInstanceOf(ReservedBarcodeFormatException.class)
+                .hasMessageContaining("ITEM-0000000042");
+
+        verify(itemRepository, never()).save(any());
+        verify(itemRepository, never()).existsByBarcode(any());
         verify(stockRepository, never()).save(any());
     }
 
@@ -179,7 +215,7 @@ class ItemServiceImplTest {
         Item existingItem = new Item();
         existingItem.setId(itemId);
         existingItem.setName("Товар");
-        existingItem.setCategory("Категория");
+        existingItem.setCategory(createCategory("Категория"));
         existingItem.setMinStock(5);
         existingItem.setActive(true);
         existingItem.setPrice(BigDecimal.valueOf(100.00));
@@ -190,6 +226,8 @@ class ItemServiceImplTest {
                 10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00), "EXIST-BARCODE");
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(categoryRepository.findByNameIgnoreCase("Новая категория"))
+                .thenReturn(Optional.of(createCategory("Новая категория")));
         when(itemRepository.existsByBarcode("EXIST-BARCODE")).thenReturn(true);
 
         assertThatThrownBy(() -> itemService.updateItem(itemId, request))
@@ -197,6 +235,42 @@ class ItemServiceImplTest {
                 .hasMessageContaining("EXIST-BARCODE");
 
         verify(itemRepository, never()).save(any());
+    }
+
+    /**
+     * Попытка обновить barcode на зарезервированный формат автогенерации
+     * выбрасывает ReservedBarcodeFormatException — с переходом на независимый
+     * sequence (items_barcode_seq) barcode больше не выводится формулой из id,
+     * поэтому исключений "для своего id" не бывает: любой ручной ввод в формате
+     * ITEM-<10 цифр> отклоняется безусловно (OPS-5).
+     */
+    @Test
+    void updateItemWithReservedFormatBarcodeThrowsReservedBarcodeFormatException() {
+        Long itemId = 3L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory(createCategory("Категория"));
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+        existingItem.setBarcode("OLD-BARCODE");
+
+        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00), "ITEM-0000000099");
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(categoryRepository.findByNameIgnoreCase("Новая категория"))
+                .thenReturn(Optional.of(createCategory("Новая категория")));
+        when(barcodeGenerator.matchesReservedFormat("ITEM-0000000099")).thenReturn(true);
+
+        assertThatThrownBy(() -> itemService.updateItem(itemId, request))
+                .isInstanceOf(ReservedBarcodeFormatException.class)
+                .hasMessageContaining("ITEM-0000000099");
+
+        verify(itemRepository, never()).save(any());
+        verify(itemRepository, never()).existsByBarcode(any());
     }
 
     /**

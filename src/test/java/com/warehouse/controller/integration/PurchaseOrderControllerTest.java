@@ -119,6 +119,7 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
                 .active(true)
                 .price(new BigDecimal("1500.00"))
                 .cost(new BigDecimal("1100.00"))
+                .barcode("ITEM-TEST-PO-" + System.nanoTime())
                 .build();
         item = itemRepository.save(item);
 
