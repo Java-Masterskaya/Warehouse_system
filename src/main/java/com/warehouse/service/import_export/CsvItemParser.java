@@ -81,13 +81,6 @@ public class CsvItemParser {
                     try {
                         ItemImportRowDto dto = mapRecordToDto(record);
 
-                        if (dto.sku() != null && !seenSkusInFile.add(dto.sku())) {
-                            chunkErrors.add(new ItemImportErrorDto(fileRowNumber,
-                                    dto.sku(),
-                                    "Дубликат SKU '" + dto.sku() + "' внутри импортируемого файла"));
-                            continue;
-                        }
-
                         Set<ConstraintViolation<ItemImportRowDto>> violations = validator.validate(dto);
 
                         if (!violations.isEmpty()) {
@@ -96,9 +89,17 @@ public class CsvItemParser {
                                                             .reduce((m1, m2) -> m1 + "; " + m2)
                                                             .orElse("Ошибка валидации");
                             chunkErrors.add(new ItemImportErrorDto(fileRowNumber, dto.sku(), errorMessage));
-                        } else {
-                            validRows.add(new ValidRowHolder(fileRowNumber, dto));
+                            continue;
                         }
+
+                        if (dto.sku() != null && !seenSkusInFile.add(dto.sku())) {
+                            chunkErrors.add(new ItemImportErrorDto(fileRowNumber,
+                                    dto.sku(),
+                                    "Дубликат SKU '" + dto.sku() + "' внутри импортируемого файла"));
+                            continue;
+                        }
+
+                        validRows.add(new ValidRowHolder(fileRowNumber, dto));
                     } catch (Exception e) {
                         chunkErrors.add(new ItemImportErrorDto(fileRowNumber, rawSku,
                                 "Некорректный формат данных: " + getReadableErrorMessage(e)));
