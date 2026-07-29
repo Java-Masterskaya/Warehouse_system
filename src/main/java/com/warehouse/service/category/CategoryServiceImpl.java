@@ -98,8 +98,8 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional
     @Caching(evict = {
-            @CacheEvict(value = "categories", allEntries = true),
-            @CacheEvict(value = "item", allEntries = true)
+        @CacheEvict(value = "categories", allEntries = true),
+        @CacheEvict(value = "item", allEntries = true)
     })
     public CategoryResponse updateCategory(
             Long categoryId,

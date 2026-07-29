@@ -1,68 +1,65 @@
 package com.warehouse.kafka.integration;
 
-import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.Batch;
-import com.warehouse.entity.Category;
-import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
-import com.warehouse.entity.OutboxEvent;
-import com.warehouse.entity.OutboxStatus;
-import com.warehouse.entity.Role;
-import com.warehouse.entity.Stock;
-import com.warehouse.entity.User;
-import com.warehouse.entity.Warehouse;
-import com.warehouse.repository.BatchRepository;
-import com.warehouse.repository.CategoryRepository;
-import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.OutboxEventRepository;
-import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.UserRepository;
-import com.warehouse.repository.WarehouseRepository;
+import com.warehouse.entity.*;
+import com.warehouse.repository.*;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.messaging.Message;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(classes = WarehouseApp.class, properties = {
-        "spring.kafka.bootstrap-servers=invalid:9092",
-        "spring.kafka.outbox.polling.interval-ms=3600000"
+    "spring.kafka.outbox.polling.interval-ms=3600000"
 })
+@DirtiesContext
 class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockMovementService stockMovementService;
-
     @Autowired
     private OutboxEventRepository outboxEventRepository;
-
     @Autowired
     private ItemRepository itemRepository;
-
     @Autowired
     private UserRepository userRepository;
-
     @Autowired
     private StockRepository stockRepository;
-
     @Autowired
     private CategoryRepository categoryRepository;
-
     @Autowired
     private WarehouseRepository warehouseRepository;
-
     @Autowired
     private BatchRepository batchRepository;
+    @Autowired
+    private StockMovementRepository stockMovementRepository;
+    @Autowired
+    private StockReserveRepository stockReserveRepository;
+    @Autowired
+    private StockAlertRepository stockAlertRepository;
+    @Autowired
+    private PurchaseOrderItemRepository purchaseOrderItemRepository;
+    @Autowired
+    private PurchaseOrderRepository purchaseOrderRepository;
 
     private Item testItem;
     private User testUser;
@@ -71,15 +68,18 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        stockMovementRepository.deleteAllInBatch();
+        stockReserveRepository.deleteAllInBatch();
+        batchRepository.deleteAll();
+        stockAlertRepository.deleteAll();
+        purchaseOrderItemRepository.deleteAllInBatch();
+        purchaseOrderRepository.deleteAllInBatch();
         stockRepository.deleteAll();
         itemRepository.deleteAll();
         categoryRepository.deleteAll();
         outboxEventRepository.deleteAll();
-        batchRepository.deleteAll();
 
-        Category category = categoryRepository.save(
-                Category.builder().name("Test").build()
-        );
+        Category category = categoryRepository.save(Category.builder().name("Test").build());
 
         defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
                 .orElseThrow(() -> new IllegalStateException("Default warehouse not configured"));
@@ -131,7 +131,7 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         assertThat(response.type()).isEqualTo(MovementType.WRITE_OFF);
         assertThat(response.quantity()).isEqualTo(15);
 
-        Stock stock = stockRepository.findByItemIdAndWarehouseId(testItemId, defaultWarehouse.getId()).orElseThrow();
+        Stock stock = stockRepository.findByItemId(testItemId).orElseThrow();
         assertThat(stock.getQuantity()).isEqualTo(5);
 
         List<OutboxEvent> pending = outboxEventRepository.findPendingEvents(10);
@@ -139,5 +139,22 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         OutboxEvent event = pending.get(0);
         assertThat(event.getEventType()).isEqualTo("LowStockAlert");
         assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING);
+    }
+
+    @TestConfiguration
+    static class KafkaUnavailableConfig {
+        @Bean
+        @Primary
+        public KafkaTemplate<String, Object> stubKafkaTemplate() {
+            @SuppressWarnings("unchecked")
+            KafkaTemplate<String, Object> template = mock(KafkaTemplate.class);
+            when(template.send(any(Message.class)))
+                    .thenThrow(new RuntimeException("Kafka is down"));
+            when(template.send(any(String.class), any(), any()))
+                    .thenThrow(new RuntimeException("Kafka is down"));
+            when(template.send(any(String.class), any()))
+                    .thenThrow(new RuntimeException("Kafka is down"));
+            return template;
+        }
     }
 }
