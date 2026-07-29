@@ -5,8 +5,10 @@ import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.WarehouseRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class CsvImportService {
 
     private final ItemRepository     itemRepository;
     private final CategoryRepository categoryRepository;
+    private final WarehouseRepository warehouseRepository;
 
     private static final int BATCH_SIZE = 500;
 
@@ -61,13 +64,11 @@ public class CsvImportService {
                     continue;
                 }
 
-                // Пакетная проверка SKU для текущей пачки
                 Set<String> candidateSkus = candidateRows.stream()
                                                          .map(row -> row.dto().sku())
                                                          .collect(Collectors.toSet());
                 Set<String> existingSkus = new HashSet<>(itemRepository.findAllSkusIn(candidateSkus));
 
-                // Пакетный поиск категорий для текущей пачки
                 Set<String> categoryNames = candidateRows.stream()
                                                          .map(row -> row.dto().category())
                                                          .collect(Collectors.toSet());
@@ -100,7 +101,7 @@ public class CsvImportService {
                     Item item = mapDtoToEntity(dto, category);
                     itemsToSave.add(item);
                 }
-                // Сохраняем пачку товаров батчами
+
                 if (!itemsToSave.isEmpty()) {
                     saveInBatches(itemsToSave);
                     totalImported += itemsToSave.size();
@@ -135,10 +136,8 @@ public class CsvImportService {
                                        })
                                        .toList();
 
-        // 1. Быстро вставляем пачку новых товаров нативным батчем
         jdbcTemplate.batchUpdate(insertItemsSql, itemArgs);
 
-        // 2. Собираем SKU только что вставленных товаров, чтобы узнать их новые сгенерированные ID
         List<String> skus = items.stream().map(Item::getSku).toList();
         String placeholders = String.join(",", skus.stream().map(s -> "?").toList());
         String selectIdsSql = "SELECT id, sku FROM items WHERE sku IN (" + placeholders + ")";
@@ -159,14 +158,16 @@ public class CsvImportService {
                 }
         );
 
-        // 3. Пакетно создаем пустые стоки (quantity = 0) строго для этих новых товаров
         String insertStockSql = """
-                    INSERT INTO stocks (item_id, quantity)
-                    VALUES (?, 0)
+                    INSERT INTO stock (item_id, quantity, warehouse_id)
+                    VALUES (?, 0, ?)
                 """;
 
+        Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
+                                                       .orElseThrow(() -> new IllegalStateException("Default warehouse is not configured"));
+
         List<Object[]> stockArgs = skuToIdMap.values().stream()
-                                             .map(itemId -> new Object[]{itemId})
+                                             .map(itemId -> new Object[]{itemId, defaultWarehouse.getId()})
                                              .toList();
 
         if (!stockArgs.isEmpty()) {
