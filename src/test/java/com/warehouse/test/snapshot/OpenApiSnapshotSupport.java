@@ -58,7 +58,12 @@ public final class OpenApiSnapshotSupport {
 
     private static Path resolveSnapshotSourceFile() {
         String projectRoot = System.getProperty(PROJECT_ROOT_DIR_PROPERTY);
-        Path base = projectRoot != null ? Path.of(projectRoot) : Path.of("").toAbsolutePath();
+        Path base;
+        if (projectRoot != null) {
+            base = Path.of(projectRoot);
+        } else {
+            base = Path.of("").toAbsolutePath();
+        }
         return base.resolve("src").resolve("test").resolve("resources").resolve("openapi").resolve("warehouse.json");
     }
 
