@@ -9,20 +9,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
-import org.springframework.dao.DataAccessException;
-import org.springframework.data.redis.connection.RedisClusterConnection;
-import org.springframework.data.redis.connection.RedisConnection;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisSentinelConnection;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @DirtiesContext
@@ -34,19 +33,30 @@ class CategoryServiceRedisFallbackIntegrationTest extends AbstractIntegrationTes
     @Autowired
     private CategoryRepository categoryRepository;
 
-    @Autowired
-    private RedisConnectionFactory redisConnectionFactory;
+    @MockitoBean
+    private CacheManager cacheManager;
 
     @BeforeEach
     void setUp() {
         categoryRepository.deleteAll();
         categoryRepository.save(Category.builder().name("Books").build());
         categoryRepository.save(Category.builder().name("Electronics").build());
+
+        Cache cache = mock(Cache.class);
+        when(cacheManager.getCache("categories")).thenReturn(cache);
+
+        doThrow(new RuntimeException("Redis is down")).when(cache).get(any(), any(Class.class));
+        doThrow(new RuntimeException("Redis is down")).when(cache).put(any(), any());
+        doThrow(new RuntimeException("Redis is down")).when(cache).evict(any());
+        doThrow(new RuntimeException("Redis is down")).when(cache).clear();
     }
 
     @Test
-    void redisShouldBeUnavailable() {
-        assertThatThrownBy(() -> redisConnectionFactory.getConnection())
+    void cacheShouldBeUnavailable() {
+        Cache cache = cacheManager.getCache("categories");
+        assertThat(cache).isNotNull();
+
+        assertThatThrownBy(() -> cache.get("anyKey", Object.class))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Redis is down");
     }
@@ -58,41 +68,6 @@ class CategoryServiceRedisFallbackIntegrationTest extends AbstractIntegrationTes
             assertThat(categories).isNotEmpty();
             assertThat(categories).extracting(CategoryResponse::name)
                     .containsExactlyInAnyOrder("Books", "Electronics");
-        }
-    }
-
-    @TestConfiguration
-    static class RedisUnavailableConfig {
-
-        @Bean
-        @Primary
-        public RedisConnectionFactory stubRedisConnectionFactory() {
-            return new RedisConnectionFactory() {
-                @Override
-                public RedisConnection getConnection() {
-                    throw new RuntimeException("Redis is down");
-                }
-
-                @Override
-                public RedisClusterConnection getClusterConnection() {
-                    throw new RuntimeException("Redis is down");
-                }
-
-                @Override
-                public RedisSentinelConnection getSentinelConnection() {
-                    throw new RuntimeException("Redis is down");
-                }
-
-                @Override
-                public boolean getConvertPipelineAndTxResults() {
-                    return false;
-                }
-
-                @Override
-                public DataAccessException translateExceptionIfPossible(RuntimeException ex) {
-                    return null;
-                }
-            };
         }
     }
 }

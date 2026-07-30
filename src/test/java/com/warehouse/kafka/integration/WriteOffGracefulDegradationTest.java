@@ -1,12 +1,33 @@
 package com.warehouse.kafka.integration;
 
-import com.warehouse.WarehouseApp;
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.WarehouseApp;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.*;
-import com.warehouse.repository.*;
+import com.warehouse.entity.Batch;
+import com.warehouse.entity.Category;
+import com.warehouse.entity.Item;
+import com.warehouse.entity.MovementType;
+import com.warehouse.entity.OutboxEvent;
+import com.warehouse.entity.OutboxStatus;
+import com.warehouse.entity.Role;
+import com.warehouse.entity.Stock;
+import com.warehouse.entity.User;
+import com.warehouse.entity.Warehouse;
+import com.warehouse.kafka.outbox.OutboxEventRelay;
+import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.OutboxEventRepository;
+import com.warehouse.repository.PurchaseOrderItemRepository;
+import com.warehouse.repository.PurchaseOrderRepository;
+import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
+import com.warehouse.repository.UserRepository;
+import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,8 +37,9 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.messaging.Message;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,11 +50,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(classes = WarehouseApp.class, properties = {
-    "spring.kafka.outbox.polling.interval-ms=3600000"
-})
+@SpringBootTest(classes = WarehouseApp.class)
 @DirtiesContext
 class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
+
+    @MockitoBean
+    private OutboxEventRelay outboxEventRelay;
 
     @Autowired
     private StockMovementService stockMovementService;
