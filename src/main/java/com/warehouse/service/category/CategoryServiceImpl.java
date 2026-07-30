@@ -61,7 +61,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "categories")
-    @CircuitBreaker(name = "itemCache", fallbackMethod = "getCategoriesFallback")
+    @CircuitBreaker(name = "categoryCache", fallbackMethod = "getCategoriesFallback")
     public List<CategoryResponse> getCategories() {
         log.debug("Getting all categories");
 

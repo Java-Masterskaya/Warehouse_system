@@ -96,6 +96,12 @@ resilience4j:
     instances:
       itemCache:
         base-config: default
+        ignore-exceptions:
+          - com.warehouse.exception.EntityNotFoundException
+      categoryCache:
+        base-config: default
+        ignore-exceptions:
+          - com.warehouse.exception.EntityNotFoundException
       kafkaProducer:
         base-config: default
         wait-duration-in-open-state: 10s
