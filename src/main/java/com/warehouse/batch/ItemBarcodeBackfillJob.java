@@ -61,6 +61,7 @@ public class ItemBarcodeBackfillJob {
     private final ItemBarcodeGenerator barcodeGenerator;
     private final TransactionTemplate txTemplate;
 
+    private final Object stateLock = new Object();
     private final AtomicBoolean stopped = new AtomicBoolean(false);
     private final AtomicBoolean running = new AtomicBoolean(false);
 
@@ -78,11 +79,13 @@ public class ItemBarcodeBackfillJob {
      * Мягко запросить остановку после завершения текущего батча.
      */
     public void stop() {
-        if (!running.get()) {
-            log.warn("Запрошена остановка backfill, но джоба сейчас не выполняется.");
-            return;
+        synchronized (stateLock) {
+            if (!running.get()) {
+                log.warn("Запрошена остановка backfill, но джоба сейчас не выполняется.");
+                return;
+            }
+            stopped.set(true);
         }
-        stopped.set(true);
         log.info("Запрошена остановка backfill. Завершу текущий батч и выйду.");
     }
 
@@ -108,8 +111,11 @@ public class ItemBarcodeBackfillJob {
      * @throws BackfillAlreadyRunningException если джоба уже выполняется в другом потоке
      */
     public Result run(int batchSize) {
-        if (!running.compareAndSet(false, true)) {
-            throw BackfillAlreadyRunningException.forJob("ItemBarcodeBackfillJob");
+        synchronized (stateLock) {
+            if (!running.compareAndSet(false, true)) {
+                throw BackfillAlreadyRunningException.forJob("ItemBarcodeBackfillJob");
+            }
+            stopped.set(false);
         }
         try {
             return doRun(batchSize);
@@ -119,7 +125,6 @@ public class ItemBarcodeBackfillJob {
     }
 
     private Result doRun(int batchSize) {
-        stopped.set(false);
         AtomicLong totalProcessed = new AtomicLong(0);
         long lastId = 0L;
         int iterations = 0;
