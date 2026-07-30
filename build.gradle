@@ -69,6 +69,7 @@ dependencies {
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'com.atlassian.oai:swagger-request-validator-mockmvc:2.46.1'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'org.testcontainers:kafka:1.21.4'
@@ -90,6 +91,9 @@ dependencyManagement {
 test {
     useJUnitPlatform()
     environment 'SPRING_PROFILES_ACTIVE', 'test'
+    // Позволяет обновить зафиксированный OpenAPI-снапшот (см. OpenApiSnapshotSupport):
+    // ./gradlew test --tests "*OpenApiContractDriftTest" -DupdateOpenApiSnapshot=true
+    systemProperty 'updateOpenApiSnapshot', System.getProperty('updateOpenApiSnapshot', 'false')
 }
 
 checkstyle {
