@@ -123,7 +123,21 @@ class ItemApiContractTest extends AbstractOpenApiContractTest {
 
     @Test
     void getItemListMatchesContract() throws Exception {
+        // Фильтруем по уникальному SKU: без фильтра список содержит вперемешку товары
+        // из других тестовых классов, некоторые из которых создают Item напрямую через
+        // репозиторий без price/cost — это валидно для их сценариев, но не относится
+        // к проверке контракта ответа для товаров, реально созданных через API.
+        String sku = "SKU-CONTRACT-LIST-" + System.currentTimeMillis();
+        CreateItemRequest request = new CreateItemRequest(
+                sku, "Товар", "Контракт", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+        mockMvc.perform(post(BASE_URL)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
         mockMvc.perform(get(BASE_URL)
+                        .param("search", sku)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(openApiContract());

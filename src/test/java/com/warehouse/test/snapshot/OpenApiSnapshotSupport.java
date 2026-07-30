@@ -42,12 +42,24 @@ public final class OpenApiSnapshotSupport {
      */
     public static final String UPDATE_SNAPSHOT_PROPERTY = "updateOpenApiSnapshot";
 
-    private static final Path SNAPSHOT_SOURCE_FILE =
-            Path.of("src", "test", "resources", "openapi", "warehouse.json");
+    /**
+     * Системное свойство с абсолютным путём к корню проекта (задаётся в {@code build.gradle}
+     * через {@code project.projectDir}). Запись снапшота не должна зависеть от того, что рабочая
+     * директория форкнутой тестовой JVM случайно совпадёт с корнем проекта.
+     */
+    private static final String PROJECT_ROOT_DIR_PROPERTY = "projectRootDir";
+
+    private static final Path SNAPSHOT_SOURCE_FILE = resolveSnapshotSourceFile();
 
     private static final int MAX_REPORTED_DIFFERENCES = 40;
 
     private OpenApiSnapshotSupport() {
+    }
+
+    private static Path resolveSnapshotSourceFile() {
+        String projectRoot = System.getProperty(PROJECT_ROOT_DIR_PROPERTY);
+        Path base = projectRoot != null ? Path.of(projectRoot) : Path.of("").toAbsolutePath();
+        return base.resolve("src").resolve("test").resolve("resources").resolve("openapi").resolve("warehouse.json");
     }
 
     /**

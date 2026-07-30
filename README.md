@@ -347,8 +347,6 @@ API описывается code-first: springdoc генерирует спеку
 ./gradlew test --tests "*OpenApiContractDriftTest" -DupdateOpenApiSnapshot=true
 ```
 
-Дифф в `git diff src/test/resources/openapi/warehouse.json` — часть код-ревью: ревьюер видит,
-что именно изменилось в контракте, а не только в реализации.
 
 ### Известное ограничение: формат `date-time`
 

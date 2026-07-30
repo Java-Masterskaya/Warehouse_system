@@ -94,6 +94,9 @@ test {
     // Позволяет обновить зафиксированный OpenAPI-снапшот (см. OpenApiSnapshotSupport):
     // ./gradlew test --tests "*OpenApiContractDriftTest" -DupdateOpenApiSnapshot=true
     systemProperty 'updateOpenApiSnapshot', System.getProperty('updateOpenApiSnapshot', 'false')
+    // Явно передаём корень проекта — запись снапшота не должна зависеть от рабочей
+    // директории форкнутой тестовой JVM (по умолчанию она и так == projectDir, но лучше не гадать).
+    systemProperty 'projectRootDir', project.projectDir.absolutePath
 }
 
 checkstyle {
