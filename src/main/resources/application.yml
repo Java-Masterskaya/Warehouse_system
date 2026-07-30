@@ -15,7 +15,9 @@ spring:
         order_updates: true
   flyway:
     enabled: true
-
+  mvc:
+    async:
+      request-timeout: 180000 # 3 минуты
   servlet:
     multipart:
       enabled: true

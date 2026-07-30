@@ -26,10 +26,10 @@ public class CsvItemParser {
 
     private final        Validator   validator;
     private static final int         CHUNK_SIZE       = 1000;
-    private static final Set<String> REQUIRED_HEADERS = Set.of("sku", "name", "category", "price", "cost", "warehouse");
 
     public Iterable<CsvChunk> parseInChunks(InputStream inputStream) {
-        return () -> new Iterator<CsvChunk>() {
+        return () -> new Iterator<>() {
+//         todo 'BOMInputStream(java.io.InputStream)' is deprecated
             private final BOMInputStream      bomInputStream = new BOMInputStream(inputStream);
             private final InputStreamReader   reader         = new InputStreamReader(bomInputStream);
             private final CSVParser           csvParser;
@@ -131,13 +131,6 @@ public class CsvItemParser {
                 parseBigDecimal(record.get("Cost")));
     }
 
-    private Integer parseInteger(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return Integer.parseInt(value.trim());
-    }
-
     private BigDecimal parseBigDecimal(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -174,8 +167,5 @@ public class CsvItemParser {
 
     // Вспомогательные классы-обёртки
     public record ValidRowHolder(int rowNumber, ItemImportRowDto dto) {
-    }
-
-    public record ParsedCsvResult(int totalRows, List<ValidRowHolder> validRows, List<ItemImportErrorDto> errors) {
     }
 }

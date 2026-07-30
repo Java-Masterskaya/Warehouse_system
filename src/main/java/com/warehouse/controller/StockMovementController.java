@@ -136,7 +136,6 @@ public class StockMovementController {
     public ResponseEntity<StreamingResponseBody> exportMovements(Authentication authentication) {
         SecurityContext context = SecurityContextHolder.getContext();
         StreamingResponseBody responseBody = outputStream -> {
-            // 1. Устанавливаем контекст
             SecurityContextHolder.setContext(context);
             try (OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
                 csvExportService.exportMovement(writer);

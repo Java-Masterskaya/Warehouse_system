@@ -2,19 +2,18 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.dto.response.item.ItemResponse;
-import com.warehouse.dto.response.PageResponse;
+import com.warehouse.service.category.CategoryService;
 import com.warehouse.service.import_export.CsvExportService;
 import com.warehouse.service.import_export.CsvImportService;
-import com.warehouse.service.category.CategoryService;
 import com.warehouse.service.item.ItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,16 +25,16 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
@@ -67,7 +66,8 @@ public class ItemController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size
+    ) {
         log.debug("Received get items request: sort={}, order={}, category={}, search={}, page={}, size={}",
                 sort, order, category, search, page, size);
         return itemService.getItems(sort, order, category, search, page, size);
@@ -88,7 +88,8 @@ public class ItemController {
     @PreAuthorize("hasRole('ADMIN')")
     public ItemResponse updateItem(
             @PathVariable Long itemId,
-            @Valid @RequestBody UpdateItemRequest request) {
+            @Valid @RequestBody UpdateItemRequest request
+    ) {
         log.debug("Received update item request: itemId={}, name={}, category={}", itemId, request.name(),
                 request.category());
         return itemService.updateItem(itemId, request);
@@ -125,7 +126,10 @@ public class ItemController {
     @GetMapping("/export")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<StreamingResponseBody> exportItems(Authentication authentication, @RequestParam(required = true) Boolean active) {
+    public ResponseEntity<StreamingResponseBody> exportItems(
+            Authentication authentication,
+            @RequestParam(value = "active", required = false) Boolean active
+    ) {
         SecurityContext context = SecurityContextHolder.getContext();
         StreamingResponseBody responseBody = outputStream -> {
             SecurityContextHolder.setContext(context);

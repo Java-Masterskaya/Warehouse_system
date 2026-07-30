@@ -30,13 +30,13 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CsvImportServiceImpl implements CsvImportService{
+public class CsvImportServiceImpl implements CsvImportService {
 
     private final CsvItemParser csvItemParser;
     private final JdbcTemplate  jdbcTemplate;
 
-    private final ItemRepository     itemRepository;
-    private final CategoryRepository categoryRepository;
+    private final ItemRepository      itemRepository;
+    private final CategoryRepository  categoryRepository;
     private final WarehouseRepository warehouseRepository;
 
     private static final int BATCH_SIZE = 500;
@@ -164,7 +164,8 @@ public class CsvImportServiceImpl implements CsvImportService{
                 """;
 
         Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
-                                                       .orElseThrow(() -> new IllegalStateException("Default warehouse is not configured"));
+                                                        .orElseThrow(() -> new IllegalStateException(
+                                                                "Default warehouse is not configured"));
 
         List<Object[]> stockArgs = skuToIdMap.values().stream()
                                              .map(itemId -> new Object[]{itemId, defaultWarehouse.getId()})
