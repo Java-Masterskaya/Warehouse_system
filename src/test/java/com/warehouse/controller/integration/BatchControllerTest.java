@@ -118,16 +118,16 @@ class BatchControllerTest extends AbstractIntegrationTest {
         testItemId = testItem.getId();
 
         // Создаём пользователя admin только если его нет
-        userRepository.findByUsername("admin").orElseGet(() -> {
+        userRepository.findByUsername("New_admin").orElseGet(() -> {
             User admin = new User();
-            admin.setUsername("admin");
+            admin.setUsername("New_admin");
             admin.setPassword(passwordEncoder.encode("secret"));
             admin.setRole(com.warehouse.entity.Role.ROLE_ADMIN);
             admin.setActive(true);
             return userRepository.save(admin);
         });
 
-        adminToken = obtainToken("admin", "secret");
+        adminToken = obtainToken("New_admin", "secret");
     }
 
     /**

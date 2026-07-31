@@ -8,23 +8,33 @@ import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
+import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.UserRepository;
+import com.warehouse.security.UserPrincipal;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,12 +71,19 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     private CategoryRepository categoryRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
     private BatchRepository batchRepository;
 
     private Long itemId;
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.clearContext();
         // Очищаем таблицы в правильном порядке, учитывая внешние ключи
         stockMovementRepository.deleteAllInBatch();
         batchRepository.deleteAll();
@@ -107,6 +124,13 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         batchRepository.save(batch);
 
         itemId = item.getId();
+
+        setAuthentification();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     /**
@@ -183,4 +207,27 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         assertThat(response2.getCurrentStock()).isEqualTo(17);
     }
 
+    private void setAuthentification() {
+        User admin = createActiveAdmin("admin");
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new UserPrincipal(admin.getId(), admin.getUsername(), admin.getPassword(), admin.isActive(),
+                        List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))), null,
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+    }
+
+    private User createActiveAdmin(String username) {
+        return userRepository.findByUsername(username).map(user -> {
+            user.setPassword(passwordEncoder.encode("password"));
+            user.setRole(Role.ROLE_ADMIN);
+            user.setActive(true);
+            return userRepository.save(user);
+        }).orElseGet(() -> {
+            User user = new User();
+            user.setUsername(username);
+            user.setPassword(passwordEncoder.encode("password"));
+            user.setRole(Role.ROLE_ADMIN);
+            user.setActive(true);
+            return userRepository.save(user);
+        });
+    }
 }
