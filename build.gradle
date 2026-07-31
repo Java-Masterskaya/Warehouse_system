@@ -78,6 +78,7 @@ dependencies {
     testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
     testImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
     testImplementation "org.testcontainers:redpanda:${testcontainersVersion}"
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.2'
 
     testRuntimeOnly 'com.h2database:h2'
 }

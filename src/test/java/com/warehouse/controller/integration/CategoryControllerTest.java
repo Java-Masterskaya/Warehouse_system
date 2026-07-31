@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.request.category.CreateCategoryRequest;
 import com.warehouse.dto.request.category.UpdateCategoryRequest;
-import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Role;
@@ -72,23 +71,27 @@ class CategoryControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        adminToken = obtainToken("admin", "secret");
+        User adminUser = userRepository.findByUsername("admin").orElseGet(() -> {
+            User admin = new User();
+            admin.setUsername("admin");
+            admin.setPassword(passwordEncoder.encode("secret"));
+            admin.setRole(Role.ROLE_ADMIN);
+            admin.setActive(true);
+            return userRepository.saveAndFlush(admin);
+        });
 
-        User testUser = userRepository.findByUsername("category-test-user")
-                .orElseGet(() -> {
-                    User user = new User();
-                    user.setUsername("category-test-user");
-                    user.setPassword(passwordEncoder.encode("password"));
-                    user.setRole(Role.ROLE_USER);
-                    user.setActive(true);
-                    return userRepository.save(user);
-                });
+        adminToken = jwtUtil.generateToken("admin", adminUser.getId(), List.of("ROLE_ADMIN"));
 
-        userToken = jwtUtil.generateToken(
-                testUser.getUsername(),
-                testUser.getId(),
-                List.of("ROLE_USER")
-        );
+        User testUser = userRepository.findByUsername("category-test-user").orElseGet(() -> {
+            User user = new User();
+            user.setUsername("category-test-user");
+            user.setPassword(passwordEncoder.encode("password"));
+            user.setRole(Role.ROLE_USER);
+            user.setActive(true);
+            return userRepository.save(user);
+        });
+
+        userToken = jwtUtil.generateToken(testUser.getUsername(), testUser.getId(), List.of("ROLE_USER"));
 
         suffix = String.valueOf(System.currentTimeMillis());
     }
@@ -97,18 +100,17 @@ class CategoryControllerTest extends AbstractIntegrationTest {
      * ADMIN может создать категорию.
      */
     @Test
-    void createCategoryAdminReturns201() throws Exception {
+    void createCategoryAdminReturns201()
+            throws Exception {
         String categoryName = "Созданная категория-" + suffix;
-        CreateCategoryRequest request =
-                new CreateCategoryRequest(categoryName);
+        CreateCategoryRequest request = new CreateCategoryRequest(categoryName);
 
-        mockMvc.perform(post(BASE_URL)
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.name").value(categoryName));
+        mockMvc.perform(post(BASE_URL).header("Authorization", "Bearer " + adminToken)
+                                      .contentType(MediaType.APPLICATION_JSON)
+                                      .content(objectMapper.writeValueAsString(request)))
+               .andExpect(status().isCreated())
+               .andExpect(jsonPath("$.id").isNumber())
+               .andExpect(jsonPath("$.name").value(categoryName));
 
         assertThat(categoryRepository.existsByNameIgnoreCase(categoryName)).isTrue();
     }
@@ -117,43 +119,36 @@ class CategoryControllerTest extends AbstractIntegrationTest {
      * ADMIN может получить категорию по идентификатору.
      */
     @Test
-    void getCategoryAdminReturns200() throws Exception {
-        Category category = saveCategory(
-                "Категория для получения-" + suffix
-        );
+    void getCategoryAdminReturns200()
+            throws Exception {
+        Category category = saveCategory("Категория для получения-" + suffix);
 
-        mockMvc.perform(get(BASE_URL + "/" + category.getId())
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(category.getId()))
-                .andExpect(jsonPath("$.name").value(category.getName()));
+        mockMvc.perform(get(BASE_URL + "/" + category.getId()).header("Authorization", "Bearer " + adminToken))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.id").value(category.getId()))
+               .andExpect(jsonPath("$.name").value(category.getName()));
     }
 
     /**
      * ADMIN может изменить название категории.
      */
     @Test
-    void updateCategoryAdminReturns200() throws Exception {
-        Category category = saveCategory(
-                "Категория до обновления-" + suffix
-        );
+    void updateCategoryAdminReturns200()
+            throws Exception {
+        Category category = saveCategory("Категория до обновления-" + suffix);
 
         String updatedName = "Категория после обновления-" + suffix;
 
-        UpdateCategoryRequest request =
-                new UpdateCategoryRequest(updatedName);
+        UpdateCategoryRequest request = new UpdateCategoryRequest(updatedName);
 
-        mockMvc.perform(put(BASE_URL + "/" + category.getId())
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(category.getId()))
-                .andExpect(jsonPath("$.name").value(updatedName));
+        mockMvc.perform(put(BASE_URL + "/" + category.getId()).header("Authorization", "Bearer " + adminToken)
+                                                              .contentType(MediaType.APPLICATION_JSON)
+                                                              .content(objectMapper.writeValueAsString(request)))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.id").value(category.getId()))
+               .andExpect(jsonPath("$.name").value(updatedName));
 
-        Category updatedCategory = categoryRepository
-                .findById(category.getId())
-                .orElseThrow();
+        Category updatedCategory = categoryRepository.findById(category.getId()).orElseThrow();
 
         assertThat(updatedCategory.getName()).isEqualTo(updatedName);
     }
@@ -162,17 +157,14 @@ class CategoryControllerTest extends AbstractIntegrationTest {
      * ADMIN может удалить категорию, которая не используется товарами.
      */
     @Test
-    void deleteUnusedCategoryAdminReturns204() throws Exception {
-        Category category = saveCategory(
-                "Категория для удаления-" + suffix
-        );
+    void deleteUnusedCategoryAdminReturns204()
+            throws Exception {
+        Category category = saveCategory("Категория для удаления-" + suffix);
 
-        mockMvc.perform(delete(BASE_URL + "/" + category.getId())
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNoContent());
+        mockMvc.perform(delete(BASE_URL + "/" + category.getId()).header("Authorization", "Bearer " + adminToken))
+               .andExpect(status().isNoContent());
 
-        assertThat(categoryRepository.existsById(category.getId()))
-                .isFalse();
+        assertThat(categoryRepository.existsById(category.getId())).isFalse();
     }
 
     /**
@@ -180,24 +172,19 @@ class CategoryControllerTest extends AbstractIntegrationTest {
      * возвращает 409 Conflict.
      */
     @Test
-    void deleteCategoryInUseReturns409() throws Exception {
-        Category category = saveCategory(
-                "Используемая категория-" + suffix
-        );
+    void deleteCategoryInUseReturns409()
+            throws Exception {
+        Category category = saveCategory("Используемая категория-" + suffix);
 
         Item item = saveItem(category);
 
-        mockMvc.perform(delete(BASE_URL + "/" + category.getId())
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error")
-                        .value("CATEGORY_IN_USE"));
+        mockMvc.perform(delete(BASE_URL + "/" + category.getId()).header("Authorization", "Bearer " + adminToken))
+               .andExpect(status().isConflict())
+               .andExpect(jsonPath("$.error").value("CATEGORY_IN_USE"));
 
-        assertThat(categoryRepository.existsById(category.getId()))
-                .isTrue();
+        assertThat(categoryRepository.existsById(category.getId())).isTrue();
 
-        assertThat(itemRepository.existsById(item.getId()))
-                .isTrue();
+        assertThat(itemRepository.existsById(item.getId())).isTrue();
     }
 
     /**
@@ -205,21 +192,17 @@ class CategoryControllerTest extends AbstractIntegrationTest {
      * возвращает 409 Conflict.
      */
     @Test
-    void createDuplicateCategoryReturns409() throws Exception {
-        Category category = saveCategory(
-                "Дублирующаяся категория-" + suffix
-        );
+    void createDuplicateCategoryReturns409()
+            throws Exception {
+        Category category = saveCategory("Дублирующаяся категория-" + suffix);
 
-        CreateCategoryRequest request =
-                new CreateCategoryRequest(category.getName());
+        CreateCategoryRequest request = new CreateCategoryRequest(category.getName());
 
-        mockMvc.perform(post(BASE_URL)
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error")
-                        .value("DUPLICATE_CATEGORY"));
+        mockMvc.perform(post(BASE_URL).header("Authorization", "Bearer " + adminToken)
+                                      .contentType(MediaType.APPLICATION_JSON)
+                                      .content(objectMapper.writeValueAsString(request)))
+               .andExpect(status().isConflict())
+               .andExpect(jsonPath("$.error").value("DUPLICATE_CATEGORY"));
     }
 
     /**
@@ -227,74 +210,67 @@ class CategoryControllerTest extends AbstractIntegrationTest {
      * возвращает 404 Not Found.
      */
     @Test
-    void getNonExistingCategoryReturns404() throws Exception {
-        mockMvc.perform(get(BASE_URL + "/999999999")
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error")
-                        .value("ENTITY_NOT_FOUND"));
+    void getNonExistingCategoryReturns404()
+            throws Exception {
+        mockMvc.perform(get(BASE_URL + "/999999999").header("Authorization", "Bearer " + adminToken))
+               .andExpect(status().isNotFound())
+               .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"));
     }
 
     /**
      * Пустое название категории не проходит валидацию.
      */
     @Test
-    void createCategoryBlankNameReturns400() throws Exception {
-        CreateCategoryRequest request =
-                new CreateCategoryRequest("");
+    void createCategoryBlankNameReturns400()
+            throws Exception {
+        CreateCategoryRequest request = new CreateCategoryRequest("");
 
-        mockMvc.perform(post(BASE_URL)
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error")
-                        .value("VALIDATION_ERROR"));
+        mockMvc.perform(post(BASE_URL).header("Authorization", "Bearer " + adminToken)
+                                      .contentType(MediaType.APPLICATION_JSON)
+                                      .content(objectMapper.writeValueAsString(request)))
+               .andExpect(status().isBadRequest())
+               .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
     }
 
     /**
      * USER не может создавать категории.
      */
     @Test
-    void createCategoryUserReturns403() throws Exception {
-        CreateCategoryRequest request =
-                new CreateCategoryRequest(
-                        "Запрещенная категория-" + suffix
-                );
+    void createCategoryUserReturns403()
+            throws Exception {
+        CreateCategoryRequest request = new CreateCategoryRequest("Запрещенная категория-" + suffix);
 
-        mockMvc.perform(post(BASE_URL)
-                        .header("Authorization", "Bearer " + userToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error")
-                        .value("ACCESS_DENIED"));
+        mockMvc.perform(post(BASE_URL).header("Authorization", "Bearer " + userToken)
+                                      .contentType(MediaType.APPLICATION_JSON)
+                                      .content(objectMapper.writeValueAsString(request)))
+               .andExpect(status().isForbidden())
+               .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
     }
 
     /**
      * Запрос без токена возвращает 401 Unauthorized.
      */
     @Test
-    void createCategoryWithoutTokenReturns401() throws Exception {
-        CreateCategoryRequest request =
-                new CreateCategoryRequest(
-                        "Категория без токена-" + suffix
-                );
+    void createCategoryWithoutTokenReturns401()
+            throws Exception {
+        CreateCategoryRequest request = new CreateCategoryRequest("Категория без токена-" + suffix);
 
-        mockMvc.perform(post(BASE_URL)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error")
-                        .value("UNAUTHORIZED"));
+        mockMvc.perform(post(BASE_URL).contentType(MediaType.APPLICATION_JSON)
+                                      .content(objectMapper.writeValueAsString(request)))
+               .andExpect(status().isUnauthorized())
+               .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
     private Category saveCategory(String name) {
-        return categoryRepository.save(
-                Category.builder()
-                        .name(name)
-                        .build()
-        );
+        Category category;
+        if (!categoryRepository.existsByNameIgnoreCase(name)) {
+            Category newCategory = new Category();
+            newCategory.setName(name);
+            category = categoryRepository.save(newCategory);
+        } else {
+            category = categoryRepository.findByNameIgnoreCase(name).get();
+        }
+        return category;
     }
 
     private Item saveItem(Category category) {
@@ -308,26 +284,5 @@ class CategoryControllerTest extends AbstractIntegrationTest {
         item.setActive(true);
 
         return itemRepository.save(item);
-    }
-
-    private String obtainToken(
-            String username,
-            String password
-    ) throws Exception {
-
-        LoginRequest request =
-                new LoginRequest(username, password);
-
-        String response = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-
-        return objectMapper.readTree(response)
-                .get("accessToken")
-                .asText();
     }
 }

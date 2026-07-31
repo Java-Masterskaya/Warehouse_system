@@ -1,5 +1,9 @@
 package com.warehouse.service.item;
 
+import com.warehouse.audit.AuditContext;
+import com.warehouse.audit.Auditable;
+import com.warehouse.audit.entity.AuditAction;
+import com.warehouse.audit.entity.EntityType;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
@@ -44,11 +48,13 @@ public class ItemServiceImpl implements ItemService {
     private final StockRepository stockRepository;
     private final WarehouseRepository warehouseRepository;
     private final ItemMapper itemMapper;
+    private final AuditContext auditContext;
     private final StockAvailabilityService availabilityService;
     private final CategoryRepository categoryRepository;
 
     @Transactional
     @Override
+    @Auditable(action = AuditAction.CREATE, entityType = EntityType.ITEM)
     public ItemResponse createItem(CreateItemRequest request) {
         log.debug("Creating item with SKU '{}'", request.sku());
 
@@ -72,6 +78,9 @@ public class ItemServiceImpl implements ItemService {
         stock.setQuantity(0);
         stockRepository.save(stock);
 
+        auditContext.setEntityId(item.getId());
+        auditContext.setNewValue(item);
+
         log.info("Item created: id={}, SKU='{}'", item.getId(), item.getSku());
         return itemMapper.toResponse(item);
     }
@@ -79,6 +88,7 @@ public class ItemServiceImpl implements ItemService {
     @Transactional
     @Override
     @CacheEvict(value = "item", key = "#itemId")
+    @Auditable(action = AuditAction.UPDATE, entityType = EntityType.ITEM)
     public ItemResponse updateItem(Long itemId, UpdateItemRequest request) {
         log.debug("Updating item with id={}", itemId);
 
@@ -87,7 +97,8 @@ public class ItemServiceImpl implements ItemService {
                     log.warn("Item with id={} not found", itemId);
                     return EntityNotFoundException.forId("Item", itemId);
                 });
-
+        auditContext.setEntityId(itemId);
+        auditContext.setOldValue(item);
         if (!item.isActive()) {
             log.warn("Attempt to update inactive item with id={}", itemId);
             throw EntityNotFoundException.forId("Item", itemId);
@@ -100,6 +111,7 @@ public class ItemServiceImpl implements ItemService {
         item.setCost(confirmCost(request.cost()));
 
         Item savedItem = itemRepository.save(item);
+        auditContext.setNewValue(savedItem);
         log.info("Item updated: id={}, SKU='{}'", savedItem.getId(), savedItem.getSku());
         return itemMapper.toResponse(savedItem);
     }
@@ -158,18 +170,21 @@ public class ItemServiceImpl implements ItemService {
     @Transactional
     @Override
     @CacheEvict(value = "item", key = "#itemId")
+    @Auditable(action = AuditAction.DEACTIVATE, entityType = EntityType.ITEM)
     public void softDeleteItem(Long itemId) {
         Item item = itemRepository.findById(itemId).orElseThrow(() -> {
             log.warn("Item с id={} не найден", itemId);
             return EntityNotFoundException.forId("Item", itemId);
         });
-
+        auditContext.setEntityId(itemId);
+        auditContext.setOldValue(item);
         if (!item.isActive()) {
             log.warn("Item с id={} уже неактивный", itemId);
             throw new EntityNotFoundException("Item with id=" + itemId + " is already deactivated");
         }
 
         item.setActive(false);
+        auditContext.setNewValue(item);
         log.info("Item c id={} успешно деактивирован", itemId);
     }
 
