@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -87,6 +88,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
 
         mockMvc.perform(post("/api/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -99,6 +101,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
 
         mockMvc.perform(post("/api/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
@@ -134,6 +137,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
 
         mockMvc.perform(post("/api/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnprocessableEntity())

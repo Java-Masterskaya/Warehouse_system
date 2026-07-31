@@ -2709,6 +2709,14 @@
         "tags" : [ "Движения товара" ],
         "summary" : "Списать товар",
         "operationId" : "writeOffReceipt",
+        "parameters" : [ {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -2941,6 +2949,14 @@
         "tags" : [ "Движения товара" ],
         "summary" : "Зарегистрировать поступление",
         "operationId" : "registerReceipt",
+        "parameters" : [ {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {
