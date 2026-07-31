@@ -130,15 +130,17 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
     private void fillDb(int records, LocalDateTime time)
             throws Exception {
 
-        Category category = new Category();
-        category.setName("Категория");
-        Category saved = categoryRepository.saveAndFlush(category);
+        Category category = categoryRepository.findByNameIgnoreCase("Категория").orElseGet(() -> {
+            Category cat = new Category();
+            cat.setName("Категория");
+            return categoryRepository.saveAndFlush(cat);
+        });
 
         Item item = new Item();
         item.setSku("SKU-1");
         item.setActive(true);
         item.setName("Товар");
-        item.setCategory(saved);
+        item.setCategory(category);
         item.setCost(new BigDecimal(100));
         item.setPrice(new BigDecimal(300));
         item.setMinStock(0);

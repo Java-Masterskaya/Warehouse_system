@@ -98,9 +98,7 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
     private void fillDb(int items)
             throws Exception {
 
-        Category category = new Category();
-        category.setName("Категория");
-        categoryRepository.saveAndFlush(category);
+
 
         StringBuilder csvBuilder = new StringBuilder("SKU,Name,Category,Price,Cost\n");
 
