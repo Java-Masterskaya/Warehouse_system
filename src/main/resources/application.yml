@@ -62,6 +62,11 @@ spring:
     timeout-per-shutdown-phase: 20s
 
 app:
+  audit:
+    retention:
+      # 1.5 года (18 месяцев) для покрытия закрытия фин. года и проверок в Q1
+      days: 547
+      batch-size: 5000
   kafka:
     topics:
       low-stock:
@@ -78,6 +83,11 @@ app:
       max-attempts: 3
   jwt:
     refresh-retry-ttl-seconds: 60
+  idempotency:
+    ttl-hours: 24
+    required: true # Обязательность заголовка Idempotency-Key
+    cleanup-cron: "0 0 * * * *"  # Каждый час
+    enforce-after: 2026-08-26
 
 management:
   server:

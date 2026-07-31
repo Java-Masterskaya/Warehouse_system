@@ -15,4 +15,5 @@ public record ItemResponse(
         BigDecimal cost,
         @JsonProperty("isActive") boolean active,
         LocalDateTime createdAt
-) {}
+) {
+}
