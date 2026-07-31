@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.mockito.Mockito.verify;
@@ -122,6 +123,7 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
         for (int i = 0; i < 3; i++) {
             mockMvc.perform(post("/api/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
+                            .header("Idempotency-Key", UUID.randomUUID().toString())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(movementJson))
                     .andExpect(status().isOk());
@@ -133,6 +135,7 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
         // 3. 4-й запрос превышает лимит
         mockMvc.perform(post("/api/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(movementJson))
                 .andExpect(status().isTooManyRequests());

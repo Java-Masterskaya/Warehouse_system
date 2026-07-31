@@ -34,8 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @SpringBootTest
 @Testcontainers
 class StockReserveConcurrencyTest extends AbstractIntegrationTest {
-    @Autowired
-    StockReserveService service;
+
     @Autowired
     StockRepository stockRepository;
     @Autowired
@@ -43,22 +42,25 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
     @Autowired
     StockReserveRepository reserveRepository;
     @Autowired
-    UserRepository userRepository;
+    UserRepository         userRepository;
     @Autowired
-    ItemRepository itemRepository;
+    ItemRepository         itemRepository;
     @Autowired
-    StockReserveService stockReserveService;
-
+    StockReserveService    stockReserveService;
     @Autowired
-    CategoryRepository categoryRepository;
+    CategoryRepository     categoryRepository;
 
     @Test
     void shouldNotAllowOverReservation() throws Exception {
-        Category category = categoryRepository.save(
-                Category.builder()
-                        .name("category")
-                        .build()
-        );
+        String categoryName = "Category";
+        Category category;
+        if (!categoryRepository.existsByNameIgnoreCase(categoryName)) {
+            Category newCategory = new Category();
+            newCategory.setName(categoryName);
+            category = categoryRepository.save(newCategory);
+        } else {
+            category = categoryRepository.findByNameIgnoreCase(categoryName).get();
+        }
 
         Item item = itemRepository.save(
                 Item.builder().sku("12345676").name("name").category(category).minStock(0).active(true).build());
@@ -93,8 +95,8 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
             }
         }).count();
         assertEquals(1, successfulReservations);
-        long reserved = reserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE,
-                LocalDateTime.now());
+        long reserved =
+                reserveRepository.findActiveReserveSumByStock(stock, ReservationStatus.ACTIVE, LocalDateTime.now());
         assertEquals(7, reserved);
     }
 }

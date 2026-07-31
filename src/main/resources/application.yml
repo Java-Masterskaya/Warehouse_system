@@ -63,6 +63,11 @@ spring:
 
 app:
   instance-id: ${INSTANCE_ID:${HOSTNAME:local}}
+  audit:
+    retention:
+      # 1.5 года (18 месяцев) для покрытия закрытия фин. года и проверок в Q1
+      days: 547
+      batch-size: 5000
   kafka:
     topics:
       low-stock:
@@ -84,6 +89,11 @@ app:
       wait-timeout-ms: ${JWT_REFRESH_LOCK_WAIT_TIMEOUT_MS:5000}
       ttl-ms: ${JWT_REFRESH_LOCK_TTL_MS:30000}
       retry-interval-ms: ${JWT_REFRESH_LOCK_RETRY_INTERVAL_MS:50}
+  idempotency:
+    ttl-hours: 24
+    required: true # Обязательность заголовка Idempotency-Key
+    cleanup-cron: "0 0 * * * *"  # Каждый час
+    enforce-after: 2026-08-26
 
 management:
   server:

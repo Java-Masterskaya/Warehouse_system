@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.audit.AuditContext;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.User;
 import com.warehouse.exception.EntityNotFoundException;
@@ -44,6 +45,9 @@ public class UserServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
+    private AuditContext auditContext;
+
+    @Mock
     private TokenService tokenService;
 
     private UserService userService;
@@ -52,7 +56,7 @@ public class UserServiceImplTest {
     void setUp() {
         UserMapper userMapper = Mappers.getMapper(UserMapper.class);
 
-        userService = new UserServiceImpl(userRepository, userMapper, passwordEncoder, tokenService);
+        userService = new UserServiceImpl(userRepository, userMapper, passwordEncoder, auditContext, tokenService);
     }
 
     /**
@@ -79,8 +83,10 @@ public class UserServiceImplTest {
         user.setActive(true);
 
         Long userId = user.getId();
-
+        User deactivated = user;
+        deactivated.setActive(false);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(deactivated)).thenReturn(deactivated);
 
         userService.deactivateUser(userId, 2L);
 
@@ -139,6 +145,9 @@ public class UserServiceImplTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(firstAdmin));
         when(userRepository.findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN))
                 .thenReturn(List.of(firstAdmin, secondAdmin));
+        User deactivated = firstAdmin;
+        deactivated.setActive(false);
+        when(userRepository.save(deactivated)).thenReturn(deactivated);
 
         userService.deactivateUser(1L, 2L);
 
@@ -155,6 +164,9 @@ public class UserServiceImplTest {
         user.setActive(true);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        User deactivated = user;
+        deactivated.setActive(false);
+        when(userRepository.save(deactivated)).thenReturn(deactivated);
 
         userService.deactivateUser(1L, 2L);
 
