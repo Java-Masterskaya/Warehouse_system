@@ -99,14 +99,13 @@ public class StockReserveServiceImpl implements StockReserveService {
         Stock stock = lockStock(itemId);
 
         Reservation reservation = getActiveReservation(request.reservationId(), itemId);
-        int stockAfter = batchService.writeOffReservedByFEFO(
+        batchService.writeOffReservedByFEFO(
                 itemId,
                 stock.getWarehouse().getId(),
                 reservation.getQuantity(),
                 LocalDateTime.now()
         );
         updateReservationStatus(reservation, ReservationStatus.CONSUMED);
-        stock.setQuantity(stockAfter);
 
         //make movement and alert
         stockMovementService.newStockMovement(

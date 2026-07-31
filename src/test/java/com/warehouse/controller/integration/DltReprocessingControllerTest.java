@@ -17,6 +17,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.batch.BatchCleanupActor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -131,12 +132,12 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         jdbcTemplate.update("DELETE FROM stock_movements");
         jdbcTemplate.update("DELETE FROM batches");
         jdbcTemplate.update("DELETE FROM outbox");
+        jdbcTemplate.update("DELETE FROM reserves");
 
         jdbcTemplate.update("DELETE FROM stock");
         jdbcTemplate.update("DELETE FROM items");
         jdbcTemplate.update("DELETE FROM categories");
         jdbcTemplate.update("DELETE FROM users");
-        jdbcTemplate.update("DELETE FROM reserves");
 
         // Очищаем последовательно, чтобы убрать дубликаты (DELETE + INSERT работает быстрее)
         jdbcTemplate.update("ALTER SEQUENCE stock_alerts_id_seq RESTART WITH 1");
@@ -159,6 +160,13 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         user.setRole(Role.ROLE_USER);
         user.setActive(true);
         userRepository.save(user);
+
+        User batchCleanupActor = new User();
+        batchCleanupActor.setUsername(BatchCleanupActor.USERNAME);
+        batchCleanupActor.setPassword("!disabled-system-actor!");
+        batchCleanupActor.setRole(Role.ROLE_USER);
+        batchCleanupActor.setActive(false);
+        userRepository.save(batchCleanupActor);
 
         testCategory = categoryRepository.save(
                 Category.builder()

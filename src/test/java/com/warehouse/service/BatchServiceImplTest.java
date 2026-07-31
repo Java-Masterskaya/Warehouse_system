@@ -3,12 +3,16 @@ package com.warehouse.service;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ExpiredBatchScope;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.UserRepository;
+import com.warehouse.service.batch.BatchCleanupActor;
 import com.warehouse.service.batch.BatchServiceImpl;
+import com.warehouse.service.batch.ExpiredBatchCleanupWorker;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,17 +20,24 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,6 +59,18 @@ class BatchServiceImplTest {
     private StockAvailabilityService availabilityService;
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ExpiredBatchCleanupWorker expiredBatchCleanupWorker;
+
+    @Mock
+    private CacheManager cacheManager;
+
+    @Mock
+    private Cache itemCache;
+
+    @Mock
     private ExpiredBatchScope sourceScope;
 
     @Mock
@@ -60,7 +83,14 @@ class BatchServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        batchService = new BatchServiceImpl(batchRepository, stockRepository, availabilityService);
+        batchService = new BatchServiceImpl(
+                batchRepository,
+                stockRepository,
+                availabilityService,
+                userRepository,
+                expiredBatchCleanupWorker,
+                cacheManager
+        );
         item = Item.builder().id(ITEM_ID).build();
         sourceWarehouse = Warehouse.builder().id(SOURCE_WAREHOUSE_ID).name("Source").build();
         destinationWarehouse = Warehouse.builder()
@@ -195,82 +225,99 @@ class BatchServiceImplTest {
     }
 
     @Test
-    void shouldClearExpiredBatchesFromEachMatchingStockPair() {
-        Batch firstSourceBatch = batch(sourceWarehouse, 4, NOW.minusDays(3));
-        Batch secondSourceBatch = batch(sourceWarehouse, 3, NOW.minusDays(1));
-        Batch destinationBatch = batch(destinationWarehouse, 5, NOW.minusHours(1));
-        Stock sourceStock = stock(sourceWarehouse, 12);
-        Stock destinationStock = stock(destinationWarehouse, 9);
+    void shouldClearExpiredBatchesThroughIndependentScopeWorkers() {
+        User actor = User.builder().id(40L).build();
         when(sourceScope.getItemId()).thenReturn(ITEM_ID);
         when(sourceScope.getWarehouseId()).thenReturn(SOURCE_WAREHOUSE_ID);
         when(destinationScope.getItemId()).thenReturn(ITEM_ID);
         when(destinationScope.getWarehouseId()).thenReturn(DESTINATION_WAREHOUSE_ID);
+        when(userRepository.findByUsername(BatchCleanupActor.USERNAME))
+                .thenReturn(Optional.of(actor));
+        when(cacheManager.getCache("item")).thenReturn(itemCache);
         when(batchRepository.findExpiredScopesWithQuantity(NOW))
                 .thenReturn(List.of(sourceScope, destinationScope));
-        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
-                .thenReturn(Optional.of(sourceStock));
-        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(
-                ITEM_ID,
-                DESTINATION_WAREHOUSE_ID
-        )).thenReturn(Optional.of(destinationStock));
-        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+        when(expiredBatchCleanupWorker.clearScope(
                 ITEM_ID,
                 SOURCE_WAREHOUSE_ID,
+                actor.getId(),
                 NOW
-        )).thenReturn(List.of(firstSourceBatch, secondSourceBatch));
-        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+        )).thenReturn(2);
+        when(expiredBatchCleanupWorker.clearScope(
                 ITEM_ID,
                 DESTINATION_WAREHOUSE_ID,
+                actor.getId(),
                 NOW
-        )).thenReturn(List.of(destinationBatch));
+        )).thenReturn(1);
 
         int cleared = batchService.clearExpiredBatches(NOW);
 
-        assertAll(
-                () -> assertEquals(3, cleared),
-                () -> assertEquals(0, firstSourceBatch.getQuantity()),
-                () -> assertEquals(0, secondSourceBatch.getQuantity()),
-                () -> assertEquals(0, destinationBatch.getQuantity()),
-                () -> assertEquals(5, sourceStock.getQuantity()),
-                () -> assertEquals(4, destinationStock.getQuantity())
+        assertEquals(3, cleared);
+        verify(expiredBatchCleanupWorker).clearScope(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                actor.getId(),
+                NOW
         );
-        verify(stockRepository).save(sourceStock);
-        verify(stockRepository).save(destinationStock);
-        verify(batchRepository).saveAll(List.of(firstSourceBatch, secondSourceBatch));
-        verify(batchRepository).saveAll(List.of(destinationBatch));
+        verify(expiredBatchCleanupWorker).clearScope(
+                ITEM_ID,
+                DESTINATION_WAREHOUSE_ID,
+                actor.getId(),
+                NOW
+        );
+        verify(itemCache, times(2)).evict(ITEM_ID);
     }
 
     @Test
-    void shouldFailCleanupWithoutMutatingDataWhenBatchesExceedMatchingStock() {
-        Batch expiredBatch = batch(sourceWarehouse, 8, NOW.minusDays(1));
-        Stock stock = stock(sourceWarehouse, 7);
+    void shouldContinueCleanupWhenOneScopeFails() {
+        User actor = User.builder().id(40L).build();
         when(sourceScope.getItemId()).thenReturn(ITEM_ID);
         when(sourceScope.getWarehouseId()).thenReturn(SOURCE_WAREHOUSE_ID);
+        when(destinationScope.getItemId()).thenReturn(ITEM_ID);
+        when(destinationScope.getWarehouseId()).thenReturn(DESTINATION_WAREHOUSE_ID);
+        when(userRepository.findByUsername(BatchCleanupActor.USERNAME))
+                .thenReturn(Optional.of(actor));
+        when(cacheManager.getCache("item")).thenReturn(itemCache);
         when(batchRepository.findExpiredScopesWithQuantity(NOW))
-                .thenReturn(List.of(sourceScope));
-        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, SOURCE_WAREHOUSE_ID))
-                .thenReturn(Optional.of(stock));
-        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                .thenReturn(List.of(sourceScope, destinationScope));
+        when(expiredBatchCleanupWorker.clearScope(
                 ITEM_ID,
                 SOURCE_WAREHOUSE_ID,
+                actor.getId(),
                 NOW
-        )).thenReturn(List.of(expiredBatch));
+        )).thenThrow(new IllegalStateException("simulated scope failure"));
+        when(expiredBatchCleanupWorker.clearScope(
+                ITEM_ID,
+                DESTINATION_WAREHOUSE_ID,
+                actor.getId(),
+                NOW
+        )).thenReturn(1);
 
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> batchService.clearExpiredBatches(NOW)
-        );
+        int cleared = batchService.clearExpiredBatches(NOW);
 
-        assertAll(
-                () -> assertEquals(
-                        "Batch quantity exceeds stock for item 10 at warehouse 20",
-                        exception.getMessage()
-                ),
-                () -> assertEquals(8, expiredBatch.getQuantity()),
-                () -> assertEquals(7, stock.getQuantity())
+        assertEquals(1, cleared);
+        verify(expiredBatchCleanupWorker).clearScope(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                actor.getId(),
+                NOW
         );
-        verify(batchRepository, never()).saveAll(any());
-        verify(stockRepository, never()).save(any(Stock.class));
+        verify(expiredBatchCleanupWorker).clearScope(
+                ITEM_ID,
+                DESTINATION_WAREHOUSE_ID,
+                actor.getId(),
+                NOW
+        );
+        verify(itemCache).evict(ITEM_ID);
+    }
+
+    @Test
+    void shouldRunCleanupOrchestratorWithoutSharedTransaction() throws NoSuchMethodException {
+        Method method = BatchServiceImpl.class.getMethod("clearExpiredBatches", LocalDateTime.class);
+
+        Transactional annotation = method.getAnnotation(Transactional.class);
+
+        assertNotNull(annotation);
+        assertEquals(Propagation.NOT_SUPPORTED, annotation.propagation());
     }
 
     private Stock stock(Warehouse warehouse, int quantity) {

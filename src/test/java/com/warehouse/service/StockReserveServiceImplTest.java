@@ -279,7 +279,10 @@ public class StockReserveServiceImplTest {
                 eq(warehouse.getId()),
                 eq(reservation.getQuantity()),
                 any(LocalDateTime.class)
-        )).thenReturn(5);
+        )).thenAnswer(invocation -> {
+            stock.setQuantity(5);
+            return 999;
+        });
         when(stockRepository.findTotalQuantityByItemId(item.getId())).thenReturn(5L);
 
         service.writeOff(item.getId(), request, ctx);

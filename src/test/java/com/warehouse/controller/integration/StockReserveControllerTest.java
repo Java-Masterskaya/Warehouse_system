@@ -15,6 +15,7 @@ import com.warehouse.entity.User;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
@@ -25,12 +26,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -65,6 +69,12 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     CategoryRepository categoryRepository;
+
+    @Autowired
+    StockAlertRepository stockAlertRepository;
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
     private String adminToken;
     private String userToken;
@@ -174,6 +184,8 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
     @Test
     void adminCanWriteOffReservation() throws Exception {
+        item.setMinStock(6);
+        itemRepository.saveAndFlush(item);
 
         Reservation reservation = createReservation(5);
 
@@ -184,8 +196,47 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONSUMED"));
 
         Stock updated = stockRepository.findById(stock.getId()).orElseThrow();
+        Reservation updatedReservation = reservationRepository.findById(reservation.getId()).orElseThrow();
+        Batch updatedBatch = batchRepository
+                .findByItemIdAndWarehouseIdOrderByExpiryDateAsc(item.getId(), defaultWarehouse().getId())
+                .getFirst();
 
         assertThat(updated.getQuantity()).isEqualTo(5);
+        assertThat(updatedBatch.getQuantity()).isEqualTo(5);
+        assertThat(updatedReservation.getStatus()).isEqualTo(ReservationStatus.CONSUMED);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM stock_movements
+                        WHERE item_id = ?
+                          AND warehouse_id = ?
+                          AND type = 'WRITE_OFF'
+                          AND quantity = 5
+                        """,
+                Long.class,
+                item.getId(),
+                defaultWarehouse().getId()
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                        SELECT u.username
+                        FROM stock_movements sm
+                        JOIN users u ON u.id = sm.user_id
+                        WHERE sm.item_id = ?
+                          AND sm.type = 'WRITE_OFF'
+                        """,
+                String.class,
+                item.getId()
+        )).isEqualTo("admin");
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var alerts = stockAlertRepository.findByItemId(item.getId());
+            assertThat(alerts).singleElement().satisfies(alert -> {
+                assertThat(alert.getCurrentStock()).isEqualTo(5);
+                assertThat(alert.getMinStock()).isEqualTo(6);
+                assertThat(alert.getTriggeredBy()).isEqualTo("admin");
+            });
+        });
     }
 
     private Reservation createReservation(int quantity) {
