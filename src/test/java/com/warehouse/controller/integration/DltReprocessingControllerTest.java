@@ -173,6 +173,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .category(testCategory)
                 .minStock(10)
                 .active(true)
+                .barcode("ITEM-TEST-DLT-" + System.nanoTime())
                 .build();
         testItem = itemRepository.save(testItem);
         testItemId = testItem.getId();

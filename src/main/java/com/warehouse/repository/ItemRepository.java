@@ -4,12 +4,13 @@ import com.warehouse.dto.response.item.ItemDetailsProjection;
 import com.warehouse.dto.response.valuation.CategoryValuation;
 import com.warehouse.entity.Item;
 import com.warehouse.repository.projection.LowStockProjection;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -29,6 +30,15 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
 
     Optional<Item> findBySku(String sku);
 
+    boolean existsByBarcode(String barcode);
+
+    @Query("""
+            SELECT DISTINCT i.category
+            FROM Item i
+            WHERE i.active = true
+            """)
+    List<String> findDistinctCategories();
+
     @Query("""
             SELECT new com.warehouse.dto.response.item.ItemDetailsProjection(
                 i.id,
@@ -41,7 +51,8 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
                 i.cost,
                 i.active,
                 i.createdAt,
-                i.updatedAt
+                i.updatedAt,
+                i.barcode
             )
             FROM Item i
             LEFT JOIN Stock s ON s.item.id = i.id
@@ -108,4 +119,49 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
     List<CategoryValuation> calculateValuationByCategory();
 
     boolean existsByCategoryId(Long categoryId);
+
+    /**
+     * Найти id товаров с NULL barcode, отсортированные для стабильной пагинации.
+     * Используется батчевой backfill-джобой. Только id (не вся сущность) — джоба
+     * обновляет barcode точечным UPDATE, не читая и не переписывая остальные поля.
+     *
+     * @param lastProcessedId id последнего обработанного товара (не включая)
+     * @param pageable        пагинация, определяющая размер батча
+     * @return список id товаров, требующих backfill
+     */
+    @Query("SELECT i.id FROM Item i WHERE i.barcode IS NULL AND i.id > :lastId ORDER BY i.id ASC")
+    List<Long> findIdsByBarcodeIsNullAndIdGreaterThanOrderByIdAsc(
+            @Param("lastId") Long lastProcessedId,
+            Pageable pageable
+    );
+
+    /**
+     * Точечно проставить barcode, только если он всё ещё NULL. Атомарно перепроверяет
+     * условие прямо в БД — не перезаписывает остальные поля и не может затереть barcode,
+     * выставленный конкурентно между чтением id и этим UPDATE.
+     *
+     * @param id      id товара
+     * @param barcode новое значение barcode
+     * @return 1, если строка обновлена; 0, если barcode уже был не NULL
+     */
+    @Modifying
+    @Query("UPDATE Item i SET i.barcode = :barcode, i.updatedAt = CURRENT_TIMESTAMP "
+            + "WHERE i.id = :id AND i.barcode IS NULL")
+    int updateBarcodeIfNull(@Param("id") Long id, @Param("barcode") String barcode);
+
+    /**
+     * Быстро проверить, остались ли ещё NULL barcode.
+     *
+     * @return true, если хотя бы одна строка всё ещё имеет NULL barcode
+     */
+    @Query(value = "SELECT EXISTS(SELECT 1 FROM items WHERE barcode IS NULL)", nativeQuery = true)
+    boolean existsByBarcodeIsNull();
+
+    /**
+     * Получить следующее значение независимого sequence для номера barcode.
+     *
+     * @return следующее значение items_barcode_seq
+     */
+    @Query(value = "SELECT nextval('items_barcode_seq')", nativeQuery = true)
+    Long nextBarcodeSequenceValue();
 }
