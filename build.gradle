@@ -106,13 +106,14 @@ pitest {
     targetTests = [
             'com.warehouse.service.StockMovementServiceImplTest',
             'com.warehouse.service.StockReserveServiceImplTest',
+            'com.warehouse.service.StockAvailabilityServiceTest',
             'com.warehouse.service.BatchServiceImplTest'
     ]
 
     mutators = ['STRONGER']
     outputFormats = ['HTML', 'XML']
     timestampedReports = false
-    mutationThreshold = 0
+    mutationThreshold = 70
 }
 
 checkstyle {
