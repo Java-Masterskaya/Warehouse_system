@@ -2,6 +2,7 @@ package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
@@ -77,6 +78,9 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuditContext auditContext;
 
     @Autowired
     private CategoryRepository categoryRepository;

@@ -16,4 +16,5 @@ public record ItemResponse(
         @JsonProperty("isActive") boolean active,
         LocalDateTime createdAt,
         String barcode
-) {}
+) {
+}

@@ -1,8 +1,6 @@
 package com.warehouse.controller.integration;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
-import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,20 +31,15 @@ class BackfillAdminControllerTest extends AbstractIntegrationTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
     private JwtUtil jwtUtil;
 
     private String adminToken;
     private String userToken;
 
     @BeforeEach
-    void setUp() throws Exception {
-        adminToken = obtainToken("admin", "secret");
-
-        // Генерируем токен для обычного пользователя (username=testuser создаётся в data.sql)
-        userToken = jwtUtil.generateToken("testuser", 2L, java.util.List.of("ROLE_USER"));
+    void setUp() {
+        adminToken = jwtUtil.generateToken("backfill-admin", -101L, java.util.List.of("ROLE_ADMIN"));
+        userToken = jwtUtil.generateToken("backfill-user", -102L, java.util.List.of("ROLE_USER"));
     }
 
     /**
@@ -122,15 +115,4 @@ class BackfillAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
 
-    private String obtainToken(String username, String password) throws Exception {
-        LoginRequest request = new LoginRequest(username, password);
-        String response = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        return objectMapper.readTree(response).get("accessToken").asText();
-    }
 }

@@ -1,5 +1,9 @@
 package com.warehouse.service.movement;
 
+import com.warehouse.audit.AuditContext;
+import com.warehouse.audit.Auditable;
+import com.warehouse.audit.entity.AuditAction;
+import com.warehouse.audit.entity.EntityType;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
@@ -9,8 +13,9 @@ import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
-import com.warehouse.entity.Batch;
 import com.warehouse.dto.response.movement.StockTransferResponse;
+import com.warehouse.dto.response.stock.StockAuditDto;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Stock;
@@ -20,16 +25,16 @@ import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
-import com.warehouse.metric.MetricService;
 import com.warehouse.exception.StocktakeConflictException;
+import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.mapper.StockMovementMapper;
+import com.warehouse.metric.MetricService;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
-import com.warehouse.kafka.outbox.OutboxService;
-import com.warehouse.repository.BatchRepository;
 import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import lombok.AccessLevel;
@@ -61,17 +66,18 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class StockMovementServiceImpl implements StockMovementService {
 
-    StockMovementMapper mapper;
+    StockMovementMapper      mapper;
     StockAvailabilityService availabilityService;
-    ItemRepository itemRepository;
-    StockMovementRepository stockMovementRepository;
-    UserRepository userRepository;
-    WarehouseRepository warehouseRepository;
-    StockRepository stockRepository;
-    BatchService batchService;
-    BatchRepository batchRepository;
-    OutboxService outboxService;
-    MetricService metricService;
+    ItemRepository           itemRepository;
+    StockMovementRepository  stockMovementRepository;
+    UserRepository           userRepository;
+    WarehouseRepository      warehouseRepository;
+    StockRepository          stockRepository;
+    BatchService             batchService;
+    BatchRepository          batchRepository;
+    OutboxService            outboxService;
+    MetricService            metricService;
+    AuditContext             auditContext;
 
     /**
      * Регистрирует приход товара на склад.
@@ -85,6 +91,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Override
     @Transactional
     @CacheEvict(value = "item", key = "#request.itemId")
+    @Auditable(action = AuditAction.RECEIVE, entityType = EntityType.STOCK)
     public StockMovementResponse registerReceipt(ReceiveStockRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -109,16 +116,18 @@ public class StockMovementServiceImpl implements StockMovementService {
         );
 
         int stockAfter = stockRepository.findQuantityByItemId(itemId)
-                .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
+                                        .orElseThrow(() -> EntityNotFoundException.forId("Stock", itemId));
 
+        auditContext.setEntityId(itemId);
+        auditContext.setOldValue(new StockAuditDto(itemId, stockAfter - quantity));
+        auditContext.setNewValue(new StockAuditDto(itemId, stockAfter));
         StockMovement stockMovement = newStockMovement(
                 item,
                 defaultWarehouse,
                 quantity,
                 ctx,
                 MovementType.RECEIVE,
-                batch
-        );
+                batch);
 
         log.info("Stock receipt registered: itemId={}, quantity={}, expiryDate={}, "
                         + "batchId={}, newTotal={}, userId={}, movementId={}", itemId,
@@ -132,6 +141,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Override
     @Transactional
     @CacheEvict(value = "item", key = "#request.itemId")
+    @Auditable(action = AuditAction.WRITE_OFF, entityType = EntityType.STOCK)
     public StockMovementResponse writeOffReceipt(WriteOffStockRequest request, UserContext ctx) {
         int quantity = request.quantity();
         Long itemId = request.itemId();
@@ -140,8 +150,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         itemCheckForActive(item);
 
-        log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}",
-                itemId, quantity, ctx.userId());
+        log.debug("Processing stock write-off for itemId={}, quantity={}, userId={}", itemId, quantity, ctx.userId());
 
         LocalDateTime now = LocalDateTime.now();
         Warehouse defaultWarehouse = defaultWarehouse();
@@ -157,13 +166,13 @@ public class StockMovementServiceImpl implements StockMovementService {
             // Создаем общее движение для всей операции списания
             User userRef = userRepository.getReferenceById(ctx.userId());
             StockMovement stockMovement = StockMovement.builder()
-                    .item(item)
-                    .warehouse(defaultWarehouse)
-                    .user(userRef)
-                    .type(MovementType.WRITE_OFF)
-                    .quantity(quantity)
-                    .batch(null)
-                    .build();
+                                                       .item(item)
+                                                       .warehouse(defaultWarehouse)
+                                                       .user(userRef)
+                                                       .type(MovementType.WRITE_OFF)
+                                                       .quantity(quantity)
+                                                       .batch(null)
+                                                       .build();
             stockMovementRepository.save(stockMovement);
 
             int totalAfter = Math.toIntExact(stockRepository.findTotalQuantityByItemId(itemId));
@@ -184,6 +193,10 @@ public class StockMovementServiceImpl implements StockMovementService {
                         item.getId(), totalAfter, item.getMinStock());
             }
 
+            auditContext.setEntityId(itemId);
+            auditContext.setOldValue(new StockAuditDto(itemId, stockAfter + quantity));
+            auditContext.setNewValue(new StockAuditDto(itemId, stockAfter));
+
             log.info("Write-off completed: itemId={}, quantity={}, newTotal={}, userId={}, movementId={}",
                     itemId, quantity, stockAfter, ctx.userId(), stockMovement.getId());
 
@@ -198,8 +211,10 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId, MovementType type, int page,
-            int size) {
+    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(
+            Long itemId, MovementType type, int page,
+            int size
+    ) {
         if (!itemRepository.existsById(itemId)) {
             log.warn("Item с id={} не найден", itemId);
             throw EntityNotFoundException.forId("Item", itemId);
@@ -216,6 +231,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Override
     @Transactional
     @CacheEvict(value = "item", key = "#request.itemId")
+    @Auditable(action = AuditAction.ADJUSTMENT, entityType = EntityType.STOCK)
     public StockMovementResponse stocktake(StocktakeRequest request, UserContext ctx) {
         Long itemId = request.itemId();
         int counted = request.countedQuantity();
@@ -224,8 +240,10 @@ public class StockMovementServiceImpl implements StockMovementService {
         itemCheckForActive(item);
 
         Stock stock = stockRepository.findByItemIdForUpdate(itemId)
-                .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item", itemId));
+                                     .orElseThrow(() -> EntityNotFoundException.forId("Stock not found for item",
+                                             itemId));
 
+        auditContext.setEntityId(itemId);
         int reserved = availabilityService.getReserved(stock);
         if (counted < reserved) {
             log.warn("Stocktake conflict: itemId={}, countedQuantity={}, reservedQuantity={}. "
@@ -235,9 +253,11 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         long totalBefore = stockRepository.findTotalQuantityByItemId(itemId);
         int current = stock.getQuantity();
+        auditContext.setOldValue(new StockAuditDto(itemId, current));
         int delta = counted - current;
 
         if (delta == 0) {
+            auditContext.clear();
             log.info("Stocktake: no change for itemId={}", itemId);
             return mapper.toNoMovementResponse(itemId, counted);
         }
@@ -265,7 +285,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
         User userRef = userRepository.getReferenceById(ctx.userId());
         StockMovement stockMovement = StockMovement.builder().item(item).user(userRef).type(MovementType.ADJUSTMENT)
-                .warehouse(stock.getWarehouse()).quantity(delta).batch(null).build();
+                                                   .warehouse(stock.getWarehouse()).quantity(delta).batch(null).build();
 
         stockMovementRepository.save(stockMovement);
 
@@ -287,8 +307,8 @@ public class StockMovementServiceImpl implements StockMovementService {
                     item.getId(), totalAfter, item.getMinStock());
         }
 
-        log.info("Stocktake: itemId={}, current={}, counted={}, delta={}, userId={}",
-                itemId, current, counted, delta, ctx.userId());
+        log.info("Stocktake: itemId={}, current={}, counted={}, delta={}, userId={}", itemId, current, counted, delta,
+                ctx.userId());
 
         metricService.increment("warehouse.movements.adjustment.total");
 
@@ -345,23 +365,23 @@ public class StockMovementServiceImpl implements StockMovementService {
         User userRef = userRepository.getReferenceById(ctx.userId());
 
         StockMovement outMovement = StockMovement.builder()
-                .item(item)
-                .warehouse(fromWarehouse)
-                .user(userRef)
-                .type(MovementType.TRANSFER_OUT)
-                .quantity(quantity)
-                .createdAt(transferredAt)
-                .transferId(transferId)
-                .build();
+                                                 .item(item)
+                                                 .warehouse(fromWarehouse)
+                                                 .user(userRef)
+                                                 .type(MovementType.TRANSFER_OUT)
+                                                 .quantity(quantity)
+                                                 .createdAt(transferredAt)
+                                                 .transferId(transferId)
+                                                 .build();
         StockMovement inMovement = StockMovement.builder()
-                .item(item)
-                .warehouse(toWarehouse)
-                .user(userRef)
-                .type(MovementType.TRANSFER_IN)
-                .quantity(quantity)
-                .createdAt(transferredAt)
-                .transferId(transferId)
-                .build();
+                                                .item(item)
+                                                .warehouse(toWarehouse)
+                                                .user(userRef)
+                                                .type(MovementType.TRANSFER_IN)
+                                                .quantity(quantity)
+                                                .createdAt(transferredAt)
+                                                .transferId(transferId)
+                                                .build();
 
         stockMovementRepository.saveAllAndFlush(List.of(outMovement, inMovement));
         metricService.increment("warehouse.movements.transfer.total");
@@ -407,8 +427,8 @@ public class StockMovementServiceImpl implements StockMovementService {
                         now
                 );
         int batchAvailable = sourceBatches.stream()
-                .mapToInt(Batch::getQuantity)
-                .reduce(0, Math::addExact);
+                                          .mapToInt(Batch::getQuantity)
+                                          .reduce(0, Math::addExact);
         if (batchAvailable < quantity) {
             metricService.increment("warehouse.movements.transfer.rejected.total");
             throw InsufficientStockException.atWarehouse(
@@ -429,11 +449,11 @@ public class StockMovementServiceImpl implements StockMovementService {
             int moved = Math.min(sourceBatch.getQuantity(), remaining);
             sourceBatch.setQuantity(sourceBatch.getQuantity() - moved);
             destinationBatches.add(Batch.builder()
-                    .item(item)
-                    .warehouse(toWarehouse)
-                    .quantity(moved)
-                    .expiryDate(sourceBatch.getExpiryDate())
-                    .build());
+                                        .item(item)
+                                        .warehouse(toWarehouse)
+                                        .quantity(moved)
+                                        .expiryDate(sourceBatch.getExpiryDate())
+                                        .build());
             remaining -= moved;
         }
 
@@ -442,8 +462,10 @@ public class StockMovementServiceImpl implements StockMovementService {
     }
 
     @Override
-    public StockMovement newStockMovement(Item item, Warehouse warehouse,
-                                          int quantity, UserContext ctx, MovementType type) {
+    public StockMovement newStockMovement(
+            Item item, Warehouse warehouse,
+            int quantity, UserContext ctx, MovementType type
+    ) {
         return newStockMovement(item, warehouse, quantity, ctx, type, null);
     }
 
@@ -459,27 +481,27 @@ public class StockMovementServiceImpl implements StockMovementService {
         User userRef = userRepository.getReferenceById(ctx.userId());
 
         StockMovement stockMovement = StockMovement.builder()
-                .item(item)
-                .warehouse(warehouse)
-                .user(userRef)
-                .type(type)
-                .quantity(quantity)
-                .batch(batch)
-                .build();
+                                                   .item(item)
+                                                   .warehouse(warehouse)
+                                                   .user(userRef)
+                                                   .type(type)
+                                                   .quantity(quantity)
+                                                   .batch(batch)
+                                                   .build();
         return stockMovementRepository.save(stockMovement);
     }
 
     private Stock findLockedStock(List<Stock> stocks, Long warehouseId, Long itemId) {
         return stocks.stream()
-                .filter(stock -> stock.getWarehouse().getId().equals(warehouseId))
-                .findFirst()
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Stock not found for item " + itemId + " at warehouse " + warehouseId));
+                     .filter(stock -> stock.getWarehouse().getId().equals(warehouseId))
+                     .findFirst()
+                     .orElseThrow(() -> new EntityNotFoundException(
+                             "Stock not found for item " + itemId + " at warehouse " + warehouseId));
     }
 
     private Warehouse warehouseCheckForExist(Long warehouseId) {
         return warehouseRepository.findById(warehouseId)
-                .orElseThrow(() -> EntityNotFoundException.forId("Warehouse", warehouseId));
+                                  .orElseThrow(() -> EntityNotFoundException.forId("Warehouse", warehouseId));
     }
 
     private void distributeDeltaAcrossBatches(
@@ -494,11 +516,11 @@ public class StockMovementServiceImpl implements StockMovementService {
                 throw new InvalidMovementRequestException("Surplus expiry date must be in the future");
             }
             batchRepository.save(Batch.builder()
-                    .item(item)
-                    .warehouse(warehouse)
-                    .quantity(delta)
-                    .expiryDate(surplusExpiryDate)
-                    .build());
+                                      .item(item)
+                                      .warehouse(warehouse)
+                                      .quantity(delta)
+                                      .expiryDate(surplusExpiryDate)
+                                      .build());
         } else if (delta < 0) {
             int remaining = -delta;
             for (Batch batch : batches) {
@@ -520,7 +542,7 @@ public class StockMovementServiceImpl implements StockMovementService {
 
     private Warehouse defaultWarehouse() {
         return warehouseRepository.findByDefaultWarehouseTrue()
-                .orElseThrow(() -> new EntityNotFoundException("Default warehouse not found"));
+                                  .orElseThrow(() -> new EntityNotFoundException("Default warehouse not found"));
     }
 
     private void itemCheckForActive(Item item) {
