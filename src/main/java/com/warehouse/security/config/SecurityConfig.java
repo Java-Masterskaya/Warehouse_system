@@ -3,6 +3,7 @@ package com.warehouse.security.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.security.JwtAuthFilter;
+import com.warehouse.security.RateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final ObjectMapper objectMapper;
+    private final RateLimitFilter rateLimitFilter;
 
     // Цепочка с более высоким приоритетом, которая отвечает
     // исключительно за менеджмент-порт и эндпоинты актуатора
@@ -87,7 +89,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint())
                         .accessDeniedHandler(accessDeniedHandler())
                 )
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

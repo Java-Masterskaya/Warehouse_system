@@ -54,6 +54,9 @@ class AuthServiceImplTest {
     @Mock
     private MetricService metricService;
 
+    @Mock
+    private LoginAttemptService loginAttemptService;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
@@ -91,6 +94,7 @@ class AuthServiceImplTest {
 
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                     .thenReturn(authentication);
+            when(loginAttemptService.checkAndConsume(TEST_USERNAME)).thenReturn(0L);
             when(authentication.getPrincipal()).thenReturn(userPrincipal);
             when(authentication.getAuthorities())
                     .thenReturn((Collection) List.of(new SimpleGrantedAuthority("ROLE_USER")));
@@ -108,6 +112,7 @@ class AuthServiceImplTest {
             assertThat(response.expiresIn()).isEqualTo(EXPIRATION_MS);
 
             verify(metricService).increment("warehouse.auth.login.success.total");
+            verify(loginAttemptService).registerSuccess(TEST_USERNAME);
         }
 
         @Test
@@ -126,6 +131,7 @@ class AuthServiceImplTest {
             Authentication authentication = mock(Authentication.class);
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                     .thenReturn(authentication);
+            when(loginAttemptService.checkAndConsume(TEST_USERNAME)).thenReturn(0L);
             when(authentication.getPrincipal()).thenReturn(inactiveUser);
 
             // Act & Assert
@@ -134,6 +140,8 @@ class AuthServiceImplTest {
                     .hasMessageContaining("deactivated");
 
             verify(metricService).increment("warehouse.auth.login.failure.total");
+            // registerSuccess вызывается до проверки isEnabled (см. AuthServiceImpl.login)
+            verify(loginAttemptService).registerSuccess(TEST_USERNAME);
         }
 
         @Test
@@ -141,6 +149,7 @@ class AuthServiceImplTest {
         void loginWithInvalidCredentialsShouldThrowException() {
             // Arrange
             LoginRequest request = new LoginRequest(TEST_USERNAME, "wrong");
+            when(loginAttemptService.checkAndConsume(TEST_USERNAME)).thenReturn(0L);
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                     .thenThrow(new AuthenticationException("Bad credentials") {});
 

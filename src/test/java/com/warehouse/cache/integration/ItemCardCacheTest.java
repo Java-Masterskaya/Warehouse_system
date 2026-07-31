@@ -2,9 +2,11 @@ package com.warehouse.cache.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
@@ -15,14 +17,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
+import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Интеграционный тест для проверки кэширования карточки товара.
  */
+@TestPropertySource(properties = "bucket4j.enabled=false")
 @SpringBootTest
 class ItemCardCacheTest extends AbstractIntegrationTest {
 
@@ -42,6 +47,9 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     CacheManager cacheManager;
 
     @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
     private CategoryRepository categoryRepository;
 
     private Long itemId;
@@ -51,6 +59,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         cacheManager.getCache("item").clear();
 
         stockMovementRepository.deleteAllInBatch();
+        batchRepository.deleteAll();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
         categoryRepository.deleteAllInBatch();
@@ -77,6 +86,13 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         stock.setQuantity(10);
         stockRepository.save(stock);
 
+        batchRepository.save(Batch.builder()
+                .item(item)
+                .warehouse(defaultWarehouse())
+                .quantity(10)
+                .expiryDate(LocalDateTime.now().plusDays(30))
+                .build());
+
         itemId = item.getId();
     }
 
@@ -91,6 +107,25 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         assertThat(response.getId()).isEqualTo(itemId);
         assertThat(response.getName()).isEqualTo("Ноутбук");
         assertThat(response.getCurrentStock()).isEqualTo(10);
+        assertThat(response.getAvailable()).isEqualTo(10);
+        assertThat(response.getWarehouseStocks()).singleElement()
+                .extracting(stock -> stock.available())
+                .isEqualTo(10L);
+    }
+
+    @Test
+    void expiredBatchIsExcludedFromAvailableQuantity() {
+        Batch batch = batchRepository.findAll().get(0);
+        batch.setExpiryDate(LocalDateTime.now().minusDays(1));
+        batchRepository.saveAndFlush(batch);
+
+        ItemDetailsResponse response = itemService.getItem(itemId);
+
+        assertThat(response.getCurrentStock()).isEqualTo(10);
+        assertThat(response.getAvailable()).isZero();
+        assertThat(response.getWarehouseStocks()).singleElement()
+                .extracting(stock -> stock.available())
+                .isEqualTo(0L);
     }
 
     /**
@@ -100,6 +135,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     void getItemShouldBeCached() {
         ItemDetailsResponse firstCall = itemService.getItem(itemId);
 
+        batchRepository.deleteAll();
         stockRepository.deleteAll();
         itemRepository.deleteAll();
 

@@ -1,10 +1,16 @@
 package com.warehouse.kafka.integration;
 
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.PurchaseOrderItemRepository;
+import com.warehouse.repository.PurchaseOrderRepository;
 import com.warehouse.repository.StockAlertRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.StockRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -24,11 +30,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.redpanda.RedpandaContainer;
-import org.testcontainers.utility.DockerImageName;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -44,27 +47,31 @@ import static org.awaitility.Awaitility.await;
 
 @Slf4j
 @Tag("integration")
-@Testcontainers
+@TestPropertySource(properties = "bucket4j.enabled=false")
 @SpringBootTest(classes = WarehouseApp.class)
-class LowStockAlertDltIntegrationTest {
-
-    static final RedpandaContainer redpanda =
-            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1"));
-
-    static {
-        redpanda.start();
-    }
-
-    @DynamicPropertySource
-    static void kafkaProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.kafka.bootstrap-servers", redpanda::getBootstrapServers);
-    }
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private KafkaTemplate<String, Object> kafkaTemplate;
 
     @Autowired
     private StockAlertRepository stockAlertRepository;
+
+    @Autowired
+    private StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
+    private StockReserveRepository stockReserveRepository;
+
+    @Autowired
+    private PurchaseOrderItemRepository purchaseOrderItemRepository;
+
+    @Autowired
+    private PurchaseOrderRepository purchaseOrderRepository;
 
     @Autowired
     private StockRepository stockRepository;
@@ -78,9 +85,15 @@ class LowStockAlertDltIntegrationTest {
     void setUp() {
         testStartTime = System.currentTimeMillis();
         log.info("=== Starting test setup ===");
-        stockAlertRepository.deleteAll();
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
+        // Порядок важен: сначала зависимости (FK), потом родительские таблицы
+        stockAlertRepository.deleteAllInBatch();
+        stockMovementRepository.deleteAllInBatch();
+        stockReserveRepository.deleteAllInBatch();
+        purchaseOrderItemRepository.deleteAllInBatch();
+        purchaseOrderRepository.deleteAllInBatch();
+        batchRepository.deleteAllInBatch();
+        stockRepository.deleteAllInBatch();
+        itemRepository.deleteAllInBatch();
         clearDltTopic();
         log.info("=== Test setup completed ===");
     }
@@ -129,13 +142,13 @@ class LowStockAlertDltIntegrationTest {
 
     private AdminClient createAdminClient() {
         Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers());
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getRedpanda().getBootstrapServers());
         return AdminClient.create(props);
     }
 
     private Consumer<String, String> createDltConsumer() {
         Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers());
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, getRedpanda().getBootstrapServers());
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "dlt-test-" + UUID.randomUUID());

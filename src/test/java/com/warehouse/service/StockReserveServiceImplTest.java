@@ -20,6 +20,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.movement.StockMovementService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.service.reservation.StockReserveServiceImpl;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -71,6 +73,9 @@ public class StockReserveServiceImplTest {
 
     @Mock
     StockMovementService movementService;
+
+    @Mock
+    BatchService batchService;
 
     @Mock
     KafkaStockAlertProducer kafkaProducer;
@@ -269,8 +274,12 @@ public class StockReserveServiceImplTest {
 
         when(itemRepository.findById(item.getId())).thenReturn(Optional.of(item));
 
-        when(stockRepository.decreaseQuantityIfEnoughAtWarehouse(
-                item.getId(), warehouse.getId(), reservation.getQuantity())).thenReturn(1);
+        when(batchService.writeOffReservedByFEFO(
+                eq(item.getId()),
+                eq(warehouse.getId()),
+                eq(reservation.getQuantity()),
+                any(LocalDateTime.class)
+        )).thenReturn(5);
         when(stockRepository.findTotalQuantityByItemId(item.getId())).thenReturn(5L);
 
         service.writeOff(item.getId(), request, ctx);
@@ -367,8 +376,17 @@ public class StockReserveServiceImplTest {
 
         when(stockReserveRepository.findById(reservation.getId())).thenReturn(Optional.of(reservation));
 
-        when(stockRepository.decreaseQuantityIfEnoughAtWarehouse(
-                item.getId(), warehouse.getId(), reservation.getQuantity())).thenReturn(0);
+        when(batchService.writeOffReservedByFEFO(
+                eq(item.getId()),
+                eq(warehouse.getId()),
+                eq(reservation.getQuantity()),
+                any(LocalDateTime.class)
+        )).thenThrow(InsufficientStockException.atWarehouse(
+                item.getId(),
+                warehouse.getId(),
+                reservation.getQuantity(),
+                stock.getQuantity()
+        ));
 
         assertThatThrownBy(() -> service.writeOff(item.getId(), request, ctx)).isInstanceOf(
                 InsufficientStockException.class);

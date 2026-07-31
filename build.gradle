@@ -36,6 +36,7 @@ dependencies {
     implementation 'org.mapstruct:mapstruct:1.5.+'
     implementation 'org.springframework.retry:spring-retry'
     implementation 'org.springframework.cloud:spring-cloud-starter-consul-config'
+    implementation 'com.bucket4j:bucket4j_jdk17-lettuce:8.19.0'
 
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.micrometer:micrometer-tracing'

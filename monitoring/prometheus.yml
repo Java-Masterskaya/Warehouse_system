@@ -14,7 +14,7 @@ scrape_configs:
     static_configs:
       # При запуске приложения (warehouse-app) в контейнере, нужно указать 'warehouse-app:8081'
       # Если приложение вне докера - 'host.docker.internal:8081'
-      - targets: ['host.docker.internal:8081']
+      - targets: ['warehouse-app:8081']
 
 rule_files:
   - /etc/prometheus/prometheus-rules.yml
