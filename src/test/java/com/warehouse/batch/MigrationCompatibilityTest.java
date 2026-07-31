@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>Backfill-джоба корректно заполняет legacy-строки.</li>
  *   <li>После backfill ни одна строка не остаётся с NULL barcode.</li>
  *   <li>Ручной barcode, совпадающий с форматом автогенерации другого товара,
- *       не приводит к дублю (см. {@code com.warehouse.service.item.ItemBarcodeGenerator}).</li>
+ *       не приводит к дублю (см. {@code com.warehouse.service.item.ItemBarcodeGeneratorService}).</li>
  * </ol>
  * <p>
  * Изоляция между тестами: {@code @BeforeEach}/{@code deleteAll()} здесь не нужен потому, что

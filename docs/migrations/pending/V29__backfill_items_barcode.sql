@@ -6,11 +6,11 @@
 --   SELECT COUNT(*) FROM items; -- < 100 000
 --
 -- Если строк >= 100 000 — НЕ копировать этот файл никогда. Вместо этого:
---   1. Задеплоить только V25 + V26 (nullable-колонка + sequence) + Java-код.
+--   1. Задеплоить только V27 + V28 (nullable-колонка + sequence) + Java-код.
 --   2. Запустить ItemBarcodeBackfillJob через POST /admin/backfill/barcode
 --      (батчами, короткими транзакциями — см. docs/database-migrations.md).
 --   3. Дождаться SELECT COUNT(*) FROM items WHERE barcode IS NULL; → 0.
---   4. Только затем — V28 (contract).
+--   4. Только затем - V30 (contract).
 --
 -- Подробнее: docs/OPS-5-deployment-guide.md
 -- ============================================================================

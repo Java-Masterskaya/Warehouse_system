@@ -11,21 +11,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 /**
- * Юнит-тест для {@link ItemBarcodeGenerator} (OPS-5): генерация из независимого
+ * Юнит-тест для {@link ItemBarcodeGeneratorService} (OPS-5): генерация из независимого
  * sequence {@code items_barcode_seq}, fallback при коллизии, проверка
  * зарезервированного формата.
  */
 @ExtendWith(MockitoExtension.class)
-class ItemBarcodeGeneratorTest {
+class ItemBarcodeGeneratorServiceTest {
 
     @Mock
     private ItemRepository itemRepository;
 
-    private ItemBarcodeGenerator barcodeGenerator;
+    private ItemBarcodeGeneratorService barcodeGenerator;
 
     @BeforeEach
     void setUp() {
-        barcodeGenerator = new ItemBarcodeGenerator(itemRepository);
+        barcodeGenerator = new ItemBarcodeGeneratorService(itemRepository);
     }
 
     @Test

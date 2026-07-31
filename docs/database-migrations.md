@@ -66,7 +66,7 @@
 
 ## Пример: добавление колонки `items.barcode`
 
-### Шаг 1 — миграция `V25__add_items_barcode_nullable.sql`
+### Шаг 1 — миграция `V27__add_items_barcode_nullable.sql`
 
 ```sql
 ALTER TABLE items ADD COLUMN barcode VARCHAR(255);
@@ -76,10 +76,12 @@ ALTER TABLE items ADD COLUMN barcode VARCHAR(255);
 - Старый код вставляет без `barcode` — не падает.
 - Новый код уже пишет `barcode`.
 
-### Шаг 1.5 — миграция `V26__create_items_barcode_seq.sql`
+### Шаг 1.5 — миграция `V28__create_items_barcode_seq.sql`
 
 ```sql
 CREATE SEQUENCE IF NOT EXISTS items_barcode_seq START WITH 1 INCREMENT BY 1;
+
+SELECT setval('items_barcode_seq', COALESCE((SELECT MAX(id) FROM items), 1));
 ```
 
 Номер для `barcode` берётся из этого sequence, а **не** из `id` товара —
@@ -87,7 +89,7 @@ CREATE SEQUENCE IF NOT EXISTS items_barcode_seq START WITH 1 INCREMENT BY 1;
 ДО `INSERT` строки, одним `save()` вместо `INSERT` + `UPDATE`: `id` для новых
 строк генерируется стратегией `GenerationType.IDENTITY`, а значит физически
 не известен, пока не выполнен реальный `INSERT`. `CREATE SEQUENCE` — мгновенная
-операция, деплоится вместе с V25, т.к. новый код сразу начинает вызывать
+операция, деплоится вместе с V27, т.к. новый код сразу начинает вызывать
 `nextval()`.
 
 ### Шаг 2 — backfill
@@ -95,8 +97,8 @@ CREATE SEQUENCE IF NOT EXISTS items_barcode_seq START WITH 1 INCREMENT BY 1;
 Оба варианта ниже лежат в `docs/migrations/pending/`, а не в `db/migration/` —
 Flyway их не видит, пока кто-то не скопирует нужный файл осознанно (см. выше).
 
-**Для таблиц < 100K** — копируем `V27__backfill_items_barcode.sql` в
-`db/migration/` и деплоим вместе с V25/V26:
+**Для таблиц < 100K** — копируем `V29__backfill_items_barcode.sql` в
+`db/migration/` и деплоим вместе с V27/V28:
 
 ```sql
 UPDATE items
@@ -104,7 +106,7 @@ SET barcode = 'ITEM-' || lpad(nextval('items_barcode_seq')::text, 10, '0')
 WHERE barcode IS NULL;
 ```
 
-**Для таблиц ≥ 100K** — `V27` не трогаем вообще. Запускаем
+**Для таблиц ≥ 100K** — `V29` не трогаем вообще. Запускаем
 `ItemBarcodeBackfillJob` через админ-эндпоинт. Эндпоинт асинхронный: сразу
 отвечает `202 Accepted` и не держит HTTP-соединение на время всего backfill.
 
@@ -120,9 +122,9 @@ curl "http://app/admin/backfill/barcode/status" \
 Джоба идемпотентна — можно перезапустить. Повторный запуск, пока предыдущий
 ещё выполняется, вернёт `409 Conflict` (не сбрасывает прогресс первого).
 
-### Шаг 3 — миграции V28, V29, V30
+### Шаг 3 — миграции V30, V31, V32
 
-Перед деплоем проверяем не только NULL, но и дубли (иначе V30 упадёт):
+Перед деплоем проверяем не только NULL, но и дубли (иначе V32 упадёт):
 
 ```sql
 SELECT COUNT(*) FROM items WHERE barcode IS NULL;
@@ -133,13 +135,13 @@ SELECT barcode, COUNT(*) FROM items GROUP BY barcode HAVING COUNT(*) > 1;
 ```
 
 ```sql
--- V28
+-- V30
 ALTER TABLE items ALTER COLUMN barcode SET NOT NULL;
 
--- V29 (требует spring.flyway.postgresql.transactional-lock: false)
+-- V31 (требует spring.flyway.postgresql.transactional-lock: false)
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uk_items_barcode ON items (barcode);
 
--- V30
+-- V32
 ALTER TABLE items ADD CONSTRAINT uk_items_barcode UNIQUE USING INDEX uk_items_barcode;
 ```
 
@@ -153,18 +155,18 @@ ALTER TABLE items ADD CONSTRAINT uk_items_barcode UNIQUE USING INDEX uk_items_ba
 [Старый код] ------+------+------+------+------+ [Новый код]
                     \     |      |      /
                      \    |      |     /
-[V25+V26] - - - - - +----+------+----+ - - - -  (колонка nullable + sequence)
+[V27+V28] - - - - - +----+------+----+ - - - -  (колонка nullable + sequence)
                       \   |      |   /
                        \  |      |  /
 [Backfill] - - - - - - - +------+- - - - - - - -  (заполняем NULL)
                          \      /
                           \    /
-[V28-V30] - - - - - - - - + - - - - - - - - - -  (NOT NULL + UNIQUE)
+[V30-V32] - - - - - - - - + - - - - - - - - - -  (NOT NULL + UNIQUE)
 ```
 
-- В промежутке между V25/V26 и V28–V30 старый и новый код работают одновременно.
-- V25/V26 безопасны, потому что не ломают старый INSERT.
-- V28–V30 деплоятся только когда все инстансы уже новые (это отдельный деплой).
+- В промежутке между V27/V28 и V30–V32 старый и новый код работают одновременно.
+- V27/V28 безопасны, потому что не ломают старый INSERT.
+- V30–V32 деплоятся только когда все инстансы уже новые (это отдельный деплой).
 
 ---
 

@@ -52,7 +52,7 @@ public class ItemServiceImpl implements ItemService {
     private final AuditContext auditContext;
     private final StockAvailabilityService availabilityService;
     private final CategoryRepository categoryRepository;
-    private final ItemBarcodeGenerator barcodeGenerator;
+    private final ItemBarcodeGeneratorService barcodeGenerator;
 
     @Transactional
     @Override
