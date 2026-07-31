@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ItemBarcodeGenerator {
+public class ItemBarcodeGeneratorService {
 
     private static final String FORMAT = "ITEM-%010d";
     private static final int FALLBACK_SUFFIX_LENGTH = 8;

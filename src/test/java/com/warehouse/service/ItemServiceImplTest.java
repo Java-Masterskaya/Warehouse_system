@@ -19,7 +19,7 @@ import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.WarehouseRepository;
-import com.warehouse.service.item.ItemBarcodeGenerator;
+import com.warehouse.service.item.ItemBarcodeGeneratorService;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.item.ItemServiceImpl;
 import com.warehouse.service.reservation.StockAvailabilityService;
@@ -79,7 +79,7 @@ class ItemServiceImplTest {
     private CategoryRepository categoryRepository;
 
     @Mock
-    private ItemBarcodeGenerator barcodeGenerator;
+    private ItemBarcodeGeneratorService barcodeGenerator;
 
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 

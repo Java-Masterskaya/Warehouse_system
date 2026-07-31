@@ -47,7 +47,7 @@ public class ItemServiceImpl implements ItemService {
     private final ItemMapper itemMapper;
     private final StockAvailabilityService availabilityService;
     private final CategoryRepository categoryRepository;
-    private final ItemBarcodeGenerator barcodeGenerator;
+    private final ItemBarcodeGeneratorService barcodeGenerator;
 
     @Transactional
     @Override

@@ -129,6 +129,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // из предыдущих тестов нарушает ассерты и уникальные индексы
         jdbcTemplate.update("DELETE FROM stock_alerts");
         jdbcTemplate.update("DELETE FROM stock_movements");
+        jdbcTemplate.update("DELETE FROM idempotency_keys");
         jdbcTemplate.update("DELETE FROM batches");
         jdbcTemplate.update("DELETE FROM outbox");
 

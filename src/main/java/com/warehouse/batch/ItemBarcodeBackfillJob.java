@@ -2,7 +2,7 @@ package com.warehouse.batch;
 
 import com.warehouse.exception.BackfillAlreadyRunningException;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.service.item.ItemBarcodeGenerator;
+import com.warehouse.service.item.ItemBarcodeGeneratorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -58,7 +58,7 @@ public class ItemBarcodeBackfillJob {
     private static final int LOG_INTERVAL = 10;
 
     private final ItemRepository itemRepository;
-    private final ItemBarcodeGenerator barcodeGenerator;
+    private final ItemBarcodeGeneratorService barcodeGenerator;
     private final TransactionTemplate txTemplate;
 
     private final Object stateLock = new Object();
@@ -68,7 +68,7 @@ public class ItemBarcodeBackfillJob {
     private volatile Result lastResult;
 
     public ItemBarcodeBackfillJob(ItemRepository itemRepository,
-                                   ItemBarcodeGenerator barcodeGenerator,
+                                   ItemBarcodeGeneratorService barcodeGenerator,
                                    PlatformTransactionManager transactionManager) {
         this.itemRepository = itemRepository;
         this.barcodeGenerator = barcodeGenerator;

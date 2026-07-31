@@ -11,6 +11,10 @@ import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
 import com.warehouse.exception.DuplicateWarehouseNameException;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.IdempotencyConflictException;
+import com.warehouse.exception.IdempotencyKeyDuplicateException;
+import com.warehouse.exception.IdempotencyKeyRequiredException;
+import com.warehouse.exception.IdempotencyStorageException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.InvalidPurchaseOrderStatusException;
@@ -276,6 +280,36 @@ public class GlobalExceptionHandler {
             message = "Internal server error";
         }
         return new ErrorResponse("INTERNAL_ERROR", message);
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleIdempotencyConflict(IdempotencyConflictException ex) {
+        log.warn("Idempotency conflict: {}", ex.getMessage());
+        return new ErrorResponse("IDEMPOTENCY_CONFLICT", ex.getMessage());
+    }
+
+    @ExceptionHandler(IdempotencyKeyRequiredException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIdempotencyKeyRequired(IdempotencyKeyRequiredException ex) {
+        log.warn("Idempotency key required: {}", ex.getMessage());
+        return new ErrorResponse("IDEMPOTENCY_KEY_REQUIRED", ex.getMessage());
+    }
+
+    @ExceptionHandler(IdempotencyStorageException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleIdempotencyStorage(IdempotencyStorageException ex) {
+        log.error("Idempotency storage error: {}", ex.getMessage(), ex);
+        return new ErrorResponse("IDEMPOTENCY_STORAGE_ERROR",
+                "Internal error processing idempotent request. Please retry with a new key.");
+    }
+
+    @ExceptionHandler(IdempotencyKeyDuplicateException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleIdempotencyKeyDuplicate(IdempotencyKeyDuplicateException ex) {
+        log.warn("Idempotency key duplicate: {}", ex.getMessage());
+        return new ErrorResponse("IDEMPOTENCY_KEY_DUPLICATE",
+                "Concurrent request with same idempotency key detected. Please retry.");
     }
 
     private boolean isAdmin() {
