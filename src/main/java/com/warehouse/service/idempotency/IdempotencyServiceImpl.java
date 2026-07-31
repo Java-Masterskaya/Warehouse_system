@@ -165,6 +165,9 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             Object requestBody,
             Supplier<StockMovementResponse> operation
     ) {
+        // Удаляем просроченный ключ, если он есть
+        idempotencyKeyRepository.deleteExpiredKey(keyHash, ctx.userId(), endpoint, LocalDateTime.now());
+
         String bodyHash = hashRequestBody(requestBody);
         saveIdempotencyKeyPlaceholder(keyHash, ctx, endpoint, bodyHash);
 

@@ -47,4 +47,18 @@ public interface IdempotencyKeyRepository extends JpaRepository<IdempotencyKey, 
             @Param("statusCode") Integer statusCode,
             @Param("expiresAt") LocalDateTime expiresAt
     );
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM IdempotencyKey ik "
+            + "WHERE ik.keyHash = :keyHash "
+            + "AND ik.user.id = :userId "
+            + "AND ik.endpoint = :endpoint "
+            + "AND ik.expiresAt < :now")
+    int deleteExpiredKey(
+            @Param("keyHash") String keyHash,
+            @Param("userId") Long userId,
+            @Param("endpoint") String endpoint,
+            @Param("now") LocalDateTime now
+    );
 }
