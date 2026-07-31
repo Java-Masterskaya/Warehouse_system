@@ -83,6 +83,11 @@ app:
       max-attempts: 3
   jwt:
     refresh-retry-ttl-seconds: 60
+  idempotency:
+    ttl-hours: 24
+    required: true # Обязательность заголовка Idempotency-Key
+    cleanup-cron: "0 0 * * * *"  # Каждый час
+    enforce-after: 2026-08-26
 
 management:
   server:
