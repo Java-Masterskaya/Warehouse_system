@@ -27,17 +27,17 @@ import java.util.UUID;
  * @param transferId ID перевода, если движение является частью перевода
  */
 public record StockMovementResponse(
-        @Schema(nullable = true) Long itemId,
-        @Schema(nullable = true) Long movementId,
-        @Schema(nullable = true) MovementType type,
-        int quantity,
-        int stockAfter,
-        @Schema(nullable = true) Long batchId,
-        @Schema(nullable = true) LocalDateTime expiryDate,
-        @Schema(nullable = true) LocalDateTime createdAt,
-        boolean lowStockAlert,
-        @Schema(nullable = true) Long warehouseId,
-        @Schema(nullable = true) String warehouseName,
-        @Schema(nullable = true) UUID transferId
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) Long itemId,
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) Long movementId,
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) MovementType type,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int quantity,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int stockAfter,
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) Long batchId,
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime expiryDate,
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean lowStockAlert,
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) Long warehouseId,
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) String warehouseName,
+        @Schema(nullable = true, requiredMode = Schema.RequiredMode.REQUIRED) UUID transferId
 ) {
 }

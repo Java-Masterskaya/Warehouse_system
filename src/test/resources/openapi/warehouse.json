@@ -4993,6 +4993,7 @@
         }
       },
       "ItemResponse" : {
+        "required" : [ "category", "cost", "createdAt", "id", "isActive", "minStock", "name", "price", "sku" ],
         "type" : "object",
         "properties" : {
           "id" : {
@@ -5364,6 +5365,7 @@
         }
       },
       "StockMovementResponse" : {
+        "required" : [ "batchId", "createdAt", "expiryDate", "itemId", "lowStockAlert", "movementId", "quantity", "stockAfter", "transferId", "type", "warehouseId", "warehouseName" ],
         "type" : "object",
         "properties" : {
           "itemId" : {
@@ -5620,6 +5622,7 @@
         }
       },
       "LoginResponse" : {
+        "required" : [ "accessToken", "expiresIn", "refreshToken" ],
         "type" : "object",
         "properties" : {
           "accessToken" : {
@@ -5761,6 +5764,7 @@
         }
       },
       "PageResponsePurchaseOrderResponse" : {
+        "required" : [ "content", "page", "size", "totalElements", "totalPages" ],
         "type" : "object",
         "properties" : {
           "content" : {
@@ -5788,6 +5792,7 @@
         }
       },
       "PageResponseStockMovementHistoryResponse" : {
+        "required" : [ "content", "page", "size", "totalElements", "totalPages" ],
         "type" : "object",
         "properties" : {
           "content" : {
@@ -5815,6 +5820,7 @@
         }
       },
       "StockMovementHistoryResponse" : {
+        "required" : [ "createdAt", "id", "performedBy", "quantity", "transferId", "type", "warehouseId", "warehouseName" ],
         "type" : "object",
         "properties" : {
           "id" : {
@@ -5845,11 +5851,13 @@
           },
           "transferId" : {
             "type" : "string",
-            "format" : "uuid"
+            "format" : "uuid",
+            "nullable" : true
           }
         }
       },
       "PageResponseItemResponse" : {
+        "required" : [ "content", "page", "size", "totalElements", "totalPages" ],
         "type" : "object",
         "properties" : {
           "content" : {
@@ -5877,6 +5885,7 @@
         }
       },
       "ItemDetailsResponse" : {
+        "required" : [ "available", "category", "cost", "createdAt", "currentStock", "id", "isActive", "minStock", "name", "price", "reserved", "sku", "updatedAt", "warehouseStocks" ],
         "type" : "object",
         "properties" : {
           "id" : {
@@ -5934,6 +5943,7 @@
         }
       },
       "WarehouseStockResponse" : {
+        "required" : [ "available", "quantity", "reserved", "warehouseId", "warehouseName" ],
         "type" : "object",
         "properties" : {
           "warehouseId" : {
