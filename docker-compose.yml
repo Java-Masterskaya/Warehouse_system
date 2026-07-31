@@ -73,11 +73,11 @@ services:
       - ./scripts/backup.sh:/backup.sh:ro
       - ./scripts/restore.sh:/restore.sh:ro
       - ./scripts/backup-entrypoint.sh:/backup-entrypoint.sh:ro
-    entrypoint: ["sh", "/backup-entrypoint.sh"]
+    entrypoint: [ "sh", "/backup-entrypoint.sh" ]
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "test -f /backups/.last_success && test $(($(date +%s) - $(cat /backups/.last_success))) -lt 90000 || exit 1"]
+      test: [ "CMD-SHELL", "test -f /backups/.last_success && test $(($(date +%s) - $(cat /backups/.last_success))) -lt 90000 || exit 1" ]
       interval: 1m
       timeout: 5s
       retries: 3

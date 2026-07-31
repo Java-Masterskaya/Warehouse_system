@@ -132,15 +132,25 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         log.info("Test setup...");
 
-        // Удаляем в правильном порядке, чтобы избежать ошибок внешних ключей
+        // Удаляем в правильном порядке (сначала зависимые таблицы), чтобы избежать ошибок внешних ключей
+        // Важно: static Testcontainers живут между запусками, поэтому leftover data
+        // из предыдущих тестов нарушает ассерты и уникальные индексы
         jdbcTemplate.update("DELETE FROM stock_alerts");
         jdbcTemplate.update("DELETE FROM stock_movements");
         jdbcTemplate.update("DELETE FROM batches");
+        jdbcTemplate.update("DELETE FROM outbox");
 
         jdbcTemplate.update("DELETE FROM stock");
         jdbcTemplate.update("DELETE FROM items");
         jdbcTemplate.update("DELETE FROM categories");
         jdbcTemplate.update("DELETE FROM users");
+        jdbcTemplate.update("DELETE FROM reserves");
+
+        // Очищаем последовательно, чтобы убрать дубликаты (DELETE + INSERT работает быстрее)
+        jdbcTemplate.update("ALTER SEQUENCE stock_alerts_id_seq RESTART WITH 1");
+        jdbcTemplate.update("ALTER SEQUENCE items_id_seq RESTART WITH 1");
+        jdbcTemplate.update("ALTER SEQUENCE categories_id_seq RESTART WITH 1");
+        jdbcTemplate.update("ALTER SEQUENCE users_id_seq RESTART WITH 1");
 
         resetConsumerGroupOffsets();
 

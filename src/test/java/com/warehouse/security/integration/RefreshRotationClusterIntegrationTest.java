@@ -7,6 +7,7 @@ import com.warehouse.lock.DistributedLockManager;
 import com.warehouse.metric.MetricService;
 import com.warehouse.security.model.TokenPair;
 import com.warehouse.security.service.AuthServiceImpl;
+import com.warehouse.security.service.LoginAttemptService;
 import com.warehouse.security.service.TokenService;
 import com.warehouse.security.util.JwtUtil;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,7 @@ class RefreshRotationClusterIntegrationTest extends AbstractIntegrationTest {
         TokenService tokenService = mock(TokenService.class);
         AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
         MetricService metricService = mock(MetricService.class);
+        LoginAttemptService loginAttemptService = mock(LoginAttemptService.class);
 
         when(tokenService.getRefreshRetryResult(oldRefreshToken))
                 .thenAnswer(invocation -> readRetryCache(retryCache, bothReplicasReadEmptyCache));
@@ -67,6 +69,7 @@ class RefreshRotationClusterIntegrationTest extends AbstractIntegrationTest {
                 jwtUtil,
                 tokenService,
                 metricService,
+                loginAttemptService,
                 lockManager
         );
         AuthServiceImpl secondReplica = new AuthServiceImpl(
@@ -74,6 +77,7 @@ class RefreshRotationClusterIntegrationTest extends AbstractIntegrationTest {
                 jwtUtil,
                 tokenService,
                 metricService,
+                loginAttemptService,
                 lockManager
         );
 

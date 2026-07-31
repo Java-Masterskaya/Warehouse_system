@@ -72,7 +72,6 @@ public interface StockMovementService {
      */
     StockTransferResponse transfer(TransferStockRequest request, UserContext ctx);
 
-
     /**
      * Persists a stock movement for a specific warehouse.
      *
@@ -105,25 +104,6 @@ public interface StockMovementService {
     StockMovement newStockMovement(
             Item item,
             Warehouse warehouse,
-            int quantity,
-            UserContext ctx,
-            MovementType type,
-            Batch batch
-    );
-
-    /**
-     * Persists a stock movement using default warehouse.
-     * Uses default warehouse from repository.
-     *
-     * @param item moved item
-     * @param quantity movement quantity
-     * @param ctx user performing the operation
-     * @param type movement type
-     * @param batch batch reference (optional)
-     * @return persisted movement
-     */
-    StockMovement newStockMovement(
-            Item item,
             int quantity,
             UserContext ctx,
             MovementType type,
