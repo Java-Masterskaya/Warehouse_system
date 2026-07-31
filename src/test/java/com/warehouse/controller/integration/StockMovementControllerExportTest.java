@@ -136,16 +136,18 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
             return categoryRepository.saveAndFlush(cat);
         });
 
-        Item item = new Item();
-        item.setSku("SKU-1");
-        item.setActive(true);
-        item.setName("Товар");
-        item.setCategory(category);
-        item.setCost(new BigDecimal(100));
-        item.setPrice(new BigDecimal(300));
-        item.setMinStock(0);
+        Item item = itemRepository.findBySku("SKU-1").orElseGet(() -> {
+            Item i = new Item();
+            i.setSku("SKU-1");
+            i.setActive(true);
+            i.setName("Товар");
+            i.setCategory(category);
+            i.setCost(new BigDecimal(100));
+            i.setPrice(new BigDecimal(300));
+            i.setMinStock(0);
 
-        Item savedItem = itemRepository.saveAndFlush(item);
+            return itemRepository.saveAndFlush(i);
+        });
 
         Warehouse warehouse = warehouseRepository.findByDefaultWarehouseTrue()
                                                  .orElseGet(() -> warehouseRepository.save(Warehouse.builder()
@@ -176,7 +178,7 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
                 quantity = 5;
             }
             movementRepository.save(StockMovement.builder()
-                                                 .item(savedItem)
+                                                 .item(item)
                                                  .warehouse(warehouse)
                                                  .user(user)
                                                  .type(type)

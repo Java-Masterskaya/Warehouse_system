@@ -1,7 +1,6 @@
 package com.warehouse.controller.integration;
 
 import com.warehouse.AbstractIntegrationTest;
-import com.warehouse.entity.Category;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.service.import_export.CsvExportService;
 import org.junit.jupiter.api.DisplayName;
@@ -97,8 +96,6 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
 
     private void fillDb(int items)
             throws Exception {
-
-
 
         StringBuilder csvBuilder = new StringBuilder("SKU,Name,Category,Price,Cost\n");
 
