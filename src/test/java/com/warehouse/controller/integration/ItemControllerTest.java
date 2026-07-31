@@ -2,6 +2,7 @@ package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
@@ -62,6 +63,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuditContext auditContext;
 
     @Autowired
     private ItemService itemService;

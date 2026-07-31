@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
@@ -70,6 +71,9 @@ class ItemServiceImplTest {
     private StockRepository stockRepository;
 
     @Mock
+    private AuditContext auditContext;
+
+    @Mock
     private WarehouseRepository warehouseRepository;
 
     @Mock
@@ -92,6 +96,7 @@ class ItemServiceImplTest {
                 stockRepository,
                 warehouseRepository,
                 itemMapper,
+                auditContext,
                 availabilityService,
                 categoryRepository,
                 barcodeGenerator
