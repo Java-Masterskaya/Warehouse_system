@@ -3,6 +3,7 @@ plugins {
     id 'org.springframework.boot' version '3.4.5'
     id 'io.spring.dependency-management' version '1.1.5'
     id 'checkstyle'
+    id 'info.solidsoft.pitest' version '1.19.0'
 }
 
 group = 'com.warehouse'
@@ -90,6 +91,28 @@ dependencyManagement {
 test {
     useJUnitPlatform()
     environment 'SPRING_PROFILES_ACTIVE', 'test'
+}
+
+pitest {
+    junit5PluginVersion = '1.2.3'
+
+    targetClasses = [
+            'com.warehouse.service.movement.StockMovementServiceImpl',
+            'com.warehouse.service.reservation.StockReserveServiceImpl',
+            'com.warehouse.service.reservation.StockAvailabilityService',
+            'com.warehouse.service.batch.BatchServiceImpl'
+    ]
+
+    targetTests = [
+            'com.warehouse.service.StockMovementServiceImplTest',
+            'com.warehouse.service.StockReserveServiceImplTest',
+            'com.warehouse.service.BatchServiceImplTest'
+    ]
+
+    mutators = ['STRONGER']
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
+    mutationThreshold = 0
 }
 
 checkstyle {
