@@ -53,7 +53,6 @@ public class AuditService {
         log.info("Audit log retention finished. Total deleted rows: {}", totalDeleted);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int deleteBatch(int retention, int batch) {
         String sql = "SELECT purge_old_audit_logs_batch(?, ?)";
         Integer deletedCount = jdbcTemplate.queryForObject(sql, Integer.class, retention, batch);

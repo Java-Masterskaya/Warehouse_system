@@ -8,7 +8,8 @@ import com.warehouse.audit.entity.AuditLogEntity;
 import com.warehouse.audit.entity.EntityType;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.item.CreateItemRequest;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Category;
@@ -33,6 +34,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,7 +78,7 @@ public class StockMovementServiceIntegrationTest extends AbstractIntegrationTest
             stock.setQuantity(100);
             stockRepository.save(stock);
 
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(item.id(), 20);
+            ReceiveStockRequest request = new ReceiveStockRequest(item.id(), 20, LocalDateTime.now().plusDays(1));
 
             UserContext ctx = new UserContext(admin.getId(), admin.getUsername());
 
@@ -124,14 +126,12 @@ public class StockMovementServiceIntegrationTest extends AbstractIntegrationTest
             setAuthentification(admin);
 
             ItemResponse item = createItem();
-
-            Stock stock = stockRepository.findByItemId(item.id()).orElseThrow();
-            stock.setQuantity(100);
-            stockRepository.save(stock);
-
-            ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(item.id(), 30);
-
             UserContext ctx = new UserContext(admin.getId(), admin.getUsername());
+            stockMovementService.registerReceipt(new ReceiveStockRequest(item.id(),
+                    100,
+                    LocalDateTime.now().plusDays(10)), ctx);
+
+            WriteOffStockRequest request = new WriteOffStockRequest(item.id(), 30);
 
             StockMovementResponse response = stockMovementService.writeOffReceipt(request, ctx);
 

@@ -3,7 +3,6 @@ package com.warehouse.controller.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.audit.AuditContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
