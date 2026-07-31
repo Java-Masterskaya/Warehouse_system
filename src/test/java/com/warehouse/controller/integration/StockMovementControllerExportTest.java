@@ -16,18 +16,14 @@ import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.import_export.CsvExportService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.io.Writer;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -36,7 +32,6 @@ import java.time.format.DateTimeFormatter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -76,13 +71,15 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
                 mockMvc.perform(get("/api/movements/export")).andExpect(request().asyncStarted()).andReturn();
 
         MvcResult dispatched = mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk())
-               .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8"))
-               .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"movements.csv\""))
-               .andReturn();
+                                      .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8"))
+                                      .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                                              "attachment; filename=\"movements.csv\""))
+                                      .andReturn();
 
         String actualContent = dispatched.getResponse().getContentAsString(StandardCharsets.UTF_8);
         String expected = "\uFEFFItem_sku,Item_name,Warehouse,Movement_type,Quantity,Creator,Created_at,Transfer_id\n"
-                + "SKU-1,Товар,Default Warehouse,ADJUSTMENT,5,Name,"+created.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS"))+",\n";
+                + "SKU-1,Товар,Default Warehouse,ADJUSTMENT,5,Name," + created.format(DateTimeFormatter.ofPattern(
+                "yyyy-MM-dd'T'HH:mm:ss.SSSSSS")) + ",\n";
         assertThat(actualContent).isEqualToIgnoringWhitespace(expected);
     }
 

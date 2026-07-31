@@ -30,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -70,7 +69,7 @@ class CsvImportServiceTest {
         MockMultipartFile multipartFile = new MockMultipartFile("file",
                 "items.csv",
                 "text/csv",
-                "SKU,Name,Category,Price,Cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00".getBytes());
+                "SKU,Name,Category,Price,Cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00" .getBytes());
 
         CsvItemParser.ValidRowHolder row1 =
                 createValidRowHolder(1, "SKU-001", "Ноутбук", categoryName1, "1000.00", "800.00");
@@ -129,7 +128,7 @@ class CsvImportServiceTest {
     @DisplayName("Ошибка валидации, если расширение файла не .csv")
     void importItemsInvalidExtensionThrowsException() {
         MockMultipartFile txtFile =
-                new MockMultipartFile("file", "items.txt", "text/plain", "some content".getBytes());
+                new MockMultipartFile("file", "items.txt", "text/plain", "some content" .getBytes());
 
         assertThatThrownBy(() -> csvImportService.importItems(txtFile)).isInstanceOf(IllegalArgumentException.class)
                                                                        .hasMessageContaining("CSV");
@@ -141,7 +140,7 @@ class CsvImportServiceTest {
     @Test
     @DisplayName("Импорт с ошибками: дубликаты SKU и несуществующие категории корректно попадают в отчет")
     void importItemsWithErrorsReport() {
-        MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", "content".getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", "content" .getBytes());
 
         Category existingCategory = new Category();
         existingCategory.setId(1L);

@@ -63,7 +63,7 @@ class ItemControllerImportTest extends AbstractIntegrationTest {
     void importItemsWithErrorsReturns200WithErrorsList()
             throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv",
-                "sku,name,category,price,cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00".getBytes());
+                "sku,name,category,price,cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00" .getBytes());
 
         ItemImportErrorDto error = new ItemImportErrorDto(2, "SKU-EXISTS", "Товар с SKU 'SKU-EXISTS' уже существует");
         ItemImportResultDto expectedResponse = ItemImportResultDto.of(2, 1, List.of(error));

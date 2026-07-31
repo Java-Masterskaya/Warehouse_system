@@ -122,7 +122,7 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         ItemImportResultDto result = csvImportService.importItems(multipartFile);
 
         System.out.println("====================Ошибки===================");
-        for (ItemImportErrorDto error : result.errors()){
+        for (ItemImportErrorDto error : result.errors()) {
             System.out.println(error);
         }
         System.out.println("=============================================");
