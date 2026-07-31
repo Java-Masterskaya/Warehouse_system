@@ -205,6 +205,17 @@ class TokenServiceImplTest {
     }
 
     @Test
+    @DisplayName("Invalid refresh token must not revoke an unverified access token")
+    void revokeTokenPairWithInvalidRefreshShouldNotRevokeAccessToken() {
+        when(jwtUtil.parseRefreshToken(REFRESH_TOKEN)).thenReturn(Optional.empty());
+
+        tokenService.revokeTokenPair(REFRESH_TOKEN, ACCESS_TOKEN);
+
+        verify(redisTemplate).delete(argThat((String k) -> k.startsWith("refresh:")));
+        verify(jwtUtil, never()).parseAccessToken(anyString());
+    }
+
+    @Test
     @DisplayName("Should revoke a valid token pair with one Redis script")
     void revokeTokenPairShouldExecuteAtomically() {
         JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(USER_ID, USERNAME, ROLES);

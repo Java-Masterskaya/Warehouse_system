@@ -63,7 +63,7 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
         List<String> cleanupKeys = cleanupKeys(keys, userId, oldAccessHash, candidate);
 
         try {
-            seedOldRefreshToken(keys, oldTokenHash, userId);
+            seedOldRefreshToken(keys, oldTokenHash, userId, oldAccessHash);
             seedAccessToken(userId, oldAccessHash, LONG_LIVED_ACCESS_TTL_MS);
 
             TokenPair result = tokenService.rotateRefreshToken(oldRefreshToken);
@@ -71,11 +71,16 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
             assertThat(result).isEqualTo(candidate);
             assertThat(tokenService.validateRefreshToken(oldRefreshToken)).isFalse();
             assertThat(tokenService.isRefreshTokenReused(oldRefreshToken)).isTrue();
+            assertThat(redisTemplate.opsForValue().get(keys.get(1))).isEqualTo(
+                    userId + "|" + TokenHashUtil.hashToken(candidate.refreshToken())
+                            + "|" + oldAccessHash
+            );
             assertThat(tokenService.getRefreshRetryResult(oldRefreshToken)).contains(candidate);
             assertThat(redisTemplate.hasKey(keys.get(3))).isFalse();
             assertThat(redisTemplate.opsForSet().isMember(keys.get(4), oldTokenHash)).isFalse();
             assertThat(redisTemplate.opsForValue().get(keys.get(5))).isEqualTo(userId.toString());
-            assertThat(redisTemplate.opsForValue().get(keys.get(6))).isEqualTo("active");
+            assertThat(redisTemplate.opsForValue().get(keys.get(6)))
+                    .isEqualTo(TokenHashUtil.hashToken(candidate.accessToken()));
             assertThat(redisTemplate.opsForValue().get(keys.get(7))).isEqualTo("active");
             assertThat(redisTemplate.opsForSet().isMember(
                     keys.get(4),
@@ -100,6 +105,199 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
             assertThat(redisTemplate.hasKey(
                     "blacklist:" + TokenHashUtil.hashToken(candidate.accessToken())
             )).isFalse();
+        } finally {
+            redisTemplate.delete(cleanupKeys);
+        }
+    }
+
+    @Test
+    @DisplayName("Rotating one token pair must preserve another active session")
+    void rotateRefreshTokenShouldPreserveIndependentSession() {
+        Long userId = randomUserId();
+        TokenPair firstPair = new TokenPair(
+                "first-access-" + UUID.randomUUID(),
+                "first-refresh-" + UUID.randomUUID()
+        );
+        TokenPair secondPair = new TokenPair(
+                "second-access-" + UUID.randomUUID(),
+                "second-refresh-" + UUID.randomUUID()
+        );
+        TokenPair rotatedPair = new TokenPair(
+                "rotated-access-" + UUID.randomUUID(),
+                "rotated-refresh-" + UUID.randomUUID()
+        );
+        JwtUtil jwtUtil = tokenPairRotationJwtUtil(userId, firstPair, secondPair, rotatedPair);
+        TokenServiceImpl tokenService = createTokenService(jwtUtil);
+        String firstRefreshHash = TokenHashUtil.hashToken(firstPair.refreshToken());
+        String firstAccessHash = TokenHashUtil.hashToken(firstPair.accessToken());
+        String secondRefreshHash = TokenHashUtil.hashToken(secondPair.refreshToken());
+        String secondAccessHash = TokenHashUtil.hashToken(secondPair.accessToken());
+        String rotatedRefreshHash = TokenHashUtil.hashToken(rotatedPair.refreshToken());
+        String rotatedAccessHash = TokenHashUtil.hashToken(rotatedPair.accessToken());
+        String refreshSetKey = "user:refresh:set:" + userId;
+        String accessSetKey = "user:access:set:" + userId;
+        List<String> cleanupKeys = new ArrayList<>(
+                rotationKeys(firstRefreshHash, userId, rotatedPair)
+        );
+        cleanupKeys.addAll(candidateKeys(userId, firstPair));
+        cleanupKeys.addAll(candidateKeys(userId, secondPair));
+        cleanupKeys.add("blacklist:" + firstAccessHash);
+        cleanupKeys.add("blacklist:" + secondAccessHash);
+        cleanupKeys.add("blacklist:" + rotatedAccessHash);
+
+        try {
+            assertThat(tokenService.generateTokenPair("cluster-user", userId, ROLES))
+                    .isEqualTo(firstPair);
+            assertThat(tokenService.generateTokenPair("cluster-user", userId, ROLES))
+                    .isEqualTo(secondPair);
+
+            assertThat(tokenService.rotateRefreshToken(firstPair.refreshToken()))
+                    .isEqualTo(rotatedPair);
+
+            assertThat(redisTemplate.hasKey("refresh:" + firstRefreshHash)).isFalse();
+            assertThat(redisTemplate.hasKey(
+                    "user:tokens:" + userId + ":" + firstRefreshHash
+            )).isFalse();
+            assertThat(redisTemplate.hasKey(
+                    "user:access:" + userId + ":" + firstAccessHash
+            )).isFalse();
+            assertThat(redisTemplate.hasKey("blacklist:" + firstAccessHash)).isTrue();
+
+            assertThat(tokenService.validateRefreshToken(secondPair.refreshToken())).isTrue();
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:tokens:" + userId + ":" + secondRefreshHash
+            )).isEqualTo(secondAccessHash);
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:access:" + userId + ":" + secondAccessHash
+            )).isEqualTo("active");
+            assertThat(redisTemplate.hasKey("blacklist:" + secondAccessHash)).isFalse();
+
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:tokens:" + userId + ":" + rotatedRefreshHash
+            )).isEqualTo(rotatedAccessHash);
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:access:" + userId + ":" + rotatedAccessHash
+            )).isEqualTo("active");
+            assertThat(redisTemplate.hasKey("blacklist:" + rotatedAccessHash)).isFalse();
+            assertThat(redisTemplate.opsForSet().members(refreshSetKey))
+                    .containsExactlyInAnyOrder(secondRefreshHash, rotatedRefreshHash);
+            assertThat(redisTemplate.opsForSet().members(accessSetKey))
+                    .containsExactlyInAnyOrder(secondAccessHash, rotatedAccessHash);
+
+            tokenService.revokeTokenPair(
+                    secondPair.refreshToken(),
+                    secondPair.accessToken()
+            );
+            tokenService.revokeTokenPair(
+                    secondPair.refreshToken(),
+                    rotatedPair.accessToken()
+            );
+
+            assertThat(redisTemplate.hasKey("refresh:" + rotatedRefreshHash)).isTrue();
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:tokens:" + userId + ":" + rotatedRefreshHash
+            )).isEqualTo(rotatedAccessHash);
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:access:" + userId + ":" + rotatedAccessHash
+            )).isEqualTo("active");
+            assertThat(redisTemplate.hasKey("blacklist:" + rotatedAccessHash)).isFalse();
+            assertThat(redisTemplate.opsForSet().members(refreshSetKey))
+                    .containsExactly(rotatedRefreshHash);
+            assertThat(redisTemplate.opsForSet().members(accessSetKey))
+                    .containsExactly(rotatedAccessHash);
+        } finally {
+            redisTemplate.delete(cleanupKeys);
+        }
+    }
+
+    @Test
+    @DisplayName("Legacy rotation must upgrade the pair without revoking existing access tokens")
+    void rotateLegacyRefreshTokenShouldPreserveExistingSessionsAndUpgradeMapping() {
+        Long userId = randomUserId();
+        String firstRefresh = "legacy-first-refresh-" + UUID.randomUUID();
+        String secondRefresh = "legacy-second-refresh-" + UUID.randomUUID();
+        String firstRefreshHash = TokenHashUtil.hashToken(firstRefresh);
+        String secondRefreshHash = TokenHashUtil.hashToken(secondRefresh);
+        String firstAccessHash = TokenHashUtil.hashToken(
+                "legacy-first-access-" + UUID.randomUUID()
+        );
+        String secondAccessHash = TokenHashUtil.hashToken(
+                "legacy-second-access-" + UUID.randomUUID()
+        );
+        TokenPair rotatedPair = new TokenPair(
+                "legacy-rotated-access-" + UUID.randomUUID(),
+                "legacy-rotated-refresh-" + UUID.randomUUID()
+        );
+        String rotatedRefreshHash = TokenHashUtil.hashToken(rotatedPair.refreshToken());
+        String rotatedAccessHash = TokenHashUtil.hashToken(rotatedPair.accessToken());
+        JwtUtil jwtUtil = configuredJwtUtil(firstRefresh, userId, rotatedPair);
+        JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(userId, "cluster-user", ROLES);
+        when(jwtUtil.parseRefreshToken(secondRefresh)).thenReturn(Optional.of(payload));
+        TokenServiceImpl tokenService = createTokenService(jwtUtil);
+        List<String> keys = rotationKeys(firstRefreshHash, userId, rotatedPair);
+        String secondRefreshKey = "refresh:" + secondRefreshHash;
+        String secondMappingKey = "user:tokens:" + userId + ":" + secondRefreshHash;
+        String firstAccessKey = "user:access:" + userId + ":" + firstAccessHash;
+        String secondAccessKey = "user:access:" + userId + ":" + secondAccessHash;
+        List<String> cleanupKeys = new ArrayList<>(keys);
+        cleanupKeys.add(secondRefreshKey);
+        cleanupKeys.add(secondMappingKey);
+        cleanupKeys.add(firstAccessKey);
+        cleanupKeys.add(secondAccessKey);
+        cleanupKeys.add("blacklist:" + firstAccessHash);
+        cleanupKeys.add("blacklist:" + secondAccessHash);
+        cleanupKeys.add("blacklist:" + rotatedAccessHash);
+
+        try {
+            redisTemplate.opsForValue().set(
+                    keys.get(0),
+                    userId.toString(),
+                    ROTATION_TTL_MS,
+                    TimeUnit.MILLISECONDS
+            );
+            redisTemplate.opsForValue().set(
+                    keys.get(3),
+                    "active",
+                    ROTATION_TTL_MS,
+                    TimeUnit.MILLISECONDS
+            );
+            redisTemplate.opsForValue().set(
+                    secondRefreshKey,
+                    userId.toString(),
+                    ROTATION_TTL_MS,
+                    TimeUnit.MILLISECONDS
+            );
+            redisTemplate.opsForValue().set(
+                    secondMappingKey,
+                    "active",
+                    ROTATION_TTL_MS,
+                    TimeUnit.MILLISECONDS
+            );
+            redisTemplate.opsForSet().add(keys.get(4), firstRefreshHash, secondRefreshHash);
+            redisTemplate.expire(keys.get(4), ROTATION_TTL_MS, TimeUnit.MILLISECONDS);
+            seedAccessToken(userId, firstAccessHash);
+            seedAccessToken(userId, secondAccessHash);
+
+            assertThat(tokenService.rotateRefreshToken(firstRefresh)).isEqualTo(rotatedPair);
+
+            assertThat(redisTemplate.hasKey(keys.get(0))).isFalse();
+            assertThat(redisTemplate.hasKey(keys.get(3))).isFalse();
+            assertThat(tokenService.validateRefreshToken(secondRefresh)).isTrue();
+            assertThat(redisTemplate.opsForValue().get(secondMappingKey)).isEqualTo("active");
+            assertThat(redisTemplate.opsForValue().get(firstAccessKey)).isEqualTo("active");
+            assertThat(redisTemplate.opsForValue().get(secondAccessKey)).isEqualTo("active");
+            assertThat(redisTemplate.hasKey("blacklist:" + firstAccessHash)).isFalse();
+            assertThat(redisTemplate.hasKey("blacklist:" + secondAccessHash)).isFalse();
+            assertThat(redisTemplate.opsForValue().get(keys.get(6)))
+                    .isEqualTo(rotatedAccessHash);
+            assertThat(redisTemplate.opsForSet().members(keys.get(4)))
+                    .containsExactlyInAnyOrder(secondRefreshHash, rotatedRefreshHash);
+            assertThat(redisTemplate.opsForSet().members(keys.get(8)))
+                    .containsExactlyInAnyOrder(
+                            firstAccessHash,
+                            secondAccessHash,
+                            rotatedAccessHash
+                );
         } finally {
             redisTemplate.delete(cleanupKeys);
         }
@@ -177,7 +375,7 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
             );
             redisTemplate.opsForValue().set(
                     activeRefreshUserKey,
-                    "active",
+                    activeAccessHash,
                     NEW_REFRESH_TTL_MS,
                     TimeUnit.MILLISECONDS
             );
@@ -233,6 +431,12 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
     void revokeConsumedPredecessorShouldRevokeRotationWinner() {
         String oldRefreshToken = "rotated-logout-r0-" + UUID.randomUUID();
         String oldTokenHash = TokenHashUtil.hashToken(oldRefreshToken);
+        String independentRefreshHash = TokenHashUtil.hashToken(
+                "independent-refresh-" + UUID.randomUUID()
+        );
+        String independentAccessHash = TokenHashUtil.hashToken(
+                "independent-access-" + UUID.randomUUID()
+        );
         Long userId = randomUserId();
         TokenPair candidate = new TokenPair(
                 "rotated-logout-a1-" + UUID.randomUUID(),
@@ -243,11 +447,32 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
         );
         List<String> keys = rotationKeys(oldTokenHash, userId, candidate);
         String candidateBlacklist = "blacklist:" + TokenHashUtil.hashToken(candidate.accessToken());
+        String independentRefreshKey = "refresh:" + independentRefreshHash;
+        String independentMappingKey = "user:tokens:" + userId + ":" + independentRefreshHash;
+        String independentAccessKey = "user:access:" + userId + ":" + independentAccessHash;
         List<String> cleanupKeys = new ArrayList<>(keys);
         cleanupKeys.add(candidateBlacklist);
+        cleanupKeys.add(independentRefreshKey);
+        cleanupKeys.add(independentMappingKey);
+        cleanupKeys.add(independentAccessKey);
+        cleanupKeys.add("blacklist:" + independentAccessHash);
 
         try {
             seedOldRefreshToken(keys, oldTokenHash, userId);
+            redisTemplate.opsForValue().set(
+                    independentRefreshKey,
+                    userId.toString(),
+                    NEW_REFRESH_TTL_MS,
+                    TimeUnit.MILLISECONDS
+            );
+            redisTemplate.opsForValue().set(
+                    independentMappingKey,
+                    independentAccessHash,
+                    NEW_REFRESH_TTL_MS,
+                    TimeUnit.MILLISECONDS
+            );
+            redisTemplate.opsForSet().add(keys.get(4), independentRefreshHash);
+            seedAccessToken(userId, independentAccessHash);
             assertThat(tokenService.rotateRefreshToken(oldRefreshToken)).isEqualTo(candidate);
 
             tokenService.revokeRefreshToken(oldRefreshToken);
@@ -256,10 +481,117 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
             assertThat(redisTemplate.hasKey(keys.get(5))).isFalse();
             assertThat(redisTemplate.hasKey(keys.get(6))).isFalse();
             assertThat(redisTemplate.hasKey(keys.get(7))).isFalse();
-            assertThat(redisTemplate.hasKey(keys.get(8))).isFalse();
             assertThat(redisTemplate.hasKey(keys.get(9))).isFalse();
             assertThat(redisTemplate.hasKey(keys.get(10))).isFalse();
             assertThat(redisTemplate.hasKey(candidateBlacklist)).isTrue();
+            assertThat(redisTemplate.opsForValue().get(independentRefreshKey))
+                    .isEqualTo(userId.toString());
+            assertThat(redisTemplate.opsForValue().get(independentMappingKey))
+                    .isEqualTo(independentAccessHash);
+            assertThat(redisTemplate.opsForValue().get(independentAccessKey)).isEqualTo("active");
+            assertThat(redisTemplate.hasKey("blacklist:" + independentAccessHash)).isFalse();
+            assertThat(redisTemplate.opsForSet().members(keys.get(4)))
+                    .containsExactly(independentRefreshHash);
+            assertThat(redisTemplate.opsForSet().members(keys.get(8)))
+                    .containsExactly(independentAccessHash);
+        } finally {
+            redisTemplate.delete(cleanupKeys);
+        }
+    }
+
+    @Test
+    @DisplayName("Logout must reject tokens from different sessions before and after rotation")
+    void revokeTokenPairShouldRejectDifferentSessionPair() {
+        Long userId = randomUserId();
+        TokenPair firstPair = new TokenPair(
+                "logout-first-access-" + UUID.randomUUID(),
+                "logout-first-refresh-" + UUID.randomUUID()
+        );
+        TokenPair secondPair = new TokenPair(
+                "logout-second-access-" + UUID.randomUUID(),
+                "logout-second-refresh-" + UUID.randomUUID()
+        );
+        TokenPair unusedPair = new TokenPair(
+                "logout-unused-access-" + UUID.randomUUID(),
+                "logout-unused-refresh-" + UUID.randomUUID()
+        );
+        JwtUtil jwtUtil = tokenPairRotationJwtUtil(userId, firstPair, secondPair, unusedPair);
+        TokenServiceImpl tokenService = createTokenService(jwtUtil);
+        String firstRefreshHash = TokenHashUtil.hashToken(firstPair.refreshToken());
+        String firstAccessHash = TokenHashUtil.hashToken(firstPair.accessToken());
+        String secondRefreshHash = TokenHashUtil.hashToken(secondPair.refreshToken());
+        String secondAccessHash = TokenHashUtil.hashToken(secondPair.accessToken());
+        String rotatedRefreshHash = TokenHashUtil.hashToken(unusedPair.refreshToken());
+        String rotatedAccessHash = TokenHashUtil.hashToken(unusedPair.accessToken());
+        String refreshSetKey = "user:refresh:set:" + userId;
+        String accessSetKey = "user:access:set:" + userId;
+        List<String> cleanupKeys = new ArrayList<>(candidateKeys(userId, firstPair));
+        cleanupKeys.addAll(candidateKeys(userId, secondPair));
+        cleanupKeys.addAll(rotationKeys(firstRefreshHash, userId, unusedPair));
+        cleanupKeys.add("blacklist:" + firstAccessHash);
+        cleanupKeys.add("blacklist:" + secondAccessHash);
+        cleanupKeys.add("blacklist:" + rotatedAccessHash);
+
+        try {
+            assertThat(tokenService.generateTokenPair("cluster-user", userId, ROLES))
+                    .isEqualTo(firstPair);
+            assertThat(tokenService.generateTokenPair("cluster-user", userId, ROLES))
+                    .isEqualTo(secondPair);
+
+            assertThatThrownBy(() -> tokenService.revokeTokenPair(
+                    firstPair.refreshToken(),
+                    secondPair.accessToken()
+            ))
+                    .isInstanceOf(InvalidTokenException.class)
+                    .hasMessage("Access and refresh tokens do not form a token pair");
+
+            assertThat(redisTemplate.hasKey("refresh:" + firstRefreshHash)).isTrue();
+            assertThat(redisTemplate.hasKey("refresh:" + secondRefreshHash)).isTrue();
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:tokens:" + userId + ":" + firstRefreshHash
+            )).isEqualTo(firstAccessHash);
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:tokens:" + userId + ":" + secondRefreshHash
+            )).isEqualTo(secondAccessHash);
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:access:" + userId + ":" + firstAccessHash
+            )).isEqualTo("active");
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:access:" + userId + ":" + secondAccessHash
+            )).isEqualTo("active");
+            assertThat(redisTemplate.hasKey("blacklist:" + firstAccessHash)).isFalse();
+            assertThat(redisTemplate.hasKey("blacklist:" + secondAccessHash)).isFalse();
+            assertThat(redisTemplate.opsForSet().members(refreshSetKey))
+                    .containsExactlyInAnyOrder(firstRefreshHash, secondRefreshHash);
+            assertThat(redisTemplate.opsForSet().members(accessSetKey))
+                    .containsExactlyInAnyOrder(firstAccessHash, secondAccessHash);
+
+            assertThat(tokenService.rotateRefreshToken(firstPair.refreshToken()))
+                    .isEqualTo(unusedPair);
+            assertThatThrownBy(() -> tokenService.revokeTokenPair(
+                    firstPair.refreshToken(),
+                    secondPair.accessToken()
+            ))
+                    .isInstanceOf(InvalidTokenException.class)
+                    .hasMessage("Access and refresh tokens do not form a token pair");
+
+            assertThat(redisTemplate.hasKey("refresh:" + rotatedRefreshHash)).isTrue();
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:tokens:" + userId + ":" + rotatedRefreshHash
+            )).isEqualTo(rotatedAccessHash);
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:access:" + userId + ":" + rotatedAccessHash
+            )).isEqualTo("active");
+            assertThat(redisTemplate.hasKey("refresh:" + secondRefreshHash)).isTrue();
+            assertThat(redisTemplate.opsForValue().get(
+                    "user:access:" + userId + ":" + secondAccessHash
+            )).isEqualTo("active");
+            assertThat(redisTemplate.hasKey("blacklist:" + secondAccessHash)).isFalse();
+            assertThat(redisTemplate.hasKey("blacklist:" + rotatedAccessHash)).isFalse();
+            assertThat(redisTemplate.opsForSet().members(refreshSetKey))
+                    .containsExactlyInAnyOrder(secondRefreshHash, rotatedRefreshHash);
+            assertThat(redisTemplate.opsForSet().members(accessSetKey))
+                    .containsExactlyInAnyOrder(secondAccessHash, rotatedAccessHash);
         } finally {
             redisTemplate.delete(cleanupKeys);
         }
@@ -329,9 +661,13 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
         String firstHash = TokenHashUtil.hashToken(firstRefresh);
         String intermediateHash = TokenHashUtil.hashToken(firstCandidate.refreshToken());
         List<String> firstKeys = rotationKeys(firstHash, userId, firstCandidate);
+        List<String> secondKeys = rotationKeys(intermediateHash, userId, secondCandidate);
+        String secondCandidateBlacklist = "blacklist:"
+                + TokenHashUtil.hashToken(secondCandidate.accessToken());
         List<String> cleanupKeys = new ArrayList<>(firstKeys);
-        cleanupKeys.addAll(rotationKeys(intermediateHash, userId, secondCandidate));
+        cleanupKeys.addAll(secondKeys);
         cleanupKeys.add("blacklist:" + TokenHashUtil.hashToken(firstCandidate.accessToken()));
+        cleanupKeys.add(secondCandidateBlacklist);
 
         try {
             seedOldRefreshToken(firstKeys, firstHash, userId);
@@ -349,6 +685,15 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
             assertThat(redisTemplate.opsForSet().members(
                     "user:refresh:retry:set:" + userId
             )).containsExactly(intermediateHash);
+
+            tokenService.revokeRefreshToken(firstRefresh);
+
+            assertThat(redisTemplate.hasKey(secondKeys.get(5))).isFalse();
+            assertThat(redisTemplate.hasKey(secondKeys.get(6))).isFalse();
+            assertThat(redisTemplate.hasKey(secondKeys.get(7))).isFalse();
+            assertThat(redisTemplate.hasKey(secondKeys.get(9))).isFalse();
+            assertThat(redisTemplate.hasKey(secondKeys.get(10))).isFalse();
+            assertThat(redisTemplate.hasKey(secondCandidateBlacklist)).isTrue();
         } finally {
             redisTemplate.delete(cleanupKeys);
         }
@@ -507,7 +852,7 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {
-            seedOldRefreshToken(oldKeys, oldTokenHash, userId);
+            seedOldRefreshToken(oldKeys, oldTokenHash, userId, oldAccessHash);
             seedAccessToken(userId, oldAccessHash);
 
             Future<TokenPair> first = executor.submit(() -> tokenService.rotateRefreshToken(oldRefreshToken));
@@ -558,6 +903,45 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
         when(jwtUtil.getTokenRemainingTime(candidate.refreshToken()))
                 .thenReturn(NEW_REFRESH_TTL_MS);
         when(jwtUtil.getTokenRemainingTime(candidate.accessToken()))
+                .thenReturn(NEW_ACCESS_TTL_MS);
+        when(jwtUtil.getExpirationMs()).thenReturn(NEW_ACCESS_TTL_MS);
+        return jwtUtil;
+    }
+
+    private JwtUtil tokenPairRotationJwtUtil(
+            Long userId,
+            TokenPair firstPair,
+            TokenPair secondPair,
+            TokenPair rotatedPair
+    ) {
+        JwtUtil jwtUtil = mock(JwtUtil.class);
+        JwtUtil.JwtPayload payload = new JwtUtil.JwtPayload(userId, "cluster-user", ROLES);
+        when(jwtUtil.generateToken("cluster-user", userId, ROLES)).thenReturn(
+                firstPair.accessToken(),
+                secondPair.accessToken(),
+                rotatedPair.accessToken()
+        );
+        when(jwtUtil.generateRefreshToken("cluster-user", userId, ROLES)).thenReturn(
+                firstPair.refreshToken(),
+                secondPair.refreshToken(),
+                rotatedPair.refreshToken()
+        );
+        when(jwtUtil.parseRefreshToken(firstPair.refreshToken())).thenReturn(Optional.of(payload));
+        when(jwtUtil.parseRefreshToken(secondPair.refreshToken())).thenReturn(Optional.of(payload));
+        when(jwtUtil.parseAccessToken(firstPair.accessToken())).thenReturn(Optional.of(payload));
+        when(jwtUtil.parseAccessToken(secondPair.accessToken())).thenReturn(Optional.of(payload));
+        when(jwtUtil.parseAccessToken(rotatedPair.accessToken())).thenReturn(Optional.of(payload));
+        when(jwtUtil.getTokenRemainingTime(firstPair.refreshToken()))
+                .thenReturn(NEW_REFRESH_TTL_MS);
+        when(jwtUtil.getTokenRemainingTime(secondPair.refreshToken()))
+                .thenReturn(NEW_REFRESH_TTL_MS);
+        when(jwtUtil.getTokenRemainingTime(rotatedPair.refreshToken()))
+                .thenReturn(NEW_REFRESH_TTL_MS);
+        when(jwtUtil.getTokenRemainingTime(firstPair.accessToken()))
+                .thenReturn(NEW_ACCESS_TTL_MS);
+        when(jwtUtil.getTokenRemainingTime(secondPair.accessToken()))
+                .thenReturn(NEW_ACCESS_TTL_MS);
+        when(jwtUtil.getTokenRemainingTime(rotatedPair.accessToken()))
                 .thenReturn(NEW_ACCESS_TTL_MS);
         when(jwtUtil.getExpirationMs()).thenReturn(NEW_ACCESS_TTL_MS);
         return jwtUtil;
@@ -654,6 +1038,15 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void seedOldRefreshToken(List<String> keys, String oldTokenHash, Long userId) {
+        seedOldRefreshToken(keys, oldTokenHash, userId, oldTokenHash);
+    }
+
+    private void seedOldRefreshToken(
+            List<String> keys,
+            String oldTokenHash,
+            Long userId,
+            String oldAccessHash
+    ) {
         redisTemplate.opsForValue().set(
                 keys.get(0),
                 userId.toString(),
@@ -662,7 +1055,7 @@ class RefreshRotationAtomicIntegrationTest extends AbstractIntegrationTest {
         );
         redisTemplate.opsForValue().set(
                 keys.get(3),
-                "active",
+                oldAccessHash,
                 ROTATION_TTL_MS,
                 TimeUnit.MILLISECONDS
         );

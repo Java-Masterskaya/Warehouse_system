@@ -39,6 +39,7 @@ public class TokenServiceImpl implements TokenService {
     private static final String USER_REFRESH_RETRY_SET_PREFIX = "user:refresh:retry:set:";
     private static final long ROTATION_COMPLETED = 1L;
     private static final long TOKEN_LIMIT_EXCEEDED = -3L;
+    private static final long TOKEN_PAIR_MISMATCH = -4L;
     private static final long DEFAULT_MAX_ACTIVE_TOKEN_PAIRS_PER_USER = 100L;
     private static final DefaultRedisScript<Long> ROTATE_REFRESH_TOKEN_SCRIPT = new DefaultRedisScript<>(
             """
@@ -59,7 +60,6 @@ public class TokenServiceImpl implements TokenService {
                             or not newAccessTtl or newAccessTtl <= 0 then
                         return -2
                     end
-
                     local oldRefreshType = redis.call('type', KEYS[1]).ok
                     if oldRefreshType == 'none' then
                         return 0
@@ -104,9 +104,22 @@ public class TokenServiceImpl implements TokenService {
                         return 0
                     end
 
-                    local oldAccessHashes = {}
-                    if accessSetType == 'set' then
-                        oldAccessHashes = redis.call('smembers', KEYS[9])
+                    local oldPairType = redis.call('type', KEYS[4]).ok
+                    if oldPairType ~= 'string' then
+                        return -2
+                    end
+                    local oldAccessHash = redis.call('get', KEYS[4])
+                    if not oldAccessHash or oldAccessHash == '' then
+                        return -2
+                    end
+                    local oldAccessKey = nil
+                    -- Legacy pairs stored only an "active" marker, so no access hash can be selected safely.
+                    if oldAccessHash ~= 'active' then
+                        oldAccessKey = 'user:access:' .. ARGV[1] .. ':' .. oldAccessHash
+                        local oldAccessType = redis.call('type', oldAccessKey).ok
+                        if oldAccessType ~= 'none' and oldAccessType ~= 'string' then
+                            return -2
+                        end
                     end
 
                     if retrySetType == 'set' then
@@ -125,7 +138,12 @@ public class TokenServiceImpl implements TokenService {
                     redis.call('del', KEYS[12])
 
                     redis.call('del', KEYS[1])
-                    redis.call('psetex', KEYS[2], ARGV[2], ARGV[1])
+                    redis.call(
+                            'psetex',
+                            KEYS[2],
+                            ARGV[2],
+                            ARGV[1] .. '|' .. ARGV[6] .. '|' .. oldAccessHash
+                    )
                     redis.call('psetex', KEYS[3], ARGV[4], ARGV[3])
                     redis.call('psetex', KEYS[11], ARGV[4], ARGV[5])
                     redis.call('sadd', KEYS[10], ARGV[5])
@@ -136,14 +154,13 @@ public class TokenServiceImpl implements TokenService {
                     end
 
                     redis.call('psetex', KEYS[6], ARGV[8], ARGV[1])
-                    redis.call('psetex', KEYS[7], ARGV[8], 'active')
+                    redis.call('psetex', KEYS[7], ARGV[8], ARGV[7])
                     redis.call('sadd', KEYS[5], ARGV[6])
                     extendTtl(KEYS[5], newRefreshTtl)
 
-                    for _, accessHash in ipairs(oldAccessHashes) do
-                        local accessKey = 'user:access:' .. ARGV[1] .. ':' .. accessHash
-                        local remainingAccessTtl = redis.call('pttl', accessKey)
-                        local blacklistKey = 'blacklist:' .. accessHash
+                    if oldAccessKey then
+                        local remainingAccessTtl = redis.call('pttl', oldAccessKey)
+                        local blacklistKey = 'blacklist:' .. oldAccessHash
                         local currentBlacklistTtl = redis.call('pttl', blacklistKey)
                         if currentBlacklistTtl > remainingAccessTtl then
                             remainingAccessTtl = currentBlacklistTtl
@@ -151,8 +168,8 @@ public class TokenServiceImpl implements TokenService {
                         if remainingAccessTtl > 0 then
                             redis.call('psetex', blacklistKey, remainingAccessTtl, 'blacklisted')
                         end
-                        redis.call('del', accessKey)
-                        redis.call('srem', KEYS[9], accessHash)
+                        redis.call('del', oldAccessKey)
+                        redis.call('srem', KEYS[9], oldAccessHash)
                     end
 
                     redis.call('psetex', KEYS[8], ARGV[9], 'active')
@@ -215,7 +232,7 @@ public class TokenServiceImpl implements TokenService {
                     end
 
                     redis.call('psetex', KEYS[1], ARGV[4], ARGV[1])
-                    redis.call('psetex', KEYS[2], ARGV[4], 'active')
+                    redis.call('psetex', KEYS[2], ARGV[4], ARGV[3])
                     redis.call('sadd', KEYS[3], ARGV[2])
                     extendTtl(KEYS[3], refreshTtl)
                     redis.call('psetex', KEYS[4], ARGV[5], 'active')
@@ -239,6 +256,8 @@ public class TokenServiceImpl implements TokenService {
                     local retryOwnerType = redis.call('type', KEYS[4]).ok
                     local rotationType = redis.call('type', KEYS[6]).ok
                     local accessSetType = redis.call('type', KEYS[7]).ok
+                    local refreshType = redis.call('type', KEYS[1]).ok
+                    local mappingType = redis.call('type', KEYS[2]).ok
                     if refreshSetType ~= 'none' and refreshSetType ~= 'set' then
                         return -2
                     end
@@ -254,60 +273,246 @@ public class TokenServiceImpl implements TokenService {
                     if accessSetType ~= 'none' and accessSetType ~= 'set' then
                         return -2
                     end
-
-                    local function blacklistProvidedAccess()
-                        if providedAccessTtl <= 0 then
-                            return
+                    if refreshType ~= 'none' and refreshType ~= 'string' then
+                        return -2
+                    end
+                    if mappingType ~= 'none' and mappingType ~= 'string' then
+                        return -2
+                    end
+                    local function revokeAccess(accessHash, accessKey, requestedTtl)
+                        local remainingAccessTtl = redis.call('pttl', accessKey)
+                        if requestedTtl > remainingAccessTtl then
+                            remainingAccessTtl = requestedTtl
                         end
-                        local currentBlacklistTtl = redis.call('pttl', KEYS[8])
-                        if currentBlacklistTtl > providedAccessTtl then
-                            providedAccessTtl = currentBlacklistTtl
+                        if remainingAccessTtl <= 0 then
+                            remainingAccessTtl = fallbackAccessTtl
                         end
-                        redis.call('psetex', KEYS[8], providedAccessTtl, 'blacklisted')
-                        redis.call('del', KEYS[9])
+                        local blacklistKey = 'blacklist:' .. accessHash
+                        local currentBlacklistTtl = redis.call('pttl', blacklistKey)
+                        if currentBlacklistTtl > remainingAccessTtl then
+                            remainingAccessTtl = currentBlacklistTtl
+                        end
+                        redis.call('psetex', blacklistKey, remainingAccessTtl, 'blacklisted')
+                        redis.call('del', accessKey)
                         if accessSetType == 'set' then
-                            redis.call('srem', KEYS[7], ARGV[4])
+                            redis.call('srem', KEYS[7], accessHash)
                         end
                     end
 
-                    local rotationUserId = redis.call('get', KEYS[6])
-                    if rotationUserId then
+                    local function blacklistProvidedAccess()
+                        if providedAccessTtl > 0 then
+                            revokeAccess(ARGV[4], KEYS[9], providedAccessTtl)
+                        end
+                    end
+
+                    local function parseRotationValue(value)
+                        local userId, successorHash, accessHash = string.match(
+                                value,
+                                '^([^|]+)|([^|]+)|([^|]+)$'
+                        )
+                        if userId then
+                            return userId, successorHash, accessHash
+                        end
+                        return value, nil, nil
+                    end
+
+                    local rotationValue = redis.call('get', KEYS[6])
+                    if rotationValue then
+                        local rotationUserId, rotationSuccessorHash, rotationAccessHash =
+                                parseRotationValue(rotationValue)
                         if rotationUserId ~= ARGV[1] then
                             return -2
                         end
-                        if refreshSetType == 'set' then
+                        if rotationAccessHash and rotationAccessHash ~= 'active'
+                                and providedAccessTtl > 0 and rotationAccessHash ~= ARGV[4] then
+                            return -4
+                        end
+
+                        local successorRefreshHash = nil
+                        local successorRefreshKey = nil
+                        local successorMappingKey = nil
+                        local successorOwnerKey = nil
+                        local successorAccessHash = nil
+                        local successorAccessKey = nil
+                        local successorPredecessorHash = ARGV[2]
+
+                        if rotationSuccessorHash then
+                            local currentHash = rotationSuccessorHash
+                            local visitedHashes = {}
+                            local traversalComplete = false
+                            for _ = 1, 1000 do
+                                if visitedHashes[currentHash] then
+                                    return -2
+                                end
+                                visitedHashes[currentHash] = true
+                                local currentRefreshKey = 'refresh:' .. currentHash
+                                local currentRefreshType = redis.call('type', currentRefreshKey).ok
+                                if currentRefreshType == 'string' then
+                                    successorRefreshHash = currentHash
+                                    successorRefreshKey = currentRefreshKey
+                                    successorMappingKey = 'user:tokens:' .. ARGV[1]
+                                            .. ':' .. currentHash
+                                    successorOwnerKey = 'refresh:retry:owner:' .. currentHash
+                                    traversalComplete = true
+                                    break
+                                end
+                                if currentRefreshType ~= 'none' then
+                                    return -2
+                                end
+
+                                local currentRotationKey = 'rotation:' .. currentHash
+                                local currentRotationType = redis.call(
+                                        'type',
+                                        currentRotationKey
+                                ).ok
+                                if currentRotationType == 'none' then
+                                    traversalComplete = true
+                                    break
+                                end
+                                if currentRotationType ~= 'string' then
+                                    return -2
+                                end
+                                local nextUserId, nextHash = parseRotationValue(
+                                        redis.call('get', currentRotationKey)
+                                )
+                                if nextUserId ~= ARGV[1] then
+                                    return -2
+                                end
+                                if not nextHash then
+                                    traversalComplete = true
+                                    break
+                                end
+                                successorPredecessorHash = currentHash
+                                currentHash = nextHash
+                            end
+                            if not traversalComplete then
+                                return -2
+                            end
+                        elseif refreshSetType == 'set' then
                             for _, refreshHash in ipairs(redis.call('smembers', KEYS[3])) do
-                                redis.call('del', 'refresh:' .. refreshHash)
-                                redis.call('del', 'user:tokens:' .. ARGV[1] .. ':' .. refreshHash)
-                                redis.call('del', 'refresh:retry:owner:' .. refreshHash)
-                            end
-                        end
-                        if accessSetType == 'set' then
-                            for _, accessHash in ipairs(redis.call('smembers', KEYS[7])) do
-                                local accessKey = 'user:access:' .. ARGV[1] .. ':' .. accessHash
-                                local remainingAccessTtl = redis.call('pttl', accessKey)
-                                if remainingAccessTtl <= 0 then
-                                    remainingAccessTtl = fallbackAccessTtl
+                                local ownerKey = 'refresh:retry:owner:' .. refreshHash
+                                local ownerType = redis.call('type', ownerKey).ok
+                                if ownerType ~= 'none' and ownerType ~= 'string' then
+                                    return -2
                                 end
-                                local blacklistKey = 'blacklist:' .. accessHash
-                                local currentBlacklistTtl = redis.call('pttl', blacklistKey)
-                                if currentBlacklistTtl > remainingAccessTtl then
-                                    remainingAccessTtl = currentBlacklistTtl
+                                if ownerType == 'string'
+                                        and redis.call('get', ownerKey) == ARGV[2] then
+                                    if successorRefreshHash then
+                                        return -2
+                                    end
+                                    successorRefreshHash = refreshHash
+                                    successorRefreshKey = 'refresh:' .. refreshHash
+                                    successorMappingKey = 'user:tokens:' .. ARGV[1] .. ':' .. refreshHash
+                                    successorOwnerKey = ownerKey
                                 end
-                                redis.call('psetex', blacklistKey, remainingAccessTtl, 'blacklisted')
-                                redis.call('del', accessKey)
                             end
                         end
-                        if retrySetType == 'set' then
-                            for _, oldRefreshHash in ipairs(redis.call('smembers', KEYS[5])) do
-                                redis.call('del', 'refresh:retry:' .. oldRefreshHash)
+
+                        if successorRefreshHash then
+                            local successorRefreshType = redis.call('type', successorRefreshKey).ok
+                            local successorMappingType = redis.call('type', successorMappingKey).ok
+                            if successorRefreshType ~= 'string'
+                                    or redis.call('get', successorRefreshKey) ~= ARGV[1]
+                                    or successorMappingType ~= 'string'
+                                    or refreshSetType ~= 'set'
+                                    or redis.call(
+                                            'sismember',
+                                            KEYS[3],
+                                            successorRefreshHash
+                                    ) ~= 1 then
+                                return -2
+                            end
+                            local successorOwnerType = redis.call('type', successorOwnerKey).ok
+                            if successorOwnerType ~= 'none'
+                                    and successorOwnerType ~= 'string' then
+                                return -2
+                            end
+                            successorAccessHash = redis.call('get', successorMappingKey)
+                            if not successorAccessHash or successorAccessHash == '' then
+                                return -2
+                            end
+                            if successorAccessHash ~= 'active' then
+                                successorAccessKey = 'user:access:' .. ARGV[1]
+                                        .. ':' .. successorAccessHash
+                                local successorAccessType = redis.call('type', successorAccessKey).ok
+                                local successorBlacklistType = redis.call(
+                                        'type',
+                                        'blacklist:' .. successorAccessHash
+                                ).ok
+                                if successorAccessType ~= 'none'
+                                        and successorAccessType ~= 'string' then
+                                    return -2
+                                end
+                                if successorBlacklistType ~= 'none'
+                                        and successorBlacklistType ~= 'string' then
+                                    return -2
+                                end
                             end
                         end
-                        blacklistProvidedAccess()
-                        redis.call('del', KEYS[3])
-                        redis.call('del', KEYS[5])
-                        redis.call('del', KEYS[7])
+
+                        if successorRefreshHash then
+                            redis.call('del', successorRefreshKey)
+                            redis.call('del', successorMappingKey)
+                            redis.call('del', successorOwnerKey)
+                            redis.call('srem', KEYS[3], successorRefreshHash)
+                            if successorAccessKey then
+                                revokeAccess(successorAccessHash, successorAccessKey, 0)
+                            end
+                        end
+                        redis.call('del', 'refresh:retry:' .. successorPredecessorHash)
+                        redis.call('srem', KEYS[5], successorPredecessorHash)
+                        if successorPredecessorHash ~= ARGV[2] then
+                            redis.call('del', 'refresh:retry:' .. ARGV[2])
+                            redis.call('srem', KEYS[5], ARGV[2])
+                        end
+                        redis.call('del', KEYS[4])
+                        redis.call('del', KEYS[1])
+                        redis.call('del', KEYS[2])
+                        redis.call('srem', KEYS[3], ARGV[2])
                         return 2
+                    end
+
+                    if providedAccessTtl > 0 then
+                        local providedBlacklistType = redis.call('type', KEYS[8]).ok
+                        local providedAccessType = redis.call('type', KEYS[9]).ok
+                        if providedBlacklistType ~= 'none' and providedBlacklistType ~= 'string' then
+                            return -2
+                        end
+                        if providedAccessType ~= 'none' and providedAccessType ~= 'string' then
+                            return -2
+                        end
+                    end
+
+                    local mappedAccessHash = nil
+                    local mappedAccessKey = nil
+                    local legacyMapping = false
+                    if mappingType == 'string' then
+                        mappedAccessHash = redis.call('get', KEYS[2])
+                        if not mappedAccessHash or mappedAccessHash == '' then
+                            return -2
+                        end
+                        if mappedAccessHash ~= 'active' then
+                            if providedAccessTtl > 0 and mappedAccessHash ~= ARGV[4] then
+                                return -4
+                            end
+                            mappedAccessKey = 'user:access:' .. ARGV[1] .. ':' .. mappedAccessHash
+                            local mappedAccessType = redis.call('type', mappedAccessKey).ok
+                            local mappedBlacklistType = redis.call(
+                                    'type',
+                                    'blacklist:' .. mappedAccessHash
+                            ).ok
+                            if mappedAccessType ~= 'none' and mappedAccessType ~= 'string' then
+                                return -2
+                            end
+                            if mappedBlacklistType ~= 'none'
+                                    and mappedBlacklistType ~= 'string' then
+                                return -2
+                            end
+                        else
+                            legacyMapping = true
+                        end
+                    elseif refreshType == 'string' then
+                        return -2
                     end
 
                     local oldRefreshHash = redis.call('get', KEYS[4])
@@ -319,7 +524,15 @@ public class TokenServiceImpl implements TokenService {
                     redis.call('del', KEYS[1])
                     redis.call('del', KEYS[2])
                     redis.call('srem', KEYS[3], ARGV[2])
-                    blacklistProvidedAccess()
+                    if mappedAccessKey then
+                        local mappedAccessTtl = 0
+                        if providedAccessTtl > 0 then
+                            mappedAccessTtl = providedAccessTtl
+                        end
+                        revokeAccess(mappedAccessHash, mappedAccessKey, mappedAccessTtl)
+                    elseif legacyMapping then
+                        blacklistProvidedAccess()
+                    end
                     return 1
                     """,
             Long.class
@@ -514,10 +727,7 @@ public class TokenServiceImpl implements TokenService {
         Optional<JwtUtil.JwtPayload> payload = jwtUtil.parseRefreshToken(refreshToken);
         if (payload.isEmpty()) {
             redisTemplate.delete(REFRESH_PREFIX + tokenHash);
-            if (accessToken != null) {
-                blacklistAccessToken(accessToken);
-            }
-            log.info("Refresh token revoked without user index cleanup");
+            log.info("Invalid refresh token removed without unverified access token revocation");
             return;
         }
 
@@ -556,6 +766,11 @@ public class TokenServiceImpl implements TokenService {
                 accessHash,
                 Long.toString(accessTtl)
         );
+        if (Long.valueOf(TOKEN_PAIR_MISMATCH).equals(result)) {
+            throw new InvalidTokenException(
+                    "Access and refresh tokens do not form a token pair"
+            );
+        }
         requireSuccessfulScript(result, "Refresh token revocation");
         log.info("Refresh token revoked");
     }
