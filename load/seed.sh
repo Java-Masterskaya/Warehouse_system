@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # LOAD-1: наполняет базу тестовыми товарами + начальным приходом перед k6-прогоном.
-# Использование: BASE_URL=http://localhost:8080 APP_USERNAME=admin APP_PASSWORD=secret ITEM_COUNT=50 VU_COUNT=10 ./load/seed.sh
+# Использование: BASE_URL=http://localhost:8080 APP_USERNAME=admin APP_PASSWORD=secret ITEM_COUNT=50 MAX_VUS=50 ./load/seed.sh
 
 set -u
 
@@ -8,7 +8,7 @@ BASE_URL="${BASE_URL:-http://localhost:8080}"
 APP_USERNAME="${APP_USERNAME:-admin}"
 APP_PASSWORD="${APP_PASSWORD:-secret}"
 ITEM_COUNT="${ITEM_COUNT:-50}"
-VU_COUNT="${VU_COUNT:-10}"
+MAX_VUS="${MAX_VUS:-50}"
 VU_PASSWORD="${VU_PASSWORD:-LoadTest123!}"
 CATEGORY="LOAD-TEST"
 
@@ -23,8 +23,8 @@ if [ -z "$TOKEN" ]; then
   exit 1
 fi
 
-echo "Создаю $VU_COUNT тестовых пользователей (по одному на VU, чтобы не упереться в rate-limit по username)..."
-for v in $(seq 1 "$VU_COUNT"); do
+echo "Создаю $MAX_VUS тестовых пользователей (по одному на VU, чтобы не упереться в rate-limit по username)..."
+for v in $(seq 1 "$MAX_VUS"); do
   curl -s -X POST "$BASE_URL/api/users" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
