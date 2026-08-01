@@ -2,7 +2,9 @@ services:
 
   # -- Базы данных --
   postgres:
-    image: postgres:16
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
     container_name: postgres
     env_file:
       - .env
