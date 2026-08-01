@@ -7,6 +7,7 @@ import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
+import com.warehouse.dto.response.CursorPageResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -21,12 +22,17 @@ import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
+import com.warehouse.pagination.KeysetCursorCodec;
+import com.warehouse.pagination.KeysetCursorCodec.CursorContext;
+import com.warehouse.pagination.KeysetCursorCodec.CursorPosition;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockMovementKeysetRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
@@ -104,6 +110,8 @@ class StockMovementServiceImplTest {
     @Mock
     private StockMovementRepository stockMovementRepository;
     @Mock
+    private StockMovementKeysetRepository stockMovementKeysetRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private WarehouseRepository warehouseRepository;
@@ -113,6 +121,8 @@ class StockMovementServiceImplTest {
     private MetricService metricService;
     @Mock
     private AuditContext auditContext;
+    @Mock
+    private KeysetCursorCodec cursorCodec;
     @InjectMocks
     private StockMovementServiceImpl stockMovementService;
     @Captor
@@ -528,6 +538,81 @@ class StockMovementServiceImplTest {
                 anyLong(),
                 any(),
                 any(Pageable.class)
+        );
+    }
+
+    @Test
+    void cursorHistoryUsesSizePlusOneAndEncodesLastReturnedMovement() {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 8, 1, 12, 0);
+        MovementType type = MovementType.WRITE_OFF;
+        CursorContext context = new CursorContext(
+                "movement-history",
+                "createdAt",
+                "desc",
+                List.of(ITEM_ID.toString(), type.name())
+        );
+        StockMovement first = historyMovement(3L, createdAt, type);
+        StockMovement second = historyMovement(2L, createdAt, type);
+        StockMovement lookahead = historyMovement(1L, createdAt, type);
+
+        when(itemRepository.existsById(ITEM_ID)).thenReturn(true);
+        when(stockMovementKeysetRepository.findNextPage(
+                ITEM_ID, type, null, null, 3
+        )).thenReturn(List.of(first, second, lookahead));
+        when(cursorCodec.encode(context, createdAt.toString(), 2L)).thenReturn("next-cursor");
+
+        CursorPageResponse<StockMovementHistoryResponse> result =
+                stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, type, "", 2);
+
+        assertEquals(List.of(3L, 2L), result.content().stream()
+                .map(StockMovementHistoryResponse::id)
+                .toList());
+        assertTrue(result.hasNext());
+        assertEquals("next-cursor", result.nextCursor());
+        verify(cursorCodec).encode(context, createdAt.toString(), 2L);
+    }
+
+    @Test
+    void cursorHistoryRejectsInvalidTimestampBeforeQueryingRepository() {
+        CursorContext context = new CursorContext(
+                "movement-history",
+                "createdAt",
+                "desc",
+                List.of(ITEM_ID.toString(), "")
+        );
+        when(itemRepository.existsById(ITEM_ID)).thenReturn(true);
+        when(cursorCodec.decode("cursor", context)).thenReturn(new CursorPosition("invalid-date", 7L));
+
+        assertThrows(
+                InvalidCursorException.class,
+                () -> stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, null, "cursor", 2)
+        );
+
+        verify(stockMovementKeysetRepository, never()).findNextPage(
+                anyLong(), any(), any(), any(), anyInt()
+        );
+    }
+
+    @Test
+    void cursorHistoryRejectsTimestampOutsideDatabaseRange() {
+        CursorContext context = new CursorContext(
+                "movement-history",
+                "createdAt",
+                "desc",
+                List.of(ITEM_ID.toString(), "")
+        );
+        when(itemRepository.existsById(ITEM_ID)).thenReturn(true);
+        when(cursorCodec.decode("cursor", context)).thenReturn(
+                new CursorPosition("+300000-01-01T00:00", 7L)
+        );
+
+        assertThrows(
+                InvalidCursorException.class,
+                () -> stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, null, "cursor", 2)
+        );
+
+        verify(stockMovementKeysetRepository, never()).findNextPage(
+                anyLong(), any(), any(), any(), anyInt()
         );
     }
 
@@ -1074,6 +1159,19 @@ class StockMovementServiceImplTest {
         user.setRole(com.warehouse.entity.Role.ROLE_ADMIN);
         user.setActive(true);
         return user;
+    }
+
+    private StockMovement historyMovement(Long id, LocalDateTime createdAt, MovementType type) {
+        StockMovement movement = StockMovement.builder()
+                .id(id)
+                .item(createItem(ITEM_ID, "Cursor item", true, 0))
+                .warehouse(defaultWarehouse)
+                .user(createUserReference(USER_ID, USERNAME))
+                .type(type)
+                .quantity(1)
+                .createdAt(createdAt)
+                .build();
+        return movement;
     }
 
     private Item createItem(Long itemId, String name, boolean active, int minStock) {

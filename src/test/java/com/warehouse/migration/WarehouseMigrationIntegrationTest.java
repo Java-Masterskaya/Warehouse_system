@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,6 +62,7 @@ class WarehouseMigrationIntegrationTest {
         assertThat(countRows("stock_movements")).isEqualTo(movementCountBefore);
         assertThat(countRows("reserves")).isEqualTo(reserveCountBefore);
         assertRequiredWarehouseColumns();
+        assertKeysetPaginationIndexes();
         assertWarehouseIdsMustBeExplicit(legacy);
 
         assertThat(sumStock(legacy.itemId())).isEqualTo(LEGACY_QUANTITY + 11L);
@@ -85,11 +87,37 @@ class WarehouseMigrationIntegrationTest {
         Flyway flyway = Flyway.configure()
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                 .locations("classpath:db/migration")
+                .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
                 .load();
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("28");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("29");
+    }
+
+    private void assertKeysetPaginationIndexes() throws SQLException {
+        try (Connection connection = connection()) {
+            assertThat(queryLong(connection, """
+                    SELECT COUNT(*)
+                    FROM pg_index index_metadata
+                    JOIN pg_class index_class ON index_class.oid = index_metadata.indexrelid
+                    JOIN pg_namespace index_schema ON index_schema.oid = index_class.relnamespace
+                    WHERE index_schema.nspname = 'public'
+                      AND index_metadata.indisvalid
+                      AND index_class.relname IN (
+                          'idx_items_active_name_id',
+                          'idx_items_active_sku_id',
+                          'idx_movements_item_created_id',
+                          'idx_movements_item_type_created_id'
+                      )
+                    """)).isEqualTo(4L);
+            assertThat(queryLong(connection, """
+                    SELECT COUNT(*)
+                    FROM pg_indexes
+                    WHERE schemaname = 'public'
+                      AND indexname = 'idx_movements_item_id_created'
+                    """)).isZero();
+        }
     }
 
     private void migrateToV20() {
