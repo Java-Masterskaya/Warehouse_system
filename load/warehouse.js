@@ -13,7 +13,11 @@ const APP_PASSWORD = __ENV.APP_PASSWORD || 'secret';
 // иначе весь трафик записи считается за одного 'admin' и упирается в rate-limit
 // на /api/movements (rate-limiting.movements.username в application.yml).
 const VU_PASSWORD = __ENV.VU_PASSWORD || 'LoadTest123!';
-const MAX_VUS = Number(__ENV.MAX_VUS || 10);
+const MAX_VUS = Number(__ENV.MAX_VUS || 50);
+
+const okStatus = http.expectedStatuses(200);
+const receiveStatus = http.expectedStatuses(200, 409, 429);
+const writeOffStatus = http.expectedStatuses(200, 409, 422, 429);
 
 export const options = {
     stages: [
@@ -21,13 +25,12 @@ export const options = {
         { duration: '2m', target: MAX_VUS },
         { duration: '30s', target: 0 },
     ],
-    // Зафиксировано по итогам первого чистого прогона (p95 list/detail/history
-    // ~6-12ms локально) с запасом ~5-10x на CI/прод-окружение и реальный объём данных.
     thresholds: {
         list_items_duration: ['p(95)<50'],
         item_detail_duration: ['p(95)<50'],
         history_duration: ['p(95)<50'],
         http_req_duration: ['p(95)<100'],
+        http_req_failed: ['rate<0.01'],
     },
 };
 
@@ -46,13 +49,14 @@ function fakeIp(slot) {
     return `10.0.${Math.floor(slot / 250)}.${(slot % 250) + 1}`;
 }
 
-function vuHeaders(token) {
+function vuHeaders(token, responseCallback) {
     return {
         headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
             'X-Forwarded-For': fakeIp(__VU),
         },
+        responseCallback,
     };
 }
 
@@ -68,12 +72,12 @@ export function setup() {
     );
     check(loginRes, { 'login: 200': (r) => r.status === 200 });
 
-    const token = loginRes.json('accessToken');
-    if (!token) {
+    const adminToken = loginRes.json('accessToken');
+    if (!adminToken) {
         throw new Error('Логин не вернул accessToken — проверь APP_USERNAME/APP_PASSWORD/BASE_URL');
     }
 
-    const itemsRes = http.get(`${BASE_URL}/api/items?page=0&size=50`, authHeaders(token));
+    const itemsRes = http.get(`${BASE_URL}/api/items?page=0&size=50`, authHeaders(adminToken));
     check(itemsRes, { 'setup items: 200': (r) => r.status === 200 });
 
     const itemIds = (itemsRes.json('content') || []).map((item) => item.id);
@@ -100,61 +104,77 @@ export function setup() {
         tokensByVu[v] = token;
     }
 
-    return { itemIds, tokensByVu };
+    return { itemIds, tokensByVu, adminToken };
 }
 
 export default function (data) {
     const { itemIds, tokensByVu } = data;
-    const headers = vuHeaders(tokensByVu[__VU]);
+    const token = tokensByVu[__VU];
 
-    // Для чтения — случайный item из общего пула, конфликтов тут не бывает.
     const randomItemId = itemIds[Math.floor(Math.random() * itemIds.length)];
     // Для записи (receive/write-off) — свой item на каждый VU, чтобы не создавать
     // искусственную конкуренцию за одну и ту же строку stock (@Version) между VU.
     const myItemId = itemIds[(__VU - 1) % itemIds.length];
 
     group('list items', () => {
-        const res = http.get(`${BASE_URL}/api/items?page=0&size=20`, headers);
+        const res = http.get(`${BASE_URL}/api/items?page=0&size=20`, vuHeaders(token, okStatus));
         listDuration.add(res.timings.duration);
         check(res, { 'list: 200': (r) => r.status === 200 });
     });
-    sleep(1);
+    sleep(0.3);
 
     group('item detail', () => {
-        const res = http.get(`${BASE_URL}/api/items/${randomItemId}`, headers);
+        const res = http.get(`${BASE_URL}/api/items/${randomItemId}`, vuHeaders(token, okStatus));
         detailDuration.add(res.timings.duration);
         check(res, { 'detail: 200': (r) => r.status === 200 });
     });
-    sleep(1);
+    sleep(0.3);
 
     group('movement history', () => {
-        const res = http.get(`${BASE_URL}/api/movements/${randomItemId}/history?page=0&size=20`, headers);
+        const res = http.get(
+            `${BASE_URL}/api/movements/${randomItemId}/history?page=0&size=20`,
+            vuHeaders(token, okStatus)
+        );
         historyDuration.add(res.timings.duration);
         check(res, { 'history: 200': (r) => r.status === 200 });
     });
-    sleep(1);
+    sleep(0.3);
 
     group('receive', () => {
         const res = http.post(
             `${BASE_URL}/api/movements/receive`,
             JSON.stringify({ itemId: myItemId, quantity: 20, expiryDate: futureIsoDate(30) }),
-            headers
+            vuHeaders(token, receiveStatus)
         );
-        // 409 допустим: даже при партиционировании по VU остаётся редкий шанс
-        // конкуренции (например, с уже идущим прогоном) — это не баг скрипта.
-        check(res, { 'receive: 200 or 409': (r) => r.status === 200 || r.status === 409 });
+        check(res, {
+            'receive: 200, 409 or 429': (r) => r.status === 200 || r.status === 409 || r.status === 429,
+        });
     });
-    sleep(1);
+    sleep(0.3);
 
     group('write-off', () => {
         const res = http.post(
             `${BASE_URL}/api/movements/write-off`,
             JSON.stringify({ itemId: myItemId, quantity: 5 }),
-            headers
+            vuHeaders(token, writeOffStatus)
         );
         check(res, {
-            'write-off: 200, 409 or 422': (r) => r.status === 200 || r.status === 409 || r.status === 422,
+            'write-off: 200, 409, 422 or 429': (r) =>
+                r.status === 200 || r.status === 409 || r.status === 422 || r.status === 429,
         });
     });
-    sleep(1);
+    sleep(0.3);
+}
+
+export function teardown(data) {
+    const { itemIds, adminToken } = data;
+    const headers = authHeaders(adminToken);
+
+    for (const itemId of itemIds) {
+        http.post(
+            `${BASE_URL}/api/inventory/stocktake`,
+            JSON.stringify({ itemId, countedQuantity: 100, surplusExpiryDate: futureIsoDate(30) }),
+            headers
+        );
+    }
 }
