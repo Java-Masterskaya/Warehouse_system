@@ -24,8 +24,8 @@ git checkout main && git pull
 ### Этап 1: Expand + Backfill (V27 + V28 + V29)
 
 **Что деплоится:**
-- `V32__add_items_barcode_nullable.sql` — добавляет nullable колонку (уже в `db/migration/`)
-- `V33__create_items_barcode_seq.sql` — независимый sequence для номера barcode,
+- `V33__add_items_barcode_nullable.sql` — добавляет nullable колонку (уже в `db/migration/`)
+- `V34__create_items_barcode_seq.sql` — независимый sequence для номера barcode,
   не привязанный к id товара (уже в `db/migration/`, см. "Почему отдельный sequence" ниже)
 - `docs/migrations/pending/V29__backfill_items_barcode.sql` — UPDATE существующих строк.
   **В `db/migration/` его кладём только для таблиц < 100 000 строк** (см. ниже) —

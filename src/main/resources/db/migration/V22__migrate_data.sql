@@ -1,7 +1,7 @@
 -- noinspection SqlResolveForFile
 
 -- =============================================
--- V21.1: Migrate existing data to partitioned table
+-- V22: Migrate existing data to partitioned table
 -- =============================================
 
 DO
