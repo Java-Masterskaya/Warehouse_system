@@ -1,5 +1,3 @@
--- noinspection SqlResolveForFile
-
 -- =============================================
 -- V21.3: Copy remaining data
 -- =============================================
@@ -11,13 +9,32 @@ $$
         last_id    BIGINT := 0;
         row_count  INT;
         max_id     BIGINT;
+        default_warehouse_id BIGINT := 1;  -- ID дефолтного склада
     BEGIN
         SELECT COALESCE(MAX(id), 0) INTO max_id FROM stock_movements_old;
 
         WHILE last_id < max_id
             LOOP
-                INSERT INTO stock_movements (id, item_id, user_id, type, quantity, created_at)
-                SELECT id, item_id, user_id, type, quantity, created_at
+                -- Вставляем данные с warehouse_id = 1 (дефолтный склад)
+                INSERT INTO stock_movements (
+                    id,
+                    item_id,
+                    user_id,
+                    type,
+                    quantity,
+                    created_at,
+                    warehouse_id,
+                    transfer_id
+                )
+                SELECT
+                    id,
+                    item_id,
+                    user_id,
+                    type,
+                    quantity,
+                    created_at,
+                    COALESCE(warehouse_id, default_warehouse_id) AS warehouse_id,  -- Если есть warehouse_id - берем, иначе 1
+                    transfer_id
                 FROM stock_movements_old
                 WHERE id > last_id
                 ORDER BY id

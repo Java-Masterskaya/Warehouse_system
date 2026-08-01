@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -30,7 +31,12 @@ class WarehouseMigrationIntegrationTest {
 
     @Container
     private static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine");
+            new PostgreSQLContainer<>(
+                    DockerImageName.parse("ghcr.io/dbsystel/postgresql-partman:16")
+                            .asCompatibleSubstituteFor("postgres")
+            )
+                    .withInitScript("init.sql");
+    ;
 
     @Test
     void migrationPreservesLegacyStockMovementAndReservation() throws Exception {
@@ -89,7 +95,7 @@ class WarehouseMigrationIntegrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("28");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("33");
     }
 
     private void migrateToV20() {

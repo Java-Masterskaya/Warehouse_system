@@ -1,5 +1,6 @@
 package com.warehouse.batch.integration;
 
+import com.warehouse.repository.StockAlertRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,12 +57,15 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private StockMovementService stockMovementService;
 
+    @Autowired
+    private StockAlertRepository stockAlertRepository;
+
     private Long itemId;
     private Long warehouseId;
 
     @BeforeEach
     void setUp() {
-        // Очищаем таблицы
+        stockAlertRepository.deleteAllInBatch();
         stockMovementRepository.deleteAllInBatch();
         batchRepository.deleteAll();
         stockRepository.deleteAllInBatch();

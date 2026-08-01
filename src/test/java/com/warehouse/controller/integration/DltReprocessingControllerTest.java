@@ -39,6 +39,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -70,6 +71,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(classes = WarehouseApp.class)
 @ActiveProfiles("test")
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
     @DynamicPropertySource
@@ -123,6 +125,8 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         log.info("Test setup...");
+
+        clearDltTopicSimple();
 
         // Удаляем в правильном порядке (сначала зависимые таблицы), чтобы избежать ошибок внешних ключей
         // Важно: static Testcontainers живут между запусками, поэтому leftover data
@@ -971,4 +975,46 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 });
     }
 
+    private void clearDltTopicSimple() {
+        try (AdminClient adminClient = createAdminClient()) {
+            var existingTopics = adminClient.listTopics().names().get();
+            if (!existingTopics.contains(DLT_TOPIC)) {
+                log.debug("DLT topic does not exist, skipping cleanup");
+                return;
+            }
+
+            var topicDesc = adminClient.describeTopics(Collections.singletonList(DLT_TOPIC))
+                    .allTopicNames().get();
+            int partitionCount = topicDesc.get(DLT_TOPIC).partitions().size();
+
+            List<TopicPartition> partitions = IntStream.range(0, partitionCount)
+                    .mapToObj(i -> new TopicPartition(DLT_TOPIC, i))
+                    .collect(Collectors.toList());
+
+            try {
+                adminClient.deleteConsumerGroups(Collections.singletonList(REPROCESS_GROUP_ID)).all().get(5, TimeUnit.SECONDS);
+                log.debug("Deleted consumer group: {}", REPROCESS_GROUP_ID);
+            } catch (Exception e) {
+                log.debug("Could not delete consumer group (may not exist): {}", e.getMessage());
+            }
+
+            Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndMetadata> offsets = new HashMap<>();
+            for (TopicPartition tp : partitions) {
+                offsets.put(tp, new org.apache.kafka.clients.consumer.OffsetAndMetadata(0));
+            }
+
+            try {
+                adminClient.alterConsumerGroupOffsets(REPROCESS_GROUP_ID, offsets).all().get(5, TimeUnit.SECONDS);
+                log.debug("Reset DLT offsets to 0 for group {}", REPROCESS_GROUP_ID);
+            } catch (Exception e) {
+                log.debug("Could not reset offsets: {}", e.getMessage());
+            }
+
+            Thread.sleep(500);
+
+            log.debug("DLT topic cleaned successfully");
+        } catch (Exception e) {
+            log.warn("Failed to clear DLT topic: {}", e.getMessage());
+        }
+    }
 }

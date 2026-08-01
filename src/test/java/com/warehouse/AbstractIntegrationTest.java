@@ -1,10 +1,12 @@
 package com.warehouse;
 
+import com.warehouse.config.TestcontainersConfig;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.WarehouseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -23,6 +25,7 @@ import org.testcontainers.utility.DockerImageName;
  * всегда имеет актуальные адреса.
  */
 @AutoConfigureMockMvc
+@Import(TestcontainersConfig.class)
 public abstract class AbstractIntegrationTest {
 
     @Autowired
