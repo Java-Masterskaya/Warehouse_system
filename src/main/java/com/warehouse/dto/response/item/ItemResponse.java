@@ -16,6 +16,6 @@ public record ItemResponse(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BigDecimal cost,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @JsonProperty("isActive") boolean active,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String barcode;
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String barcode
 
 ) {}

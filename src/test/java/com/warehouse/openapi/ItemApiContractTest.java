@@ -49,7 +49,7 @@ class ItemApiContractTest extends AbstractOpenApiContractTest {
     void createItemSuccessMatchesContract() throws Exception {
         CreateItemRequest request = new CreateItemRequest(
                 "SKU-CONTRACT-" + System.currentTimeMillis(), "Товар", "Контракт",
-                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), "BARCODE-" + System.nanoTime());
 
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
@@ -63,7 +63,7 @@ class ItemApiContractTest extends AbstractOpenApiContractTest {
     void createItemDuplicateSkuMatchesContract() throws Exception {
         CreateItemRequest request = new CreateItemRequest(
                 "SKU-CONTRACT-DUP-" + System.currentTimeMillis(), "Товар", "Контракт",
-                0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), "BARCODE-" + System.nanoTime());
 
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
@@ -98,7 +98,7 @@ class ItemApiContractTest extends AbstractOpenApiContractTest {
     void createItemNoTokenMatchesContract() throws Exception {
         CreateItemRequest request = new CreateItemRequest(
                 "SKU-CONTRACT-NOAUTH-" + System.currentTimeMillis(), "Товар", "Контракт",
-                0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), "BARCODE-" + System.nanoTime());
 
         mockMvc.perform(post(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -111,7 +111,7 @@ class ItemApiContractTest extends AbstractOpenApiContractTest {
     void createItemUserTokenMatchesContract() throws Exception {
         CreateItemRequest request = new CreateItemRequest(
                 "SKU-CONTRACT-FORBIDDEN-" + System.currentTimeMillis(), "Товар", "Контракт",
-                0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), "BARCODE-" + System.nanoTime());
 
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + userToken)
@@ -129,7 +129,8 @@ class ItemApiContractTest extends AbstractOpenApiContractTest {
         // к проверке контракта ответа для товаров, реально созданных через API.
         String sku = "SKU-CONTRACT-LIST-" + System.currentTimeMillis();
         CreateItemRequest request = new CreateItemRequest(
-                sku, "Товар", "Контракт", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                sku, "Товар", "Контракт", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00),
+                "BARCODE-" + System.nanoTime());
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -147,7 +148,8 @@ class ItemApiContractTest extends AbstractOpenApiContractTest {
     void getItemByIdMatchesContract() throws Exception {
         String sku = "SKU-CONTRACT-GET-" + System.currentTimeMillis();
         CreateItemRequest request = new CreateItemRequest(
-                sku, "Товар", "Контракт", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                sku, "Товар", "Контракт", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00),
+                "BARCODE-" + System.nanoTime());
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)

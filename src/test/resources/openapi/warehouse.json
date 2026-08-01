@@ -10,6 +10,18 @@
     "description" : "Generated server url"
   } ],
   "tags" : [ {
+    "name" : "DLQ Management",
+    "description" : "Управление Dead Letter Queue (только ADMIN)"
+  }, {
+    "name" : "Категории",
+    "description" : "Управление категориями товаров"
+  }, {
+    "name" : "Аутентификация",
+    "description" : "Управление аутентификацией и токенами"
+  }, {
+    "name" : "Admin: Backfill",
+    "description" : "Управление ручными backfill-операциями"
+  }, {
     "name" : "Заказы поставщикам",
     "description" : "Управление заказами поставки"
   }, {
@@ -22,14 +34,8 @@
     "name" : "Пользователи",
     "description" : "Управление пользователями (только ADMIN)"
   }, {
-    "name" : "DLQ Management",
-    "description" : "Управление Dead Letter Queue (только ADMIN)"
-  }, {
     "name" : "Товары",
     "description" : "Управление каталогом товаров"
-  }, {
-    "name" : "Категории",
-    "description" : "Управление категориями товаров"
   }, {
     "name" : "Инвентаризация",
     "description" : "Корректировка остатков (только ADMIN)"
@@ -42,9 +48,6 @@
   }, {
     "name" : "Склады",
     "description" : "Управление складами"
-  }, {
-    "name" : "Аутентификация",
-    "description" : "Управление аутентификацией и токенами"
   } ],
   "paths" : {
     "/api/suppliers/{supplierId}" : {
@@ -108,9 +111,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -231,9 +234,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -344,9 +347,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -452,9 +455,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -575,9 +578,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -688,9 +691,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -796,9 +799,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -919,9 +922,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1032,9 +1035,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1131,9 +1134,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1248,9 +1251,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1354,9 +1357,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1471,9 +1474,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1577,9 +1580,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1694,9 +1697,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1819,9 +1822,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -1944,9 +1947,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -2069,9 +2072,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -2194,9 +2197,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -2308,9 +2311,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -2433,9 +2436,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -2548,9 +2551,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -2653,9 +2656,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -2774,9 +2777,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -2890,9 +2893,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3014,9 +3017,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3170,9 +3173,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3284,9 +3287,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3400,9 +3403,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3516,9 +3519,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3633,9 +3636,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3747,9 +3750,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3854,9 +3857,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3958,9 +3961,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -3998,6 +4001,235 @@
           },
           "200" : {
             "description" : "OK"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/admin/backfill/barcode" : {
+      "post" : {
+        "tags" : [ "Admin: Backfill" ],
+        "summary" : "Запустить backfill штрихкодов (асинхронно)",
+        "operationId" : "runBackfill",
+        "parameters" : [ {
+          "name" : "batchSize",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/admin/backfill/barcode/stop" : {
+      "post" : {
+        "tags" : [ "Admin: Backfill" ],
+        "summary" : "Остановить backfill штрихкодов",
+        "operationId" : "stopBackfill",
+        "responses" : {
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -4058,9 +4290,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -4164,9 +4396,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -4282,9 +4514,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -4397,9 +4629,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -4502,9 +4734,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -4643,9 +4875,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -4749,9 +4981,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -4795,6 +5027,115 @@
                   "type" : "array",
                   "items" : {
                     "$ref" : "#/components/schemas/CategoryResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/admin/backfill/barcode/status" : {
+      "get" : {
+        "tags" : [ "Admin: Backfill" ],
+        "summary" : "Статус backfill штрихкодов",
+        "operationId" : "backfillStatus",
+        "responses" : {
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
                   }
                 }
               }
@@ -4868,9 +5209,9 @@
               "*/*" : {
                 "schema" : {
                   "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  }, {
                     "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
                 }
               }
@@ -5005,11 +5346,16 @@
           },
           "cost" : {
             "type" : "number"
+          },
+          "barcode" : {
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
           }
         }
       },
       "ItemResponse" : {
-        "required" : [ "category", "cost", "createdAt", "id", "isActive", "minStock", "name", "price", "sku" ],
+        "required" : [ "barcode", "category", "cost", "createdAt", "id", "isActive", "minStock", "name", "price", "sku" ],
         "type" : "object",
         "properties" : {
           "id" : {
@@ -5041,6 +5387,9 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "barcode" : {
+            "type" : "string"
           }
         }
       },
@@ -5555,6 +5904,11 @@
           },
           "cost" : {
             "type" : "number"
+          },
+          "barcode" : {
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
           }
         }
       },
@@ -5901,7 +6255,7 @@
         }
       },
       "ItemDetailsResponse" : {
-        "required" : [ "available", "category", "cost", "createdAt", "currentStock", "id", "isActive", "minStock", "name", "price", "reserved", "sku", "updatedAt", "warehouseStocks" ],
+        "required" : [ "available", "barcode", "category", "cost", "createdAt", "currentStock", "id", "isActive", "minStock", "name", "price", "reserved", "sku", "updatedAt", "warehouseStocks" ],
         "type" : "object",
         "properties" : {
           "id" : {
@@ -5938,6 +6292,9 @@
           "updatedAt" : {
             "type" : "string",
             "format" : "date-time"
+          },
+          "barcode" : {
+            "type" : "string"
           },
           "available" : {
             "type" : "integer",
