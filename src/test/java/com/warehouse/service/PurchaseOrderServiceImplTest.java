@@ -1,7 +1,6 @@
 package com.warehouse.service;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderItemRequest;
 import com.warehouse.dto.request.purchaseorder.CreatePurchaseOrderRequest;
 import com.warehouse.dto.request.purchaseorder.ReceivePurchaseOrderItemRequest;
@@ -29,12 +28,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -177,7 +179,11 @@ class PurchaseOrderServiceImplTest {
         ReceivePurchaseOrderRequest request =
                 new ReceivePurchaseOrderRequest(
                         List.of(
-                                new ReceivePurchaseOrderItemRequest(1000L, 4)
+                                new ReceivePurchaseOrderItemRequest(
+                                        1000L,
+                                        4,
+                                        LocalDateTime.now().plusDays(30)
+                                )
                         )
                 );
 
@@ -225,7 +231,11 @@ class PurchaseOrderServiceImplTest {
         ReceivePurchaseOrderRequest request =
                 new ReceivePurchaseOrderRequest(
                         List.of(
-                                new ReceivePurchaseOrderItemRequest(1000L, 4)
+                                new ReceivePurchaseOrderItemRequest(
+                                        1000L,
+                                        4,
+                                        LocalDateTime.now().plusDays(30)
+                                )
                         )
                 );
 
@@ -243,8 +253,8 @@ class PurchaseOrderServiceImplTest {
         assertThat(orderItem.getReceivedQty()).isEqualTo(4);
 
         verify(stockMovementService).registerReceipt(
-                new ChangeQuantityMovementRequest(10L, 4),
-                context
+                argThat(r -> r.itemId().equals(10L) && r.quantity() == 4),
+                eq(context)
         );
     }
 
@@ -277,7 +287,11 @@ class PurchaseOrderServiceImplTest {
         ReceivePurchaseOrderRequest request =
                 new ReceivePurchaseOrderRequest(
                         List.of(
-                                new ReceivePurchaseOrderItemRequest(1000L, 10)
+                                new ReceivePurchaseOrderItemRequest(
+                                        1000L,
+                                        10,
+                                        LocalDateTime.now().plusDays(30)
+                                )
                         )
                 );
 
@@ -295,8 +309,8 @@ class PurchaseOrderServiceImplTest {
         assertThat(orderItem.getReceivedQty()).isEqualTo(10);
 
         verify(stockMovementService).registerReceipt(
-                new ChangeQuantityMovementRequest(10L, 10),
-                context
+                argThat(r -> r.itemId().equals(10L) && r.quantity() == 10),
+                eq(context)
         );
     }
 
@@ -329,7 +343,11 @@ class PurchaseOrderServiceImplTest {
         ReceivePurchaseOrderRequest request =
                 new ReceivePurchaseOrderRequest(
                         List.of(
-                                new ReceivePurchaseOrderItemRequest(1000L, 4)
+                                new ReceivePurchaseOrderItemRequest(
+                                        1000L,
+                                        4,
+                                        LocalDateTime.now().plusDays(30)
+                                )
                         )
                 );
 

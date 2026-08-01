@@ -29,6 +29,11 @@ spring:
   cache:
     type: none
 
+  bucket4j:
+    enabled: true
+    cache:
+      type: redis
+
 redis:
   cache:
     categories-ttl-minutes: 10
@@ -40,3 +45,8 @@ app:
     expiration-ms: 86400000
     refresh-expiration-ms: 604800000
     refresh-retry-ttl-seconds: 3
+  idempotency:
+    ttl-hours: 1
+    required: true
+    cleanup-cron: "0 0/1 * * * *"
+    enforce-after: 2020-01-01  # Дата в прошлом

@@ -14,5 +14,6 @@ public record ItemResponse(
         BigDecimal price,
         BigDecimal cost,
         @JsonProperty("isActive") boolean active,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String barcode
 ) {}

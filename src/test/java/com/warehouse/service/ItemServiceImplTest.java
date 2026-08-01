@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.PageResponse;
@@ -10,13 +11,16 @@ import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.Warehouse;
+import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.ReservedBarcodeFormatException;
 import com.warehouse.mapper.ItemMapper;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.WarehouseRepository;
+import com.warehouse.service.item.ItemBarcodeGeneratorService;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.item.ItemServiceImpl;
 import com.warehouse.service.reservation.StockAvailabilityService;
@@ -67,6 +71,9 @@ class ItemServiceImplTest {
     private StockRepository stockRepository;
 
     @Mock
+    private AuditContext auditContext;
+
+    @Mock
     private WarehouseRepository warehouseRepository;
 
     @Mock
@@ -74,6 +81,9 @@ class ItemServiceImplTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private ItemBarcodeGeneratorService barcodeGenerator;
 
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 
@@ -86,8 +96,10 @@ class ItemServiceImplTest {
                 stockRepository,
                 warehouseRepository,
                 itemMapper,
+                auditContext,
                 availabilityService,
-                categoryRepository
+                categoryRepository,
+                barcodeGenerator
         );
     }
 
@@ -98,7 +110,7 @@ class ItemServiceImplTest {
     @Test
     void createItemSuccess() {
         CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
-                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), null);
 
         Category category = createCategory("Электроника");
 
@@ -117,6 +129,7 @@ class ItemServiceImplTest {
         });
         when(stockRepository.save(any(Stock.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(barcodeGenerator.generate()).thenReturn("ITEM-0000000001");
 
         ItemResponse result = itemService.createItem(request);
 
@@ -127,9 +140,12 @@ class ItemServiceImplTest {
         assertThat(result.minStock()).isEqualTo(5);
         assertThat(result.active()).isTrue();
         assertThat(result.createdAt()).isNotNull();
-        verify(itemRepository).save(any(Item.class));
+        assertThat(result.barcode()).isEqualTo("ITEM-0000000001");
+        // Один save(): barcode не зависит от id, поэтому готов ещё до INSERT (OPS-5).
+        verify(itemRepository, times(1)).save(any(Item.class));
         verify(stockRepository).save(any(Stock.class));
         verify(categoryRepository).findByNameIgnoreCase("Электроника");
+        verify(barcodeGenerator).generate();
     }
 
     /**
@@ -138,7 +154,7 @@ class ItemServiceImplTest {
     @Test
     void createItemDuplicateSkuThrowsDuplicateSkuException() {
         CreateItemRequest request = new CreateItemRequest("SKU-001", "Ноутбук", "Электроника",
-                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25));
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), null);
 
         when(itemRepository.existsBySku("SKU-001")).thenReturn(true);
 
@@ -148,6 +164,118 @@ class ItemServiceImplTest {
 
         verify(itemRepository, never()).save(any());
         verify(stockRepository, never()).save(any());
+    }
+
+    /**
+     * Попытка создать товар с дублирующимся barcode выбрасывает DuplicateBarcodeException.
+     */
+    @Test
+    void createItemDuplicateBarcodeThrowsDuplicateBarcodeException() {
+        CreateItemRequest request = new CreateItemRequest("SKU-BAR-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), "EXIST-BARCODE");
+
+        when(itemRepository.existsBySku("SKU-BAR-001")).thenReturn(false);
+        when(categoryRepository.findByNameIgnoreCase("Электроника"))
+                .thenReturn(Optional.of(createCategory("Электроника")));
+        when(itemRepository.existsByBarcode("EXIST-BARCODE")).thenReturn(true);
+
+        assertThatThrownBy(() -> itemService.createItem(request))
+                .isInstanceOf(DuplicateBarcodeException.class)
+                .hasMessageContaining("EXIST-BARCODE");
+
+        verify(itemRepository, never()).save(any());
+        verify(stockRepository, never()).save(any());
+    }
+
+    /**
+     * Попытка создать товар с ручным barcode в формате автогенерации
+     * выбрасывает ReservedBarcodeFormatException — id ещё не существует,
+     * поэтому "свой" id подтвердить невозможно, формат отклоняется целиком.
+     */
+    @Test
+    void createItemWithReservedFormatBarcodeThrowsReservedBarcodeFormatException() {
+        CreateItemRequest request = new CreateItemRequest("SKU-RESERVED-001", "Ноутбук", "Электроника",
+                5, BigDecimal.valueOf(100.50), BigDecimal.valueOf(75.25), "ITEM-0000000042");
+
+        when(itemRepository.existsBySku("SKU-RESERVED-001")).thenReturn(false);
+        when(categoryRepository.findByNameIgnoreCase("Электроника"))
+                .thenReturn(Optional.of(createCategory("Электроника")));
+        when(barcodeGenerator.matchesReservedFormat("ITEM-0000000042")).thenReturn(true);
+
+        assertThatThrownBy(() -> itemService.createItem(request))
+                .isInstanceOf(ReservedBarcodeFormatException.class)
+                .hasMessageContaining("ITEM-0000000042");
+
+        verify(itemRepository, never()).save(any());
+        verify(itemRepository, never()).existsByBarcode(any());
+        verify(stockRepository, never()).save(any());
+    }
+
+    /**
+     * Попытка обновить товар на дублирующийся barcode выбрасывает DuplicateBarcodeException.
+     */
+    @Test
+    void updateItemDuplicateBarcodeThrowsDuplicateBarcodeException() {
+        Long itemId = 3L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory(createCategory("Категория"));
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+        existingItem.setBarcode("OLD-BARCODE");
+
+        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00), "EXIST-BARCODE");
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(categoryRepository.findByNameIgnoreCase("Новая категория"))
+                .thenReturn(Optional.of(createCategory("Новая категория")));
+        when(itemRepository.existsByBarcode("EXIST-BARCODE")).thenReturn(true);
+
+        assertThatThrownBy(() -> itemService.updateItem(itemId, request))
+                .isInstanceOf(DuplicateBarcodeException.class)
+                .hasMessageContaining("EXIST-BARCODE");
+
+        verify(itemRepository, never()).save(any());
+    }
+
+    /**
+     * Попытка обновить barcode на зарезервированный формат автогенерации
+     * выбрасывает ReservedBarcodeFormatException — с переходом на независимый
+     * sequence (items_barcode_seq) barcode больше не выводится формулой из id,
+     * поэтому исключений "для своего id" не бывает: любой ручной ввод в формате
+     * ITEM-<10 цифр> отклоняется безусловно (OPS-5).
+     */
+    @Test
+    void updateItemWithReservedFormatBarcodeThrowsReservedBarcodeFormatException() {
+        Long itemId = 3L;
+        Item existingItem = new Item();
+        existingItem.setId(itemId);
+        existingItem.setName("Товар");
+        existingItem.setCategory(createCategory("Категория"));
+        existingItem.setMinStock(5);
+        existingItem.setActive(true);
+        existingItem.setPrice(BigDecimal.valueOf(100.00));
+        existingItem.setCost(BigDecimal.valueOf(50.00));
+        existingItem.setBarcode("OLD-BARCODE");
+
+        UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00), "ITEM-0000000099");
+
+        when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
+        when(categoryRepository.findByNameIgnoreCase("Новая категория"))
+                .thenReturn(Optional.of(createCategory("Новая категория")));
+        when(barcodeGenerator.matchesReservedFormat("ITEM-0000000099")).thenReturn(true);
+
+        assertThatThrownBy(() -> itemService.updateItem(itemId, request))
+                .isInstanceOf(ReservedBarcodeFormatException.class)
+                .hasMessageContaining("ITEM-0000000099");
+
+        verify(itemRepository, never()).save(any());
+        verify(itemRepository, never()).existsByBarcode(any());
     }
 
     /**
@@ -166,7 +294,7 @@ class ItemServiceImplTest {
         existingItem.setCost(BigDecimal.valueOf(75.25));
 
         UpdateItemRequest request = new UpdateItemRequest("Новое название", "Новая категория",
-                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00));
+                10, BigDecimal.valueOf(120.00), BigDecimal.valueOf(85.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(categoryRepository.findByNameIgnoreCase("Новая категория"))
@@ -203,7 +331,7 @@ class ItemServiceImplTest {
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
         UpdateItemRequest request = new UpdateItemRequest("Обновленный товар", "Обновленная категория",
-                10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+                10, BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(categoryRepository.findByNameIgnoreCase("Обновленная категория"))
@@ -236,7 +364,7 @@ class ItemServiceImplTest {
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
         UpdateItemRequest request = new UpdateItemRequest("Товар с нулевой ценой",
-                "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+                "Категория", 5, BigDecimal.ZERO, BigDecimal.ZERO, null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(categoryRepository.findByNameIgnoreCase("Категория"))
@@ -267,7 +395,7 @@ class ItemServiceImplTest {
         existingItem.setCost(BigDecimal.valueOf(50.00));
 
         UpdateItemRequest request = new UpdateItemRequest("Товар", "Категория",
-                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                5, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(existingItem));
         when(categoryRepository.findByNameIgnoreCase("Категория"))
@@ -289,7 +417,7 @@ class ItemServiceImplTest {
     void updateItemItemNotFoundThrowsException() {
         Long itemId = 3L;
         UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
-                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.empty());
 
@@ -314,7 +442,7 @@ class ItemServiceImplTest {
         inactiveItem.setCost(BigDecimal.valueOf(30.00));
 
         UpdateItemRequest request = new UpdateItemRequest("Тест", "Тест Категория",
-                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00));
+                10, BigDecimal.valueOf(50.00), BigDecimal.valueOf(30.00), null);
 
         when(itemRepository.findById(itemId)).thenReturn(Optional.of(inactiveItem));
 
@@ -392,11 +520,13 @@ class ItemServiceImplTest {
         ItemDetailsProjection projection = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
-                true, LocalDateTime.now(), LocalDateTime.now()
+                true, LocalDateTime.now(), LocalDateTime.now(),
+                null
         );
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(projection));
         when(availabilityService.getTotalReserved(1L)).thenReturn(3L);
+        when(availabilityService.getTotalAvailable(1L)).thenReturn(20L);
         when(stockRepository.findAllByItemIdWithWarehouse(1L)).thenReturn(List.of());
 
         ItemDetailsResponse result = itemService.getItem(1L);
@@ -418,6 +548,7 @@ class ItemServiceImplTest {
 
         verify(itemRepository).findWithStock(1L);
         verify(availabilityService).getTotalReserved(1L);
+        verify(availabilityService).getTotalAvailable(1L);
         verify(stockRepository).findAllByItemIdWithWarehouse(1L);
     }
 
@@ -443,7 +574,8 @@ class ItemServiceImplTest {
         ItemDetailsProjection response = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00),
-                false, LocalDateTime.now(), LocalDateTime.now()
+                false, LocalDateTime.now(), LocalDateTime.now(),
+                null
         );
 
         when(itemRepository.findWithStock(1L)).thenReturn(Optional.of(response));
@@ -543,7 +675,8 @@ class ItemServiceImplTest {
         ItemDetailsProjection response = new ItemDetailsProjection(
                 1L, "WH-001", "Ноутбук Dell XPS 15", "Электроника", 5, 23,
                 BigDecimal.valueOf(1500.99), BigDecimal.valueOf(1000.49),
-                true, LocalDateTime.now(), LocalDateTime.now()
+                true, LocalDateTime.now(), LocalDateTime.now(),
+                null
         );
 
         assertThat(response.price()).isEqualTo(BigDecimal.valueOf(1500.99));

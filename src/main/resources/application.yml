@@ -11,6 +11,8 @@ spring:
   flyway:
     enabled: true
     mixed: true
+    postgresql:
+      transactional-lock: false
 
   kafka:
     producer:
@@ -63,6 +65,11 @@ spring:
     timeout-per-shutdown-phase: 20s
 
 app:
+  audit:
+    retention:
+      # 1.5 года (18 месяцев) для покрытия закрытия фин. года и проверок в Q1
+      days: 547
+      batch-size: 5000
   kafka:
     topics:
       low-stock:
@@ -79,6 +86,11 @@ app:
       max-attempts: 3
   jwt:
     refresh-retry-ttl-seconds: 60
+  idempotency:
+    ttl-hours: 24
+    required: true # Обязательность заголовка Idempotency-Key
+    cleanup-cron: "0 0 * * * *"  # Каждый час
+    enforce-after: 2026-08-26
 
 management:
   server:
@@ -86,7 +98,7 @@ management:
   tracing:
     enabled: true
     sampling:
-      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.5}
   otlp:
     tracing:
       endpoint: ${OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
@@ -112,11 +124,28 @@ management:
     readinessstate:
       enabled: true
   metrics:
-    enable:
-      http: true
-      web: true
     tags:
       application: warehouse-system
+
+rate-limiting:
+  login:
+    ip:
+      capacity: 10
+      refill-tokens: 2
+      duration: 1m
+    username:
+      capacity: 5
+      refill-tokens: 1
+      duration: 2m
+  movements:
+    ip:
+      capacity: 100
+      refill-tokens: 50
+      duration: 1m
+    username:
+      capacity: 40
+      refill-tokens: 10
+      duration: 10s
 
 server:
   shutdown: graceful
@@ -125,6 +154,7 @@ logging:
   level:
     root: WARN
     com.warehouse: INFO
+    com.warehouse.kafka.consumer: WARN
     com.warehouse.service.outbox: INFO
 
   pattern:
