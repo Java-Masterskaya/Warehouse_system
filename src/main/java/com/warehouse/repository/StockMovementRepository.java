@@ -45,4 +45,6 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             @Param("type") MovementType type,
             Pageable pageable
     );
+
+    StockMovement findTopByOrderByIdDesc();
 }

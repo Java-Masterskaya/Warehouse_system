@@ -2,6 +2,7 @@ package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
@@ -79,6 +80,9 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
+    private AuditContext auditContext;
+
+    @Autowired
     private CategoryRepository categoryRepository;
 
     private String adminToken;
@@ -104,6 +108,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         testItem.setActive(true);
         testItem.setPrice(BigDecimal.valueOf(500.00));
         testItem.setCost(BigDecimal.valueOf(300.00));
+        testItem.setBarcode("ITEM-TEST-MOVEMENT-" + uniqueSku);
         testItem = itemRepository.save(testItem);
 
         Stock stock = new Stock();

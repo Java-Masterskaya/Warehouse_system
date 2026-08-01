@@ -97,6 +97,7 @@ class MultiWarehouseAggregationIntegrationTest extends AbstractIntegrationTest {
                 .active(true)
                 .price(new BigDecimal("15.00"))
                 .cost(new BigDecimal("10.00"))
+                .barcode("ITEM-TEST-MULTI-" + suffix)
                 .build());
 
         Stock defaultStock = Stock.builder()

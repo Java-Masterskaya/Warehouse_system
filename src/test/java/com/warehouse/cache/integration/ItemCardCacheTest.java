@@ -78,6 +78,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));
         item.setCost(BigDecimal.valueOf(1000.00));
+        item.setBarcode("ITEM-TEST-CARDCACHE-001");
         itemRepository.save(item);
 
         Stock stock = new Stock();
