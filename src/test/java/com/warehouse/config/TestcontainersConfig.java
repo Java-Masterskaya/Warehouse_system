@@ -12,10 +12,12 @@ public class TestcontainersConfig {
     @Bean
     @ServiceConnection
     public PostgreSQLContainer<?> postgresContainer() {
-        return new PostgreSQLContainer<>(
+        try (PostgreSQLContainer<?> container = new PostgreSQLContainer<>(
                 DockerImageName.parse("ghcr.io/dbsystel/postgresql-partman:16")
                         .asCompatibleSubstituteFor("postgres")
-        )
-                .withInitScript("init.sql");
+        )) {
+            container.withInitScript("init.sql");
+            return container;
+        }
     }
 }
