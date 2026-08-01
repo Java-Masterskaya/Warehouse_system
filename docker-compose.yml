@@ -260,7 +260,6 @@ services:
       - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - promtail_positions:/tmp/positions.yaml
     command: -config.file=/etc/promtail/config.yml
     networks:
       - app-network
@@ -273,7 +272,6 @@ volumes:
   consul_data:
   postgres_backups:
   loki-data:
-  promtail_positions:
 
 networks:
   app-network:
