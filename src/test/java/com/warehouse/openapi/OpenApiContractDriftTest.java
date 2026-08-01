@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -32,6 +33,7 @@ class OpenApiContractDriftTest extends AbstractIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
+    @DirtiesContext
     void generatedSpecMatchesCommittedContract() throws Exception {
         JsonNode liveSpec = OpenApiSnapshotSupport.fetchLiveSpec(mockMvc, objectMapper);
         OpenApiSnapshotSupport.assertNoContractDrift(liveSpec, objectMapper);

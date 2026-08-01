@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
@@ -81,9 +82,12 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     OutboxEventRepository outboxEventRepository;
 
     private Long testItemId;
+    private String uniqueTestId;
 
     @BeforeEach
     void setUp() {
+        uniqueTestId = String.valueOf(System.currentTimeMillis());
+
         // Порядок важен: сначала зависимости (FK), потом родительские таблицы
         outboxEventRepository.deleteAll();
         stockAlertRepository.deleteAll();
@@ -95,6 +99,13 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
         stockRepository.deleteAll();
         itemRepository.deleteAll();
         categoryRepository.deleteAll();
+
+        await().pollDelay(Duration.ofMillis(500))
+                .pollInterval(Duration.ofMillis(100))
+                .atMost(Duration.ofSeconds(2))
+                .until(() -> true);
+
+        await().pollDelay(Duration.ofMillis(300)).until(() -> true);
 
         Category category = categoryRepository.save(
                 Category.builder()
@@ -114,6 +125,11 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
                 .build();
         item = itemRepository.save(item);
         testItemId = item.getId();
+
+        await().pollDelay(Duration.ofMillis(500))
+                .pollInterval(Duration.ofMillis(100))
+                .atMost(Duration.ofSeconds(3))
+                .until(() -> true);
     }
 
     /**

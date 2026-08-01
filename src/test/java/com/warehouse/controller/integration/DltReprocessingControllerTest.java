@@ -992,7 +992,8 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                     .collect(Collectors.toList());
 
             try {
-                adminClient.deleteConsumerGroups(Collections.singletonList(REPROCESS_GROUP_ID)).all().get(5, TimeUnit.SECONDS);
+                adminClient.deleteConsumerGroups(Collections.singletonList(REPROCESS_GROUP_ID))
+                        .all().get(5, TimeUnit.SECONDS);
                 log.debug("Deleted consumer group: {}", REPROCESS_GROUP_ID);
             } catch (Exception e) {
                 log.debug("Could not delete consumer group (may not exist): {}", e.getMessage());

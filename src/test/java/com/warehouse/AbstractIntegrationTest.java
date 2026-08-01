@@ -15,6 +15,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.Duration;
+
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
+
 /**
  * Абстрактный базовый класс для интеграционных тестов.
  * Управляет жизненным циклом тестовых контейнеров через static-блок.
@@ -93,4 +97,14 @@ public abstract class AbstractIntegrationTest {
             redisTemplate.delete(keys);
         }
     }
+    @BeforeEach
+    void waitForKafka() {
+        await().pollDelay(Duration.ofSeconds(1))
+                .pollInterval(Duration.ofSeconds(1))
+                .atMost(Duration.ofSeconds(10))
+                .until(() -> {
+                    return true;
+                });
+    }
+
 }
