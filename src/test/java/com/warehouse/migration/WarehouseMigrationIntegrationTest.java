@@ -29,6 +29,7 @@ class WarehouseMigrationIntegrationTest {
     private static final int LEGACY_QUANTITY = 37;
     private static final long LEGACY_VERSION = 4L;
 
+    @SuppressWarnings("resource")
     @Container
     private static final PostgreSQLContainer<?> postgres =
             new PostgreSQLContainer<>(
@@ -36,7 +37,6 @@ class WarehouseMigrationIntegrationTest {
                             .asCompatibleSubstituteFor("postgres")
             )
                     .withInitScript("init.sql");
-    ;
 
     @Test
     void migrationPreservesLegacyStockMovementAndReservation() throws Exception {
