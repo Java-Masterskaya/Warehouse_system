@@ -11,7 +11,7 @@ import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.service.batch.ExpiredBatchCleanupWorker;
+import com.warehouse.service.batch.ExpiredBatchCleanupService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +34,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ExpiredBatchCleanupWorkerTest {
+class ExpiredBatchCleanupServiceTest {
 
     private static final long ITEM_ID = 10L;
     private static final long WAREHOUSE_ID = 20L;
@@ -53,13 +53,13 @@ class ExpiredBatchCleanupWorkerTest {
     @Mock
     private UserRepository userRepository;
 
-    private ExpiredBatchCleanupWorker worker;
+    private ExpiredBatchCleanupService service;
     private Item item;
     private Warehouse warehouse;
 
     @BeforeEach
     void setUp() {
-        worker = new ExpiredBatchCleanupWorker(
+        service = new ExpiredBatchCleanupService(
                 batchRepository,
                 stockRepository,
                 stockMovementRepository,
@@ -87,7 +87,7 @@ class ExpiredBatchCleanupWorkerTest {
                 .thenReturn(batches);
         when(userRepository.getReferenceById(ACTOR_ID)).thenReturn(actor);
 
-        int cleared = worker.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
+        int cleared = service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
 
         ArgumentCaptor<StockMovement> movementCaptor = ArgumentCaptor.forClass(StockMovement.class);
         verify(stockMovementRepository).saveAndFlush(movementCaptor.capture());
@@ -119,7 +119,7 @@ class ExpiredBatchCleanupWorkerTest {
         when(batchRepository.findExpiredByItemAndWarehouseForUpdate(ITEM_ID, WAREHOUSE_ID, NOW))
                 .thenReturn(List.of());
 
-        int cleared = worker.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
+        int cleared = service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
 
         assertThat(cleared).isZero();
         assertThat(stock.getQuantity()).isEqualTo(20);
@@ -141,7 +141,7 @@ class ExpiredBatchCleanupWorkerTest {
         when(batchRepository.findExpiredByItemAndWarehouseForUpdate(ITEM_ID, WAREHOUSE_ID, NOW))
                 .thenReturn(List.of(batch));
 
-        assertThatThrownBy(() -> worker.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW))
+        assertThatThrownBy(() -> service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Batch quantity exceeds stock for item 10 at warehouse 20");
 
@@ -154,7 +154,7 @@ class ExpiredBatchCleanupWorkerTest {
 
     @Test
     void shouldStartEachScopeInRequiresNewTransaction() throws NoSuchMethodException {
-        Method method = ExpiredBatchCleanupWorker.class.getMethod(
+        Method method = ExpiredBatchCleanupService.class.getMethod(
                 "clearScope",
                 Long.class,
                 Long.class,

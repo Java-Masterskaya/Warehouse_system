@@ -1,6 +1,7 @@
 package com.warehouse.batch.integration;
 
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.batch.BatchCleanupActor;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
@@ -20,7 +21,6 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.batch.BatchService;
-import com.warehouse.service.batch.BatchCleanupActor;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

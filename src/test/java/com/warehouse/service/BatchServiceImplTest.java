@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.batch.BatchCleanupActor;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -10,9 +11,8 @@ import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ExpiredBatchScope;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.service.batch.BatchCleanupActor;
 import com.warehouse.service.batch.BatchServiceImpl;
-import com.warehouse.service.batch.ExpiredBatchCleanupWorker;
+import com.warehouse.service.batch.ExpiredBatchCleanupService;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +62,7 @@ class BatchServiceImplTest {
     private UserRepository userRepository;
 
     @Mock
-    private ExpiredBatchCleanupWorker expiredBatchCleanupWorker;
+    private ExpiredBatchCleanupService expiredBatchCleanupService;
 
     @Mock
     private CacheManager cacheManager;
@@ -88,7 +88,7 @@ class BatchServiceImplTest {
                 stockRepository,
                 availabilityService,
                 userRepository,
-                expiredBatchCleanupWorker,
+                expiredBatchCleanupService,
                 cacheManager
         );
         item = Item.builder().id(ITEM_ID).build();
@@ -236,13 +236,13 @@ class BatchServiceImplTest {
         when(cacheManager.getCache("item")).thenReturn(itemCache);
         when(batchRepository.findExpiredScopesWithQuantity(NOW))
                 .thenReturn(List.of(sourceScope, destinationScope));
-        when(expiredBatchCleanupWorker.clearScope(
+        when(expiredBatchCleanupService.clearScope(
                 ITEM_ID,
                 SOURCE_WAREHOUSE_ID,
                 actor.getId(),
                 NOW
         )).thenReturn(2);
-        when(expiredBatchCleanupWorker.clearScope(
+        when(expiredBatchCleanupService.clearScope(
                 ITEM_ID,
                 DESTINATION_WAREHOUSE_ID,
                 actor.getId(),
@@ -252,13 +252,13 @@ class BatchServiceImplTest {
         int cleared = batchService.clearExpiredBatches(NOW);
 
         assertEquals(3, cleared);
-        verify(expiredBatchCleanupWorker).clearScope(
+        verify(expiredBatchCleanupService).clearScope(
                 ITEM_ID,
                 SOURCE_WAREHOUSE_ID,
                 actor.getId(),
                 NOW
         );
-        verify(expiredBatchCleanupWorker).clearScope(
+        verify(expiredBatchCleanupService).clearScope(
                 ITEM_ID,
                 DESTINATION_WAREHOUSE_ID,
                 actor.getId(),
@@ -279,13 +279,13 @@ class BatchServiceImplTest {
         when(cacheManager.getCache("item")).thenReturn(itemCache);
         when(batchRepository.findExpiredScopesWithQuantity(NOW))
                 .thenReturn(List.of(sourceScope, destinationScope));
-        when(expiredBatchCleanupWorker.clearScope(
+        when(expiredBatchCleanupService.clearScope(
                 ITEM_ID,
                 SOURCE_WAREHOUSE_ID,
                 actor.getId(),
                 NOW
         )).thenThrow(new IllegalStateException("simulated scope failure"));
-        when(expiredBatchCleanupWorker.clearScope(
+        when(expiredBatchCleanupService.clearScope(
                 ITEM_ID,
                 DESTINATION_WAREHOUSE_ID,
                 actor.getId(),
@@ -295,13 +295,13 @@ class BatchServiceImplTest {
         int cleared = batchService.clearExpiredBatches(NOW);
 
         assertEquals(1, cleared);
-        verify(expiredBatchCleanupWorker).clearScope(
+        verify(expiredBatchCleanupService).clearScope(
                 ITEM_ID,
                 SOURCE_WAREHOUSE_ID,
                 actor.getId(),
                 NOW
         );
-        verify(expiredBatchCleanupWorker).clearScope(
+        verify(expiredBatchCleanupService).clearScope(
                 ITEM_ID,
                 DESTINATION_WAREHOUSE_ID,
                 actor.getId(),

@@ -1,4 +1,4 @@
-package com.warehouse.service.batch;
+package com.warehouse.batch;
 
 /**
  * Stable audit identity used by the automatic expired batch cleanup.

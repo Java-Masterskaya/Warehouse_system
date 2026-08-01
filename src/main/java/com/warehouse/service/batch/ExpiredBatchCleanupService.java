@@ -25,7 +25,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ExpiredBatchCleanupWorker {
+public class ExpiredBatchCleanupService {
 
     private final BatchRepository batchRepository;
     private final StockRepository stockRepository;

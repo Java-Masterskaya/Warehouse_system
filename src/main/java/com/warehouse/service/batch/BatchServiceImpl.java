@@ -1,5 +1,6 @@
 package com.warehouse.service.batch;
 
+import com.warehouse.batch.BatchCleanupActor;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -34,7 +35,7 @@ public class BatchServiceImpl implements BatchService {
     StockRepository stockRepository;
     StockAvailabilityService availabilityService;
     UserRepository userRepository;
-    ExpiredBatchCleanupWorker expiredBatchCleanupWorker;
+    ExpiredBatchCleanupService expiredBatchCleanupService;
     CacheManager cacheManager;
 
     @Override
@@ -107,7 +108,7 @@ public class BatchServiceImpl implements BatchService {
         int clearedBatches = 0;
         for (BatchScope scope : scopes) {
             try {
-                int clearedInScope = expiredBatchCleanupWorker.clearScope(
+                int clearedInScope = expiredBatchCleanupService.clearScope(
                         scope.itemId(),
                         scope.warehouseId(),
                         actorId,

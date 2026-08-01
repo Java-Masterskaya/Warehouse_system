@@ -1,6 +1,7 @@
 package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.batch.BatchCleanupActor;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
@@ -14,7 +15,6 @@ import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
-import com.warehouse.service.batch.BatchCleanupActor;
 import com.warehouse.service.batch.BatchService;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
