@@ -133,6 +133,7 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.TEN)
                 .cost(BigDecimal.ONE)
                 .active(true)
+                .barcode("ITEM-TEST-TRANSFER-" + suffix)
                 .build());
 
         sourceStock = stockRepository.saveAndFlush(Stock.builder()

@@ -83,6 +83,7 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(100.00));
         item.setCost(BigDecimal.valueOf(50.00));
+        item.setBarcode("ITEM-TEST-FEFO-001");
         itemRepository.save(item);
 
         // Создаем stock для товара (необходим для registerReceipt)

@@ -1,5 +1,6 @@
 package com.warehouse.service;
 
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
@@ -110,6 +111,8 @@ class StockMovementServiceImplTest {
     private OutboxService outboxService;
     @Mock
     private MetricService metricService;
+    @Mock
+    private AuditContext auditContext;
     @InjectMocks
     private StockMovementServiceImpl stockMovementService;
     @Captor

@@ -306,6 +306,7 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
         item.setCategory(category);
         item.setMinStock(5);
         item.setActive(true);
+        item.setBarcode("ITEM-TEST-CONC-" + UUID.randomUUID());
 
         return itemRepository.saveAndFlush(item);
     }

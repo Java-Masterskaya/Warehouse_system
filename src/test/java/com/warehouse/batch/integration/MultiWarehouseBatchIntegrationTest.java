@@ -95,6 +95,7 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
                 .price(BigDecimal.TEN)
                 .cost(BigDecimal.ONE)
                 .active(true)
+                .barcode("ITEM-TEST-MULTIBATCH-" + suffix)
                 .build());
 
         User user = userRepository.saveAndFlush(User.builder()

@@ -24,6 +24,7 @@ public class ItemDetailsResponse {
     @JsonProperty("isActive") boolean active;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
+    String barcode;
     long available;
     long reserved;
     List<WarehouseStockResponse> warehouseStocks;

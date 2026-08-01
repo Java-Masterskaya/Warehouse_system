@@ -99,6 +99,7 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
         item.setCategory(category);
         item.setMinStock(1);
         item.setActive(true);
+        item.setBarcode("ITEM-TEST-RESERVE-" + System.nanoTime());
 
         itemRepository.save(item);
 

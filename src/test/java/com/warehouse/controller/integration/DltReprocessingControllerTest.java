@@ -130,6 +130,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // из предыдущих тестов нарушает ассерты и уникальные индексы
         jdbcTemplate.update("DELETE FROM stock_alerts");
         jdbcTemplate.update("DELETE FROM stock_movements");
+        jdbcTemplate.update("DELETE FROM idempotency_keys");
         jdbcTemplate.update("DELETE FROM batches");
         jdbcTemplate.update("DELETE FROM outbox");
         jdbcTemplate.update("DELETE FROM reserves");
@@ -180,6 +181,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .category(testCategory)
                 .minStock(10)
                 .active(true)
+                .barcode("ITEM-TEST-DLT-" + System.nanoTime())
                 .build();
         testItem = itemRepository.save(testItem);
         testItemId = testItem.getId();
