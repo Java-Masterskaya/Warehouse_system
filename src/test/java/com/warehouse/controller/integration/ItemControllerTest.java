@@ -2,6 +2,7 @@ package com.warehouse.controller.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.request.security.LoginRequest;
@@ -64,6 +65,9 @@ class ItemControllerTest extends AbstractIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
+    private AuditContext auditContext;
+
+    @Autowired
     private ItemService itemService;
 
     @Autowired
@@ -106,7 +110,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemAdminTokenReturns201WithBody() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell",
-                "Электроника", 5, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00));
+                "Электроника", 5, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00), null);
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -124,7 +128,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemDuplicateSkuReturns409() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар",
-                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + adminToken)
@@ -146,7 +150,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemNoTokenReturns401() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар",
-                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
         mockMvc.perform(post("/api/items")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -161,7 +165,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     @Test
     void createItemUserTokenReturns403() throws Exception {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар",
-                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
         mockMvc.perform(post("/api/items")
                         .header("Authorization", "Bearer " + userToken)
@@ -363,7 +367,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
         UpdateItemRequest request = new UpdateItemRequest(
                 "Обновленный товар", "Обновленная категория", 10,
-                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00), null);
 
         mockMvc.perform(put("/api/items/" + item.getId())
                         .header("Authorization", "Bearer " + adminToken)
@@ -407,7 +411,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 .orElseThrow();
 
         UpdateItemRequest request = new UpdateItemRequest(
-                "Товар", "Тест", 5, BigDecimal.ZERO, BigDecimal.ZERO);
+                "Товар", "Тест", 5, BigDecimal.ZERO, BigDecimal.ZERO, null);
 
         mockMvc.perform(put("/api/items/" + item.getId())
                         .header("Authorization", "Bearer " + adminToken)
@@ -484,7 +488,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
         UpdateItemRequest request = new UpdateItemRequest(
                 "Обновленный товар", "Тест", 10,
-                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00));
+                BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00), null);
 
         mockMvc.perform(put("/api/items/" + item.getId())
                         .header("Authorization", "Bearer " + userToken)
@@ -658,7 +662,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     private void createItem(String sku, String name, String category) throws Exception {
         CreateItemRequest request = new CreateItemRequest(
-                sku, name, category, 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00));
+                sku, name, category, 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
         mockMvc.perform(post(BASE_URL)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)

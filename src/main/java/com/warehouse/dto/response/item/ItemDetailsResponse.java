@@ -25,6 +25,7 @@ public class ItemDetailsResponse {
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @JsonProperty("isActive") boolean active;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime updatedAt;
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String barcode;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long available;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long reserved;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<WarehouseStockResponse> warehouseStocks;

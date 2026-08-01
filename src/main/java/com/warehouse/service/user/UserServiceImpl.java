@@ -1,5 +1,9 @@
 package com.warehouse.service.user;
 
+import com.warehouse.audit.AuditContext;
+import com.warehouse.audit.Auditable;
+import com.warehouse.audit.entity.AuditAction;
+import com.warehouse.audit.entity.EntityType;
 import com.warehouse.dto.request.user.UserCreateRequest;
 import com.warehouse.dto.response.user.UserResponse;
 import com.warehouse.entity.Role;
@@ -26,10 +30,12 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final AuditContext auditContext;
     private final TokenService tokenService;
 
     @Transactional
     @Override
+    @Auditable(action = AuditAction.CREATE, entityType = EntityType.USER)
     public UserResponse createUser(UserCreateRequest request) {
         log.debug("Create user with name '{}'", request.getUsername());
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -39,7 +45,10 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.toEntity(request);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        userRepository.save(user);
+        User saved = userRepository.save(user);
+
+        auditContext.setNewValue(userMapper.toAuditDto(saved));
+        auditContext.setEntityId(saved.getId());
 
         log.info("User created: name={}", user.getUsername());
         return userMapper.toResponse(user);
@@ -55,6 +64,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    @Auditable(action = AuditAction.DEACTIVATE, entityType = EntityType.USER)
     public void deactivateUser(Long userId, Long currentUserId) {
         log.debug("Deactivate user with id '{}' by user with id '{}'", userId, currentUserId);
         if (userId.equals(currentUserId)) {
@@ -66,6 +76,7 @@ public class UserServiceImpl implements UserService {
             log.warn("User with id '{}' not found", userId);
             return EntityNotFoundException.forId("User", userId);
         });
+        auditContext.setOldValue(userMapper.toAuditDto(user));
 
         if (user.getRole() == Role.ROLE_ADMIN) {
             List<User> activeAdmins = userRepository.findActiveUsersByRoleForUpdate(Role.ROLE_ADMIN);
@@ -77,7 +88,9 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setActive(false);
-        userRepository.save(user);
+        User saved = userRepository.save(user);
+        auditContext.setNewValue(userMapper.toAuditDto(saved));
+        auditContext.setEntityId(user.getId());
 
         tokenService.blacklistAllUserAccessTokens(userId);
         // Revoke all tokens for this user
