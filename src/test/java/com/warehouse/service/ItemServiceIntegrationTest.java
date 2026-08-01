@@ -88,7 +88,7 @@ public class ItemServiceIntegrationTest extends AbstractIntegrationTest {
 
             itemService.updateItem(item.id(),
                     new UpdateItemRequest("New name", item.category(), 20, BigDecimal.valueOf(200),
-                            BigDecimal.valueOf(150)));
+                            BigDecimal.valueOf(150), null));
 
             AuditLogEntity audit = auditRepository.findTopByOrderByIdDesc();
 
@@ -193,7 +193,8 @@ public class ItemServiceIntegrationTest extends AbstractIntegrationTest {
                         categoryName,
                         10,
                         BigDecimal.valueOf(100),
-                        BigDecimal.valueOf(70)
+                        BigDecimal.valueOf(70),
+                        null
                 )
         );
     }

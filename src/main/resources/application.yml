@@ -10,6 +10,8 @@ spring:
 
   flyway:
     enabled: true
+    postgresql:
+      transactional-lock: false
 
   kafka:
     producer:

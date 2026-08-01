@@ -4,8 +4,10 @@ import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
 import com.warehouse.exception.ActiveTokenLimitExceededException;
+import com.warehouse.exception.BackfillAlreadyRunningException;
 import com.warehouse.exception.CategoryInUseException;
 import com.warehouse.exception.DltReprocessingInProgressException;
+import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateCategoryException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
@@ -23,12 +25,14 @@ import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.PurchaseOrderOverReceiptException;
 import com.warehouse.exception.RefreshInProgressException;
 import com.warehouse.exception.ReservationException;
+import com.warehouse.exception.ReservedBarcodeFormatException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.exception.StockMovementInvariantException;
 import com.warehouse.exception.TooManyAttemptLoginException;
 import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.exception.TokenReuseException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -42,6 +46,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import jakarta.validation.ConstraintViolationException;
 
 import java.util.List;
 
@@ -73,6 +78,25 @@ public class GlobalExceptionHandler {
     public ErrorResponse handlePurchaseOrderOverReceipt(
             PurchaseOrderOverReceiptException ex) {
         return new ErrorResponse("PURCHASE_ORDER_OVER_RECEIPT", ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateBarcodeException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDuplicateBarcode(DuplicateBarcodeException ex) {
+        String message;
+        if (isAdmin()) {
+            message = ex.getMessage();
+        } else {
+            message = "Barcode already exists";
+        }
+        return new ErrorResponse("DUPLICATE_BARCODE", message);
+    }
+
+    @ExceptionHandler(ReservedBarcodeFormatException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleReservedBarcodeFormat(ReservedBarcodeFormatException ex) {
+        log.warn("Reserved barcode format violation: {}", ex.getMessage());
+        return new ErrorResponse("RESERVED_BARCODE_FORMAT", ex.getMessage());
     }
 
     @ExceptionHandler(DuplicateSkuException.class)
@@ -142,6 +166,13 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("DLT_REPROCESSING_IN_PROGRESS", ex.getMessage());
     }
 
+    @ExceptionHandler(BackfillAlreadyRunningException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleBackfillAlreadyRunning(BackfillAlreadyRunningException ex) {
+        log.warn("Backfill already running: {}", ex.getMessage());
+        return new ErrorResponse("BACKFILL_ALREADY_RUNNING", ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ValidationErrorResponse handleValidation(MethodArgumentNotValidException ex) {
@@ -150,6 +181,13 @@ public class GlobalExceptionHandler {
                 .toList();
 
         return new ValidationErrorResponse("VALIDATION_ERROR", fieldErrors);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleConstraintViolation(ConstraintViolationException ex) {
+        log.warn("Constraint violation: {}", ex.getMessage());
+        return new ErrorResponse("VALIDATION_ERROR", ex.getMessage());
     }
 
     @ExceptionHandler(SelfDeactivationException.class)
@@ -224,6 +262,19 @@ public class GlobalExceptionHandler {
         log.warn("Concurrent stock modification detected: {}", ex.getMessage());
         return new ErrorResponse("CONCURRENT_MODIFICATION",
                 "Resource was modified by another transaction. Please retry.");
+    }
+
+    // Общий перехватчик для нарушений ограничений БД, которые не покрыты более
+    // специфичными исключениями выше (в первую очередь — UNIQUE на barcode/sku,
+    // если что-то обошло прикладные проверки раньше, например прямой доступ к БД
+    // в обход ItemServiceImpl). Без него такие нарушения падали бы в
+    // handleGeneral как 500.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        return new ErrorResponse("DATA_INTEGRITY_VIOLATION",
+                "Операция нарушает ограничения целостности данных");
     }
 
     @ExceptionHandler(TooManyAttemptLoginException.class)
