@@ -35,8 +35,15 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected WarehouseRepository warehouseRepository;
 
+    private static final DockerImageName POSTGRES_IMAGE =
+            DockerImageName.parse("warehouse_system-postgres:latest")
+                    .asCompatibleSubstituteFor("postgres");
+
     static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine");
+            new PostgreSQLContainer<>(POSTGRES_IMAGE)
+                    .withDatabaseName("warehouse")
+                    .withUsername("postgres")
+                    .withPassword("postgres");
 
     static final RedpandaContainer redpanda =
             new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"));
@@ -97,6 +104,7 @@ public abstract class AbstractIntegrationTest {
             redisTemplate.delete(keys);
         }
     }
+
     @BeforeEach
     void waitForKafka() {
         await().pollDelay(Duration.ofSeconds(1))

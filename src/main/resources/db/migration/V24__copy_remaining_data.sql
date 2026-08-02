@@ -1,5 +1,5 @@
 -- =============================================
--- V24: Copy remaining data
+-- V24: Copy remaining data and fix transfer_id
 -- =============================================
 
 DO
@@ -15,7 +15,6 @@ $$
 
         WHILE last_id < max_id
             LOOP
-                -- Вставляем данные с warehouse_id = 1 (дефолтный склад)
                 INSERT INTO stock_movements (
                     id,
                     item_id,
@@ -33,13 +32,20 @@ $$
                     type,
                     quantity,
                     created_at,
-                    COALESCE(warehouse_id, default_warehouse_id) AS warehouse_id,  -- Если есть warehouse_id - берем, иначе 1
+                    COALESCE(warehouse_id, default_warehouse_id) AS warehouse_id,
                     transfer_id
                 FROM stock_movements_old
                 WHERE id > last_id
                 ORDER BY id
                 LIMIT batch_size
-                ON CONFLICT (id, created_at) DO NOTHING;
+                ON CONFLICT (id) DO UPDATE SET
+                                               transfer_id = EXCLUDED.transfer_id,
+                                               warehouse_id = EXCLUDED.warehouse_id,
+                                               item_id = EXCLUDED.item_id,
+                                               user_id = EXCLUDED.user_id,
+                                               type = EXCLUDED.type,
+                                               quantity = EXCLUDED.quantity,
+                                               created_at = EXCLUDED.created_at;
 
                 GET DIAGNOSTICS row_count = ROW_COUNT;
                 EXIT WHEN row_count = 0;

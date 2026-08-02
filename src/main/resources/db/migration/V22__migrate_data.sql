@@ -1,5 +1,3 @@
--- noinspection SqlResolveForFile
-
 -- =============================================
 -- V22: Migrate existing data to partitioned table
 -- =============================================
@@ -18,8 +16,8 @@ $$
 
         WHILE last_id < max_id
             LOOP
-                INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity, created_at, warehouse_id)
-                SELECT id, item_id, user_id, type, quantity, created_at, warehouse_id
+                INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity, created_at, warehouse_id, transfer_id)
+                SELECT id, item_id, user_id, type, quantity, created_at, warehouse_id, transfer_id
                 FROM stock_movements
                 WHERE id > last_id
                 ORDER BY id
