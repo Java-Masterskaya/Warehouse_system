@@ -792,6 +792,73 @@ class StockMovementServiceImplTest {
     }
 
     /**
+     * Инвентаризация завершается ошибкой, если количества в партиях
+     * недостаточно для распределения уменьшения остатка.
+     */
+    @Test
+    void stocktakeShouldFailWhenBatchesCannotCoverDecrease() {
+        int countedQuantity = 5;
+
+        StocktakeRequest request = new StocktakeRequest(
+                ITEM_ID,
+                countedQuantity,
+                null
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        Item item = createItem(ITEM_ID, "Test", true, 0);
+
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
+        stock.setQuantity(12);
+
+        Batch firstBatch = createBatch(
+                ITEM_ID,
+                1L,
+                3,
+                LocalDateTime.now().plusDays(10)
+        );
+        Batch secondBatch = createBatch(
+                ITEM_ID,
+                2L,
+                3,
+                LocalDateTime.now().plusDays(20)
+        );
+        List<Batch> batches = List.of(firstBatch, secondBatch);
+
+        when(itemRepository.findById(ITEM_ID))
+                .thenReturn(Optional.of(item));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID))
+                .thenReturn(Optional.of(stock));
+        when(availabilityService.getReserved(stock))
+                .thenReturn(0);
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID))
+                .thenReturn(12L);
+        when(batchRepository.findByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID
+        )).thenReturn(batches);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> stockMovementService.stocktake(request, userContext)
+        );
+
+        assertEquals(
+                "Unable to distribute adjustment across batches",
+                exception.getMessage()
+        );
+
+        assertEquals(12, stock.getQuantity());
+
+        verify(batchRepository, never()).saveAll(any());
+        verify(stockRepository, never()).save(any(Stock.class));
+        verify(stockMovementRepository, never()).save(any(StockMovement.class));
+        verify(userRepository, never()).getReferenceById(anyLong());
+    }
+
+    /**
      * Инвентаризация: фактический остаток меньше активных резервов.
      * Выбрасывается StocktakeConflictException.
      */
