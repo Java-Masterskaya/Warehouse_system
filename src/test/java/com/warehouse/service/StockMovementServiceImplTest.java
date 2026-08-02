@@ -705,7 +705,7 @@ class StockMovementServiceImplTest {
                 .thenReturn(new StockMovementResponse(
                         ITEM_ID, null, MovementType.WRITE_OFF, QUANTITY,
                         stockAfterWriteOff, null, null, null, false,
-                         null, null, null));
+                        null, null, null));
 
         StockMovementResponse response = stockMovementService.writeOffReceipt(request, userContext);
 
@@ -789,6 +789,161 @@ class StockMovementServiceImplTest {
     }
 
     /**
+     * Инвентаризация уменьшает количество сразу в нескольких партиях по FEFO.
+     * Проверяется корректное распределение уменьшения и итоговое количество в каждой партии.
+     */
+    @Test
+    void stocktakeShouldDistributeDecreaseAcrossSeveralBatches() {
+        int countedQuantity = 5;
+
+        StocktakeRequest request = new StocktakeRequest(
+                ITEM_ID,
+                countedQuantity,
+                null
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        Item item = createItem(ITEM_ID, "Test", true, 0);
+
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
+        stock.setQuantity(12);
+
+        Batch firstBatch = createBatch(
+                ITEM_ID,
+                1L,
+                3,
+                LocalDateTime.now().plusDays(10)
+        );
+        Batch secondBatch = createBatch(
+                ITEM_ID,
+                2L,
+                9,
+                LocalDateTime.now().plusDays(20)
+        );
+        List<Batch> batches = List.of(firstBatch, secondBatch);
+
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID))
+                .thenReturn(Optional.of(item));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID))
+                .thenReturn(Optional.of(stock));
+        when(availabilityService.getReserved(stock))
+                .thenReturn(0);
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID))
+                .thenReturn(12L);
+        when(batchRepository.findByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID
+        )).thenReturn(batches);
+        when(userRepository.getReferenceById(USER_ID))
+                .thenReturn(userRef);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(
+                any(StockMovement.class),
+                eq(countedQuantity),
+                eq(false)
+        )).thenReturn(new StockMovementResponse(
+                ITEM_ID,
+                99L,
+                MovementType.ADJUSTMENT,
+                -7,
+                countedQuantity,
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null
+        ));
+
+        StockMovementResponse response =
+                stockMovementService.stocktake(request, userContext);
+
+        assertEquals(countedQuantity, response.stockAfter());
+        assertEquals(-7, response.quantity());
+
+        assertEquals(0, firstBatch.getQuantity());
+        assertEquals(5, secondBatch.getQuantity());
+        assertEquals(countedQuantity, stock.getQuantity());
+
+        verify(batchRepository).saveAll(batches);
+        verify(stockRepository).save(stock);
+        verify(stockMovementRepository).save(any(StockMovement.class));
+    }
+
+    /**
+     * Инвентаризация завершается ошибкой, если количества в партиях
+     * недостаточно для распределения уменьшения остатка.
+     */
+    @Test
+    void stocktakeShouldFailWhenBatchesCannotCoverDecrease() {
+        int countedQuantity = 5;
+
+        StocktakeRequest request = new StocktakeRequest(
+                ITEM_ID,
+                countedQuantity,
+                null
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        Item item = createItem(ITEM_ID, "Test", true, 0);
+
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
+        stock.setQuantity(12);
+
+        Batch firstBatch = createBatch(
+                ITEM_ID,
+                1L,
+                3,
+                LocalDateTime.now().plusDays(10)
+        );
+        Batch secondBatch = createBatch(
+                ITEM_ID,
+                2L,
+                3,
+                LocalDateTime.now().plusDays(20)
+        );
+        List<Batch> batches = List.of(firstBatch, secondBatch);
+
+        when(itemRepository.findById(ITEM_ID))
+                .thenReturn(Optional.of(item));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID))
+                .thenReturn(Optional.of(stock));
+        when(availabilityService.getReserved(stock))
+                .thenReturn(0);
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID))
+                .thenReturn(12L);
+        when(batchRepository.findByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID
+        )).thenReturn(batches);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> stockMovementService.stocktake(request, userContext)
+        );
+
+        assertEquals(
+                "Unable to distribute adjustment across batches",
+                exception.getMessage()
+        );
+
+        assertEquals(12, stock.getQuantity());
+
+        verify(batchRepository, never()).saveAll(any());
+        verify(stockRepository, never()).save(any(Stock.class));
+        verify(stockMovementRepository, never()).save(any(StockMovement.class));
+        verify(userRepository, never()).getReferenceById(anyLong());
+    }
+
+    /**
      * Инвентаризация: фактический остаток меньше активных резервов.
      * Выбрасывается StocktakeConflictException.
      */
@@ -816,6 +971,64 @@ class StockMovementServiceImplTest {
         verify(stockRepository, never()).save(any());
         verify(stockMovementRepository, never()).save(any());
 
+    }
+
+    /**
+     * Инвентаризация: фактический остаток равен зарезервированному.
+     * Конфликт не возникает, операция завершается без создания движения.
+     */
+    @Test
+    void stocktakeShouldAllowWhenCountedEqualsReserved() {
+        int countedQuantity = 10;
+
+        StocktakeRequest request = new StocktakeRequest(
+                ITEM_ID,
+                countedQuantity,
+                null
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
+        stock.setQuantity(countedQuantity);
+
+        StockMovementResponse expectedResponse = new StockMovementResponse(
+                ITEM_ID,
+                null,
+                null,
+                0,
+                countedQuantity,
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null
+        );
+
+        when(itemRepository.findById(ITEM_ID))
+                .thenReturn(Optional.of(item));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID))
+                .thenReturn(Optional.of(stock));
+        when(availabilityService.getReserved(stock))
+                .thenReturn(countedQuantity);
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID))
+                .thenReturn((long) countedQuantity);
+        when(mapper.toNoMovementResponse(ITEM_ID, countedQuantity))
+                .thenReturn(expectedResponse);
+
+        StockMovementResponse response =
+                stockMovementService.stocktake(request, userContext);
+
+        assertSame(expectedResponse, response);
+        assertEquals(countedQuantity, response.stockAfter());
+
+        verify(stockRepository, never()).save(any(Stock.class));
+        verify(stockMovementRepository, never()).save(any(StockMovement.class));
     }
 
     /**
@@ -860,6 +1073,46 @@ class StockMovementServiceImplTest {
     }
 
     /**
+     * Инвентаризация не позволяет увеличить остаток без указания срока годности
+     * для излишков.
+     */
+    @Test
+    void stocktakeShouldRejectIncreaseWithoutSurplusExpiryDate() {
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 15, null);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        Item item = createItem(ITEM_ID, "Test", true, 5);
+
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
+        stock.setQuantity(10);
+
+        when(itemRepository.findById(ITEM_ID))
+                .thenReturn(Optional.of(item));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID))
+                .thenReturn(Optional.of(stock));
+        when(availabilityService.getReserved(stock))
+                .thenReturn(0);
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID))
+                .thenReturn(10L);
+
+        InvalidMovementRequestException exception = assertThrows(
+                InvalidMovementRequestException.class,
+                () -> stockMovementService.stocktake(request, userContext)
+        );
+
+        assertEquals(
+                "Surplus expiry date is required when stocktake increases quantity",
+                exception.getMessage()
+        );
+
+        verify(batchRepository, never()).save(any(Batch.class));
+        verify(stockRepository, never()).save(any(Stock.class));
+        verify(stockMovementRepository, never()).save(any(StockMovement.class));
+    }
+
+    /**
      * Инвентаризация: фактический остаток ниже minStock.
      * Устанавливается lowStockAlert=true и событие сохраняется в outbox.
      */
@@ -900,6 +1153,72 @@ class StockMovementServiceImplTest {
         LowStockAlertEvent savedEvent = eventCaptor.getValue();
         assertEquals(ITEM_ID, savedEvent.itemId());
         verify(metricService).increment("warehouse.movements.adjustment.total");
+    }
+
+    /**
+     * Инвентаризация: итоговый остаток равен минимальному.
+     * Low stock alert не создаётся (граничный случай).
+     */
+    @Test
+    void stocktakeShouldNotSendAlertWhenTotalEqualsMinStock() {
+        int minStock = 7;
+
+        StocktakeRequest request = new StocktakeRequest(ITEM_ID, 7, null);
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        Item item = createItem(ITEM_ID, "Test", true, minStock);
+
+        Stock stock = new Stock();
+        stock.setItem(item);
+        stock.setWarehouse(defaultWarehouse);
+        stock.setQuantity(10);
+
+        Batch batch = createBatch(
+                ITEM_ID,
+                1L,
+                10,
+                LocalDateTime.now().plusDays(30)
+        );
+
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID))
+                .thenReturn(Optional.of(item));
+        when(stockRepository.findByItemIdForUpdate(ITEM_ID))
+                .thenReturn(Optional.of(stock));
+        when(availabilityService.getReserved(stock))
+                .thenReturn(0);
+        when(stockRepository.findTotalQuantityByItemId(ITEM_ID))
+                .thenReturn(10L);
+        when(batchRepository.findByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID
+        )).thenReturn(List.of(batch));
+        when(userRepository.getReferenceById(USER_ID))
+                .thenReturn(userRef);
+        when(stockMovementRepository.save(any(StockMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(any(), eq(7), eq(false)))
+                .thenReturn(new StockMovementResponse(
+                        ITEM_ID,
+                        99L,
+                        MovementType.ADJUSTMENT,
+                        -3,
+                        7,
+                        null,
+                        null,
+                        null,
+                        false,
+                        null,
+                        null,
+                        null
+                ));
+
+        StockMovementResponse response =
+                stockMovementService.stocktake(request, userContext);
+
+        assertFalse(response.lowStockAlert());
+        verify(outboxService, never()).saveLowStockAlertEvent(any());
     }
 
     /**
@@ -1023,6 +1342,127 @@ class StockMovementServiceImplTest {
     }
 
     /**
+     * Перемещение между одним и тем же складом запрещено.
+     */
+    @Test
+    void transferShouldRejectSameSourceAndDestinationWarehouse() {
+        TransferStockRequest request = new TransferStockRequest(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID,
+                DEFAULT_WAREHOUSE_ID,
+                QUANTITY
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        InvalidMovementRequestException exception = assertThrows(
+                InvalidMovementRequestException.class,
+                () -> stockMovementService.transfer(request, userContext)
+        );
+
+        assertEquals(
+                "Source and destination warehouses must be different",
+                exception.getMessage()
+        );
+
+        verify(itemRepository, never()).findById(anyLong());
+        verify(stockRepository, never())
+                .findByItemAndWarehousesForUpdate(anyLong(), anyList());
+        verify(stockMovementRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    /**
+     * Перемещение: доступное количество равно запрошенному.
+     * Перемещение выполняется успешно (граничный случай).
+     */
+    @Test
+    void transferShouldAllowWhenAvailableEqualsRequestedQuantity() {
+        int transferQuantity = 5;
+
+        TransferStockRequest request = new TransferStockRequest(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID,
+                SECONDARY_WAREHOUSE_ID,
+                transferQuantity
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        Item item = createItem(ITEM_ID, "Transfer item", true, 0);
+
+        Warehouse destination = Warehouse.builder()
+                .id(SECONDARY_WAREHOUSE_ID)
+                .name("Secondary Warehouse")
+                .build();
+
+        Stock sourceStock = Stock.builder()
+                .item(item)
+                .warehouse(defaultWarehouse)
+                .quantity(transferQuantity)
+                .build();
+
+        Stock destinationStock = Stock.builder()
+                .item(item)
+                .warehouse(destination)
+                .quantity(2)
+                .build();
+
+        Batch sourceBatch = Batch.builder()
+                .item(item)
+                .warehouse(defaultWarehouse)
+                .quantity(transferQuantity)
+                .expiryDate(LocalDateTime.now().plusDays(10))
+                .build();
+
+        User userRef = createUserReference(USER_ID, USERNAME);
+
+        when(itemRepository.findById(ITEM_ID))
+                .thenReturn(Optional.of(item));
+        when(warehouseRepository.findById(DEFAULT_WAREHOUSE_ID))
+                .thenReturn(Optional.of(defaultWarehouse));
+        when(warehouseRepository.findById(SECONDARY_WAREHOUSE_ID))
+                .thenReturn(Optional.of(destination));
+        when(stockRepository.findByItemAndWarehousesForUpdate(
+                ITEM_ID,
+                List.of(DEFAULT_WAREHOUSE_ID, SECONDARY_WAREHOUSE_ID)
+        )).thenReturn(List.of(sourceStock, destinationStock));
+        when(availabilityService.getAvailable(sourceStock))
+                .thenReturn(transferQuantity);
+        when(batchRepository
+                .findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
+                        eq(ITEM_ID),
+                        eq(DEFAULT_WAREHOUSE_ID),
+                        any(LocalDateTime.class)
+                )).thenReturn(List.of(sourceBatch));
+        when(userRepository.getReferenceById(USER_ID))
+                .thenReturn(userRef);
+        when(stockMovementRepository.saveAllAndFlush(anyList()))
+                .thenAnswer(invocation -> {
+                    List<StockMovement> movements = invocation.getArgument(0);
+                    movements.get(0).setId(101L);
+                    movements.get(1).setId(102L);
+                    return movements;
+                });
+
+        StockTransferResponse response =
+                stockMovementService.transfer(request, userContext);
+
+        assertEquals(0, sourceStock.getQuantity());
+        assertEquals(7, destinationStock.getQuantity());
+        assertEquals(0, sourceBatch.getQuantity());
+
+        assertEquals(0, response.fromStockAfter());
+        assertEquals(7, response.toStockAfter());
+        assertEquals(transferQuantity, response.quantity());
+
+        verify(stockRepository).saveAll(
+                List.of(sourceStock, destinationStock)
+        );
+        verify(stockMovementRepository).saveAllAndFlush(anyList());
+        verify(metricService).increment(
+                "warehouse.movements.transfer.total"
+        );
+    }
+
+    /**
      * Insufficient available stock does not change stocks, batches or movements.
      */
     @Test
@@ -1071,8 +1511,7 @@ class StockMovementServiceImplTest {
                 .findNonExpiredByItemAndWarehouseOrderByExpiryDateAscForUpdate(
                         anyLong(),
                         anyLong(),
-                        any(LocalDateTime.class)
-            );
+                        any(LocalDateTime.class));
         verify(batchRepository, never()).saveAll(any());
         verify(stockRepository, never()).saveAll(any());
         verify(stockMovementRepository, never()).saveAllAndFlush(anyList());
