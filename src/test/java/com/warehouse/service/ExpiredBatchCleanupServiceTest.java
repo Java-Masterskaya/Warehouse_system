@@ -129,6 +129,35 @@ class ExpiredBatchCleanupServiceTest {
     }
 
     @Test
+    void shouldClearScopeWhenExpiredQuantityEqualsStockQuantity() {
+        Stock stock = Stock.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(7)
+                .build();
+        Batch expiredBatch = batch(7, NOW.minusDays(1));
+        User actor = User.builder().id(ACTOR_ID).build();
+
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(ITEM_ID, WAREHOUSE_ID, NOW))
+                .thenReturn(List.of(expiredBatch));
+        when(userRepository.getReferenceById(ACTOR_ID)).thenReturn(actor);
+
+        int cleared = service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
+
+        assertThat(cleared).isEqualTo(1);
+        assertThat(expiredBatch.getQuantity()).isZero();
+        assertThat(stock.getQuantity()).isZero();
+
+        ArgumentCaptor<StockMovement> movementCaptor = ArgumentCaptor.forClass(StockMovement.class);
+        verify(stockMovementRepository).saveAndFlush(movementCaptor.capture());
+        assertThat(movementCaptor.getValue().getQuantity()).isEqualTo(7);
+        verify(batchRepository).saveAll(List.of(expiredBatch));
+        verify(stockRepository).save(stock);
+    }
+
+    @Test
     void shouldRejectScopeWhenExpiredQuantityExceedsStock() {
         Stock stock = Stock.builder()
                 .item(item)
