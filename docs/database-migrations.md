@@ -183,6 +183,74 @@ ALTER TABLE items ADD CONSTRAINT uk_items_barcode UNIQUE USING INDEX uk_items_ba
   действует обычное правило "не редактировать".
 - Перед merge: `./gradlew test`.
 
+### Восстановление после сбоя `CREATE INDEX CONCURRENTLY`
+
+`CREATE INDEX CONCURRENTLY` выполняется вне транзакции. Если миграция V29
+прервана, PostgreSQL может оставить индекс с `indisvalid = false`. Такой индекс
+не используется планировщиком, но занимает место и создает нагрузку при записи.
+`flyway repair` исправляет только `flyway_schema_history` и не удаляет оставшиеся
+объекты базы данных.
+
+1. Остановить rollout и повторные запуски Flyway.
+2. Проверить четыре индекса V29:
+
+```sql
+SELECT n.nspname AS schema_name,
+       c.relname AS index_name,
+       i.indisready,
+       i.indisvalid,
+       pg_get_indexdef(c.oid) AS definition
+FROM pg_catalog.pg_index AS i
+JOIN pg_catalog.pg_class AS c ON c.oid = i.indexrelid
+JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+WHERE n.nspname = current_schema()
+  AND c.relname IN (
+      'idx_items_active_name_id',
+      'idx_items_active_sku_id',
+      'idx_movements_item_created_id',
+      'idx_movements_item_type_created_id'
+  )
+ORDER BY c.relname;
+```
+
+После успешной миграции запрос должен вернуть четыре строки с
+`indisready = true` и `indisvalid = true`.
+
+3. Удалить только неготовые или невалидные индексы. Команды должны выполняться
+   в autocommit, без `BEGIN`:
+
+```sql
+SELECT format('DROP INDEX CONCURRENTLY IF EXISTS %I.%I;', n.nspname, c.relname)
+FROM pg_catalog.pg_index AS i
+JOIN pg_catalog.pg_class AS c ON c.oid = i.indexrelid
+JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+WHERE n.nspname = current_schema()
+  AND c.relname IN (
+      'idx_items_active_name_id',
+      'idx_items_active_sku_id',
+      'idx_movements_item_created_id',
+      'idx_movements_item_type_created_id'
+  )
+  AND (NOT i.indisready OR NOT i.indisvalid)
+\gexec
+```
+
+`\gexec` является командой `psql`: она выполняет каждый сгенерированный
+`DROP INDEX CONCURRENTLY` отдельно.
+
+4. Выполнить `flyway repair` тем же Flyway runner и с теми же `locations`, URL и
+   credentials, которые используются для `migrate`. Не редактировать
+   `flyway_schema_history` вручную.
+5. Повторно запустить миграцию и запрос из шага 2. Дополнительно проверить, что
+   замененный индекс удален:
+
+```sql
+SELECT to_regclass(current_schema() || '.idx_movements_item_id_created') IS NULL
+       AS old_index_removed;
+```
+
+Ожидаемый результат: `old_index_removed = true`.
+
 ---
 
 ## Где найти код
