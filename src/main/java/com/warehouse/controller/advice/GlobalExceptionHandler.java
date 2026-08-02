@@ -255,6 +255,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(TooManyAttemptLoginException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
     public ResponseEntity<ErrorResponse> handleTooManyAttemptLogin(TooManyAttemptLoginException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getWaitTime()))
