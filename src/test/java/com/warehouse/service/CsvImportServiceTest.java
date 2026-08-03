@@ -6,7 +6,8 @@ import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.service.import_export.CsvImportService;
+import com.warehouse.repository.WarehouseRepository;
+import com.warehouse.service.import_export.CsvImportServiceImpl;
 import com.warehouse.service.import_export.CsvItemParser;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
@@ -51,8 +52,11 @@ class CsvImportServiceTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private WarehouseRepository warehouseRepository;
+
     @InjectMocks
-    private CsvImportService csvImportService;
+    private CsvImportServiceImpl csvImportService;
 
     @Test
     @DisplayName("Успешный импорт номенклатуры с нулевым остатком из MultipartFile (на моках)")
@@ -69,7 +73,7 @@ class CsvImportServiceTest {
         MockMultipartFile multipartFile = new MockMultipartFile("file",
                 "items.csv",
                 "text/csv",
-                "SKU,Name,Category,Price,Cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00" .getBytes());
+                "SKU,Name,Category,Price,Cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00".getBytes());
 
         CsvItemParser.ValidRowHolder row1 =
                 createValidRowHolder(1, "SKU-001", "Ноутбук", categoryName1, "1000.00", "800.00");
@@ -128,7 +132,7 @@ class CsvImportServiceTest {
     @DisplayName("Ошибка валидации, если расширение файла не .csv")
     void importItemsInvalidExtensionThrowsException() {
         MockMultipartFile txtFile =
-                new MockMultipartFile("file", "items.txt", "text/plain", "some content" .getBytes());
+                new MockMultipartFile("file", "items.txt", "text/plain", "some content".getBytes());
 
         assertThatThrownBy(() -> csvImportService.importItems(txtFile)).isInstanceOf(IllegalArgumentException.class)
                                                                        .hasMessageContaining("CSV");
@@ -140,7 +144,7 @@ class CsvImportServiceTest {
     @Test
     @DisplayName("Импорт с ошибками: дубликаты SKU и несуществующие категории корректно попадают в отчет")
     void importItemsWithErrorsReport() {
-        MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", "content" .getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", "content".getBytes());
 
         Category existingCategory = new Category();
         existingCategory.setId(1L);
