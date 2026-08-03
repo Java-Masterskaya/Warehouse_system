@@ -11,6 +11,8 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.item.ItemService;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +49,9 @@ class ItemServiceRedisFallbackIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockRepository stockRepository;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
 
     @MockitoBean
     private CacheManager cacheManager;
@@ -111,5 +116,18 @@ class ItemServiceRedisFallbackIntegrationTest extends AbstractIntegrationTest {
             assertThat(item.getId()).isEqualTo(itemId);
             assertThat(item.getName()).isEqualTo("Fallback Item");
         }
+    }
+
+    @Test
+    void shouldOpenCircuitBreakerAfterRepeatedFailures() {
+        var breaker = circuitBreakerRegistry.circuitBreaker("itemCache");
+
+        assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+
+        for (int i = 0; i < 7; i++) {
+            itemService.getItem(itemId);
+        }
+
+        assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN);
     }
 }

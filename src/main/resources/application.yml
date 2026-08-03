@@ -147,6 +147,8 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+    circuitbreakers:
+      enabled: true
   metrics:
     tags:
       application: warehouse-system

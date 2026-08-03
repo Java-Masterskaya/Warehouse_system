@@ -2,6 +2,7 @@ package com.warehouse.kafka.producer;
 
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.metric.MetricService;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
@@ -24,15 +25,18 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
     private final MetricService metricService;
     private final Tracer tracer;
     private final Propagator propagator;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     public KafkaStockAlertProducer(KafkaTemplate<String, Object> kafkaTemplate,
                                    MetricService metricService,
                                    Tracer tracer,
-                                   Propagator propagator) {
+                                   Propagator propagator,
+                                   CircuitBreakerRegistry circuitBreakerRegistry) {
         this.kafkaTemplate = kafkaTemplate;
         this.metricService = metricService;
         this.tracer = tracer;
         this.propagator = propagator;
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
     }
 
     @CircuitBreaker(name = "kafkaProducer", fallbackMethod = "sendLowStockAlertFallback")
@@ -82,8 +86,11 @@ public class KafkaStockAlertProducer implements KafkaProducerService {
 
     @SuppressWarnings("unused")
     public void sendLowStockAlertFallback(LowStockAlertEvent alert, Throwable t) {
-        log.warn("CircuitBreaker kafkaProducer is open, alert not sent to Kafka. "
-                + "Event will be retried by outbox relay. Error: {}", t.getMessage());
+        var state = circuitBreakerRegistry
+                .circuitBreaker("kafkaProducer")
+                .getState();
+        log.warn("kafkaProducer call failed (breaker state = {}), alert not sent to Kafka. "
+                + "Event will be retried by outbox relay. Error: {}", state, t.getMessage());
         metricService.increment("warehouse.kafka.producer.circuit_open");
 
         if (t instanceof RuntimeException) {

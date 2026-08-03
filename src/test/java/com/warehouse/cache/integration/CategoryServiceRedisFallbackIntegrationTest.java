@@ -5,6 +5,8 @@ import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.entity.Category;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.service.category.CategoryService;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +34,9 @@ class CategoryServiceRedisFallbackIntegrationTest extends AbstractIntegrationTes
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
 
     @MockitoBean
     private CacheManager cacheManager;
@@ -69,5 +74,18 @@ class CategoryServiceRedisFallbackIntegrationTest extends AbstractIntegrationTes
             assertThat(categories).extracting(CategoryResponse::name)
                     .containsExactlyInAnyOrder("Books", "Electronics");
         }
+    }
+
+    @Test
+    void shouldOpenCircuitBreakerAfterRepeatedFailures() {
+        var breaker = circuitBreakerRegistry.circuitBreaker("categoryCache");
+
+        assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+
+        for (int i = 0; i < 7; i++) {
+            categoryService.getCategories();
+        }
+
+        assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN);
     }
 }

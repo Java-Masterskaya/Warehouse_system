@@ -10,6 +10,7 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.CategoryMapper;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
     private final ItemRepository itemRepository;
     private final CategoryMapper categoryMapper;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     @Transactional
@@ -78,7 +80,11 @@ public class CategoryServiceImpl implements CategoryService {
 
     @SuppressWarnings("unused")
     public List<CategoryResponse> getCategoriesFallback(Throwable t) {
-        log.warn("CircuitBreaker itemCache is open for categories, fallback to DB");
+        var state = circuitBreakerRegistry
+                .circuitBreaker("categoryCache")
+                .getState();
+        log.warn("categoryCache call failed (breaker stete = {}), fallback to DB. Error: {}",
+                state, t.getMessage());
         return categoryRepository.findAllByOrderByNameAsc()
                 .stream()
                 .map(categoryMapper::toResponse)

@@ -24,6 +24,7 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.specification.ItemSpecification;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class ItemServiceImpl implements ItemService {
     private final AuditContext auditContext;
     private final StockAvailabilityService availabilityService;
     private final CategoryRepository categoryRepository;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Transactional
     @Override
@@ -163,7 +165,11 @@ public class ItemServiceImpl implements ItemService {
 
     @SuppressWarnings("unused")
     public ItemDetailsResponse getItemFallback(Long itemId, Throwable t) {
-        log.warn("CircuitBreaker itemCache is open, fallback to DB. Error: {}", t.getMessage());
+        var state = circuitBreakerRegistry
+                .circuitBreaker("itemCache")
+                .getState();
+        log.warn("itemCache call failed (breaker state = {}), fallback to DB. Error: {}",
+                state, t.getMessage());
         return getItemFromDb(itemId);
     }
 

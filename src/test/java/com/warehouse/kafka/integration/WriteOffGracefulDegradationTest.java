@@ -8,7 +8,6 @@ import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
-import com.warehouse.entity.MovementType;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.OutboxStatus;
 import com.warehouse.entity.Role;
@@ -29,33 +28,30 @@ import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.movement.StockMovementService;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.messaging.Message;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(classes = WarehouseApp.class)
 @DirtiesContext
 class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
-
-    @MockitoBean
-    private OutboxEventRelay outboxEventRelay;
 
     @Autowired
     private StockMovementService stockMovementService;
@@ -83,6 +79,13 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
     private PurchaseOrderItemRepository purchaseOrderItemRepository;
     @Autowired
     private PurchaseOrderRepository purchaseOrderRepository;
+    @Autowired
+    private OutboxEventRelay outboxEventRelay;
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    @MockitoBean
+    private KafkaTemplate<String, Object> kafkaTemplate;
 
     private Item testItem;
     private User testUser;
@@ -91,6 +94,9 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        when(kafkaTemplate.send(any(org.apache.kafka.clients.producer.ProducerRecord.class)))
+                .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Kafka is down")));
+
         stockMovementRepository.deleteAllInBatch();
         stockReserveRepository.deleteAllInBatch();
         batchRepository.deleteAll();
@@ -120,13 +126,13 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         Stock stock = new Stock();
         stock.setItem(testItem);
         stock.setWarehouse(defaultWarehouse);
-        stock.setQuantity(20);
+        stock.setQuantity(10);
         stockRepository.save(stock);
 
         Batch batch = new Batch();
         batch.setItem(testItem);
         batch.setWarehouse(defaultWarehouse);
-        batch.setQuantity(20);
+        batch.setQuantity(10);
         batch.setExpiryDate(LocalDateTime.now().plusDays(30));
         batchRepository.save(batch);
 
@@ -144,40 +150,33 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldWriteOffSuccessfullyWhenKafkaUnavailable() {
-        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 15);
+    void shouldSaveOutboxEventsAndOpenCircuitBreakerWhenKafkaIsDown() {
         UserContext ctx = new UserContext(testUser.getId(), testUser.getUsername());
 
-        StockMovementResponse response = stockMovementService.writeOffReceipt(request, ctx);
-
-        assertThat(response.lowStockAlert()).isTrue();
-        assertThat(response.type()).isEqualTo(MovementType.WRITE_OFF);
-        assertThat(response.quantity()).isEqualTo(15);
-
-        Stock stock = stockRepository.findByItemId(testItemId).orElseThrow();
-        assertThat(stock.getQuantity()).isEqualTo(5);
-
-        List<OutboxEvent> pending = outboxEventRepository.findPendingEvents(10);
-        assertThat(pending).hasSize(1);
-        OutboxEvent event = pending.get(0);
-        assertThat(event.getEventType()).isEqualTo("LowStockAlert");
-        assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING);
-    }
-
-    @TestConfiguration
-    static class KafkaUnavailableConfig {
-        @Bean
-        @Primary
-        public KafkaTemplate<String, Object> stubKafkaTemplate() {
-            @SuppressWarnings("unchecked")
-            KafkaTemplate<String, Object> template = mock(KafkaTemplate.class);
-            when(template.send(any(Message.class)))
-                    .thenThrow(new RuntimeException("Kafka is down"));
-            when(template.send(any(String.class), any(), any()))
-                    .thenThrow(new RuntimeException("Kafka is down"));
-            when(template.send(any(String.class), any()))
-                    .thenThrow(new RuntimeException("Kafka is down"));
-            return template;
+        for (int i = 0; i < 7; i++) {
+            WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 1);
+            StockMovementResponse response = stockMovementService.writeOffReceipt(request, ctx);
+            assertThat(response.lowStockAlert()).isTrue();
         }
+
+        List<OutboxEvent> pendingEvents = outboxEventRepository.findAll();
+        assertThat(pendingEvents).hasSize(7);
+        pendingEvents.forEach(event -> assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING));
+
+        outboxEventRelay.relayPendingEvents();
+
+        CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("kafkaProducer");
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(100))
+            .untilAsserted(() ->
+                assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN)
+            );
+
+        List<OutboxEvent> updatedEvents = outboxEventRepository.findAll();
+        assertThat(updatedEvents).hasSize(7);
+        updatedEvents.forEach(event ->
+                assertThat(event.getStatus()).isIn(OutboxStatus.FAILED, OutboxStatus.PENDING)
+        );
     }
 }

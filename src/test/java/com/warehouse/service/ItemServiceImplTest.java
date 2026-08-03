@@ -21,6 +21,7 @@ import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.item.ItemServiceImpl;
 import com.warehouse.service.reservation.StockAvailabilityService;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -79,6 +80,9 @@ class ItemServiceImplTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 
     private ItemService itemService;
@@ -92,7 +96,8 @@ class ItemServiceImplTest {
                 itemMapper,
                 auditContext,
                 availabilityService,
-                categoryRepository
+                categoryRepository,
+                circuitBreakerRegistry
         );
     }
 
