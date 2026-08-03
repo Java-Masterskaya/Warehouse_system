@@ -16,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -98,6 +98,180 @@ class BatchServiceImplTest {
                 () -> assertEquals(expiryDate, savedBatch.getExpiryDate()),
                 () -> assertEquals(12, stock.getQuantity())
         );
+    }
+
+    @Test
+    void shouldRejectBatchWhenQuantityIsZero() {
+        LocalDateTime expiryDate = LocalDateTime.now().plusDays(1);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        item,
+                        sourceWarehouse,
+                        0,
+                        expiryDate
+                )
+        );
+
+        assertEquals("Quantity must be greater than zero", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectBatchWhenQuantityIsNegative() {
+        LocalDateTime expiryDate = LocalDateTime.now().plusDays(1);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        item,
+                        sourceWarehouse,
+                        -1,
+                        expiryDate
+                )
+        );
+
+        assertEquals("Quantity must be greater than zero", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectBatchWhenItemIsNotPersisted() {
+        Item itemWithoutId = Item.builder().build();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        itemWithoutId,
+                        sourceWarehouse,
+                        5,
+                        LocalDateTime.now().plusDays(1)
+                )
+        );
+
+        assertEquals("Item must be persisted", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectBatchWhenItemIsNull() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        null,
+                        sourceWarehouse,
+                        5,
+                        LocalDateTime.now().plusDays(1)
+                )
+        );
+
+        assertEquals("Item must be persisted", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectBatchWhenWarehouseIsNotPersisted() {
+        Warehouse warehouseWithoutId = Warehouse.builder()
+                .name("Not persisted")
+                .build();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        item,
+                        warehouseWithoutId,
+                        5,
+                        LocalDateTime.now().plusDays(1)
+                )
+        );
+
+        assertEquals("Warehouse must be persisted", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectBatchWhenWarehouseIsNull() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        item,
+                        null,
+                        5,
+                        LocalDateTime.now().plusDays(1)
+                )
+        );
+
+        assertEquals("Warehouse must be persisted", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectBatchWhenExpiryDateIsNull() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        item,
+                        sourceWarehouse,
+                        5,
+                        null
+                )
+        );
+
+        assertEquals("Expiry date is required", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectBatchWhenExpiryDateIsNow() {
+        LocalDateTime expiryDate = LocalDateTime.now();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        item,
+                        sourceWarehouse,
+                        5,
+                        expiryDate
+                )
+        );
+
+        assertEquals("Expiry date must be in the future", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectBatchWhenExpiryDateIsNotInTheFuture() {
+        LocalDateTime expiryDate = LocalDateTime.now().minusSeconds(1);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.createBatchAndIncreaseStock(
+                        item,
+                        sourceWarehouse,
+                        5,
+                        expiryDate
+                )
+        );
+
+        assertEquals("Expiry date must be in the future", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository);
+    }
+
+    @Test
+    void shouldRejectWriteOffWhenQuantityIsZero() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> batchService.writeOffByFEFO(
+                        ITEM_ID,
+                        SOURCE_WAREHOUSE_ID,
+                        0,
+                        NOW
+                )
+        );
+
+        assertEquals("Quantity must be greater than zero", exception.getMessage());
+        verifyNoInteractions(batchRepository, stockRepository, availabilityService);
     }
 
     @Test
@@ -269,6 +443,64 @@ class BatchServiceImplTest {
                 () -> assertEquals(8, expiredBatch.getQuantity()),
                 () -> assertEquals(7, stock.getQuantity())
         );
+        verify(batchRepository, never()).saveAll(any());
+        verify(stockRepository, never()).save(any(Stock.class));
+    }
+
+    @Test
+    void shouldClearExpiredBatchesWhenTheirQuantityEqualsStockQuantity() {
+        Batch expiredBatch = batch(sourceWarehouse, 7, NOW.minusDays(1));
+        Stock stock = stock(sourceWarehouse, 7);
+
+        when(sourceScope.getItemId()).thenReturn(ITEM_ID);
+        when(sourceScope.getWarehouseId()).thenReturn(SOURCE_WAREHOUSE_ID);
+        when(batchRepository.findExpiredScopesWithQuantity(NOW))
+                .thenReturn(List.of(sourceScope));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID
+        )).thenReturn(Optional.of(stock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of(expiredBatch));
+
+        int cleared = batchService.clearExpiredBatches(NOW);
+
+        assertAll(
+                () -> assertEquals(1, cleared),
+                () -> assertEquals(0, expiredBatch.getQuantity()),
+                () -> assertEquals(0, stock.getQuantity())
+        );
+
+        verify(batchRepository).saveAll(List.of(expiredBatch));
+        verify(stockRepository).save(stock);
+    }
+
+    @Test
+    void shouldSkipScopeWhenExpiredBatchesAreEmpty() {
+        Stock stock = stock(sourceWarehouse, 7);
+
+        when(sourceScope.getItemId()).thenReturn(ITEM_ID);
+        when(sourceScope.getWarehouseId()).thenReturn(SOURCE_WAREHOUSE_ID);
+        when(batchRepository.findExpiredScopesWithQuantity(NOW))
+                .thenReturn(List.of(sourceScope));
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID
+        )).thenReturn(Optional.of(stock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(
+                ITEM_ID,
+                SOURCE_WAREHOUSE_ID,
+                NOW
+        )).thenReturn(List.of());
+
+        int cleared = batchService.clearExpiredBatches(NOW);
+
+        assertEquals(0, cleared);
+        assertEquals(7, stock.getQuantity());
+
         verify(batchRepository, never()).saveAll(any());
         verify(stockRepository, never()).save(any(Stock.class));
     }
