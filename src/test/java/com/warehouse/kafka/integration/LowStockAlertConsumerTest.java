@@ -110,6 +110,7 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
                 .active(true)
                 .price(BigDecimal.valueOf(100.00))
                 .cost(BigDecimal.valueOf(50.00))
+                .barcode("ITEM-TEST-LOWSTOCK-001")
                 .build();
         item = itemRepository.save(item);
         testItemId = item.getId();

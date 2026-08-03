@@ -1,4 +1,12 @@
 # yaml-language-server: $schema=https://json.schemastore.org/spring-configuration-properties.json
+springdoc:
+  api-docs:
+    # OpenAPI 3.0.1 вместо дефолтных 3.1.0: контрактные тесты (swagger-request-validator)
+    # используют движок валидации схем, который не полностью понимает диалект JSON Schema
+    # 2020-12 из OpenAPI 3.1 — под 3.1 проверка типов полей в ответе молча не срабатывает
+    # (см. src/test/java/com/warehouse/openapi). 3.0.1 также шире поддерживается codegen-тулингом.
+    version: OPENAPI_3_0
+
 spring:
   application:
     name: warehouse-app
@@ -10,6 +18,8 @@ spring:
 
   flyway:
     enabled: true
+    postgresql:
+      transactional-lock: false
 
   data:
     redis:

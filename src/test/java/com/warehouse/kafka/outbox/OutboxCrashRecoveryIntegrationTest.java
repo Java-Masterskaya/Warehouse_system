@@ -135,6 +135,7 @@ class OutboxCrashRecoveryIntegrationTest extends AbstractIntegrationTest {
         testItem.setCategory(category);
         testItem.setMinStock(10);
         testItem.setActive(true);
+        testItem.setBarcode("ITEM-TEST-CRASH-" + System.nanoTime());
         testItem = itemRepository.save(testItem);
 
         // Создаём остаток и партию вручную (чтобы FEFO могла работать)

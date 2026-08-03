@@ -199,6 +199,6 @@ public class StockMovementServiceIntegrationTest extends AbstractIntegrationTest
 
         return itemService.createItem(
                 new CreateItemRequest("SKU-001-" + System.currentTimeMillis(), "Test item", categoryName, 10,
-                        BigDecimal.valueOf(100), BigDecimal.valueOf(70)));
+                        BigDecimal.valueOf(100), BigDecimal.valueOf(70), null));
     }
 }

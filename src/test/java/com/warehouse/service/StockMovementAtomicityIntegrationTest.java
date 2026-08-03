@@ -90,6 +90,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         testItem.setCategory(category);
         testItem.setMinStock(10);
         testItem.setActive(true);
+        testItem.setBarcode("ITEM-TEST-ATOM-" + System.nanoTime());
         testItem = itemRepository.save(testItem);
 
         // Создаём остаток и партию
