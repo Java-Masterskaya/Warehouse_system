@@ -83,7 +83,7 @@ public class CategoryServiceImpl implements CategoryService {
         var state = circuitBreakerRegistry
                 .circuitBreaker("categoryCache")
                 .getState();
-        log.warn("categoryCache call failed (breaker stete = {}), fallback to DB. Error: {}",
+        log.warn("categoryCache call failed (breaker state = {}), fallback to DB. Error: {}",
                 state, t.getMessage());
         return categoryRepository.findAllByOrderByNameAsc()
                 .stream()
