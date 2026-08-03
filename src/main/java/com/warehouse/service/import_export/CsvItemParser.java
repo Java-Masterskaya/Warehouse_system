@@ -11,6 +11,7 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.input.BOMInputStream;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
@@ -30,8 +31,18 @@ public class CsvItemParser {
 
     public Iterable<CsvChunk> parseInChunks(InputStream inputStream) {
         return () -> new Iterator<>() {
-//         todo 'BOMInputStream(java.io.InputStream)' is deprecated
-            private final BOMInputStream      bomInputStream = new BOMInputStream(inputStream);
+            private final BOMInputStream      bomInputStream;
+
+            {
+                try {
+                    bomInputStream = BOMInputStream.builder()
+                                                           .setInputStream(inputStream)
+                                                           .get();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
             private final InputStreamReader   reader         = new InputStreamReader(bomInputStream, StandardCharsets.UTF_8);
             private final CSVParser           csvParser;
             private final Iterator<CSVRecord> recordIterator;
