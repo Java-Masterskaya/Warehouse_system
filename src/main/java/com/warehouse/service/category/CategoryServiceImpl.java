@@ -10,6 +10,8 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.mapper.CategoryMapper;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -29,6 +31,7 @@ public class CategoryServiceImpl implements CategoryService {
     private final CategoryRepository categoryRepository;
     private final ItemRepository itemRepository;
     private final CategoryMapper categoryMapper;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     @Transactional
@@ -60,6 +63,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "categories")
+    @CircuitBreaker(name = "categoryCache", fallbackMethod = "getCategoriesFallback")
     public List<CategoryResponse> getCategories() {
         log.debug("Getting all categories");
 
@@ -72,6 +76,19 @@ public class CategoryServiceImpl implements CategoryService {
         log.info("Found {} categories", categories.size());
 
         return categories;
+    }
+
+    @SuppressWarnings("unused")
+    public List<CategoryResponse> getCategoriesFallback(Throwable t) {
+        var state = circuitBreakerRegistry
+                .circuitBreaker("categoryCache")
+                .getState();
+        log.warn("categoryCache call failed (breaker state = {}), fallback to DB. Error: {}",
+                state, t.getMessage());
+        return categoryRepository.findAllByOrderByNameAsc()
+                .stream()
+                .map(categoryMapper::toResponse)
+                .toList();
     }
 
     @Override

@@ -21,6 +21,10 @@ spring:
     postgresql:
       transactional-lock: false
 
+  data:
+    redis:
+      timeout: 500ms
+
   kafka:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -99,6 +103,29 @@ app:
     cleanup-cron: "0 0 * * * *"  # Каждый час
     enforce-after: 2026-08-26
 
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      itemCache:
+        base-config: default
+        ignore-exceptions:
+          - com.warehouse.exception.EntityNotFoundException
+      categoryCache:
+        base-config: default
+        ignore-exceptions:
+          - com.warehouse.exception.EntityNotFoundException
+      kafkaProducer:
+        base-config: default
+        wait-duration-in-open-state: 10s
+
 management:
   server:
     port: 8081 # Выделенный порт для Actuator (будет закрыт от внешних пользователей)
@@ -129,6 +156,8 @@ management:
     livenessstate:
       enabled: true
     readinessstate:
+      enabled: true
+    circuitbreakers:
       enabled: true
   metrics:
     tags:

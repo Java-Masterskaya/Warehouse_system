@@ -26,6 +26,8 @@ import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import com.warehouse.specification.ItemSpecification;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -52,6 +54,7 @@ public class ItemServiceImpl implements ItemService {
     private final AuditContext auditContext;
     private final StockAvailabilityService availabilityService;
     private final CategoryRepository categoryRepository;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final ItemBarcodeGeneratorService barcodeGenerator;
 
     @Transactional
@@ -190,26 +193,20 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "item", key = "#itemId")
+    @CircuitBreaker(name = "itemCache", fallbackMethod = "getItemFallback")
     public ItemDetailsResponse getItem(Long itemId) {
         log.debug("Getting item with id '{}'", itemId);
-        ItemDetailsProjection item = itemRepository.findWithStock(itemId)
-                .orElseThrow(() -> {
-                    log.warn("Item not found: id={}", itemId);
-                    return new EntityNotFoundException("Товар не найден");
-                });
+        return getItemFromDb(itemId);
+    }
 
-        if (!item.active()) {
-            log.warn("Item inactive: id={}", itemId);
-            throw new EntityNotFoundException("Товар неактивен");
-        }
-        long reserved = availabilityService.getTotalReserved(itemId);
-        long available = availabilityService.getTotalAvailable(itemId);
-
-        List<WarehouseStockResponse> warehouseStocks = stockRepository.findAllByItemIdWithWarehouse(itemId).stream()
-                .map(this::toWarehouseStockResponse)
-                .toList();
-
-        return itemMapper.mapProjectionToDetailsResponse(item, available, reserved, warehouseStocks);
+    @SuppressWarnings("unused")
+    public ItemDetailsResponse getItemFallback(Long itemId, Throwable t) {
+        var state = circuitBreakerRegistry
+                .circuitBreaker("itemCache")
+                .getState();
+        log.warn("itemCache call failed (breaker state = {}), fallback to DB. Error: {}",
+                state, t.getMessage());
+        return getItemFromDb(itemId);
     }
 
     @Transactional
@@ -265,5 +262,25 @@ public class ItemServiceImpl implements ItemService {
                 reserved,
                 availabilityService.getAvailable(stock)
         );
+    }
+
+    private ItemDetailsResponse getItemFromDb(Long itemId) {
+        ItemDetailsProjection item = itemRepository.findWithStock(itemId)
+                .orElseThrow(() -> {
+                    log.warn("Item not found: id={}", itemId);
+                    return new EntityNotFoundException("Товар не найден");
+                });
+        if (!item.active()) {
+            log.warn("Item inactive: id={}", itemId);
+            throw new EntityNotFoundException("Товар неактивен");
+        }
+        long reserved = availabilityService.getTotalReserved(itemId);
+        long available = availabilityService.getTotalAvailable(itemId);
+
+        List<WarehouseStockResponse> warehouseStocks = stockRepository.findAllByItemIdWithWarehouse(itemId).stream()
+                .map(this::toWarehouseStockResponse)
+                .toList();
+
+        return itemMapper.mapProjectionToDetailsResponse(item, available, reserved, warehouseStocks);
     }
 }
