@@ -10,9 +10,8 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const APP_USERNAME = __ENV.APP_USERNAME || 'admin';
 const APP_PASSWORD = __ENV.APP_PASSWORD || 'secret';
 
-// load/seed.sh не хардкодит пароль VU-пользователей — генерирует случайный на
-// запуск и сохраняет в load/.vu-password (в git не попадает). Читаем его отсюда
-// по умолчанию, чтобы не передавать пароль руками между seed.sh и k6 run.
+// Пароль VU-пользователей из load/.vu-password (генерирует seed.sh, в git не попадает) —
+// так не нужно передавать его руками между seed.sh и k6 run.
 function readSeedPassword() {
     try {
         return open('./.vu-password').trim();
@@ -21,9 +20,8 @@ function readSeedPassword() {
     }
 }
 
-// Каждый VU логинится под своим пользователем (loadtest-vu-N, см. load/seed.sh) —
-// иначе весь трафик записи считается за одного 'admin' и упирается в rate-limit
-// на /api/movements (rate-limiting.movements.username в application.yml).
+// Каждый VU — свой пользователь (loadtest-vu-N, см. seed.sh), иначе весь трафик
+// записи считается за одного 'admin' и упирается в rate-limit на /api/movements.
 const VU_PASSWORD = __ENV.VU_PASSWORD || readSeedPassword() || 'LoadTest123!';
 const MAX_VUS = Number(__ENV.MAX_VUS || 50);
 // Та же категория, что создаёт load/seed.sh — teardown() трогает только эти товары,
@@ -54,6 +52,7 @@ export const options = {
 const listDuration = new Trend('list_items_duration');
 const detailDuration = new Trend('item_detail_duration');
 const historyDuration = new Trend('history_duration');
+const searchDuration = new Trend('search_items_duration');
 const receiveThrottled = new Rate('receive_throttled_rate');
 const writeOffThrottled = new Rate('writeoff_throttled_rate');
 
@@ -150,6 +149,17 @@ export default function (data) {
         const res = http.get(`${BASE_URL}/api/items?page=0&size=20`, vuHeaders(token, okStatus));
         listDuration.add(res.timings.duration);
         check(res, { 'list: 200': (r) => r.status === 200 });
+    });
+    sleep(0.3);
+
+    group('search items', () => {
+        const searchTerm = `Item ${Math.floor(Math.random() * itemIds.length) + 1}`;
+        const res = http.get(
+            `${BASE_URL}/api/items?page=0&size=20&search=${encodeURIComponent(searchTerm)}`,
+            vuHeaders(token, okStatus)
+        );
+        searchDuration.add(res.timings.duration);
+        check(res, { 'search: 200': (r) => r.status === 200 });
     });
     sleep(0.3);
 
