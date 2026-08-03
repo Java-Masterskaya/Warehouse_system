@@ -7,9 +7,9 @@ import com.warehouse.entity.Category;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.WarehouseRepository;
+import com.warehouse.service.import_export.ChunkService;
 import com.warehouse.service.import_export.CsvImportServiceImpl;
 import com.warehouse.service.import_export.CsvItemParser;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,7 +17,6 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.InputStream;
@@ -29,7 +28,6 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,10 +42,7 @@ class CsvImportServiceTest {
     private ItemRepository itemRepository;
 
     @Mock
-    private EntityManager entityManager;
-
-    @Mock
-    private JdbcTemplate jdbcTemplate;
+    private ChunkService chunkService;
 
     @Mock
     private CategoryRepository categoryRepository;
@@ -89,29 +84,15 @@ class CsvImportServiceTest {
                 category1,
                 category2));
 
-        // Настраиваем мок JdbcTemplate для запроса выборки ID по SKU (возвращаем маппинг)
-        when(jdbcTemplate.query(anyString(),
-                any(org.springframework.jdbc.core.PreparedStatementSetter.class),
-                any(org.springframework.jdbc.core.ResultSetExtractor.class)))
-                .thenAnswer(invocation -> {
-                    var rse = (org.springframework.jdbc.core.ResultSetExtractor<?>) invocation.getArgument(2);
-                    return java.util.Map.of("SKU-001", 10L, "SKU-002", 11L);
-                });
-
         ItemImportResultDto result = csvImportService.importItems(multipartFile);
 
         assertThat(result.totalRows()).isEqualTo(2);
         assertThat(result.imported()).isEqualTo(2);
         assertThat(result.errors()).isEmpty();
 
-        verify(jdbcTemplate).batchUpdate(
-                org.mockito.ArgumentMatchers.contains("INSERT INTO items"),
-                ArgumentMatchers.<List<Object[]>>any()
-        );
-
-        verify(jdbcTemplate).batchUpdate(
-                org.mockito.ArgumentMatchers.contains("INSERT INTO stocks"),
-                ArgumentMatchers.<List<Object[]>>any()
+        verify(chunkService).saveInBatches(
+                ArgumentMatchers.eq(List.of(row1, row2)),
+                any()
         );
     }
 
@@ -124,8 +105,7 @@ class CsvImportServiceTest {
                                                                          .hasMessageContaining("не может быть пустым");
 
         verify(csvItemParser, never()).parseInChunks(any());
-        verify(itemRepository, never()).saveAll(any());
-        verify(jdbcTemplate, never()).batchUpdate(anyString(), ArgumentMatchers.<List<Object[]>>any());
+        verify(chunkService, never()).saveInBatches(any(), any());
     }
 
     @Test
@@ -138,7 +118,7 @@ class CsvImportServiceTest {
                                                                        .hasMessageContaining("CSV");
 
         verify(csvItemParser, never()).parseInChunks(any());
-        verify(jdbcTemplate, never()).batchUpdate(anyString(), ArgumentMatchers.<List<Object[]>>any());
+        verify(chunkService, never()).saveInBatches(any(), any());
     }
 
     @Test
@@ -164,11 +144,6 @@ class CsvImportServiceTest {
         when(itemRepository.findAllSkusIn(any())).thenReturn(List.of("SKU-EXISTS"));
         when(categoryRepository.findAllByNameIgnoreCaseIn(any())).thenReturn(List.of(existingCategory));
 
-        when(jdbcTemplate.query(anyString(),
-                any(org.springframework.jdbc.core.PreparedStatementSetter.class),
-                any(org.springframework.jdbc.core.ResultSetExtractor.class)))
-                .thenReturn(java.util.Map.of("SKU-NEW", 1L));
-
         ItemImportResultDto result = csvImportService.importItems(file);
 
         assertThat(result.totalRows()).isEqualTo(3);
@@ -185,14 +160,9 @@ class CsvImportServiceTest {
         assertThat(categoryError.sku()).isEqualTo("SKU-ANOTHER");
         assertThat(categoryError.errorMessage()).contains("Category with name Неизвестная not found");
 
-        verify(jdbcTemplate).batchUpdate(
-                org.mockito.ArgumentMatchers.contains("INSERT INTO items"),
-                ArgumentMatchers.<List<Object[]>>any()
-        );
-
-        verify(jdbcTemplate).batchUpdate(
-                org.mockito.ArgumentMatchers.contains("INSERT INTO stocks"),
-                ArgumentMatchers.<List<Object[]>>any()
+        verify(chunkService).saveInBatches(
+                ArgumentMatchers.eq(List.of(row1)),
+                any()
         );
     }
 

@@ -1,7 +1,6 @@
 package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
-import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
@@ -36,13 +35,13 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     private CsvImportService csvImportService;
 
     @Autowired
-    private ItemRepository itemRepository;
+    private ItemRepository          itemRepository;
     @Autowired
     private StockMovementRepository movementRepository;
     @Autowired
-    private StockReserveRepository reserveRepository;
+    private StockReserveRepository  reserveRepository;
     @Autowired
-    private StockRepository stockRepository;
+    private StockRepository         stockRepository;
 
     @Autowired
     private CsvItemParser csvItemParser;
@@ -68,7 +67,8 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     void shouldCreateEmptyStockForImportedItems() {
 
         String csvContent = "Name,Category,SKU,Price,Cost\nЧайник,Категория,TEST-SKU-999,3000.00,2000.00";
-        MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", csvContent.getBytes());
+        MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv",
+                csvContent.getBytes());
 
         ItemImportResultDto result = csvImportService.importItems(file);
 
@@ -148,11 +148,11 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(itemRepository.existsBySku("SKU-invalid")).isFalse();
     }
 
-    private Category createCategory(){
+    private Category createCategory() {
         return categoryRepository.findByNameIgnoreCase("Категория").orElseGet(() -> {
-                    Category category = new Category();
-                    category.setName("Категория");
-                    return categoryRepository.saveAndFlush(category);
+            Category category = new Category();
+            category.setName("Категория");
+            return categoryRepository.saveAndFlush(category);
         });
     }
 }

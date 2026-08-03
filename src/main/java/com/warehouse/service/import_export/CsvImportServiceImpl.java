@@ -5,22 +5,16 @@ import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
-import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.WarehouseRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,10 +27,10 @@ import java.util.stream.Collectors;
 public class CsvImportServiceImpl implements CsvImportService {
 
     private final CsvItemParser csvItemParser;
-    private final ChunkService chunkService;
+    private final ChunkService  chunkService;
 
-    private final ItemRepository      itemRepository;
-    private final CategoryRepository  categoryRepository;
+    private final ItemRepository     itemRepository;
+    private final CategoryRepository categoryRepository;
 
     @Override
     public ItemImportResultDto importItems(MultipartFile file) {
@@ -75,7 +69,7 @@ public class CsvImportServiceImpl implements CsvImportService {
                                                                               (existing, replacement) -> existing
                                                                       ));
 
-                List<Item> itemsToSave = new ArrayList<>();
+                List<CsvItemParser.ValidRowHolder> validHoldersToSave = new ArrayList<>();
 
                 for (CsvItemParser.ValidRowHolder holder : candidateRows) {
                     ItemImportRowDto dto = holder.dto();
@@ -93,13 +87,12 @@ public class CsvImportServiceImpl implements CsvImportService {
                         continue;
                     }
 
-                    Item item = mapDtoToEntity(dto, category);
-                    itemsToSave.add(item);
+                    validHoldersToSave.add(holder);
                 }
 
-                if (!itemsToSave.isEmpty()) {
-                    chunkService.saveInBatches(itemsToSave);
-                    totalImported += itemsToSave.size();
+                if (!validHoldersToSave.isEmpty()) {
+                    chunkService.saveInBatches(validHoldersToSave, allErrors);
+                    totalImported += validHoldersToSave.size();
                 }
             }
             log.info("Успешно импортировано {} товаров из CSV", totalImported);
