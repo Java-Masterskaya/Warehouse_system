@@ -25,7 +25,7 @@ import java.util.Set;
 public class CsvItemParser {
 
     private final        Validator   validator;
-    private static final int         CHUNK_SIZE       = 1000;
+    private static final int         CHUNK_SIZE       = 500;
 
     public Iterable<CsvChunk> parseInChunks(InputStream inputStream) {
         return () -> new Iterator<>() {

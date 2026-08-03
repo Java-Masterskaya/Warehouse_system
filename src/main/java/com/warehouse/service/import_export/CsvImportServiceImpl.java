@@ -33,18 +33,12 @@ import java.util.stream.Collectors;
 public class CsvImportServiceImpl implements CsvImportService {
 
     private final CsvItemParser csvItemParser;
-    private final JdbcTemplate  jdbcTemplate;
+    private final ChunkService chunkService;
 
     private final ItemRepository      itemRepository;
     private final CategoryRepository  categoryRepository;
-    private final WarehouseRepository warehouseRepository;
-
-    private static final int BATCH_SIZE = 500;
-
-    private final EntityManager entityManager;
 
     @Override
-    @Transactional
     public ItemImportResultDto importItems(MultipartFile file) {
 
         validateFile(file);
@@ -104,7 +98,7 @@ public class CsvImportServiceImpl implements CsvImportService {
                 }
 
                 if (!itemsToSave.isEmpty()) {
-                    saveInBatches(itemsToSave);
+                    chunkService.saveInBatches(itemsToSave);
                     totalImported += itemsToSave.size();
                 }
             }
@@ -113,66 +107,6 @@ public class CsvImportServiceImpl implements CsvImportService {
 
         } catch (IOException e) {
             throw new RuntimeException("Ошибка чтения файла при импорте", e);
-        }
-    }
-
-    private void saveInBatches(List<Item> items) {
-        if (items.isEmpty()) {
-            return;
-        }
-
-        String insertItemsSql = """
-                    INSERT INTO items (sku, name, category_id, price, cost)
-                    VALUES (?, ?, ?, ?, ?)
-                """;
-
-        List<Object[]> itemArgs = items.stream()
-                                       .map(item -> new Object[]{
-                                               item.getSku(),
-                                               item.getName(),
-                                               item.getCategory().getId(),
-                                               item.getPrice(),
-                                               item.getCost()
-                                       })
-                                       .toList();
-
-        jdbcTemplate.batchUpdate(insertItemsSql, itemArgs);
-
-        List<String> skus = items.stream().map(Item::getSku).toList();
-        String placeholders = String.join(",", skus.stream().map(s -> "?").toList());
-        String selectIdsSql = "SELECT id, sku FROM items WHERE sku IN (" + placeholders + ")";
-
-        Map<String, Long> skuToIdMap = jdbcTemplate.query(
-                selectIdsSql,
-                ps -> {
-                    for (int i = 0; i < skus.size(); i++) {
-                        ps.setString(i + 1, skus.get(i));
-                    }
-                },
-                rs -> {
-                    Map<String, Long> map = new HashMap<>();
-                    while (rs.next()) {
-                        map.put(rs.getString("sku"), rs.getLong("id"));
-                    }
-                    return map;
-                }
-        );
-
-        String insertStockSql = """
-                    INSERT INTO stock (item_id, quantity, warehouse_id)
-                    VALUES (?, 0, ?)
-                """;
-
-        Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
-                                                        .orElseThrow(() -> new IllegalStateException(
-                                                                "Default warehouse is not configured"));
-
-        List<Object[]> stockArgs = skuToIdMap.values().stream()
-                                             .map(itemId -> new Object[]{itemId, defaultWarehouse.getId()})
-                                             .toList();
-
-        if (!stockArgs.isEmpty()) {
-            jdbcTemplate.batchUpdate(insertStockSql, stockArgs);
         }
     }
 
