@@ -155,14 +155,7 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
                                                                                                     .defaultWarehouse(
                                                                                                             false)
                                                                                                     .build()));
-        User user = userRepository.save(
-                User.builder()
-                    .username("Name")
-                    .password("pass")
-                    .role(Role.ROLE_ADMIN)
-                    .active(true)
-                    .createdAt(LocalDateTime.now())
-                    .build());
+        User user = getUser();
 
         for (int i = 1; i <= records; i++) {
             MovementType type;
@@ -187,5 +180,16 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
                                                          time)
                                                  .build());
         }
+    }
+
+    private User getUser() {
+        return userRepository.findByUsername("Name").orElseGet(() -> userRepository.save(
+                User.builder()
+                    .username("Name")
+                    .password("pass")
+                    .role(Role.ROLE_ADMIN)
+                    .active(true)
+                    .createdAt(LocalDateTime.now())
+                    .build()));
     }
 }

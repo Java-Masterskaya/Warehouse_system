@@ -54,9 +54,7 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         movementRepository.deleteAll();
         reserveRepository.deleteAll();
         stockRepository.deleteAll();
-
         itemRepository.deleteAll();
-
         categoryRepository.deleteAll();
 
         createCategory();

@@ -44,12 +44,10 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
     void exportItemsWhenAdminShouldReturnCsvStream()
             throws Exception {
         fillDb(1);
-        // 1. Выполняем асинхронный запрос
         MvcResult mvcResult = mockMvc.perform(get("/api/items/export")).andExpect(
                                              request().asyncStarted()) // Проверяем, что запустился асинхронный стриминг
                                      .andReturn();
 
-        // 2. Дожидаемся завершения асинхронного потока и проверяем результат
         MvcResult dispatched = mockMvc.perform(asyncDispatch(mvcResult))
                                       .andExpect(status().isOk())
                                       .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8"))
