@@ -7,15 +7,18 @@ import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.service.import_export.CsvImportService;
 import com.warehouse.service.import_export.CsvItemParser;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -25,7 +28,6 @@ import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-@Transactional
 public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private CategoryRepository categoryRepository;
@@ -35,6 +37,12 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ItemRepository itemRepository;
+    @Autowired
+    private StockMovementRepository movementRepository;
+    @Autowired
+    private StockReserveRepository reserveRepository;
+    @Autowired
+    private StockRepository stockRepository;
 
     @Autowired
     private CsvItemParser csvItemParser;
@@ -42,15 +50,24 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Test
-    @DisplayName("Интеграционный тест: у новых импортированных товаров автоматически создается пустой сток в БД")
-    @Transactional
-    void shouldCreateEmptyStockForImportedItems() {
-        Category category = new Category();
-        category.setName("Бытовая техника");
-        Category savedCategory = categoryRepository.save(category);
+    @BeforeEach
+    void setUp() {
+        movementRepository.deleteAll();
+        reserveRepository.deleteAll();
+        stockRepository.deleteAll();
 
-        String csvContent = "Name,Category,SKU,Price,Cost\nЧайник,Бытовая техника,TEST-SKU-999,3000.00,2000.00";
+        itemRepository.deleteAll();
+
+        categoryRepository.deleteAll();
+
+        createCategory();
+    }
+
+    @Test
+    @DisplayName("У новых импортированных товаров автоматически создается пустой сток в БД")
+    void shouldCreateEmptyStockForImportedItems() {
+
+        String csvContent = "Name,Category,SKU,Price,Cost\nЧайник,Категория,TEST-SKU-999,3000.00,2000.00";
         MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", csvContent.getBytes());
 
         ItemImportResultDto result = csvImportService.importItems(file);
@@ -91,11 +108,8 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Одна невалидная строка не должна откатывать всю транзакцию")
-    void shouldRolldownImpostIfInvalidRowInChunk() {
-        Category category = new Category();
-        category.setName("Категория");
-        categoryRepository.saveAndFlush(category);
+    @DisplayName("Импорт продолжает работу и собирает ошибки, если часть строк не прошла валидацию")
+    void shouldCollectErrorsAndImportValidRowsWhenSomeRowsAreInvalid() {
 
         StringBuilder csvBuilder = new StringBuilder("SKU,Name,Category,Price,Cost\n");
 
@@ -121,12 +135,6 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
 
         ItemImportResultDto result = csvImportService.importItems(multipartFile);
 
-        System.out.println("====================Ошибки===================");
-        for (ItemImportErrorDto error : result.errors()) {
-            System.out.println(error);
-        }
-        System.out.println("=============================================");
-
         assertThat(result).isNotNull();
 
         assertThat(result.failed()).isEqualTo(1);
@@ -138,5 +146,13 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(savedCountInDb).isEqualTo(2500);
 
         assertThat(itemRepository.existsBySku("SKU-invalid")).isFalse();
+    }
+
+    private Category createCategory(){
+        return categoryRepository.findByNameIgnoreCase("Категория").orElseGet(() -> {
+                    Category category = new Category();
+                    category.setName("Категория");
+                    return categoryRepository.saveAndFlush(category);
+        });
     }
 }
