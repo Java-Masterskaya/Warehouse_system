@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { check, group, sleep } from 'k6';
-import { Trend } from 'k6/metrics';
+import { Trend, Rate } from 'k6/metrics';
 
 // LOAD-1: логин -> список товаров -> карточка -> история -> приход -> списание.
 // Запуск: BASE_URL=... APP_USERNAME=... APP_PASSWORD=... k6 run load/warehouse.js
@@ -9,11 +9,26 @@ import { Trend } from 'k6/metrics';
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const APP_USERNAME = __ENV.APP_USERNAME || 'admin';
 const APP_PASSWORD = __ENV.APP_PASSWORD || 'secret';
+
+// load/seed.sh не хардкодит пароль VU-пользователей — генерирует случайный на
+// запуск и сохраняет в load/.vu-password (в git не попадает). Читаем его отсюда
+// по умолчанию, чтобы не передавать пароль руками между seed.sh и k6 run.
+function readSeedPassword() {
+    try {
+        return open('./.vu-password').trim();
+    } catch (e) {
+        return null;
+    }
+}
+
 // Каждый VU логинится под своим пользователем (loadtest-vu-N, см. load/seed.sh) —
 // иначе весь трафик записи считается за одного 'admin' и упирается в rate-limit
 // на /api/movements (rate-limiting.movements.username в application.yml).
-const VU_PASSWORD = __ENV.VU_PASSWORD || 'LoadTest123!';
+const VU_PASSWORD = __ENV.VU_PASSWORD || readSeedPassword() || 'LoadTest123!';
 const MAX_VUS = Number(__ENV.MAX_VUS || 50);
+// Та же категория, что создаёт load/seed.sh — teardown() трогает только эти товары,
+// а не первые попавшиеся в базе (важно на общем стенде с реальными данными).
+const LOAD_TEST_CATEGORY = 'LOAD-TEST';
 
 const okStatus = http.expectedStatuses(200);
 const receiveStatus = http.expectedStatuses(200, 409, 429);
@@ -31,12 +46,16 @@ export const options = {
         history_duration: ['p(95)<50'],
         http_req_duration: ['p(95)<100'],
         http_req_failed: ['rate<0.01'],
+        receive_throttled_rate: ['rate<0.15'],
+        writeoff_throttled_rate: ['rate<0.15'],
     },
 };
 
 const listDuration = new Trend('list_items_duration');
 const detailDuration = new Trend('item_detail_duration');
 const historyDuration = new Trend('history_duration');
+const receiveThrottled = new Rate('receive_throttled_rate');
+const writeOffThrottled = new Rate('writeoff_throttled_rate');
 
 function authHeaders(token) {
     return { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } };
@@ -49,15 +68,16 @@ function fakeIp(slot) {
     return `10.0.${Math.floor(slot / 250)}.${(slot % 250) + 1}`;
 }
 
-function vuHeaders(token, responseCallback) {
-    return {
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'X-Forwarded-For': fakeIp(__VU),
-        },
-        responseCallback,
+function vuHeaders(token, responseCallback, idempotencyKey) {
+    const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-Forwarded-For': fakeIp(__VU),
     };
+    if (idempotencyKey) {
+        headers['Idempotency-Key'] = idempotencyKey;
+    }
+    return { headers, responseCallback };
 }
 
 function futureIsoDate(daysAhead) {
@@ -77,12 +97,17 @@ export function setup() {
         throw new Error('Логин не вернул accessToken — проверь APP_USERNAME/APP_PASSWORD/BASE_URL');
     }
 
-    const itemsRes = http.get(`${BASE_URL}/api/items?page=0&size=50`, authHeaders(adminToken));
+    const itemsRes = http.get(
+        `${BASE_URL}/api/items?page=0&size=50&category=${LOAD_TEST_CATEGORY}`,
+        authHeaders(adminToken)
+    );
     check(itemsRes, { 'setup items: 200': (r) => r.status === 200 });
 
     const itemIds = (itemsRes.json('content') || []).map((item) => item.id);
     if (itemIds.length === 0) {
-        throw new Error('Нет товаров для теста — засиди данные перед прогоном (см. LOAD-1: сидинг)');
+        throw new Error(
+            `Нет товаров категории ${LOAD_TEST_CATEGORY} для теста — засиди данные перед прогоном (см. load/seed.sh)`
+        );
     }
 
     // Логиним всех VU-пользователей заранее, здесь, один раз — не полагаемся на то,
@@ -104,11 +129,16 @@ export function setup() {
         tokensByVu[v] = token;
     }
 
-    return { itemIds, tokensByVu, adminToken };
+    // Один на весь прогон — общий для всех VU (передаётся через data), чтобы повторный
+    // запуск теста не попадал в TTL уже использованных Idempotency-Key прошлого прогона
+    // (app.idempotency.ttl-hours в application.yml).
+    const runId = __ENV.RUN_ID || Date.now().toString();
+
+    return { itemIds, tokensByVu, adminToken, runId };
 }
 
 export default function (data) {
-    const { itemIds, tokensByVu } = data;
+    const { itemIds, tokensByVu, runId } = data;
     const token = tokensByVu[__VU];
 
     const randomItemId = itemIds[Math.floor(Math.random() * itemIds.length)];
@@ -141,11 +171,13 @@ export default function (data) {
     sleep(0.3);
 
     group('receive', () => {
+        const idempotencyKey = `${runId}-vu${__VU}-iter${__ITER}-receive`;
         const res = http.post(
             `${BASE_URL}/api/movements/receive`,
             JSON.stringify({ itemId: myItemId, quantity: 20, expiryDate: futureIsoDate(30) }),
-            vuHeaders(token, receiveStatus)
+            vuHeaders(token, receiveStatus, idempotencyKey)
         );
+        receiveThrottled.add(res.status === 429);
         check(res, {
             'receive: 200, 409 or 429': (r) => r.status === 200 || r.status === 409 || r.status === 429,
         });
@@ -153,11 +185,13 @@ export default function (data) {
     sleep(0.3);
 
     group('write-off', () => {
+        const idempotencyKey = `${runId}-vu${__VU}-iter${__ITER}-writeoff`;
         const res = http.post(
             `${BASE_URL}/api/movements/write-off`,
             JSON.stringify({ itemId: myItemId, quantity: 5 }),
-            vuHeaders(token, writeOffStatus)
+            vuHeaders(token, writeOffStatus, idempotencyKey)
         );
+        writeOffThrottled.add(res.status === 429);
         check(res, {
             'write-off: 200, 409, 422 or 429': (r) =>
                 r.status === 200 || r.status === 409 || r.status === 422 || r.status === 429,
