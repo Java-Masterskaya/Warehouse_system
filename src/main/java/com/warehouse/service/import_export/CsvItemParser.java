@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -31,7 +32,7 @@ public class CsvItemParser {
         return () -> new Iterator<>() {
 //         todo 'BOMInputStream(java.io.InputStream)' is deprecated
             private final BOMInputStream      bomInputStream = new BOMInputStream(inputStream);
-            private final InputStreamReader   reader         = new InputStreamReader(bomInputStream);
+            private final InputStreamReader   reader         = new InputStreamReader(bomInputStream, StandardCharsets.UTF_8);
             private final CSVParser           csvParser;
             private final Iterator<CSVRecord> recordIterator;
 
