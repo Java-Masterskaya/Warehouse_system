@@ -215,10 +215,14 @@ export function teardown(data) {
     const headers = authHeaders(adminToken);
 
     for (const itemId of itemIds) {
-        http.post(
+        const res = http.post(
             `${BASE_URL}/api/inventory/stocktake`,
             JSON.stringify({ itemId, countedQuantity: 100, surplusExpiryDate: futureIsoDate(30) }),
             headers
         );
+        check(res, { 'teardown stocktake: 200': (r) => r.status === 200 });
+        if (res.status !== 200) {
+            console.error(`Stocktake failed for item ${itemId}: ${res.status}`);
+        }
     }
 }
