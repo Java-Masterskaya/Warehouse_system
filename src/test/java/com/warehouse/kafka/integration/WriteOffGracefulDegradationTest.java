@@ -153,17 +153,15 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
     void shouldSaveOutboxEventsAndOpenCircuitBreakerWhenKafkaIsDown() {
         UserContext ctx = new UserContext(testUser.getId(), testUser.getUsername());
 
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 10; i++) {
             WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 1);
             StockMovementResponse response = stockMovementService.writeOffReceipt(request, ctx);
             assertThat(response.lowStockAlert()).isTrue();
         }
 
         List<OutboxEvent> pendingEvents = outboxEventRepository.findAll();
-        assertThat(pendingEvents).hasSize(7);
+        assertThat(pendingEvents).hasSize(10);
         pendingEvents.forEach(event -> assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING));
-
-        outboxEventRelay.relayPendingEvents();
 
         CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("kafkaProducer");
         Awaitility.await()
@@ -173,8 +171,10 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
                 assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN)
             );
 
+        outboxEventRelay.relayPendingEvents();
+
         List<OutboxEvent> updatedEvents = outboxEventRepository.findAll();
-        assertThat(updatedEvents).hasSize(7);
+        assertThat(updatedEvents).hasSize(10);
         updatedEvents.forEach(event ->
                 assertThat(event.getStatus()).isIn(OutboxStatus.FAILED, OutboxStatus.PENDING)
         );
