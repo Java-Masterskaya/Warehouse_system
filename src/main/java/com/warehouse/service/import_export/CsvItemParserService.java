@@ -23,7 +23,7 @@ import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
-public class CsvItemParser {
+public class CsvItemParserService {
 
     private final        Validator validator;
     private static final int       CHUNK_SIZE = 500;

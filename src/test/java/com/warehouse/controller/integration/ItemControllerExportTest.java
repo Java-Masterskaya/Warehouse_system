@@ -2,6 +2,7 @@ package com.warehouse.controller.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.entity.Category;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.PurchaseOrderItemRepository;
@@ -70,6 +71,9 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
     private PurchaseOrderItemRepository purchaseOrderItemRepository;
 
     @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
@@ -78,18 +82,11 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
         purchaseOrderItemRepository.deleteAll();
         purchaseOrderRepository.deleteAll();
         stockAlertRepository.deleteAll();
-        // 1. Сначала удаляем движения (они ссылаются на товары и склады)
         movementRepository.deleteAll();
-
-        // 2. Затем удаляем остатки (они ссылаются на товары)
+        batchRepository.deleteAll();
         stockRepository.deleteAll();
-
-        // 3. Теперь можно безопасно удалить товары (они ссылаются на категории)
         itemRepository.deleteAll();
-
-        // 4. И в самом конце — категории и склады (родители)
         categoryRepository.deleteAll();
-        // warehouseRepository.deleteAll(); // если нужно
     }
 
     @Test
@@ -114,8 +111,8 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
         // Проверяем гибко: файл не пустой, содержит нужные заголовки и нашу добавленную строку
         assertThat(actualContent)
                 .isNotNull()
-                .contains("SKU,Name,Category,Quantity,Price") // заголовки на месте
-                .contains("SKU-1,Товар 1,Категория,0,100.00");  // наш товар гарантированно присутствует в выгрузке
+                .contains("SKU,Name,Category,Quantity,Price")
+                .contains("SKU-1,Товар 1,Категория,0,100.00");
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.warehouse.entity.Role;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.PurchaseOrderItemRepository;
@@ -69,7 +70,7 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
     private CsvExportService csvExportService;
 
     @Autowired
-    private StockAlertRepository    stockAlertRepository;
+    private StockAlertRepository stockAlertRepository;
 
     @Autowired
     private PurchaseOrderRepository purchaseOrderRepository;
@@ -77,25 +78,20 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
     @Autowired
     private PurchaseOrderItemRepository purchaseOrderItemRepository;
 
+    @Autowired
+    private BatchRepository batchRepository;
+
     @BeforeEach
     @AfterEach
     void clearDatabase() {
         purchaseOrderItemRepository.deleteAll();
         purchaseOrderRepository.deleteAll();
-
         stockAlertRepository.deleteAll();
-        // 1. Сначала удаляем движения (они ссылаются на товары и склады)
         movementRepository.deleteAll();
-
-        // 2. Затем удаляем остатки (они ссылаются на товары)
+        batchRepository.deleteAll();
         stockRepository.deleteAll();
-
-        // 3. Теперь можно безопасно удалить товары (они ссылаются на категории)
         itemRepository.deleteAll();
-
-        // 4. И в самом конце — категории и склады (родители)
         categoryRepository.deleteAll();
-        // warehouseRepository.deleteAll(); // если нужно
     }
 
     @Test

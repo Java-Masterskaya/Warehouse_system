@@ -5,6 +5,7 @@ import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.PurchaseOrderItemRepository;
@@ -63,6 +64,9 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private PurchaseOrderItemRepository purchaseOrderItemRepository;
 
+    @Autowired
+    private BatchRepository batchRepository;
+
     @BeforeEach
     @AfterEach
     void clearDatabase() {
@@ -70,6 +74,7 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         purchaseOrderRepository.deleteAll();
         stockAlertRepository.deleteAll();
         movementRepository.deleteAll();
+        batchRepository.deleteAll();
         stockRepository.deleteAll();
         itemRepository.deleteAll();
         categoryRepository.deleteAll();
