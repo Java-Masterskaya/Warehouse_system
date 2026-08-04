@@ -2,7 +2,6 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
-import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemImportResultDto;
@@ -31,8 +30,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,10 +58,10 @@ import java.util.List;
 @Validated
 public class ItemController {
 
-    private final ItemService itemService;
+    private final ItemService      itemService;
     private final CsvExportService csvExportService;
     private final CsvImportService csvImportService;
-    private final CategoryService categoryService;
+    private final CategoryService  categoryService;
 
     @Operation(summary = "Список товаров", description = "Постраничный список с фильтрацией и сортировкой")
     @GetMapping
@@ -73,9 +72,6 @@ public class ItemController {
             @RequestParam(defaultValue = "asc") String order,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
             @Parameter(schema = @Schema(
                     type = "integer",
                     format = "int32",
@@ -89,7 +85,8 @@ public class ItemController {
                     description = "Opaque keyset cursor. Supply an empty value to start cursor pagination.",
                     allowEmptyValue = true
             )
-            @RequestParam(required = false) String cursor) {
+            @RequestParam(required = false) String cursor
+    ) {
         if (cursor != null) {
             if (page != null) {
                 throw new InvalidCursorException();
