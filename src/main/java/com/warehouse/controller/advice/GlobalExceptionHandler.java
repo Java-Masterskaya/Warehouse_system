@@ -3,9 +3,11 @@ package com.warehouse.controller.advice;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.dto.response.error.FieldError;
 import com.warehouse.dto.response.error.ValidationErrorResponse;
+import com.warehouse.exception.ActiveTokenLimitExceededException;
 import com.warehouse.exception.BackfillAlreadyRunningException;
-import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.CategoryInUseException;
+import com.warehouse.exception.DltReprocessingInProgressException;
+import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateCategoryException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.DuplicateUsernameException;
@@ -22,6 +24,7 @@ import com.warehouse.exception.InvalidPurchaseOrderStatusException;
 import com.warehouse.exception.InvalidTokenException;
 import com.warehouse.exception.LastAdminDeactivationException;
 import com.warehouse.exception.PurchaseOrderOverReceiptException;
+import com.warehouse.exception.RefreshInProgressException;
 import com.warehouse.exception.ReservationException;
 import com.warehouse.exception.ReservedBarcodeFormatException;
 import com.warehouse.exception.SelfDeactivationException;
@@ -158,6 +161,12 @@ public class GlobalExceptionHandler {
         return new ErrorResponse("DUPLICATE_CATEGORY", ex.getMessage());
     }
 
+    @ExceptionHandler(DltReprocessingInProgressException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDltReprocessingInProgress(DltReprocessingInProgressException ex) {
+        return new ErrorResponse("DLT_REPROCESSING_IN_PROGRESS", ex.getMessage());
+    }
+
     @ExceptionHandler(BackfillAlreadyRunningException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleBackfillAlreadyRunning(BackfillAlreadyRunningException ex) {
@@ -225,6 +234,20 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleTokenReuseException(TokenReuseException ex) {
         log.warn("Token reuse detected: {}", ex.getMessage());
         return new ErrorResponse("TOKEN_REUSE", ex.getMessage());
+    }
+
+    @ExceptionHandler(RefreshInProgressException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleRefreshInProgressException(RefreshInProgressException ex) {
+        log.warn("Refresh token rotation is already in progress");
+        return new ErrorResponse("REFRESH_IN_PROGRESS", ex.getMessage());
+    }
+
+    @ExceptionHandler(ActiveTokenLimitExceededException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ErrorResponse handleActiveTokenLimitExceeded(ActiveTokenLimitExceededException ex) {
+        log.warn("Active token pair limit reached");
+        return new ErrorResponse("ACTIVE_TOKEN_LIMIT_EXCEEDED", ex.getMessage());
     }
 
     @ExceptionHandler(InvalidMovementRequestException.class)

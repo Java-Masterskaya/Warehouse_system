@@ -4,6 +4,7 @@ import com.warehouse.audit.dto.AuditEvent;
 import com.warehouse.audit.entity.AuditLogEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -39,6 +40,11 @@ public class AuditService {
     }
 
     @Scheduled(cron = "0 0 3 * * ?")
+    @SchedulerLock(
+            name = "cleanupOldAuditLogs",
+            lockAtLeastFor = "PT1M",
+            lockAtMostFor = "PT6H"
+    )
     public void cleanupOldAuditLogs() {
         log.info("Starting audit log retention cleanup (older than {} days)...", retentionDays);
         int totalDeleted = 0;
