@@ -178,4 +178,3 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isUnauthorized()); // Ошибка пароля, но НЕ 429!
     }
 }
-

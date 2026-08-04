@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.response.DltReprocessDetail;
 import com.warehouse.dto.response.DltReprocessResponse;
+import com.warehouse.exception.DltReprocessingInProgressException;
 import com.warehouse.kafka.config.KafkaTopicProperties;
-import lombok.RequiredArgsConstructor;
+import com.warehouse.lock.DistributedLock;
+import com.warehouse.lock.PostgresAdvisoryLockManager;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -19,10 +21,11 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -43,16 +46,18 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class DltReprocessingServiceImpl implements DltReprocessingService {
 
     private static final int MAX_EXCEPTION_MESSAGE_LENGTH = 200;
     private static final Duration POLL_TIMEOUT = Duration.ofSeconds(2);
     private static final int MAX_EMPTY_POLLS = 3;
+    private static final String REPROCESS_LOCK_NAME = "kafka-dlt-low-stock-reprocess";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final KafkaTopicProperties topicProperties;
     private final ObjectMapper objectMapper;
+    private final PostgresAdvisoryLockManager advisoryLockManager;
+    private final AsyncTaskExecutor applicationTaskExecutor;
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -63,9 +68,61 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
     @Value("${app.kafka.topics.low-stock.reprocess-send-timeout-sec:10}")
     private int sendTimeoutSec;
 
-    @Async
+    public DltReprocessingServiceImpl(
+            KafkaTemplate<String, Object> kafkaTemplate,
+            KafkaTopicProperties topicProperties,
+            ObjectMapper objectMapper,
+            PostgresAdvisoryLockManager advisoryLockManager,
+            @Qualifier("applicationTaskExecutor") AsyncTaskExecutor applicationTaskExecutor
+    ) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.topicProperties = topicProperties;
+        this.objectMapper = objectMapper;
+        this.advisoryLockManager = advisoryLockManager;
+        this.applicationTaskExecutor = applicationTaskExecutor;
+    }
+
     @Override
     public CompletableFuture<DltReprocessResponse> reprocessAllDltMessages() {
+        DistributedLock lock = advisoryLockManager.tryAcquire(REPROCESS_LOCK_NAME)
+                .orElseThrow(DltReprocessingInProgressException::new);
+        CompletableFuture<DltReprocessResponse> result = new CompletableFuture<>();
+
+        try {
+            applicationTaskExecutor.execute(() -> executeReprocessing(lock, result));
+        } catch (RuntimeException e) {
+            releaseAfterSchedulingFailure(lock, e);
+            throw e;
+        }
+
+        return result;
+    }
+
+    private void executeReprocessing(
+            DistributedLock lock,
+            CompletableFuture<DltReprocessResponse> result
+    ) {
+        try {
+            DltReprocessResponse response;
+            try (lock) {
+                response = performReprocessing();
+            }
+            result.complete(response);
+        } catch (Throwable e) {
+            log.error("DLT reprocessing worker failed", e);
+            result.completeExceptionally(e);
+        }
+    }
+
+    private void releaseAfterSchedulingFailure(DistributedLock lock, RuntimeException schedulingFailure) {
+        try {
+            lock.close();
+        } catch (RuntimeException releaseFailure) {
+            schedulingFailure.addSuppressed(releaseFailure);
+        }
+    }
+
+    private DltReprocessResponse performReprocessing() {
         String dltTopic = topicProperties.getName() + ".DLT";
         String mainTopic = topicProperties.getName();
 
@@ -76,10 +133,10 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
             ReprocessResult result = processMessages(consumer, mainTopic);
             deleteProcessedRecords(dltTopic, result);
             logResult(result);
-            return CompletableFuture.completedFuture(result.toResponse());
+            return result.toResponse();
         } catch (Exception e) {
             log.error("DLT reprocessing error: {}", e.getMessage());
-            return CompletableFuture.completedFuture(new DltReprocessResponse(0, 0, 0, List.of()));
+            return new DltReprocessResponse(0, 0, 0, List.of());
         }
     }
 
@@ -145,6 +202,7 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
             }
 
             totalMessages++;
+            processedCount++;
             String recordKey = getRecordKey(record);
             String dedupKey = recordKey + "@" + record.partition() + "@" + record.offset();
 
@@ -164,7 +222,6 @@ public class DltReprocessingServiceImpl implements DltReprocessingService {
 
             if (singleResult.success()) {
                 successCount++;
-                processedCount++;
                 maxProcessedOffsets.merge(tp, singleResult.offset(), Math::max);
             } else {
                 failedCount++;

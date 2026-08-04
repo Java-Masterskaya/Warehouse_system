@@ -33,17 +33,17 @@ public interface TokenService {
 
     void revokeRefreshToken(String refreshToken);
 
+    void revokeTokenPair(String refreshToken, String accessToken);
+
     void revokeAllUserTokens(Long userId);
 
-    void rotateRefreshToken(String oldRefreshToken);
+    TokenPair rotateRefreshToken(String oldRefreshToken);
 
     boolean isAccessTokenBlacklisted(String accessToken);
 
     void blacklistAccessToken(String accessToken);
 
     void blacklistAllUserAccessTokens(Long userId);
-
-    void saveRefreshRetryResult(String oldRefreshToken, TokenPair tokenPair);
 
     Optional<TokenPair> getRefreshRetryResult(String oldRefreshToken);
 

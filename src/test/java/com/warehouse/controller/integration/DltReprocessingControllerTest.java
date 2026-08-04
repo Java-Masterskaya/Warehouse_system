@@ -12,6 +12,8 @@ import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockAlert;
 import com.warehouse.entity.User;
+import com.warehouse.lock.DistributedLock;
+import com.warehouse.lock.PostgresAdvisoryLockManager;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
@@ -30,6 +32,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -63,6 +66,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Slf4j
@@ -81,6 +85,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     private static final String MAIN_TOPIC = "low-stock-alerts";
     private static final String DLT_TOPIC = "low-stock-alerts.DLT";
     private static final String REPROCESS_GROUP_ID = "dlt-reprocess-service";
+    private static final String REPROCESS_LOCK_NAME = "kafka-dlt-low-stock-reprocess";
 
     @Autowired
     private MockMvc mockMvc;
@@ -114,6 +119,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private PostgresAdvisoryLockManager advisoryLockManager;
 
     private String adminToken;
     private String userToken;
@@ -205,6 +213,13 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         userToken = obtainToken("testuser", "password");
 
         log.info("Setup completed");
+    }
+
+    @AfterEach
+    void waitForDltReprocessingToFinish() {
+        await().atMost(30, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(this::canAcquireAndReleaseReprocessLock);
     }
 
     // ==================== Helpers ====================
@@ -660,6 +675,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Batch 1 done: 5 processed, 5 remain");
 
         // Phase 5: Second reprocessing call
+        waitForDltReprocessingToFinish();
         mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
@@ -875,7 +891,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldNotCreateDuplicatesWhenReprocessingCalledMultipleTimes() throws Exception {
+    void shouldRejectConcurrentReprocessingAndAllowStartAfterCompletion() throws Exception {
         log.info("=== Starting multiple reprocessing calls test ===");
 
         long itemId = 888888L;
@@ -911,17 +927,16 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         );
         log.info("Item created");
 
-        // Вызываем репроцессинг НЕСКОЛЬКО РАЗ
-        for (int i = 0; i < 3; i++) {
-            mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
-                            .header("Authorization", "Bearer " + adminToken)
-                            .contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(status().isAccepted());
-            log.info("Reprocess call #{}", i + 1);
+        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted());
 
-            // Даем время на обработку между вызовами
-            Thread.sleep(2000);
-        }
+        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("DLT_REPROCESSING_IN_PROGRESS"));
 
         // Ждем завершения обработки и появления StockAlert
         await().atMost(20, TimeUnit.SECONDS)
@@ -936,8 +951,13 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                             .isGreaterThanOrEqualTo(1);
                 });
 
-        // Дополнительная пауза чтобы убедиться, что дубликаты не создались
-        Thread.sleep(3000);
+        waitForDltReprocessingToFinish();
+
+        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted());
+        waitForDltReprocessingToFinish();
 
         // ФИНАЛЬНАЯ ПРОВЕРКА: должен быть ровно ОДИН StockAlert
         List<StockAlert> allAlerts = stockAlertRepository.findAll();
@@ -946,10 +966,10 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .count();
 
         assertThat(count)
-                .as("Expected exactly 1 StockAlert after 3 reprocess calls, but found %d. Duplicates detected!", count)
+                .as("Expected 1 StockAlert after a rejected concurrent start and a later retry, but found %d", count)
                 .isEqualTo(1);
 
-        log.info("=== Multiple reprocessing calls test PASSED ===");
+        log.info("=== Concurrent DLT reprocessing test PASSED ===");
     }
 
     private void verifyDltRemainingCount(int callNumber, int expectedCount) {
@@ -977,6 +997,12 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                                 .isEqualTo(expectedCount);
                     }
                 });
+    }
+
+    private boolean canAcquireAndReleaseReprocessLock() {
+        var acquired = advisoryLockManager.tryAcquire(REPROCESS_LOCK_NAME);
+        acquired.ifPresent(DistributedLock::close);
+        return acquired.isPresent();
     }
 
 }
