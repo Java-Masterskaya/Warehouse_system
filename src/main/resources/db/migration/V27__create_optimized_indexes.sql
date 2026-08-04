@@ -1,4 +1,4 @@
--- V27: Concurrent index creation to avoid table locking
+-- V27: Create indexes on partitioned table
 
 DO $$
     BEGIN
@@ -22,15 +22,15 @@ DO $$
         END IF;
     END $$;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stock_movements_item_id
+CREATE INDEX IF NOT EXISTS idx_stock_movements_item_id
     ON ONLY stock_movements(item_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stock_movements_user_id
+CREATE INDEX IF NOT EXISTS idx_stock_movements_user_id
     ON ONLY stock_movements(user_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stock_movements_warehouse_id
+CREATE INDEX IF NOT EXISTS idx_stock_movements_warehouse_id
     ON ONLY stock_movements(warehouse_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stock_movements_created_at
+CREATE INDEX IF NOT EXISTS idx_stock_movements_created_at
     ON ONLY stock_movements(created_at DESC);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stock_movements_item_date
+CREATE INDEX IF NOT EXISTS idx_stock_movements_item_date
     ON ONLY stock_movements(item_id, created_at DESC);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stock_movements_warehouse_date
+CREATE INDEX IF NOT EXISTS idx_stock_movements_warehouse_date
     ON ONLY stock_movements(warehouse_id, created_at DESC);

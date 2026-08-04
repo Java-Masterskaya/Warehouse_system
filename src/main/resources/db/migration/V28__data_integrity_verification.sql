@@ -12,7 +12,8 @@ DO $$
         FROM stock_movements_archive a
         WHERE NOT EXISTS (
             SELECT 1 FROM stock_movements n
-            WHERE n.id = a.id AND n.created_at::timestamp = a.created_at::timestamp
+            WHERE n.id = a.id
+              AND CAST(n.created_at AS TIMESTAMP) = CAST(a.created_at AS TIMESTAMP)
         );
 
         IF diff_count > 0 THEN
