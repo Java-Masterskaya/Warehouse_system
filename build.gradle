@@ -82,12 +82,36 @@ dependencies {
     testImplementation "org.testcontainers:redpanda:${testcontainersVersion}"
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 
+    // Property-based tests (складские инварианты на случайных последовательностях операций)
+    testImplementation 'net.jqwik:jqwik:1.10.1'
+    // jqwik-engine requests a newer junit-platform-launcher than Spring Boot's managed BOM;
+    // pin it explicitly so Gradle's auto-added launcher doesn't drift out of sync with the
+    // BOM-managed junit-platform-engine/commons versions (mismatched launcher/engine versions
+    // fail at runtime with NoClassDefFoundError: OutputDirectoryCreator).
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     testRuntimeOnly 'com.h2database:h2'
 }
 
 dependencyManagement {
     imports {
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:2024.0.0"
+    }
+}
+
+// jqwik-engine requests a newer org.junit.platform:junit-platform-launcher than the one
+// managed by Spring Boot's BOM for junit-platform-engine/commons. Gradle's jvm-test-suite
+// plugin auto-adds a launcher matching the *unresolved* highest-requested engine version,
+// which then drifts out of sync with the BOM-downgraded engine/commons and fails at runtime
+// (NoClassDefFoundError: OutputDirectoryCreator). Force all junit-platform-* artifacts to a
+// single consistent version to keep engine, commons and launcher aligned. Scoped to test-*
+// configurations only, so it can't affect main/annotationProcessor resolution.
+configurations.matching { it.name.startsWith('test') }.configureEach {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'org.junit.platform') {
+            details.useVersion('1.11.4')
+            details.because('keep junit-platform-launcher aligned with the BOM-managed engine/commons version')
+        }
     }
 }
 
