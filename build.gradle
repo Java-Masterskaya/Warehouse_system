@@ -113,14 +113,16 @@ pitest {
             'com.warehouse.service.movement.StockMovementServiceImpl',
             'com.warehouse.service.reservation.StockReserveServiceImpl',
             'com.warehouse.service.reservation.StockAvailabilityService',
-            'com.warehouse.service.batch.BatchServiceImpl'
+            'com.warehouse.service.batch.BatchServiceImpl',
+            'com.warehouse.service.batch.ExpiredBatchCleanupService'
     ]
 
     targetTests = [
             'com.warehouse.service.StockMovementServiceImplTest',
             'com.warehouse.service.StockReserveServiceImplTest',
             'com.warehouse.service.StockAvailabilityServiceTest',
-            'com.warehouse.service.BatchServiceImplTest'
+            'com.warehouse.service.BatchServiceImplTest',
+            'com.warehouse.service.ExpiredBatchCleanupServiceTest'
     ]
 
     mutators = ['STRONGER']

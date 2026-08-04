@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,10 +62,13 @@ class WarehouseMigrationIntegrationTest {
         assertThat(countRows("stock_movements")).isEqualTo(movementCountBefore);
         assertThat(countRows("reserves")).isEqualTo(reserveCountBefore);
         assertRequiredWarehouseColumns();
+        assertKeysetPaginationIndexes();
         assertWarehouseIdsMustBeExplicit(legacy);
 
         assertThat(sumStock(legacy.itemId())).isEqualTo(LEGACY_QUANTITY + 11L);
         assertTransferMovementTypesAccepted(legacy, secondWarehouseId);
+        assertExpiredMovementConstraints(legacy);
+        assertBatchCleanupActor();
 
         assertThatThrownBy(() -> insertStock(legacy.itemId(), secondWarehouseId, 5))
                 .isInstanceOf(SQLException.class)
@@ -85,11 +89,37 @@ class WarehouseMigrationIntegrationTest {
         Flyway flyway = Flyway.configure()
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                 .locations("classpath:db/migration")
+                .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
                 .load();
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("29");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("30");
+    }
+
+    private void assertKeysetPaginationIndexes() throws SQLException {
+        try (Connection connection = connection()) {
+            assertThat(queryLong(connection, """
+                    SELECT COUNT(*)
+                    FROM pg_index index_metadata
+                    JOIN pg_class index_class ON index_class.oid = index_metadata.indexrelid
+                    JOIN pg_namespace index_schema ON index_schema.oid = index_class.relnamespace
+                    WHERE index_schema.nspname = 'public'
+                      AND index_metadata.indisvalid
+                      AND index_class.relname IN (
+                          'idx_items_active_name_id',
+                          'idx_items_active_sku_id',
+                          'idx_movements_item_created_id',
+                          'idx_movements_item_type_created_id'
+                      )
+                    """)).isEqualTo(4L);
+            assertThat(queryLong(connection, """
+                    SELECT COUNT(*)
+                    FROM pg_indexes
+                    WHERE schemaname = 'public'
+                      AND indexname = 'idx_movements_item_id_created'
+                    """)).isZero();
+        }
     }
 
     private void migrateToV20() {
@@ -316,6 +346,67 @@ class WarehouseMigrationIntegrationTest {
         )).isPositive();
     }
 
+    private void assertExpiredMovementConstraints(LegacyData legacy) throws SQLException {
+        assertThat(insertMovement(
+                legacy.itemId(),
+                legacy.userId(),
+                "EXPIRED",
+                1,
+                DEFAULT_WAREHOUSE_ID,
+                null
+        )).isPositive();
+        assertMovementCheckViolation(legacy, "EXPIRED", 0);
+        assertMovementCheckViolation(legacy, "EXPIRED", -1);
+
+        assertThat(insertMovement(
+                legacy.itemId(),
+                legacy.userId(),
+                "ADJUSTMENT",
+                1,
+                DEFAULT_WAREHOUSE_ID,
+                null
+        )).isPositive();
+        assertThat(insertMovement(
+                legacy.itemId(),
+                legacy.userId(),
+                "ADJUSTMENT",
+                -1,
+                DEFAULT_WAREHOUSE_ID,
+                null
+        )).isPositive();
+        assertMovementCheckViolation(legacy, "ADJUSTMENT", 0);
+        assertMovementCheckViolation(legacy, "UNKNOWN", 1);
+    }
+
+    private void assertMovementCheckViolation(LegacyData legacy, String type, int quantity) {
+        assertThatThrownBy(() -> insertMovement(
+                legacy.itemId(),
+                legacy.userId(),
+                type,
+                quantity,
+                DEFAULT_WAREHOUSE_ID,
+                null
+        )).isInstanceOfSatisfying(
+                SQLException.class,
+                exception -> assertThat(exception.getSQLState()).isEqualTo("23514")
+        );
+    }
+
+    private void assertBatchCleanupActor() throws SQLException {
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT role, is_active
+                     FROM users
+                     WHERE username = 'system-batch-cleanup'
+                     """);
+             ResultSet result = statement.executeQuery()) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getString("role")).isEqualTo("ROLE_USER");
+            assertThat(result.getBoolean("is_active")).isFalse();
+            assertThat(result.next()).isFalse();
+        }
+    }
+
     private long insertMovement(
             long itemId,
             long userId,
@@ -323,13 +414,24 @@ class WarehouseMigrationIntegrationTest {
             long warehouseId,
             UUID transferId
     ) throws SQLException {
+        return insertMovement(itemId, userId, type, 1, warehouseId, transferId);
+    }
+
+    private long insertMovement(
+            long itemId,
+            long userId,
+            String type,
+            int quantity,
+            long warehouseId,
+            UUID transferId
+    ) throws SQLException {
         try (Connection connection = connection()) {
             return insertReturningId(connection, """
                     INSERT INTO stock_movements
                         (item_id, user_id, type, quantity, created_at, warehouse_id, transfer_id)
-                    VALUES (?, ?, ?, 1, NOW(), ?, ?)
+                    VALUES (?, ?, ?, ?, NOW(), ?, ?)
                     RETURNING id
-                    """, itemId, userId, type, warehouseId, transferId);
+                    """, itemId, userId, type, quantity, warehouseId, transferId);
         }
     }
 

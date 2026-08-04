@@ -10,6 +10,7 @@ import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
+import com.warehouse.dto.response.CursorPageResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -24,13 +25,18 @@ import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
+import com.warehouse.pagination.KeysetCursorCodec;
+import com.warehouse.pagination.KeysetCursorCodec.CursorContext;
+import com.warehouse.pagination.KeysetCursorCodec.CursorPosition;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockMovementKeysetRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
@@ -49,6 +55,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -66,10 +73,18 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class StockMovementServiceImpl implements StockMovementService {
 
+    private static final String HISTORY_CURSOR_ENDPOINT = "movement-history";
+    private static final String HISTORY_CURSOR_SORT = "createdAt";
+    private static final String HISTORY_CURSOR_DIRECTION = "desc";
+    private static final int MAX_CURSOR_PAGE_SIZE = 100;
+    private static final int MIN_CURSOR_YEAR = 1;
+    private static final int MAX_CURSOR_YEAR = 9999;
+
     StockMovementMapper      mapper;
     StockAvailabilityService availabilityService;
     ItemRepository           itemRepository;
     StockMovementRepository  stockMovementRepository;
+    StockMovementKeysetRepository stockMovementKeysetRepository;
     UserRepository           userRepository;
     WarehouseRepository      warehouseRepository;
     StockRepository          stockRepository;
@@ -78,6 +93,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     OutboxService            outboxService;
     MetricService            metricService;
     AuditContext             auditContext;
+    KeysetCursorCodec        cursorCodec;
 
     /**
      * Регистрирует приход товара на склад.
@@ -226,6 +242,72 @@ public class StockMovementServiceImpl implements StockMovementService {
                 pageable);
 
         return PageResponse.from(history);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public CursorPageResponse<StockMovementHistoryResponse> getItemMovementHistoryByCursor(
+            Long itemId,
+            MovementType type,
+            String cursor,
+            int size
+    ) {
+        validateCursorPageSize(size);
+        if (!itemRepository.existsById(itemId)) {
+            log.warn("Item with id={} was not found", itemId);
+            throw EntityNotFoundException.forId("Item", itemId);
+        }
+
+        String typeFilter = "";
+        if (type != null) {
+            typeFilter = type.name();
+        }
+        CursorContext context = new CursorContext(
+                HISTORY_CURSOR_ENDPOINT,
+                HISTORY_CURSOR_SORT,
+                HISTORY_CURSOR_DIRECTION,
+                List.of(itemId.toString(), typeFilter)
+        );
+        CursorPosition position = null;
+        LocalDateTime lastCreatedAt = null;
+        if (cursor != null && !cursor.isEmpty()) {
+            position = cursorCodec.decode(cursor, context);
+            try {
+                lastCreatedAt = LocalDateTime.parse(position.lastValue());
+                validateCursorTimestamp(lastCreatedAt);
+            } catch (DateTimeParseException exception) {
+                throw new InvalidCursorException(exception);
+            }
+        }
+        Long lastId = null;
+        if (position != null) {
+            lastId = position.lastId();
+        }
+
+        List<StockMovement> movements = stockMovementKeysetRepository.findNextPage(
+                itemId,
+                type,
+                lastCreatedAt,
+                lastId,
+                size + 1
+        );
+        boolean hasNext = movements.size() > size;
+        List<StockMovement> pageMovements = movements.stream().limit(size).toList();
+        String nextCursor = null;
+        if (hasNext) {
+            StockMovement lastMovement = pageMovements.get(pageMovements.size() - 1);
+            nextCursor = cursorCodec.encode(
+                    context,
+                    lastMovement.getCreatedAt().toString(),
+                    lastMovement.getId()
+            );
+        }
+
+        return new CursorPageResponse<>(
+                pageMovements.stream().map(this::toHistoryResponse).toList(),
+                nextCursor,
+                hasNext
+        );
     }
 
     @Override
@@ -543,6 +625,31 @@ public class StockMovementServiceImpl implements StockMovementService {
     private Warehouse defaultWarehouse() {
         return warehouseRepository.findByDefaultWarehouseTrue()
                                   .orElseThrow(() -> new EntityNotFoundException("Default warehouse not found"));
+    }
+
+    private StockMovementHistoryResponse toHistoryResponse(StockMovement movement) {
+        return new StockMovementHistoryResponse(
+                movement.getId(),
+                movement.getType(),
+                movement.getQuantity(),
+                movement.getUser().getUsername(),
+                movement.getCreatedAt(),
+                movement.getWarehouse().getId(),
+                movement.getWarehouse().getName(),
+                movement.getTransferId()
+        );
+    }
+
+    private void validateCursorPageSize(int size) {
+        if (size < 1 || size > MAX_CURSOR_PAGE_SIZE) {
+            throw new InvalidCursorException();
+        }
+    }
+
+    private void validateCursorTimestamp(LocalDateTime timestamp) {
+        if (timestamp.getYear() < MIN_CURSOR_YEAR || timestamp.getYear() > MAX_CURSOR_YEAR) {
+            throw new InvalidCursorException();
+        }
     }
 
     private void itemCheckForActive(Item item) {

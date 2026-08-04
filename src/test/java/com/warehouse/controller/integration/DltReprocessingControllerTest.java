@@ -3,6 +3,7 @@ package com.warehouse.controller.integration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.WarehouseApp;
+import com.warehouse.batch.BatchCleanupActor;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.dto.request.security.LoginRequest;
 import com.warehouse.entity.Category;
@@ -132,12 +133,12 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         jdbcTemplate.update("DELETE FROM idempotency_keys");
         jdbcTemplate.update("DELETE FROM batches");
         jdbcTemplate.update("DELETE FROM outbox");
+        jdbcTemplate.update("DELETE FROM reserves");
 
         jdbcTemplate.update("DELETE FROM stock");
         jdbcTemplate.update("DELETE FROM items");
         jdbcTemplate.update("DELETE FROM categories");
         jdbcTemplate.update("DELETE FROM users");
-        jdbcTemplate.update("DELETE FROM reserves");
 
         // Очищаем последовательно, чтобы убрать дубликаты (DELETE + INSERT работает быстрее)
         jdbcTemplate.update("ALTER SEQUENCE stock_alerts_id_seq RESTART WITH 1");
@@ -160,6 +161,13 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         user.setRole(Role.ROLE_USER);
         user.setActive(true);
         userRepository.save(user);
+
+        User batchCleanupActor = new User();
+        batchCleanupActor.setUsername(BatchCleanupActor.USERNAME);
+        batchCleanupActor.setPassword("!disabled-system-actor!");
+        batchCleanupActor.setRole(Role.ROLE_USER);
+        batchCleanupActor.setActive(false);
+        userRepository.save(batchCleanupActor);
 
         testCategory = categoryRepository.save(
                 Category.builder()
