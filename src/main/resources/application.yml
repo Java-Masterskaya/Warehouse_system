@@ -1,4 +1,12 @@
 # yaml-language-server: $schema=https://json.schemastore.org/spring-configuration-properties.json
+springdoc:
+  api-docs:
+    # OpenAPI 3.0.1 вместо дефолтных 3.1.0: контрактные тесты (swagger-request-validator)
+    # используют движок валидации схем, который не полностью понимает диалект JSON Schema
+    # 2020-12 из OpenAPI 3.1 — под 3.1 проверка типов полей в ответе молча не срабатывает
+    # (см. src/test/java/com/warehouse/openapi). 3.0.1 также шире поддерживается codegen-тулингом.
+    version: OPENAPI_3_0
+
 spring:
   application:
     name: warehouse-app
@@ -12,6 +20,10 @@ spring:
     enabled: true
     postgresql:
       transactional-lock: false
+
+  data:
+    redis:
+      timeout: 500ms
 
   kafka:
     producer:
@@ -97,6 +109,29 @@ app:
     cleanup-cron: "0 0 * * * *"  # Каждый час
     enforce-after: 2026-08-26
 
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      itemCache:
+        base-config: default
+        ignore-exceptions:
+          - com.warehouse.exception.EntityNotFoundException
+      categoryCache:
+        base-config: default
+        ignore-exceptions:
+          - com.warehouse.exception.EntityNotFoundException
+      kafkaProducer:
+        base-config: default
+        wait-duration-in-open-state: 10s
+
 management:
   server:
     port: 8081 # Выделенный порт для Actuator (будет закрыт от внешних пользователей)
@@ -120,13 +155,15 @@ management:
         enabled: true
       group:
         readiness:
-          include: readinessState,db,redis
+          include: readinessState,db
     refresh:
       enabled: true
   health:
     livenessstate:
       enabled: true
     readinessstate:
+      enabled: true
+    circuitbreakers:
       enabled: true
   metrics:
     tags:

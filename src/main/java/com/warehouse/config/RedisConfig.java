@@ -5,6 +5,7 @@ import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -92,5 +93,10 @@ public class RedisConfig {
         template.setHashValueSerializer(new StringRedisSerializer());
         template.afterPropertiesSet();
         return template;
+    }
+
+    @Bean
+    public CacheErrorHandler cacheErrorHandler() {
+        return new SelectiveCacheErrorHandler();
     }
 }

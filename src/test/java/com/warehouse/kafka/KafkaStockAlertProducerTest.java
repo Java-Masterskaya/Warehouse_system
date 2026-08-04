@@ -3,6 +3,7 @@ package com.warehouse.kafka;
 import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.metric.MetricService;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
@@ -51,6 +52,9 @@ class KafkaStockAlertProducerTest {
     private Propagator propagator;
 
     @Mock
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    @Mock
     private Span span;
 
     private KafkaStockAlertProducer producer;
@@ -65,7 +69,8 @@ class KafkaStockAlertProducerTest {
     @BeforeEach
     void setUp() {
         when(tracer.currentSpan()).thenReturn(span);
-        producer = new KafkaStockAlertProducer(kafkaTemplate, metricService, tracer, propagator);
+        producer = new KafkaStockAlertProducer(kafkaTemplate, metricService,
+                tracer, propagator, circuitBreakerRegistry);
     }
 
     /**
