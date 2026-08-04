@@ -27,8 +27,8 @@ keyset-индексов. Поэтому pending-миграции barcode пер�
 ### Этап 1: Expand + Backfill (V27 + V28 + V31)
 
 **Что деплоится:**
-- `V36__add_items_barcode_nullable.sql` — добавляет nullable колонку (уже в `db/migration/`)
-- `V37__create_items_barcode_seq.sql` — независимый sequence для номера barcode,
+- `V37__add_items_barcode_nullable.sql` — добавляет nullable колонку (уже в `db/migration/`)
+- `V38__create_items_barcode_seq.sql` — независимый sequence для номера barcode,
   не привязанный к id товара (уже в `db/migration/`, см. "Почему отдельный sequence" ниже)
 - `docs/migrations/pending/V31__backfill_items_barcode.sql` - UPDATE существующих строк.
   **В `db/migration/` его кладём только для таблиц < 100 000 строк** (см. ниже) —
