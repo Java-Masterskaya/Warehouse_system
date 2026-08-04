@@ -1,11 +1,6 @@
--- =============================================
 -- V21: Create partitioned table with pg_partman
--- =============================================
-
--- 1. Убеждаемся, что расширение установлено
 CREATE EXTENSION IF NOT EXISTS pg_partman;
 
--- 2. Создаем партиционированную таблицу
 CREATE TABLE stock_movements_new
 (
     id           BIGSERIAL,
@@ -30,9 +25,6 @@ CREATE TABLE stock_movements_new
             )
 ) PARTITION BY RANGE (created_at);
 
--- 3. Настраиваем pg_partman для управления партициями
--- pg_partman сам создаст партиции для будущих периодов
--- и будет управлять ими
 SELECT public.create_parent(
                p_parent_table => 'public.stock_movements_new',
                p_control => 'created_at',
@@ -41,7 +33,6 @@ SELECT public.create_parent(
                p_premake => 12
        );
 
--- 4. Создаем партиции для исторических данных через pg_partman
 DO $$
     DECLARE
         min_date date;
@@ -55,8 +46,6 @@ DO $$
         IF min_date IS NOT NULL THEN
             d := date_trunc('month', min_date)::date;
             WHILE d <= date_trunc('month', max_date)::date LOOP
-                -- Используем pg_partman для создания партиций
-                -- Он сам выберет правильное имя и не будет конфликтовать
                     PERFORM public.create_partition_time(
                             p_parent_table => 'public.stock_movements_new',
                             p_partition_times => ARRAY[d::timestamp]
@@ -65,27 +54,3 @@ DO $$
                 END LOOP;
         END IF;
     END $$;
-
--- 5. Sync trigger for new inserts during migration
-CREATE OR REPLACE FUNCTION sync_to_new_movements()
-    RETURNS TRIGGER AS
-$$
-BEGIN
-    INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity, created_at, warehouse_id, transfer_id)
-    VALUES (NEW.id,
-            NEW.item_id,
-            NEW.user_id,
-            NEW.type,
-            NEW.quantity,
-            NEW.created_at,
-            NEW.warehouse_id,
-            NEW.transfer_id)
-    ON CONFLICT (id, created_at) DO NOTHING;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER sync_to_new_movements_trigger
-    AFTER INSERT ON stock_movements
-    FOR EACH ROW
-EXECUTE FUNCTION sync_to_new_movements();
