@@ -51,7 +51,7 @@ public class StockMovement {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** Тип движения (приход, списание, корректировка или перевод). */
+    /** Тип движения (приход/списание). */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MovementType type;
@@ -63,6 +63,11 @@ public class StockMovement {
     /** Время операции. */
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /** Партия, с которой связано движение (для поступлений). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    private Batch batch;
 
     /** Общий идентификатор двух движений одного перевода между складами. */
     @Column(name = "transfer_id")

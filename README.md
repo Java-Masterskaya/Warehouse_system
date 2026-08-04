@@ -60,7 +60,7 @@ make up
 | PostgreSQL       | postgres:16        | 5432 |
 | Redis            | redis:7-alpine     | 6379 |
 | Redpanda (Kafka) | redpanda:v23.2.11  | 9092 (внутри Docker: 29092) |
-| Schema Registry  | встроен в Redpanda | 8081 |
+| Schema Registry  | встроен в Redpanda | 18081 (внутри Docker: 8081) |
 | Consul           | hashicorp/consul:1.16 | 8500 (UI) |
 
 ## Бэкап и восстановление БД
@@ -121,6 +121,20 @@ make up
 | `POST`   | `/api/stock/{itemId}/write-off`                  | Выкуп резерва                       |
 | `GET`    | `/api/reports/low-stock`                         | Товары ниже общего минимума         |
 | `GET`    | `/api/reports/stock-valuation`                   | Общая стоимость остатков            |
+| `GET`    | `/api/reports/expiring?days=N`                   | Партии с истекающим сроком          |
+
+## Партии и сроки годности
+
+DOM-5 хранит физический остаток как набор партий конкретного товара на конкретном складе.
+Для каждой пары `item + warehouse` количество в `stock` поддерживается равным сумме количеств ее партий.
+
+- Поступление создает новую партию с обязательным будущим `expiryDate`.
+- Списание и выкуп резерва используют FEFO: сначала расходуется партия с ближайшим сроком.
+- Просроченные партии не участвуют в доступном остатке, резервировании, списании и переводе.
+- Перевод между складами сохраняет срок годности каждой перенесенной части партии.
+- Положительная разница инвентаризации требует `surplusExpiryDate` и создает отдельную партию.
+- Ежедневная задача обнуляет просроченные партии и уменьшает остаток именно их склада.
+- Отчет `/api/reports/expiring?days=N` показывает истекающие партии с товаром и складом.
 
 ## Несколько складов
 
@@ -220,7 +234,7 @@ http://localhost:8500/v1/kv/config/warehouse-system/data
 "@warehouse-config.yaml"
 * Приложение автоматически применит изменения (в течение 1 секунды, благодаря ConfigWatch), либо:
 ```bash
-  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8080/actuator/refresh
+  curl -X POST -H "Authorization: Bearer <токен>" http://localhost:8081/actuator/refresh
 ```
 Способ 2. Через Consul UI
 Откройте http://localhost:8500
@@ -302,6 +316,46 @@ make checkstyle
 - `./gradlew check`
 - CI/CD (GitHub Actions)
 
+## OpenAPI-контракт
+
+API описывается code-first: springdoc генерирует спеку из аннотаций контроллеров и DTO
+(`GET /v3/api-docs`, Swagger UI — `/swagger-ui/index.html`). Чтобы дрейф между спекой и
+реальным поведением ловился автоматически, а не в проде, спека зафиксирована в репозитории
+как контракт-снапшот и проверяется в тестах.
+
+### Где что лежит
+
+- `src/test/resources/openapi/warehouse.json` — зафиксированный контракт (коммитится в git).
+- `com.warehouse.test.snapshot.OpenApiSnapshotSupport` — сравнение живой спеки со снапшотом
+  (по разобранному JSON-дереву, порядок ключей не важен) и его обновление.
+- `com.warehouse.openapi.OpenApiContractDriftTest` — падает, если сгенерированная спека
+  разошлась со снапшотом (убрали/переименовали поле, изменили статус ответа и т.п.).
+- `com.warehouse.openapi.{Item,StockMovement,Auth}ApiContractTest` — валидируют реальные
+  ответы MockMvc (успех **и** ошибки: 400/401/403/404/409/422/429) против зафиксированной
+  схемы через `com.atlassian.oai:swagger-request-validator-mockmvc`.
+
+### Почему снапшот коммитится, а не генерируется заново в CI
+
+Если бы CI просто генерировал спеку и ни с чем не сравнивал, "контракта" бы не существовало —
+он не был бы ничем, кроме побочного продукта текущего кода. Коммит снапшота — это то, что
+превращает спеку в реальный, версионируемый контракт: PR с несовместимым изменением API
+явно показывает дифф по `warehouse.json`, а не только по коду контроллера.
+
+### Обновление снапшота после осознанного изменения API
+
+```bash
+./gradlew test --tests "*OpenApiContractDriftTest" -DupdateOpenApiSnapshot=true
+```
+
+
+### Известное ограничение: формат `date-time`
+
+DTO используют `LocalDateTime` (без смещения часового пояса), а OpenAPI `format: date-time`
+по умолчанию требует RFC-3339 со смещением. Это осознанно понижено до `WARN` в
+`AbstractOpenApiContractTest` (не роняет тесты), а не исправлено переходом на
+`OffsetDateTime`/`Instant` — такой переход шире по объёму, чем контрактные тесты, и должен
+делаться отдельной задачей.
+
 ## Алертинг и мониторинг
 
 Проект использует стек Prometheus + Alertmanager + Grafana для мониторинга и алертинга.
@@ -318,8 +372,8 @@ make checkstyle
 **Важно:** Для запуска через `docker-compose up` или `make up` **обязательно** должен быть запущен контейнер `warehouse-app`, так как Prometheus собирает метрики с приложения через `/actuator/prometheus`. Если приложение не запущено - алерты не будут работать.
 
 **Настройка цели (target):**
-- В Docker-сети: `['warehouse-app:8080']`
-- При локальном запуске: `['host.docker.internal:8080']`
+- В Docker-сети: `['warehouse-app:8081']`
+- При локальном запуске: `['host.docker.internal:8081']`
 
 ### Alertmanager
 

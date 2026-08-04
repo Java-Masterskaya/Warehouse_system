@@ -41,15 +41,15 @@ app-down: ## Остановка приложения (SIGTERM)
 ## --- Проверка работоспособности ---
 health: ## Проверка работоспособности через Actuator
 	@echo "Проверка статуса приложения..."
-	@curl -s -H "Accept: application/json" http://localhost:8080/actuator/health
+	@curl -s -H "Accept: application/json" http://localhost:8081/actuator/health
 
 liveness: ## Проверка liveness-пробы
 	@echo "Проверка liveness..."
-	@curl -s -H "Accept: application/json" http://localhost:8080/actuator/health/liveness
+	@curl -s -H "Accept: application/json" http://localhost:8081/actuator/health/liveness
 
 readiness: ## Проверка readiness-пробы
 	@echo "Проверка readiness..."
-	@curl -s -H "Accept: application/json" http://localhost:8080/actuator/health/readiness
+	@curl -s -H "Accept: application/json" http://localhost:8081/actuator/health/readiness
 
 ## --- Тестирование ---
 test: ## Запуск тестов

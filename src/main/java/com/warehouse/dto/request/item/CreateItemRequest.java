@@ -17,8 +17,12 @@ public record CreateItemRequest(
         @NotNull
         @PositiveOrZero(message = "Цена не может быть отрицательной")
         BigDecimal price,
+
         @NotNull
         @PositiveOrZero(message = "Себестоимость не может быть отрицательной")
-        BigDecimal cost
+        BigDecimal cost,
+
+        @Size(max = 255, message = "Штрихкод не может быть длиннее 255 символов")
+        String barcode
 ) {
 }

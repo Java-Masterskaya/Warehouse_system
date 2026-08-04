@@ -2,14 +2,16 @@ package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.movement.StockMovementResponse;
+import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.OutboxEvent;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.OutboxEventRepository;
@@ -25,6 +27,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +54,9 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
 
     @Autowired
     private StockMovementService stockMovementService;
@@ -84,14 +90,23 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         testItem.setCategory(category);
         testItem.setMinStock(10);
         testItem.setActive(true);
+        testItem.setBarcode("ITEM-TEST-ATOM-" + System.nanoTime());
         testItem = itemRepository.save(testItem);
 
-        // Создаём остаток
+        // Создаём остаток и партию
         Stock stock = new Stock();
         stock.setItem(testItem);
         stock.setWarehouse(defaultWarehouse());
         stock.setQuantity(20);
         stockRepository.save(stock);
+
+        // Создаем партию для начального остатка (чтобы FEFO могла работать)
+        Batch batch = new Batch();
+        batch.setItem(testItem);
+        batch.setWarehouse(defaultWarehouse());
+        batch.setQuantity(20);
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365));
+        batchRepository.save(batch);
 
         testItemId = testItem.getId();
 
@@ -110,7 +125,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void bothMovementAndOutboxSavedOnSuccessfulTransaction() {
         // Arrange - списываем 16, чтобы остаток стал 4 (меньше minStock=10)
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 16);
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 16);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Act
@@ -146,7 +161,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void bothMovementAndOutboxRollbackOnError() {
         // Arrange
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 5);
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Подсчитываем начальное количество
@@ -189,7 +204,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
     @Test
     void neitherMovementNorOutboxSavedOnValidationFailure() {
         // Arrange - списываем больше, чем есть на складе
-        ChangeQuantityMovementRequest request = new ChangeQuantityMovementRequest(testItemId, 100);
+        WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 100);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         // Подсчитываем начальное количество
@@ -227,7 +242,7 @@ class StockMovementAtomicityIntegrationTest extends AbstractIntegrationTest {
         long initialOutboxCount = outboxEventRepository.count();
 
         // Act - проводим инвентаризацию с меньшим количеством (создаст ADJUSTMENT на -15)
-        StocktakeRequest request = new StocktakeRequest(testItemId, 5);
+        StocktakeRequest request = new StocktakeRequest(testItemId, 5, null);
         UserContext userContext = new UserContext(testUser.getId(), testUser.getUsername());
 
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);

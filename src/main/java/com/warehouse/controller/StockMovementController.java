@@ -1,8 +1,10 @@
 package com.warehouse.controller;
 
 import com.warehouse.dto.UserContext;
-import com.warehouse.dto.request.movement.ChangeQuantityMovementRequest;
+import com.warehouse.dto.request.idempotency.IdempotentRequestContext;
+import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
+import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -10,6 +12,7 @@ import com.warehouse.dto.response.movement.StockTransferResponse;
 import com.warehouse.entity.MovementType;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.import_export.CsvExportService;
+import com.warehouse.service.idempotency.IdempotencyService;
 import com.warehouse.service.movement.StockMovementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -25,16 +28,22 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.validation.annotation.Validated;
@@ -54,31 +63,61 @@ import java.nio.charset.StandardCharsets;
 @Validated
 public class StockMovementController {
 
+    private static final String RECEIVE_ENDPOINT = "/api/movements/receive";
+    private static final String WRITE_OFF_ENDPOINT = "/api/movements/write-off";
+
     StockMovementService stockMovementService;
     CsvExportService csvExportService;
+    IdempotencyService idempotencyService;
 
     @Operation(summary = "Зарегистрировать поступление")
     @PostMapping("/receive")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
     public StockMovementResponse registerReceipt(
-            @Valid @RequestBody ChangeQuantityMovementRequest request,
+            @Valid @RequestBody ReceiveStockRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        log.debug("Received stock movement request: itemId={}, quantity={}", request.itemId(), request.quantity());
-        return stockMovementService.registerReceipt(
-                request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+        log.debug("Received stock movement request: itemId={}, quantity={}, idempotencyKey={}",
+                request.itemId(), request.quantity(), idempotencyKey);
+
+        UserContext ctx = new UserContext(currentUser.getId(), currentUser.getUsername());
+        IdempotentRequestContext context = new IdempotentRequestContext(
+                idempotencyKey,
+                RECEIVE_ENDPOINT,
+                ctx
+        );
+
+        return idempotencyService.processIdempotentRequest(
+                context,
+                request,
+                () -> stockMovementService.registerReceipt(request, ctx)
+        );
     }
 
     @Operation(summary = "Списать товар")
     @PostMapping("/write-off")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public StockMovementResponse writeOffReceipt(@Valid @RequestBody ChangeQuantityMovementRequest request,
+    public StockMovementResponse writeOffReceipt(@Valid @RequestBody WriteOffStockRequest request,
+                                                 @RequestHeader(value = "Idempotency-Key", required = false)
+                                                 String idempotencyKey,
                                                  @AuthenticationPrincipal UserPrincipal currentUser) {
-        log.debug("Received stock movement writeOff request: itemId={}, quantity={}", request.itemId(),
-                request.quantity());
-        return stockMovementService.writeOffReceipt(
-                request, new UserContext(currentUser.getId(), currentUser.getUsername()));
+        log.debug("Received stock movement writeOff request: itemId={}, quantity={}, idempotencyKey={}",
+                request.itemId(), request.quantity(), idempotencyKey);
+
+        UserContext ctx = new UserContext(currentUser.getId(), currentUser.getUsername());
+        IdempotentRequestContext context = new IdempotentRequestContext(
+                idempotencyKey,
+                WRITE_OFF_ENDPOINT,
+                ctx
+        );
+
+        return idempotencyService.processIdempotentRequest(
+                context,
+                request,
+                () -> stockMovementService.writeOffReceipt(request, ctx)
+        );
     }
 
     @Operation(summary = "Перевести товар между складами")

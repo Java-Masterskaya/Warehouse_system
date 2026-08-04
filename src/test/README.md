@@ -40,6 +40,7 @@ src/test/java/com/warehouse/
 #### Использование
 
 ```java
+@SpringBootTest
 @Tag("integration")
 class MyIntegrationTest extends AbstractIntegrationTest {
     @Autowired

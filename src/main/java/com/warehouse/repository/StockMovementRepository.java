@@ -67,4 +67,6 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
                 order by sm.createdAt desc
             """)
     Stream<StockMovementExportDto> streamAllForExport();
+
+    StockMovement findTopByOrderByIdDesc();
 }

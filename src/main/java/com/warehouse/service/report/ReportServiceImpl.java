@@ -1,8 +1,10 @@
 package com.warehouse.service.report;
 
+import com.warehouse.dto.response.report.ExpiringBatch;
 import com.warehouse.dto.response.report.LowStockItem;
 import com.warehouse.dto.response.valuation.CategoryValuation;
 import com.warehouse.dto.response.valuation.StockValuationResponse;
+import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -19,6 +22,7 @@ import java.util.List;
 public class ReportServiceImpl implements ReportService {
 
     private final ItemRepository itemRepository;
+    private final BatchRepository batchRepository;
 
     @Override
     public List<LowStockItem> getLowStockItems() {
@@ -59,5 +63,31 @@ public class ReportServiceImpl implements ReportService {
                 roundedTotal, roundedByCategory.size());
 
         return new StockValuationResponse(roundedTotal, roundedByCategory);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<ExpiringBatch> getExpiringBatches(Integer days) {
+        log.debug("Get expiring batches report: days={}", days);
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime maxDate = now.plusDays(days);
+
+        List<com.warehouse.entity.Batch> batches = batchRepository.findExpiringByDays(now, maxDate);
+
+        log.info("Found {} expiring batches within {} days", batches.size(), days);
+
+        return batches.stream()
+                .map(batch -> new ExpiringBatch(
+                        batch.getId(),
+                        batch.getItem().getSku(),
+                        batch.getItem().getName(),
+                        batch.getItem().getCategory().getName(),
+                        batch.getWarehouse().getId(),
+                        batch.getWarehouse().getName(),
+                        batch.getQuantity(),
+                        batch.getExpiryDate()
+                ))
+                .toList();
     }
 }
