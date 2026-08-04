@@ -136,30 +136,39 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Test setup...");
 
         clearDltTopicSimple();
+        cleanupDatabase();
+        resetSequences();
+        resetConsumerGroupOffsets();
+        createTestUsers();
+        createTestCategoryAndItem();
+        createTestStockAndBatch();
+        generateTokens();
 
-        // Удаляем в правильном порядке (сначала зависимые таблицы), чтобы избежать ошибок внешних ключей
-        // Важно: static Testcontainers живут между запусками, поэтому leftover data
-        // из предыдущих тестов нарушает ассерты и уникальные индексы
+        log.info("Setup completed");
+    }
+
+    private void cleanupDatabase() {
+        // Удаляем в правильном порядке (сначала зависимые таблицы)
         jdbcTemplate.update("DELETE FROM stock_alerts");
         jdbcTemplate.update("DELETE FROM stock_movements");
         jdbcTemplate.update("DELETE FROM idempotency_keys");
         jdbcTemplate.update("DELETE FROM batches");
         jdbcTemplate.update("DELETE FROM outbox");
         jdbcTemplate.update("DELETE FROM reserves");
-
         jdbcTemplate.update("DELETE FROM stock");
         jdbcTemplate.update("DELETE FROM items");
         jdbcTemplate.update("DELETE FROM categories");
         jdbcTemplate.update("DELETE FROM users");
+    }
 
-        // Очищаем последовательно, чтобы убрать дубликаты (DELETE + INSERT работает быстрее)
+    private void resetSequences() {
         jdbcTemplate.update("ALTER SEQUENCE stock_alerts_id_seq RESTART WITH 1");
         jdbcTemplate.update("ALTER SEQUENCE items_id_seq RESTART WITH 1");
         jdbcTemplate.update("ALTER SEQUENCE categories_id_seq RESTART WITH 1");
         jdbcTemplate.update("ALTER SEQUENCE users_id_seq RESTART WITH 1");
+    }
 
-        resetConsumerGroupOffsets();
-
+    private void createTestUsers() {
         User admin = new User();
         admin.setUsername("admin");
         admin.setPassword(passwordEncoder.encode("secret"));
@@ -180,7 +189,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         batchCleanupActor.setRole(Role.ROLE_USER);
         batchCleanupActor.setActive(false);
         userRepository.save(batchCleanupActor);
+    }
 
+    private void createTestCategoryAndItem() {
         testCategory = categoryRepository.save(
                 Category.builder()
                         .name("Категория")
@@ -197,7 +208,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .build();
         testItem = itemRepository.save(testItem);
         testItemId = testItem.getId();
+    }
 
+    private void createTestStockAndBatch() {
         Stock stock = Stock.builder()
                 .item(testItem)
                 .warehouse(defaultWarehouse())
@@ -210,13 +223,13 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         batch.setItem(testItem);
         batch.setWarehouse(defaultWarehouse());
         batch.setQuantity(5);
-        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365));
         batchRepository.save(batch);
+    }
 
+    private void generateTokens() throws Exception {
         adminToken = obtainToken("admin", "secret");
         userToken = obtainToken("testuser", "password");
-
-        log.info("Setup completed");
     }
 
     @AfterEach
