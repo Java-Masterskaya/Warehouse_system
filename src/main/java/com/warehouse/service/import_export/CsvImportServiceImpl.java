@@ -26,8 +26,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CsvImportServiceImpl implements CsvImportService {
 
-    private final CsvItemParser csvItemParser;
-    private final ChunkService  chunkService;
+    private final CsvItemParserService csvItemParserService;
+    private final ChunkService         chunkService;
 
     private final ItemRepository     itemRepository;
     private final CategoryRepository categoryRepository;
@@ -42,13 +42,13 @@ public class CsvImportServiceImpl implements CsvImportService {
         int totalImported = 0;
 
         try (InputStream inputStream = file.getInputStream()) {
-            Iterable<CsvItemParser.CsvChunk> chunks = csvItemParser.parseInChunks(inputStream);
+            Iterable<CsvItemParserService.CsvChunk> chunks = csvItemParserService.parseInChunks(inputStream);
 
-            for (CsvItemParser.CsvChunk chunk : chunks) {
+            for (CsvItemParserService.CsvChunk chunk : chunks) {
                 totalRows += chunk.processedRowsCount();
                 allErrors.addAll(chunk.errors());
 
-                List<CsvItemParser.ValidRowHolder> candidateRows = chunk.validRows();
+                List<CsvItemParserService.ValidRowHolder> candidateRows = chunk.validRows();
                 if (candidateRows.isEmpty()) {
                     continue;
                 }
@@ -69,9 +69,9 @@ public class CsvImportServiceImpl implements CsvImportService {
                                                                               (existing, replacement) -> existing
                                                                       ));
 
-                List<CsvItemParser.ValidRowHolder> validHoldersToSave = new ArrayList<>();
+                List<CsvItemParserService.ValidRowHolder> validHoldersToSave = new ArrayList<>();
 
-                for (CsvItemParser.ValidRowHolder holder : candidateRows) {
+                for (CsvItemParserService.ValidRowHolder holder : candidateRows) {
                     ItemImportRowDto dto = holder.dto();
 
                     if (existingSkus.contains(dto.sku())) {

@@ -2,7 +2,7 @@ package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
-import com.warehouse.service.import_export.CsvItemParser;
+import com.warehouse.service.import_export.CsvItemParserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,10 +17,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-public class CsvItemParserTest extends AbstractIntegrationTest {
+public class CsvItemParserServiceTest extends AbstractIntegrationTest {
 
     @Autowired
-    private CsvItemParser csvItemParser;
+    private CsvItemParserService csvItemParserService;
 
     @Test
     @DisplayName("Строка с ошибкой валидации не блокирует последующий валидный дубликат SKU")
@@ -35,12 +35,12 @@ public class CsvItemParserTest extends AbstractIntegrationTest {
 
         InputStream inputStream = new ByteArrayInputStream(csvContent.getBytes(StandardCharsets.UTF_8));
 
-        Iterable<CsvItemParser.CsvChunk> chunks = csvItemParser.parseInChunks(inputStream);
+        Iterable<CsvItemParserService.CsvChunk> chunks = csvItemParserService.parseInChunks(inputStream);
 
-        List<CsvItemParser.ValidRowHolder> allValidRows = new ArrayList<>();
+        List<CsvItemParserService.ValidRowHolder> allValidRows = new ArrayList<>();
         List<ItemImportErrorDto> allErrors = new ArrayList<>();
 
-        for (CsvItemParser.CsvChunk chunk : chunks) {
+        for (CsvItemParserService.CsvChunk chunk : chunks) {
             allValidRows.addAll(chunk.validRows());
             allErrors.addAll(chunk.errors());
         }

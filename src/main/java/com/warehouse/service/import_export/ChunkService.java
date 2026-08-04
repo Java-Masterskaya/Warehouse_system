@@ -27,7 +27,7 @@ public class ChunkService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveInBatches(
-            List<CsvItemParser.ValidRowHolder> validRows,
+            List<CsvItemParserService.ValidRowHolder> validRows,
             List<ItemImportErrorDto> chunkErrors
     ) {
         if (validRows.isEmpty()) {
@@ -54,7 +54,7 @@ public class ChunkService {
         } catch (DataIntegrityViolationException e) {
             // Если произошла гонка (дубликат SKU в базе), сохраняем поштучно,
             // чтобы отловить конфликтные строки и записать их в ошибки, сохранив остальные
-            for (CsvItemParser.ValidRowHolder holder : validRows) {
+            for (CsvItemParserService.ValidRowHolder holder : validRows) {
                 ItemImportRowDto item =
                         holder.dto(); // Предполагается, что в ValidRowHolder есть готовый Item или метод маппинга
 
@@ -92,7 +92,7 @@ public class ChunkService {
     }
 
     private void executeBatchSave(
-            List<CsvItemParser.ValidRowHolder> validRows,
+            List<CsvItemParserService.ValidRowHolder> validRows,
             Warehouse defaultWarehouse,
             String insertItemsSql,
             String insertStockSql

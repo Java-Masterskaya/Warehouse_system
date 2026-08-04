@@ -9,7 +9,7 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.import_export.ChunkService;
 import com.warehouse.service.import_export.CsvImportServiceImpl;
-import com.warehouse.service.import_export.CsvItemParser;
+import com.warehouse.service.import_export.CsvItemParserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 class CsvImportServiceTest {
 
     @Mock
-    private CsvItemParser csvItemParser;
+    private CsvItemParserService csvItemParserService;
 
     @Mock
     private ItemRepository itemRepository;
@@ -70,15 +70,15 @@ class CsvImportServiceTest {
                 "text/csv",
                 "SKU,Name,Category,Price,Cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00".getBytes());
 
-        CsvItemParser.ValidRowHolder row1 =
+        CsvItemParserService.ValidRowHolder row1 =
                 createValidRowHolder(1, "SKU-001", "Ноутбук", categoryName1, "1000.00", "800.00");
-        CsvItemParser.ValidRowHolder row2 =
+        CsvItemParserService.ValidRowHolder row2 =
                 createValidRowHolder(2, "SKU-002", "Мышь", categoryName2, "20.00", "10.00");
 
-        CsvItemParser.CsvChunk chunk =
-                new CsvItemParser.CsvChunk(List.of(row1, row2), Collections.emptyList(), 2);
+        CsvItemParserService.CsvChunk chunk =
+                new CsvItemParserService.CsvChunk(List.of(row1, row2), Collections.emptyList(), 2);
 
-        when(csvItemParser.parseInChunks(any(InputStream.class))).thenReturn(List.of(chunk));
+        when(csvItemParserService.parseInChunks(any(InputStream.class))).thenReturn(List.of(chunk));
         when(itemRepository.findAllSkusIn(Set.of("SKU-001", "SKU-002"))).thenReturn(Collections.emptyList());
         when(categoryRepository.findAllByNameIgnoreCaseIn(Set.of(categoryName1, categoryName2))).thenReturn(List.of(
                 category1,
@@ -104,7 +104,7 @@ class CsvImportServiceTest {
         assertThatThrownBy(() -> csvImportService.importItems(emptyFile)).isInstanceOf(IllegalArgumentException.class)
                                                                          .hasMessageContaining("не может быть пустым");
 
-        verify(csvItemParser, never()).parseInChunks(any());
+        verify(csvItemParserService, never()).parseInChunks(any());
         verify(chunkService, never()).saveInBatches(any(), any());
     }
 
@@ -117,7 +117,7 @@ class CsvImportServiceTest {
         assertThatThrownBy(() -> csvImportService.importItems(txtFile)).isInstanceOf(IllegalArgumentException.class)
                                                                        .hasMessageContaining("CSV");
 
-        verify(csvItemParser, never()).parseInChunks(any());
+        verify(csvItemParserService, never()).parseInChunks(any());
         verify(chunkService, never()).saveInBatches(any(), any());
     }
 
@@ -130,17 +130,17 @@ class CsvImportServiceTest {
         existingCategory.setId(1L);
         existingCategory.setName("Электроника");
 
-        CsvItemParser.ValidRowHolder row1 =
+        CsvItemParserService.ValidRowHolder row1 =
                 createValidRowHolder(1, "SKU-NEW", "Ноутбук", "Электроника", "1000.00", "800.00");
-        CsvItemParser.ValidRowHolder row2 =
+        CsvItemParserService.ValidRowHolder row2 =
                 createValidRowHolder(2, "SKU-EXISTS", "Мышь", "Электроника", "20.00", "10.00");
-        CsvItemParser.ValidRowHolder row3 =
+        CsvItemParserService.ValidRowHolder row3 =
                 createValidRowHolder(3, "SKU-ANOTHER", "Стол", "Неизвестная", "150.00", "100.00");
 
-        CsvItemParser.CsvChunk chunk =
-                new CsvItemParser.CsvChunk(List.of(row1, row2, row3), Collections.emptyList(), 3);
+        CsvItemParserService.CsvChunk chunk =
+                new CsvItemParserService.CsvChunk(List.of(row1, row2, row3), Collections.emptyList(), 3);
 
-        when(csvItemParser.parseInChunks(any(InputStream.class))).thenReturn(List.of(chunk));
+        when(csvItemParserService.parseInChunks(any(InputStream.class))).thenReturn(List.of(chunk));
         when(itemRepository.findAllSkusIn(any())).thenReturn(List.of("SKU-EXISTS"));
         when(categoryRepository.findAllByNameIgnoreCaseIn(any())).thenReturn(List.of(existingCategory));
 
@@ -166,7 +166,7 @@ class CsvImportServiceTest {
         );
     }
 
-    private CsvItemParser.ValidRowHolder createValidRowHolder(
+    private CsvItemParserService.ValidRowHolder createValidRowHolder(
             int rowNum,
             String sku,
             String name,
@@ -175,6 +175,6 @@ class CsvImportServiceTest {
             String cost
     ) {
         ItemImportRowDto dto = new ItemImportRowDto(sku, name, category, new BigDecimal(price), new BigDecimal(cost));
-        return new CsvItemParser.ValidRowHolder(rowNum, dto);
+        return new CsvItemParserService.ValidRowHolder(rowNum, dto);
     }
 }
