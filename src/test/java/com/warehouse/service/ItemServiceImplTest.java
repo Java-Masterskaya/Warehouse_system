@@ -3,6 +3,7 @@ package com.warehouse.service;
 import com.warehouse.audit.AuditContext;
 import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
+import com.warehouse.dto.response.CursorPageResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
 import com.warehouse.dto.response.item.ItemResponse;
@@ -14,9 +15,14 @@ import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.DuplicateBarcodeException;
 import com.warehouse.exception.DuplicateSkuException;
 import com.warehouse.exception.EntityNotFoundException;
+import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.exception.ReservedBarcodeFormatException;
 import com.warehouse.mapper.ItemMapper;
+import com.warehouse.pagination.KeysetCursorCodec;
+import com.warehouse.pagination.KeysetCursorCodec.CursorContext;
+import com.warehouse.pagination.KeysetCursorCodec.CursorPosition;
 import com.warehouse.repository.CategoryRepository;
+import com.warehouse.repository.ItemKeysetRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.WarehouseRepository;
@@ -51,6 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -67,6 +74,9 @@ class ItemServiceImplTest {
 
     @Mock
     private ItemRepository itemRepository;
+
+    @Mock
+    private ItemKeysetRepository itemKeysetRepository;
 
     @Mock
     private StockRepository stockRepository;
@@ -89,6 +99,9 @@ class ItemServiceImplTest {
     @Mock
     private ItemBarcodeGeneratorService barcodeGenerator;
 
+    @Mock
+    private KeysetCursorCodec cursorCodec;
+
     private final ItemMapper itemMapper = Mappers.getMapper(ItemMapper.class);
 
     private ItemService itemService;
@@ -97,6 +110,7 @@ class ItemServiceImplTest {
     void setUp() {
         itemService = new ItemServiceImpl(
                 itemRepository,
+                itemKeysetRepository,
                 stockRepository,
                 warehouseRepository,
                 itemMapper,
@@ -104,7 +118,8 @@ class ItemServiceImplTest {
                 availabilityService,
                 categoryRepository,
                 circuitBreakerRegistry,
-                barcodeGenerator
+                barcodeGenerator,
+                cursorCodec
         );
     }
 
@@ -672,6 +687,107 @@ class ItemServiceImplTest {
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
     }
 
+    @Test
+    void cursorPageUsesSizePlusOneAndEncodesLastReturnedItem() {
+        Category category = createCategory("Cursor category");
+        Item first = cursorItem(1L, "SKU-1", "Same name", category);
+        Item second = cursorItem(2L, "SKU-2", "Same name", category);
+        Item lookahead = cursorItem(3L, "SKU-3", "Same name", category);
+        CursorContext context = new CursorContext(
+                "items",
+                "name",
+                "asc",
+                List.of("", KeysetCursorCodec.fingerprint("same"))
+        );
+
+        when(itemKeysetRepository.findNextPage(
+                "name", Sort.Direction.ASC, null, "same", null, null, 3
+        )).thenReturn(List.of(first, second, lookahead));
+        when(cursorCodec.encode(context, "Same name", 2L)).thenReturn("next-cursor");
+
+        CursorPageResponse<ItemResponse> result = itemService.getItemsByCursor(
+                "name", "asc", null, "SAME", "", 2
+        );
+
+        assertThat(result.content()).extracting(ItemResponse::id).containsExactly(1L, 2L);
+        assertThat(result.hasNext()).isTrue();
+        assertThat(result.nextCursor()).isEqualTo("next-cursor");
+        verify(cursorCodec).encode(context, "Same name", 2L);
+    }
+
+    @Test
+    void finalCursorPageUsesDecodedPositionAndHasNoNextCursor() {
+        Category category = createCategory("Cursor category");
+        Item last = cursorItem(3L, "SKU-3", "Same name", category);
+        CursorContext context = new CursorContext(
+                "items",
+                "name",
+                "asc",
+                List.of("", "")
+        );
+        CursorPosition position = new CursorPosition("Same name", 2L);
+
+        when(cursorCodec.decode("current-cursor", context)).thenReturn(position);
+        when(itemKeysetRepository.findNextPage(
+                "name", Sort.Direction.ASC, null, null, "Same name", 2L, 3
+        )).thenReturn(List.of(last));
+
+        CursorPageResponse<ItemResponse> result = itemService.getItemsByCursor(
+                "name", "asc", null, null, "current-cursor", 2
+        );
+
+        assertThat(result.content()).extracting(ItemResponse::id).containsExactly(3L);
+        assertThat(result.hasNext()).isFalse();
+        assertThat(result.nextCursor()).isNull();
+        verify(cursorCodec, never()).encode(any(), any(), anyLong());
+    }
+
+    @Test
+    void cursorPageRejectsValueThatCannotBeComparedInPostgres() {
+        CursorContext context = new CursorContext(
+                "items",
+                "name",
+                "asc",
+                List.of("", "")
+        );
+        when(cursorCodec.decode("crafted-cursor", context)).thenReturn(new CursorPosition("\0", 1L));
+
+        assertThrows(
+                InvalidCursorException.class,
+                () -> itemService.getItemsByCursor(
+                        "name", "asc", null, null, "crafted-cursor", 2
+                )
+        );
+
+        verifyNoInteractions(itemKeysetRepository);
+    }
+
+    @Test
+    void cursorPageAcceptsSortValueWithinPostgresCharacterLimit() {
+        String value = "\uD83D\uDE00".repeat(255);
+        CursorContext context = new CursorContext(
+                "items",
+                "name",
+                "asc",
+                List.of("", "")
+        );
+        CursorPosition position = new CursorPosition(value, 1L);
+
+        when(cursorCodec.decode("unicode-cursor", context)).thenReturn(position);
+        when(itemKeysetRepository.findNextPage(
+                "name", Sort.Direction.ASC, null, null, value, 1L, 3
+        )).thenReturn(List.of());
+
+        CursorPageResponse<ItemResponse> result = itemService.getItemsByCursor(
+                "name", "asc", null, null, "unicode-cursor", 2
+        );
+
+        assertThat(result.content()).isEmpty();
+        verify(itemKeysetRepository).findNextPage(
+                "name", Sort.Direction.ASC, null, null, value, 1L, 3
+        );
+    }
+
     /**
      * price и cost отображаются корректно в карточке товара.
      */
@@ -686,6 +802,17 @@ class ItemServiceImplTest {
 
         assertThat(response.price()).isEqualTo(BigDecimal.valueOf(1500.99));
         assertThat(response.cost()).isEqualTo(BigDecimal.valueOf(1000.49));
+    }
+
+    private Item cursorItem(Long id, String sku, String name, Category category) {
+        Item item = new Item();
+        item.setId(id);
+        item.setSku(sku);
+        item.setName(name);
+        item.setCategory(category);
+        item.setActive(true);
+        item.setCreatedAt(LocalDateTime.now());
+        return item;
     }
 
     /**

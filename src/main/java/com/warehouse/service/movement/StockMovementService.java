@@ -5,6 +5,7 @@ import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.StocktakeRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
+import com.warehouse.dto.response.CursorPageResponse;
 import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
@@ -51,6 +52,13 @@ public interface StockMovementService {
      */
     PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId, MovementType type, int page,
             int size);
+
+    CursorPageResponse<StockMovementHistoryResponse> getItemMovementHistoryByCursor(
+            Long itemId,
+            MovementType type,
+            String cursor,
+            int size
+    );
 
     /**
      * Выполняет инвентаризацию товара: сверяет фактический остаток

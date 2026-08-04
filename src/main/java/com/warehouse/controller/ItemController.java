@@ -4,19 +4,25 @@ import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.dto.request.item.UpdateItemRequest;
 import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.dto.response.item.ItemDetailsResponse;
+import com.warehouse.dto.response.item.ItemPaginationResponse;
 import com.warehouse.dto.response.item.ItemResponse;
-import com.warehouse.dto.response.PageResponse;
+import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.service.category.CategoryService;
 import com.warehouse.service.item.ItemService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -36,6 +42,7 @@ import java.util.List;
 @Slf4j
 @Tag(name = "Товары", description = "Управление каталогом товаров")
 @SecurityRequirement(name = "bearerAuth")
+@Validated
 public class ItemController {
 
     private final ItemService itemService;
@@ -45,16 +52,51 @@ public class ItemController {
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public PageResponse<ItemResponse> getItems(
+    public ItemPaginationResponse getItems(
             @RequestParam(defaultValue = "name") String sort,
             @RequestParam(defaultValue = "asc") String order,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @Parameter(schema = @Schema(
+                    type = "integer",
+                    format = "int32",
+                    defaultValue = "0",
+                    minimum = "0"
+            ))
+            @RequestParam(required = false) @Min(0) Integer page,
+            @Parameter(description = "Page size. Maximum 100.")
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @Parameter(
+                    description = "Opaque keyset cursor. Supply an empty value to start cursor pagination.",
+                    allowEmptyValue = true
+            )
+            @RequestParam(required = false) String cursor) {
+        if (cursor != null) {
+            if (page != null) {
+                throw new InvalidCursorException();
+            }
+            log.debug(
+                    "Received cursor item request: sort={}, order={}, category={}, search={}, size={}",
+                    sort,
+                    order,
+                    category,
+                    search,
+                    size
+            );
+            return ItemPaginationResponse.from(
+                    itemService.getItemsByCursor(sort, order, category, search, cursor, size)
+            );
+        }
+
+        int requestedPage = 0;
+        if (page != null) {
+            requestedPage = page;
+        }
         log.debug("Received get items request: sort={}, order={}, category={}, search={}, page={}, size={}",
-                sort, order, category, search, page, size);
-        return itemService.getItems(sort, order, category, search, page, size);
+                sort, order, category, search, requestedPage, size);
+        return ItemPaginationResponse.from(
+                itemService.getItems(sort, order, category, search, requestedPage, size)
+        );
     }
 
     @Operation(summary = "Создать товар")

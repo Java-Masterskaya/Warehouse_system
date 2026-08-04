@@ -16,6 +16,7 @@ import com.warehouse.exception.IdempotencyKeyDuplicateException;
 import com.warehouse.exception.IdempotencyKeyRequiredException;
 import com.warehouse.exception.IdempotencyStorageException;
 import com.warehouse.exception.InsufficientStockException;
+import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.exception.InvalidMovementRequestException;
 import com.warehouse.exception.InvalidPurchaseOrderStatusException;
 import com.warehouse.exception.InvalidTokenException;
@@ -179,6 +180,13 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleConstraintViolation(ConstraintViolationException ex) {
         log.warn("Constraint violation: {}", ex.getMessage());
         return new ErrorResponse("VALIDATION_ERROR", ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCursorException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidCursor(InvalidCursorException ex) {
+        log.warn("Invalid pagination cursor: {}", ex.getMessage());
+        return new ErrorResponse("INVALID_CURSOR", "Invalid cursor");
     }
 
     @ExceptionHandler(SelfDeactivationException.class)

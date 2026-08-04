@@ -92,13 +92,16 @@ SELECT setval('items_barcode_seq', COALESCE((SELECT MAX(id) FROM items), 1));
 операция, деплоится вместе с V27, т.к. новый код сразу начинает вызывать
 `nextval()`.
 
-### Шаг 2 — backfill
+### Шаг 2 - backfill
+
+`V29` и `V30` уже заняты активными миграциями аудита просроченных партий и
+keyset-индексов. Поэтому pending-миграции barcode используют номера `V31`-`V34`.
 
 Оба варианта ниже лежат в `docs/migrations/pending/`, а не в `db/migration/` —
 Flyway их не видит, пока кто-то не скопирует нужный файл осознанно (см. выше).
 
-**Для таблиц < 100K** — копируем `V29__backfill_items_barcode.sql` в
-`db/migration/` и деплоим вместе с V27/V28:
+**Для таблиц < 100K** - копируем `V31__backfill_items_barcode.sql` в
+`db/migration/` и деплоим вместе с текущим набором активных миграций:
 
 ```sql
 UPDATE items
@@ -106,7 +109,7 @@ SET barcode = 'ITEM-' || lpad(nextval('items_barcode_seq')::text, 10, '0')
 WHERE barcode IS NULL;
 ```
 
-**Для таблиц ≥ 100K** — `V29` не трогаем вообще. Запускаем
+**Для таблиц >= 100K** - `V31` не трогаем вообще. Запускаем
 `ItemBarcodeBackfillJob` через админ-эндпоинт. Эндпоинт асинхронный: сразу
 отвечает `202 Accepted` и не держит HTTP-соединение на время всего backfill.
 
@@ -122,9 +125,9 @@ curl "http://app/admin/backfill/barcode/status" \
 Джоба идемпотентна — можно перезапустить. Повторный запуск, пока предыдущий
 ещё выполняется, вернёт `409 Conflict` (не сбрасывает прогресс первого).
 
-### Шаг 3 — миграции V30, V31, V32
+### Шаг 3 - миграции V32, V33, V34
 
-Перед деплоем проверяем не только NULL, но и дубли (иначе V32 упадёт):
+Перед деплоем проверяем не только NULL, но и дубли (иначе V34 упадет):
 
 ```sql
 SELECT COUNT(*) FROM items WHERE barcode IS NULL;
@@ -135,13 +138,13 @@ SELECT barcode, COUNT(*) FROM items GROUP BY barcode HAVING COUNT(*) > 1;
 ```
 
 ```sql
--- V30
+-- V32
 ALTER TABLE items ALTER COLUMN barcode SET NOT NULL;
 
--- V31 (требует spring.flyway.postgresql.transactional-lock: false)
+-- V33 (требует spring.flyway.postgresql.transactional-lock: false)
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uk_items_barcode ON items (barcode);
 
--- V32
+-- V34
 ALTER TABLE items ADD CONSTRAINT uk_items_barcode UNIQUE USING INDEX uk_items_barcode;
 ```
 
@@ -161,12 +164,12 @@ ALTER TABLE items ADD CONSTRAINT uk_items_barcode UNIQUE USING INDEX uk_items_ba
 [Backfill] - - - - - - - +------+- - - - - - - -  (заполняем NULL)
                          \      /
                           \    /
-[V30-V32] - - - - - - - - + - - - - - - - - - -  (NOT NULL + UNIQUE)
+[V32-V34] - - - - - - - - + - - - - - - - - - -  (NOT NULL + UNIQUE)
 ```
 
-- В промежутке между V27/V28 и V30–V32 старый и новый код работают одновременно.
+- В промежутке между V27/V28 и V32-V34 старый и новый код работают одновременно.
 - V27/V28 безопасны, потому что не ломают старый INSERT.
-- V30–V32 деплоятся только когда все инстансы уже новые (это отдельный деплой).
+- V32-V34 деплоятся только когда все инстансы уже новые (это отдельный деплой).
 
 ---
 
@@ -182,6 +185,74 @@ ALTER TABLE items ADD CONSTRAINT uk_items_barcode UNIQUE USING INDEX uk_items_ba
   момента, пока их не скопируют в `db/migration/`. После копирования —
   действует обычное правило "не редактировать".
 - Перед merge: `./gradlew test`.
+
+### Восстановление после сбоя `CREATE INDEX CONCURRENTLY`
+
+`CREATE INDEX CONCURRENTLY` выполняется вне транзакции. Если миграция V30
+прервана, PostgreSQL может оставить индекс с `indisvalid = false`. Такой индекс
+не используется планировщиком, но занимает место и создает нагрузку при записи.
+`flyway repair` исправляет только `flyway_schema_history` и не удаляет оставшиеся
+объекты базы данных.
+
+1. Остановить rollout и повторные запуски Flyway.
+2. Проверить четыре индекса V30:
+
+```sql
+SELECT n.nspname AS schema_name,
+       c.relname AS index_name,
+       i.indisready,
+       i.indisvalid,
+       pg_get_indexdef(c.oid) AS definition
+FROM pg_catalog.pg_index AS i
+JOIN pg_catalog.pg_class AS c ON c.oid = i.indexrelid
+JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+WHERE n.nspname = current_schema()
+  AND c.relname IN (
+      'idx_items_active_name_id',
+      'idx_items_active_sku_id',
+      'idx_movements_item_created_id',
+      'idx_movements_item_type_created_id'
+  )
+ORDER BY c.relname;
+```
+
+После успешной миграции запрос должен вернуть четыре строки с
+`indisready = true` и `indisvalid = true`.
+
+3. Удалить только неготовые или невалидные индексы. Команды должны выполняться
+   в autocommit, без `BEGIN`:
+
+```sql
+SELECT format('DROP INDEX CONCURRENTLY IF EXISTS %I.%I;', n.nspname, c.relname)
+FROM pg_catalog.pg_index AS i
+JOIN pg_catalog.pg_class AS c ON c.oid = i.indexrelid
+JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+WHERE n.nspname = current_schema()
+  AND c.relname IN (
+      'idx_items_active_name_id',
+      'idx_items_active_sku_id',
+      'idx_movements_item_created_id',
+      'idx_movements_item_type_created_id'
+  )
+  AND (NOT i.indisready OR NOT i.indisvalid)
+\gexec
+```
+
+`\gexec` является командой `psql`: она выполняет каждый сгенерированный
+`DROP INDEX CONCURRENTLY` отдельно.
+
+4. Выполнить `flyway repair` тем же Flyway runner и с теми же `locations`, URL и
+   credentials, которые используются для `migrate`. Не редактировать
+   `flyway_schema_history` вручную.
+5. Повторно запустить миграцию и запрос из шага 2. Дополнительно проверить, что
+   замененный индекс удален:
+
+```sql
+SELECT to_regclass(current_schema() || '.idx_movements_item_id_created') IS NULL
+       AS old_index_removed;
+```
+
+Ожидаемый результат: `old_index_removed = true`.
 
 ---
 
