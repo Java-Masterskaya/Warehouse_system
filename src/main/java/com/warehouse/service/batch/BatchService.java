@@ -70,9 +70,8 @@ public interface BatchService {
     ) throws InsufficientStockException;
 
     /**
-     * Очистить протухшие партии (списать их количество в Stock).
-     * Атомарная операция: очищает партии и уменьшает stock.quantity.
-     * Использует pessimistic locking для безопасности.
+     * Clears expired batches and decreases the matching stock quantities.
+     * Each item and warehouse scope is committed independently and audited.
      *
      * @param now текущее время
      * @return количество очищенных партий
