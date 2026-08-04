@@ -151,4 +151,13 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
                 .andExpect(status().isOk())
                 .andExpect(openApiContract());
     }
+
+    @Test
+    void getMovementHistoryCursorMatchesContract() throws Exception {
+        mockMvc.perform(get("/api/movements/" + testItemId + "/history")
+                        .param("cursor", "")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(openApiContract());
+    }
 }

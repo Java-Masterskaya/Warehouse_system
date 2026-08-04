@@ -25,7 +25,7 @@ public class BatchCleanupScheduler {
      * Защищен от двойного запуска в кластере ShedLock.
      */
     @Scheduled(cron = "0 0 3 * * ?")
-    @SchedulerLock(name = "clearExpiredBatches", lockAtMostFor = "PT5M")
+    @SchedulerLock(name = "clearExpiredBatches", lockAtLeastFor = "PT1M", lockAtMostFor = "PT5M")
     public void clearExpiredBatches() {
         log.debug("Scheduled task: clearing expired batches");
         int cleared = batchService.clearExpiredBatches(java.time.LocalDateTime.now());

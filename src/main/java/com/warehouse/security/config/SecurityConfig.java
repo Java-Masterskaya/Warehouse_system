@@ -49,6 +49,7 @@ public class SecurityConfig {
         http
                 .securityMatcher("/actuator/**") // Работает только для портов/путей актуатора
                 .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/actuator/prometheus",

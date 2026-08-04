@@ -1,5 +1,5 @@
 # Makefile для управления стеком приложения Warehouse System
-.PHONY: up down app-up app-down infra-up infra-down consul-up consul-down monitor-up monitor-down health liveness readiness test build checkstyle clean help backup-now backup-list backup-restore backup-test backup-status
+.PHONY: up down app-up app-down infra-up infra-down consul-up consul-down monitor-up monitor-down health liveness readiness ops6-smoke test build checkstyle clean help backup-now backup-list backup-restore backup-test backup-status
 
 ## --- Управление всем стеком ---
 up: ## Запуск всего стека (инфраструктура, приложение)
@@ -23,11 +23,11 @@ consul-down: ## Остановка Consul
 	docker-compose down consul consul-seed
 
 ## --- Управление мониторингом ---
-monitor-up: ## Запуск мониторинга (Prometheus, Alertmanager, Grafana, Webhook)
-	docker-compose up -d prometheus alertmanager grafana webhook-server
+monitor-up: ## Запуск мониторинга (Prometheus, Blackbox, Alertmanager, Grafana, Webhook)
+	docker compose up -d prometheus blackbox-exporter alertmanager grafana webhook-server
 
 monitor-down: ## Остановка мониторинга
-	docker-compose down prometheus alertmanager grafana webhook-server --remove-orphans
+	docker compose stop prometheus blackbox-exporter alertmanager grafana webhook-server
 
 ## --- Управление приложением ---
 app-up: ## Запуск приложения в терминале (инфраструктура должна быть запущена через docker-compose)
@@ -40,16 +40,34 @@ app-down: ## Остановка приложения (SIGTERM)
 
 ## --- Проверка работоспособности ---
 health: ## Проверка работоспособности через Actuator
-	@echo "Проверка статуса приложения..."
-	@curl -s -H "Accept: application/json" http://localhost:8081/actuator/health
+	@echo "Проверка статуса обеих реплик..."
+	@set -e; \
+	 APP1_PORT=$$(docker compose port warehouse-app-1 8081 | awk -F: '{print $$NF}'); \
+	 APP2_PORT=$$(docker compose port warehouse-app-2 8081 | awk -F: '{print $$NF}'); \
+	 curl -fsS -H "Accept: application/json" "http://localhost:$$APP1_PORT/actuator/health"; \
+	 printf '\n'; \
+	 curl -fsS -H "Accept: application/json" "http://localhost:$$APP2_PORT/actuator/health"
 
 liveness: ## Проверка liveness-пробы
-	@echo "Проверка liveness..."
-	@curl -s -H "Accept: application/json" http://localhost:8081/actuator/health/liveness
+	@echo "Проверка liveness обеих реплик..."
+	@set -e; \
+	 APP1_PORT=$$(docker compose port warehouse-app-1 8081 | awk -F: '{print $$NF}'); \
+	 APP2_PORT=$$(docker compose port warehouse-app-2 8081 | awk -F: '{print $$NF}'); \
+	 curl -fsS -H "Accept: application/json" "http://localhost:$$APP1_PORT/actuator/health/liveness"; \
+	 printf '\n'; \
+	 curl -fsS -H "Accept: application/json" "http://localhost:$$APP2_PORT/actuator/health/liveness"
 
 readiness: ## Проверка readiness-пробы
-	@echo "Проверка readiness..."
-	@curl -s -H "Accept: application/json" http://localhost:8081/actuator/health/readiness
+	@echo "Проверка readiness обеих реплик..."
+	@set -e; \
+	 APP1_PORT=$$(docker compose port warehouse-app-1 8081 | awk -F: '{print $$NF}'); \
+	 APP2_PORT=$$(docker compose port warehouse-app-2 8081 | awk -F: '{print $$NF}'); \
+	 curl -fsS -H "Accept: application/json" "http://localhost:$$APP1_PORT/actuator/health/readiness"; \
+	 printf '\n'; \
+	 curl -fsS -H "Accept: application/json" "http://localhost:$$APP2_PORT/actuator/health/readiness"
+
+ops6-smoke: ## Проверить round-robin и JWT между репликами
+	@./scripts/ops6-smoke.sh
 
 ## --- Тестирование ---
 test: ## Запуск тестов
@@ -83,8 +101,9 @@ backup-restore: ## Восстановить из последнего бэкап
 	@echo "⚠️  This will DESTROY current database and restore from the latest backup!"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	@echo "[1/4] Stopping services..."
-	@docker compose stop warehouse-app 2>/dev/null || true
-	@VOLUME_NAME=$$(docker compose ps -q postgres 2>/dev/null | xargs -I {} docker inspect --format='{{ range .Mounts }}{{ if eq .Destination "/var/lib/postgresql/data" }}{{ .Name }}{{ end }}{{ end }}' {} 2>/dev/null | head -1); \
+	@docker compose stop nginx warehouse-app-1 warehouse-app-2 2>/dev/null || true
+	@set -e; \
+	 VOLUME_NAME=$$(docker compose ps -q postgres 2>/dev/null | xargs -I {} docker inspect --format='{{ range .Mounts }}{{ if eq .Destination "/var/lib/postgresql/data" }}{{ .Name }}{{ end }}{{ end }}' {} 2>/dev/null | head -1); \
 		if [ -z "$$VOLUME_NAME" ]; then echo "❌ FAIL: Could not determine postgres volume"; exit 1; fi; \
 		echo "   Volume to destroy: $$VOLUME_NAME"; \
 		echo "[2/4] Destroying postgres container and volume..."; \
@@ -105,7 +124,7 @@ backup-restore: ## Восстановить из последнего бэкап
 		if [ -z "$$LATEST" ]; then echo "❌ FAIL: No backup found!"; exit 1; fi; \
 		echo "   📦 Restoring from: $$LATEST"; \
 		MSYS_NO_PATHCONV=1 docker compose exec -T postgres-backup sh /restore.sh "$$LATEST"; \
-		docker compose up -d warehouse-app; \
+		docker compose up -d --wait --wait-timeout 180 warehouse-app-1 warehouse-app-2 nginx; \
 		echo "✅ Restore complete. Check: make readiness"
 
 backup-test: ## E2E-тест: бэкап → destroy → restore → проверка (весь стек)
@@ -116,8 +135,9 @@ backup-test: ## E2E-тест: бэкап → destroy → restore → прове�
 	@echo "[1/5] Creating backup..."
 	@docker compose exec -T postgres-backup sh /backup.sh
 	@echo "[2/5] Stopping services and destroying postgres..."
-	@docker compose stop warehouse-app 2>/dev/null || true
-	@VOLUME_NAME=$$(docker compose ps -q postgres 2>/dev/null | xargs -I {} docker inspect --format='{{ range .Mounts }}{{ if eq .Destination "/var/lib/postgresql/data" }}{{ .Name }}{{ end }}{{ end }}' {} 2>/dev/null | head -1); \
+	@docker compose stop nginx warehouse-app-1 warehouse-app-2 2>/dev/null || true
+	@set -e; \
+	 VOLUME_NAME=$$(docker compose ps -q postgres 2>/dev/null | xargs -I {} docker inspect --format='{{ range .Mounts }}{{ if eq .Destination "/var/lib/postgresql/data" }}{{ .Name }}{{ end }}{{ end }}' {} 2>/dev/null | head -1); \
 		if [ -z "$$VOLUME_NAME" ]; then echo "❌ FAIL: Could not determine postgres volume"; exit 1; fi; \
 		echo "   Volume to destroy: $$VOLUME_NAME"; \
 		docker compose stop postgres 2>/dev/null || true; \
@@ -138,13 +158,9 @@ backup-test: ## E2E-тест: бэкап → destroy → restore → прове�
 		echo "   📦 Restoring from: $$LATEST"; \
 		MSYS_NO_PATHCONV=1 docker compose exec -T postgres-backup sh /restore.sh "$$LATEST"; \
 		echo "[5/5] Starting app and verifying..."; \
-		docker compose up -d warehouse-app; \
-		for i in $$(seq 1 30); do \
-			STATUS=$$(docker compose ps warehouse-app --format "{{.Health}}" 2>/dev/null || echo ""); \
-			if [ "$$STATUS" = "healthy" ]; then echo "   ✅ App is ready"; break; fi; \
-			if [ $$i -eq 30 ]; then echo "   ❌ App healthcheck failed"; exit 1; fi; \
-			sleep 1; \
-		done; \
+		docker compose up -d --wait --wait-timeout 180 warehouse-app-1 warehouse-app-2 nginx; \
+		PUBLIC_PORT=$$(docker compose port nginx 80 | awk -F: '{print $$NF}'); \
+		curl -fsS "http://localhost:$$PUBLIC_PORT/nginx-health" >/dev/null; \
 		docker compose exec -T postgres sh -c \
 			'psql -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" \
 			-c "SELECT CASE WHEN EXISTS (SELECT 1 FROM flyway_schema_history WHERE success = false) THEN '\''FAILED'\'' ELSE '\''OK'\'' END AS result;"' \

@@ -9,12 +9,30 @@ alerting:
           - alertmanager:9093
 
 scrape_configs:
+  - job_name: warehouse-nginx
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ['http://nginx/nginx-health']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
   - job_name: warehouse-app
     metrics_path: /actuator/prometheus
+    honor_labels: true
     static_configs:
-      # При запуске приложения (warehouse-app) в контейнере, нужно указать 'warehouse-app:8081'
-      # Если приложение вне докера - 'host.docker.internal:8081'
-      - targets: ['warehouse-app:8081']
+      - targets: ['warehouse-app-1:8081']
+        labels:
+          replica: warehouse-app-1
+      - targets: ['warehouse-app-2:8081']
+        labels:
+          replica: warehouse-app-2
 
 rule_files:
   - /etc/prometheus/prometheus-rules.yml

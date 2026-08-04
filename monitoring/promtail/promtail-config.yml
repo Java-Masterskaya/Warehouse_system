@@ -19,8 +19,10 @@ scrape_configs:
         target_label: 'container'
       - source_labels: [ '__meta_docker_image_name' ]
         target_label: 'image'
+      - source_labels: [ '__meta_docker_container_label_com_docker_compose_service' ]
+        target_label: 'service'
       - source_labels: [ '__meta_docker_container_name' ]
-        regex: '/(warehouse-app|postgres|redis|kafka).*'
+        regex: '/.*(warehouse-app-1|warehouse-app-2|warehouse-nginx|postgres|redis|kafka).*'
         action: keep
     pipeline_stages:
       - docker: { }
@@ -31,6 +33,7 @@ scrape_configs:
             logger: logger
             level: level
             application: application
+            instance: instance
             traceId: traceId
             spanId: spanId
       - timestamp:
@@ -39,4 +42,6 @@ scrape_configs:
       - labels:
           level:
           application:
+          instance:
           container:
+          service:

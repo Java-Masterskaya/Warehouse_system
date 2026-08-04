@@ -145,6 +145,16 @@ class ItemApiContractTest extends AbstractOpenApiContractTest {
     }
 
     @Test
+    void getItemCursorListMatchesContract() throws Exception {
+        mockMvc.perform(get(BASE_URL)
+                        .param("cursor", "")
+                        .param("search", "missing-cursor-item-" + System.nanoTime())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(openApiContract());
+    }
+
+    @Test
     void getItemByIdMatchesContract() throws Exception {
         String sku = "SKU-CONTRACT-GET-" + System.currentTimeMillis();
         CreateItemRequest request = new CreateItemRequest(
