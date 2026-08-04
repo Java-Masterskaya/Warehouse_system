@@ -3120,9 +3120,10 @@
         }, {
           "name" : "size",
           "in" : "query",
-          "description" : "Page size. Maximum 100 when cursor is present.",
+          "description" : "Page size. Maximum 100.",
           "required" : false,
           "schema" : {
+            "maximum" : 100,
             "minimum" : 1,
             "type" : "integer",
             "format" : "int32",
@@ -4816,7 +4817,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "RECEIVE", "WRITE_OFF", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
+            "enum" : [ "RECEIVE", "WRITE_OFF", "EXPIRED", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
           }
         }, {
           "name" : "page",
@@ -5767,7 +5768,7 @@
           "type" : {
             "type" : "string",
             "nullable" : true,
-            "enum" : [ "RECEIVE", "WRITE_OFF", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
+            "enum" : [ "RECEIVE", "WRITE_OFF", "EXPIRED", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
           },
           "quantity" : {
             "type" : "integer",
@@ -6247,7 +6248,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "RECEIVE", "WRITE_OFF", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
+            "enum" : [ "RECEIVE", "WRITE_OFF", "EXPIRED", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
           },
           "quantity" : {
             "type" : "integer",

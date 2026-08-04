@@ -300,7 +300,17 @@ class ItemCursorPaginationIntegrationTest extends AbstractIntegrationTest {
                         .param("category", category.getName())
                         .param("size", "101"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("INVALID_CURSOR"));
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void offsetPageSizeAboveLimitReturnsBadRequest() throws Exception {
+        mockMvc.perform(get(BASE_URL)
+                        .param("page", "0")
+                        .param("category", category.getName())
+                        .param("size", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
     }
 
     private String firstNextCursor() throws Exception {

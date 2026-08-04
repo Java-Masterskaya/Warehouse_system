@@ -30,6 +30,7 @@ import com.warehouse.service.item.ItemBarcodeGeneratorService;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.item.ItemServiceImpl;
 import com.warehouse.service.reservation.StockAvailabilityService;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -93,6 +94,9 @@ class ItemServiceImplTest {
     private CategoryRepository categoryRepository;
 
     @Mock
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
+    @Mock
     private ItemBarcodeGeneratorService barcodeGenerator;
 
     @Mock
@@ -113,6 +117,7 @@ class ItemServiceImplTest {
                 auditContext,
                 availabilityService,
                 categoryRepository,
+                circuitBreakerRegistry,
                 barcodeGenerator,
                 cursorCodec
         );

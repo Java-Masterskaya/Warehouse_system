@@ -1,23 +1,33 @@
 package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.batch.BatchCleanupActor;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
+import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.service.batch.BatchService;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -59,6 +69,15 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     /**
      * Проверяет, что параллельные списания одного товара не приводят к oversell.
@@ -170,6 +189,50 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
+    @Test
+    void cleanupReleasesFirstScopeLockBeforeProcessingSecondScope() throws Exception {
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        Warehouse warehouse = defaultWarehouse();
+        Item firstItem = createItem();
+        Item secondItem = createItem();
+        Stock firstStock = createStock(firstItem, warehouse, 5);
+        Stock secondStock = createStock(secondItem, warehouse, 7);
+        expireBatches(firstItem, warehouse, now.minusDays(2));
+        expireBatches(secondItem, warehouse, now.minusDays(1));
+        ensureBatchCleanupActor();
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<Integer> cleanup = null;
+        try (Connection blockedScopeConnection = dataSource.getConnection()) {
+            blockedScopeConnection.setAutoCommit(false);
+            lockStock(blockedScopeConnection, secondStock.getId(), false);
+
+            cleanup = executor.submit(() -> batchService.clearExpiredBatches(now));
+
+            Awaitility.await()
+                    .atMost(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .until(() -> expiredMovementCount(firstItem.getId()) == 1);
+
+            assertThat(cleanup.isDone()).isFalse();
+            assertStockCanBeLocked(firstStock.getId());
+            blockedScopeConnection.rollback();
+
+            assertThat(cleanup.get(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    .isGreaterThanOrEqualTo(2);
+            assertThat(stockQuantity(firstItem, warehouse)).isZero();
+            assertThat(stockQuantity(secondItem, warehouse)).isZero();
+            assertThat(expiredMovementCount(firstItem.getId())).isEqualTo(1);
+            assertThat(expiredMovementCount(secondItem.getId())).isEqualTo(1);
+            assertStockMatchesBatchTotal(firstItem.getId(), warehouse.getId());
+            assertStockMatchesBatchTotal(secondItem.getId(), warehouse.getId());
+        } finally {
+            if (cleanup != null && !cleanup.isDone()) {
+                cleanup.cancel(true);
+            }
+            executor.shutdownNow();
+        }
+    }
+
     private boolean writeOffAfterStart(CountDownLatch ready,
                                        CountDownLatch start,
                                        Long itemId,
@@ -262,6 +325,67 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
                 .expiryDate(LocalDateTime.now().plusDays(30))
                 .build());
         return savedStock;
+    }
+
+    private void expireBatches(Item item, Warehouse warehouse, LocalDateTime expiryDate) {
+        List<Batch> batches = batchRepository.findByItemIdAndWarehouseIdOrderByExpiryDateAsc(
+                item.getId(),
+                warehouse.getId()
+        );
+        batches.forEach(batch -> batch.setExpiryDate(expiryDate));
+        batchRepository.saveAllAndFlush(batches);
+    }
+
+    private void ensureBatchCleanupActor() {
+        userRepository.findByUsername(BatchCleanupActor.USERNAME)
+                .orElseGet(() -> userRepository.saveAndFlush(User.builder()
+                        .username(BatchCleanupActor.USERNAME)
+                        .password("!disabled-system-actor!")
+                        .role(Role.ROLE_USER)
+                        .active(false)
+                        .build()));
+    }
+
+    private long expiredMovementCount(Long itemId) {
+        return jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM stock_movements
+                        WHERE item_id = ?
+                          AND type = 'EXPIRED'
+                        """,
+                Long.class,
+                itemId
+        );
+    }
+
+    private int stockQuantity(Item item, Warehouse warehouse) {
+        return stockRepository.findByItemIdAndWarehouseId(item.getId(), warehouse.getId())
+                .orElseThrow()
+                .getQuantity();
+    }
+
+    private void assertStockCanBeLocked(Long stockId) throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            lockStock(connection, stockId, true);
+            connection.rollback();
+        }
+    }
+
+    private void lockStock(Connection connection, Long stockId, boolean failFast) throws Exception {
+        String lockClause = " FOR UPDATE";
+        if (failFast) {
+            lockClause += " NOWAIT";
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT id FROM stock WHERE id = ?" + lockClause
+        )) {
+            statement.setLong(1, stockId);
+            try (ResultSet result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+            }
+        }
     }
 
     private void assertStockMatchesBatchTotal(Long itemId, Long warehouseId) {

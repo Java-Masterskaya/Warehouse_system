@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,8 +64,8 @@ public class ItemController {
                     minimum = "0"
             ))
             @RequestParam(required = false) @Min(0) Integer page,
-            @Parameter(description = "Page size. Maximum 100 when cursor is present.")
-            @RequestParam(defaultValue = "20") @Min(1) int size,
+            @Parameter(description = "Page size. Maximum 100.")
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @Parameter(
                     description = "Opaque keyset cursor. Supply an empty value to start cursor pagination.",
                     allowEmptyValue = true
