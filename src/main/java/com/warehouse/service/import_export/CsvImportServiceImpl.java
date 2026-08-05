@@ -4,7 +4,6 @@ import com.warehouse.dto.request.item.ItemImportRowDto;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
-import com.warehouse.entity.Item;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,12 +31,15 @@ public class CsvImportServiceImpl implements CsvImportService {
     private final ItemRepository     itemRepository;
     private final CategoryRepository categoryRepository;
 
+    private static final int MAX_ERRORS_TO_KEEP = 100;
+
     @Override
     public ItemImportResultDto importItems(MultipartFile file) {
 
         validateFile(file);
 
         List<ItemImportErrorDto> allErrors = new ArrayList<>();
+        int[] allErrorsCounter = {0};
         int totalRows = 0;
         int totalImported = 0;
 
@@ -46,8 +48,9 @@ public class CsvImportServiceImpl implements CsvImportService {
 
             for (CsvItemParserService.CsvChunk chunk : chunks) {
                 totalRows += chunk.processedRowsCount();
-                allErrors.addAll(chunk.errors());
-
+                for (ItemImportErrorDto dto : chunk.errors()) {
+                    addError(dto, allErrors, allErrorsCounter);
+                }
                 List<CsvItemParserService.ValidRowHolder> candidateRows = chunk.validRows();
                 if (candidateRows.isEmpty()) {
                     continue;
@@ -75,15 +78,17 @@ public class CsvImportServiceImpl implements CsvImportService {
                     ItemImportRowDto dto = holder.dto();
 
                     if (existingSkus.contains(dto.sku())) {
-                        allErrors.add(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
-                                "Товар с SKU '" + dto.sku() + "' уже существует в базе данных"));
+                        addError(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
+                                        "Товар с SKU '" + dto.sku() + "' уже существует в базе данных"),
+                                allErrors,
+                                allErrorsCounter);
                         continue;
                     }
 
                     Category category = categoryMap.get(dto.category().toLowerCase());
                     if (category == null) {
-                        allErrors.add(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
-                                "Category with name " + dto.category() + " not found"));
+                        addError(new ItemImportErrorDto(holder.rowNumber(), dto.sku(),
+                                "Category with name " + dto.category() + " not found"), allErrors, allErrorsCounter);
                         continue;
                     }
 
@@ -91,26 +96,19 @@ public class CsvImportServiceImpl implements CsvImportService {
                 }
 
                 if (!validHoldersToSave.isEmpty()) {
-                    chunkService.saveInBatches(validHoldersToSave, allErrors);
+                    chunkService.saveInBatches(validHoldersToSave, allErrors, categoryMap);
                     totalImported += validHoldersToSave.size();
                 }
             }
             log.info("Успешно импортировано {} товаров из CSV", totalImported);
+            if (allErrorsCounter[0] > 0) {
+                allErrors.add(new ItemImportErrorDto(-1, "", "И еще " + allErrorsCounter + " ошибок скрыто."));
+            }
             return ItemImportResultDto.of(totalRows, totalImported, allErrors);
 
         } catch (IOException e) {
             throw new RuntimeException("Ошибка чтения файла при импорте", e);
         }
-    }
-
-    private Item mapDtoToEntity(ItemImportRowDto dto, Category category) {
-        return Item.builder()
-                   .sku(dto.sku())
-                   .name(dto.name())
-                   .category(category)
-                   .price(dto.price())
-                   .cost(dto.cost())
-                   .build();
     }
 
     private void validateFile(MultipartFile file) {
@@ -121,6 +119,14 @@ public class CsvImportServiceImpl implements CsvImportService {
         String filename = file.getOriginalFilename();
         if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
             throw new IllegalArgumentException("Разрешена загрузка только CSV файлов");
+        }
+    }
+
+    private void addError(ItemImportErrorDto dto, List<ItemImportErrorDto> allErrors, int[] allErrorsCounter) {
+        if (allErrors.size() < MAX_ERRORS_TO_KEEP) {
+            allErrors.add(dto);
+        } else {
+            allErrorsCounter[0] += 1;
         }
     }
 }

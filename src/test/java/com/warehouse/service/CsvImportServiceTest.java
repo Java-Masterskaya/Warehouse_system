@@ -92,6 +92,7 @@ class CsvImportServiceTest {
 
         verify(chunkService).saveInBatches(
                 ArgumentMatchers.eq(List.of(row1, row2)),
+                any(),
                 any()
         );
     }
@@ -105,7 +106,7 @@ class CsvImportServiceTest {
                                                                          .hasMessageContaining("не может быть пустым");
 
         verify(csvItemParserService, never()).parseInChunks(any());
-        verify(chunkService, never()).saveInBatches(any(), any());
+        verify(chunkService, never()).saveInBatches(any(), any(), any());
     }
 
     @Test
@@ -118,7 +119,7 @@ class CsvImportServiceTest {
                                                                        .hasMessageContaining("CSV");
 
         verify(csvItemParserService, never()).parseInChunks(any());
-        verify(chunkService, never()).saveInBatches(any(), any());
+        verify(chunkService, never()).saveInBatches(any(), any(), any());
     }
 
     @Test
@@ -162,6 +163,7 @@ class CsvImportServiceTest {
 
         verify(chunkService).saveInBatches(
                 ArgumentMatchers.eq(List.of(row1)),
+                any(),
                 any()
         );
     }

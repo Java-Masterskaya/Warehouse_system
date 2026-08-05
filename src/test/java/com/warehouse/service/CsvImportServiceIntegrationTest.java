@@ -70,6 +70,7 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     @AfterEach
     void clearDatabase() {
+        reserveRepository.deleteAll();
         purchaseOrderItemRepository.deleteAll();
         purchaseOrderRepository.deleteAll();
         stockAlertRepository.deleteAll();
@@ -129,7 +130,7 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
             totalProcessedRows += chunk.processedRowsCount();
         }
 
-        assertThat(totalProcessedRows).isGreaterThanOrEqualTo(2500);
+        assertThat(totalProcessedRows).isEqualTo(2500);
     }
 
     @Test

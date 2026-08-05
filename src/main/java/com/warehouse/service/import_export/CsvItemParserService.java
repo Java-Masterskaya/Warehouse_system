@@ -2,6 +2,7 @@ package com.warehouse.service.import_export;
 
 import com.warehouse.dto.request.item.ItemImportRowDto;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
+import com.warehouse.exception.ImportException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +59,8 @@ public class CsvItemParserService {
                                                     .setIgnoreHeaderCase(true)
                                                     .build();
 
-                this.csvParser      = new CSVParser(reader, format);
+                this.csvParser = new CSVParser(reader, format);
+                validateHeaders(csvParser.getHeaderNames());
                 this.recordIterator = csvParser.iterator();
             } catch (Exception e) {
                 throw new IllegalArgumentException("Ошибка инициализации чтения CSV файла", e);
@@ -181,6 +183,22 @@ public class CsvItemParserService {
             }
         }
         return null;
+    }
+
+    private void validateHeaders(List<String> headers) {
+        List<String> lowerCaseHeaders = headers.stream()
+                                               .map(String::toLowerCase)
+                                               .toList();
+
+        boolean hasAllRequired = lowerCaseHeaders.contains("sku")
+                && lowerCaseHeaders.contains("name")
+                && lowerCaseHeaders.contains("category")
+                && lowerCaseHeaders.contains("price")
+                && lowerCaseHeaders.contains("cost");
+
+        if (!hasAllRequired) {
+            throw ImportException.ofHeaders();
+        }
     }
 
     // Вспомогательные классы-обёртки

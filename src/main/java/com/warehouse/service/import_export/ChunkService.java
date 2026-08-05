@@ -2,6 +2,7 @@ package com.warehouse.service.import_export;
 
 import com.warehouse.dto.request.item.ItemImportRowDto;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
+import com.warehouse.entity.Category;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.repository.CategoryRepository;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,12 +28,15 @@ public class ChunkService {
     private final JdbcTemplate        jdbcTemplate;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void saveInBatches(
+    public int saveInBatches(
             List<CsvItemParserService.ValidRowHolder> validRows,
-            List<ItemImportErrorDto> chunkErrors
+            List<ItemImportErrorDto> chunkErrors,
+            Map<String, Category> categoryMap
     ) {
+        int executed = 0;
+
         if (validRows.isEmpty()) {
-            return;
+            return executed;
         }
 
         Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
@@ -48,27 +53,23 @@ public class ChunkService {
                     VALUES (?, 0, ?)
                 """;
 
-        // Пробуем сохранить весь чанк пачкой (быстрый путь)
         try {
-            executeBatchSave(validRows, defaultWarehouse, insertItemsSql, insertStockSql);
+            executed = executeBatchSave(validRows, defaultWarehouse, insertItemsSql, insertStockSql, categoryMap);
         } catch (DataIntegrityViolationException e) {
-            // Если произошла гонка (дубликат SKU в базе), сохраняем поштучно,
-            // чтобы отловить конфликтные строки и записать их в ошибки, сохранив остальные
             for (CsvItemParserService.ValidRowHolder holder : validRows) {
-                ItemImportRowDto item =
-                        holder.dto(); // Предполагается, что в ValidRowHolder есть готовый Item или метод маппинга
-
+                ItemImportRowDto item = holder.dto();
                 try {
+                    Long categoryId = getCategoryId(item.category(), categoryMap); // вынесли отдельно
+
                     jdbcTemplate.update(
                             insertItemsSql,
                             item.sku(),
                             item.name(),
-                            item.category(),
+                            categoryId,
                             item.price(),
                             item.cost()
                     );
 
-                    // Сразу получаем сгенерированный ID для стока
                     Long itemId = jdbcTemplate.queryForObject(
                             "SELECT id FROM items WHERE sku = ?",
                             Long.class,
@@ -80,22 +81,29 @@ public class ChunkService {
                     }
 
                 } catch (DataIntegrityViolationException ex) {
-                    // Фиксируем ошибку гонки в общий список ошибок чанка с реальным номером строки из файла
                     chunkErrors.add(new ItemImportErrorDto(
                             holder.rowNumber(),
                             item.sku(),
                             "Товар с SKU '" + item.sku() + "' уже существует в базе данных (параллельный импорт)"
                     ));
+                } catch (Exception ex) {
+                    chunkErrors.add(new ItemImportErrorDto(
+                            holder.rowNumber(),
+                            item.sku(),
+                            "Ошибка сохранения строки: " + ex.getMessage()
+                    ));
                 }
             }
         }
+        return executed;
     }
 
-    private void executeBatchSave(
+    private int executeBatchSave(
             List<CsvItemParserService.ValidRowHolder> validRows,
             Warehouse defaultWarehouse,
             String insertItemsSql,
-            String insertStockSql
+            String insertStockSql,
+            Map<String, Category> categoryMap
     ) {
         List<Object[]> itemArgs = validRows.stream()
                                            .map(holder -> {
@@ -103,14 +111,14 @@ public class ChunkService {
                                                return new Object[]{
                                                        item.sku(),
                                                        item.name(),
-                                                       getCategoryId(item.category()),
+                                                       getCategoryId(item.category(), categoryMap),
                                                        item.price(),
                                                        item.cost()
                                                };
                                            })
                                            .toList();
 
-        jdbcTemplate.batchUpdate(insertItemsSql, itemArgs);
+        int[] updateStatuses = jdbcTemplate.batchUpdate(insertItemsSql, itemArgs);
 
         List<String> skus = validRows.stream().map(h -> h.dto().sku()).toList();
         String placeholders = String.join(",", skus.stream().map(s -> "?").toList());
@@ -139,11 +147,17 @@ public class ChunkService {
         if (!stockArgs.isEmpty()) {
             jdbcTemplate.batchUpdate(insertStockSql, stockArgs);
         }
+        return Arrays.stream(Arrays.stream(updateStatuses).toArray()).filter((i) -> i > 0).toArray().length;
     }
 
-    private Long getCategoryId(String cat) {
-        return categoryRepository.findByNameIgnoreCase(cat)
-                                 .orElseThrow(() -> new EntityNotFoundException(
-                                         "Category with name " + cat + " was not found.")).getId();
+    private Long getCategoryId(String cat, Map<String, Category> categoryMap) {
+        if (cat == null) {
+            throw new EntityNotFoundException("Category name cannot be null.");
+        }
+        Category category = categoryMap.get(cat.toLowerCase());
+        if (category == null) {
+            throw new EntityNotFoundException("Category with name " + cat + " was not found.");
+        }
+        return category.getId();
     }
 }

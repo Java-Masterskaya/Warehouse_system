@@ -98,7 +98,8 @@ public class CsvExportServiceImpl implements CsvExportService {
 
         String trimmed = value.trim();
         char firstChar = trimmed.charAt(0);
-        if (firstChar == '=' || firstChar == '+' || firstChar == '-' || firstChar == '@') {
+        if (firstChar == '=' || firstChar == '+' || firstChar == '-' || firstChar == '@' || firstChar == '\t'
+                || firstChar == '\r') {
             return "'" + trimmed;
         }
         return trimmed;
