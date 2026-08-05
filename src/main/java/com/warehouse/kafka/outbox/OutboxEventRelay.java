@@ -10,6 +10,7 @@ import com.warehouse.kafka.producer.KafkaStockAlertProducer;
 import com.warehouse.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,10 @@ public class OutboxEventRelay {
     private long retryBackoffMs;
 
     @Scheduled(fixedDelayString = "${spring.kafka.outbox.polling.interval-ms:5000}")
+    @SchedulerLock(
+            name = "relayOutboxEvents",
+            lockAtMostFor = "PT30M"
+    )
     @Transactional
     public void relayPendingEvents() {
         log.debug("Checking for pending outbox events, limit={}", pollingLimit);

@@ -5,15 +5,17 @@ import com.warehouse.dto.request.idempotency.IdempotentRequestContext;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
-import com.warehouse.dto.response.PageResponse;
-import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
+import com.warehouse.dto.response.movement.StockMovementHistoryPaginationResponse;
 import com.warehouse.dto.response.movement.StockMovementResponse;
 import com.warehouse.dto.response.movement.StockTransferResponse;
 import com.warehouse.entity.MovementType;
+import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.idempotency.IdempotencyService;
 import com.warehouse.service.movement.StockMovementService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -132,22 +134,49 @@ public class StockMovementController {
      * @param type   необязательный фильтр по типу движения
      * @param page   номер страницы (начиная с 0)
      * @param size   количество записей на странице
+     * @param cursor opaque keyset cursor, or an empty value for the first cursor page
      * @return история движений товара в виде страницы результатов
      */
     @GetMapping("/{itemId}/history")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(
+    public StockMovementHistoryPaginationResponse getItemMovementHistory(
             @PathVariable Long itemId,
             @RequestParam(required = false) MovementType type,
-            @RequestParam(defaultValue = "0")
+            @Parameter(schema = @Schema(
+                    type = "integer",
+                    format = "int32",
+                    defaultValue = "0",
+                    minimum = "0"
+            ))
+            @RequestParam(required = false)
             @Min(0)
-            int page,
+            Integer page,
 
             @RequestParam(defaultValue = "20")
             @Min(1)
             @Max(100)
-            int size) {
-        return stockMovementService.getItemMovementHistory(itemId, type, page, size);
+            int size,
+            @Parameter(
+                    description = "Opaque keyset cursor. Supply an empty value to start cursor pagination.",
+                    allowEmptyValue = true
+            )
+            @RequestParam(required = false) String cursor) {
+        if (cursor != null) {
+            if (page != null) {
+                throw new InvalidCursorException();
+            }
+            return StockMovementHistoryPaginationResponse.from(
+                    stockMovementService.getItemMovementHistoryByCursor(itemId, type, cursor, size)
+            );
+        }
+
+        int requestedPage = 0;
+        if (page != null) {
+            requestedPage = page;
+        }
+        return StockMovementHistoryPaginationResponse.from(
+                stockMovementService.getItemMovementHistory(itemId, type, requestedPage, size)
+        );
     }
 }

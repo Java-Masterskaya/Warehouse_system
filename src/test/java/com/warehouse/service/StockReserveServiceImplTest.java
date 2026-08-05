@@ -356,7 +356,10 @@ public class StockReserveServiceImplTest {
                 eq(warehouse.getId()),
                 eq(reservation.getQuantity()),
                 any(LocalDateTime.class)
-        )).thenReturn(5);
+        )).thenAnswer(invocation -> {
+            stock.setQuantity(5);
+            return 999;
+        });
         when(stockRepository.findTotalQuantityByItemId(item.getId())).thenReturn(5L);
 
         when(mapper.mapReservationToResponse(reservation))
@@ -406,7 +409,10 @@ public class StockReserveServiceImplTest {
                 eq(warehouse.getId()),
                 eq(reservation.getQuantity()),
                 any(LocalDateTime.class)
-        )).thenReturn(5);
+        )).thenAnswer(invocation -> {
+            stock.setQuantity(5);
+            return 999;
+        });
         when(itemRepository.findById(item.getId()))
                 .thenReturn(Optional.of(item));
         when(stockRepository.findTotalQuantityByItemId(item.getId()))
@@ -460,7 +466,10 @@ public class StockReserveServiceImplTest {
                 eq(warehouse.getId()),
                 eq(reservation.getQuantity()),
                 any(LocalDateTime.class)
-        )).thenReturn(5);
+        )).thenAnswer(invocation -> {
+            stock.setQuantity(5);
+            return 999;
+        });
         when(itemRepository.findById(item.getId()))
                 .thenReturn(Optional.of(item));
         when(stockRepository.findTotalQuantityByItemId(item.getId()))

@@ -3112,6 +3112,7 @@
           "in" : "query",
           "required" : false,
           "schema" : {
+            "minimum" : 0,
             "type" : "integer",
             "format" : "int32",
             "default" : 0
@@ -3119,11 +3120,23 @@
         }, {
           "name" : "size",
           "in" : "query",
+          "description" : "Page size. Maximum 100.",
           "required" : false,
           "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
             "type" : "integer",
             "format" : "int32",
             "default" : 20
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "description" : "Opaque keyset cursor. Supply an empty value to start cursor pagination.",
+          "required" : false,
+          "allowEmptyValue" : true,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -3216,7 +3229,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PageResponseItemResponse"
+                  "$ref" : "#/components/schemas/ItemPaginationResponse"
                 }
               }
             }
@@ -4804,7 +4817,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "RECEIVE", "WRITE_OFF", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
+            "enum" : [ "RECEIVE", "WRITE_OFF", "EXPIRED", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
           }
         }, {
           "name" : "page",
@@ -4826,6 +4839,15 @@
             "type" : "integer",
             "format" : "int32",
             "default" : 20
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "description" : "Opaque keyset cursor. Supply an empty value to start cursor pagination.",
+          "required" : false,
+          "allowEmptyValue" : true,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -4918,7 +4940,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PageResponseStockMovementHistoryResponse"
+                  "$ref" : "#/components/schemas/StockMovementHistoryPaginationResponse"
                 }
               }
             }
@@ -5746,7 +5768,7 @@
           "type" : {
             "type" : "string",
             "nullable" : true,
-            "enum" : [ "RECEIVE", "WRITE_OFF", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
+            "enum" : [ "RECEIVE", "WRITE_OFF", "EXPIRED", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
           },
           "quantity" : {
             "type" : "integer",
@@ -6161,7 +6183,26 @@
           }
         }
       },
-      "PageResponseStockMovementHistoryResponse" : {
+      "StockMovementHistoryCursorPageResponse" : {
+        "required" : [ "content", "hasNext", "nextCursor" ],
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/StockMovementHistoryResponse"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "StockMovementHistoryOffsetPageResponse" : {
         "required" : [ "content", "page", "size", "totalElements", "totalPages" ],
         "type" : "object",
         "properties" : {
@@ -6189,6 +6230,14 @@
           }
         }
       },
+      "StockMovementHistoryPaginationResponse" : {
+        "type" : "object",
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/StockMovementHistoryOffsetPageResponse"
+        }, {
+          "$ref" : "#/components/schemas/StockMovementHistoryCursorPageResponse"
+        } ]
+      },
       "StockMovementHistoryResponse" : {
         "required" : [ "createdAt", "id", "performedBy", "quantity", "transferId", "type", "warehouseId", "warehouseName" ],
         "type" : "object",
@@ -6199,7 +6248,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "RECEIVE", "WRITE_OFF", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
+            "enum" : [ "RECEIVE", "WRITE_OFF", "EXPIRED", "ADJUSTMENT", "TRANSFER_OUT", "TRANSFER_IN" ]
           },
           "quantity" : {
             "type" : "integer",
@@ -6226,7 +6275,26 @@
           }
         }
       },
-      "PageResponseItemResponse" : {
+      "ItemCursorPageResponse" : {
+        "required" : [ "content", "hasNext", "nextCursor" ],
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ItemResponse"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ItemOffsetPageResponse" : {
         "required" : [ "content", "page", "size", "totalElements", "totalPages" ],
         "type" : "object",
         "properties" : {
@@ -6253,6 +6321,14 @@
             "format" : "int32"
           }
         }
+      },
+      "ItemPaginationResponse" : {
+        "type" : "object",
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/ItemOffsetPageResponse"
+        }, {
+          "$ref" : "#/components/schemas/ItemCursorPageResponse"
+        } ]
       },
       "ItemDetailsResponse" : {
         "required" : [ "available", "barcode", "category", "cost", "createdAt", "currentStock", "id", "isActive", "minStock", "name", "price", "reserved", "sku", "updatedAt", "warehouseStocks" ],
