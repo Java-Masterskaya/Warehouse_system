@@ -44,8 +44,15 @@ export const options = {
         history_duration: ['p(95)<50'],
         http_req_duration: ['p(95)<100'],
         http_req_failed: ['rate<0.01'],
-        receive_throttled_rate: ['rate<0.15'],
-        writeoff_throttled_rate: ['rate<0.15'],
+        // Базовый уровень троттлинга при текущей per-VU изоляции — 0% (см. прогоны).
+        // Порог даёт запас на случай частичной деградации изоляции (VU начнут делить
+        // бакет), оставаясь достаточно строгим, чтобы поймать регрессию рано.
+        receive_throttled_rate: ['rate<0.05'],
+        writeoff_throttled_rate: ['rate<0.05'],
+        // 409/422 тоже не должны массово случаться: у каждого VU свой item (не должно
+        // быть конфликтов @Version) и большой стартовый остаток (не должно быть 422).
+        receive_conflicted_rate: ['rate<0.02'],
+        writeoff_conflicted_rate: ['rate<0.02'],
     },
 };
 
@@ -55,6 +62,8 @@ const historyDuration = new Trend('history_duration');
 const searchDuration = new Trend('search_items_duration');
 const receiveThrottled = new Rate('receive_throttled_rate');
 const writeOffThrottled = new Rate('writeoff_throttled_rate');
+const receiveConflicted = new Rate('receive_conflicted_rate');
+const writeOffConflicted = new Rate('writeoff_conflicted_rate');
 
 function authHeaders(token) {
     return { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } };
@@ -188,6 +197,7 @@ export default function (data) {
             vuHeaders(token, receiveStatus, idempotencyKey)
         );
         receiveThrottled.add(res.status === 429);
+        receiveConflicted.add(res.status === 409);
         check(res, {
             'receive: 200, 409 or 429': (r) => r.status === 200 || r.status === 409 || r.status === 429,
         });
@@ -202,6 +212,7 @@ export default function (data) {
             vuHeaders(token, writeOffStatus, idempotencyKey)
         );
         writeOffThrottled.add(res.status === 429);
+        writeOffConflicted.add(res.status === 409 || res.status === 422);
         check(res, {
             'write-off: 200, 409, 422 or 429': (r) =>
                 r.status === 200 || r.status === 409 || r.status === 422 || r.status === 429,
