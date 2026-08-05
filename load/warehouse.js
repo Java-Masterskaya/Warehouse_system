@@ -51,8 +51,8 @@ export const options = {
         writeoff_throttled_rate: ['rate<0.05'],
         // 409/422 тоже не должны массово случаться: у каждого VU свой item (не должно
         // быть конфликтов @Version) и большой стартовый остаток (не должно быть 422).
-        receive_conflicted_rate: ['rate<0.02'],
-        writeoff_conflicted_rate: ['rate<0.02'],
+        receive_conflicted_rate: ['rate<0.01'],
+        writeoff_conflicted_rate: ['rate<0.01'],
     },
 };
 
