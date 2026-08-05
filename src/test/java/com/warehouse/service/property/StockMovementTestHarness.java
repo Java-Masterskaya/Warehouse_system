@@ -22,8 +22,10 @@ import com.warehouse.exception.StockMovementInvariantException;
 import com.warehouse.kafka.outbox.OutboxService;
 import com.warehouse.mapper.StockMovementMapper;
 import com.warehouse.metric.MetricService;
+import com.warehouse.pagination.KeysetCursorCodec;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockMovementKeysetRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
@@ -31,10 +33,12 @@ import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.batch.BatchServiceImpl;
+import com.warehouse.service.batch.ExpiredBatchCleanupService;
 import com.warehouse.service.movement.StockMovementService;
 import com.warehouse.service.movement.StockMovementServiceImpl;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.cache.CacheManager;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -139,19 +143,36 @@ final class StockMovementTestHarness {
 
         StockAvailabilityService availabilityService =
                 new StockAvailabilityService(stockReserveRepository, stockRepository, batchRepository);
-        BatchService batchService = new BatchServiceImpl(batchRepository, stockRepository, availabilityService);
+        // expiredBatchCleanupService/cacheManager используются только в clearExpiredBatches(),
+        // которую этот harness не вызывает (проверяются инварианты receive/write-off/transfer) —
+        // моки без стабов, только чтобы удовлетворить конструктор.
+        ExpiredBatchCleanupService expiredBatchCleanupService = mock(ExpiredBatchCleanupService.class);
+        CacheManager cacheManager = mock(CacheManager.class);
+        BatchService batchService = new BatchServiceImpl(
+                batchRepository,
+                stockRepository,
+                availabilityService,
+                userRepository,
+                expiredBatchCleanupService,
+                cacheManager
+        );
         AuditContext auditContext = new AuditContext(new ObjectMapper());
         MetricService metricService = new MetricService(new SimpleMeterRegistry());
         OutboxService outboxService = event -> {
             // Low-stock alert outbox не участвует в проверяемых инвариантах остатков.
         };
         StockMovementMapper mapper = (entity, stockAfter, lowStockAlert) -> null;
+        // stockMovementKeysetRepository/cursorCodec используются только keyset-пагинацией
+        // истории движений, которую harness не вызывает — моки без стабов.
+        StockMovementKeysetRepository stockMovementKeysetRepository = mock(StockMovementKeysetRepository.class);
+        KeysetCursorCodec cursorCodec = mock(KeysetCursorCodec.class);
 
         this.stockMovementService = new StockMovementServiceImpl(
                 mapper,
                 availabilityService,
                 itemRepository,
                 stockMovementRepository,
+                stockMovementKeysetRepository,
                 userRepository,
                 warehouseRepository,
                 stockRepository,
@@ -159,7 +180,8 @@ final class StockMovementTestHarness {
                 batchRepository,
                 outboxService,
                 metricService,
-                auditContext
+                auditContext,
+                cursorCodec
         );
     }
 
