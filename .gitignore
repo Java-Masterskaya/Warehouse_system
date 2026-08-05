@@ -33,6 +33,7 @@ logs/
 *.key
 *.p12
 *.jks
+load/.vu-password
 
 # Docker override (local only)
 docker-compose.override.yml
