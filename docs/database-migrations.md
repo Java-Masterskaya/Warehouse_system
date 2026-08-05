@@ -66,7 +66,7 @@
 
 ## Пример: добавление колонки `items.barcode`
 
-### Шаг 1 — миграция `V37__add_items_barcode_nullable.sql`
+### Шаг 1 — миграция `V27__add_items_barcode_nullable.sql`
 
 ```sql
 ALTER TABLE items ADD COLUMN barcode VARCHAR(255);
@@ -76,7 +76,7 @@ ALTER TABLE items ADD COLUMN barcode VARCHAR(255);
 - Старый код вставляет без `barcode` — не падает.
 - Новый код уже пишет `barcode`.
 
-### Шаг 1.5 — миграция `V38__create_items_barcode_seq.sql`
+### Шаг 1.5 — миграция `V28__create_items_barcode_seq.sql`
 
 ```sql
 CREATE SEQUENCE IF NOT EXISTS items_barcode_seq START WITH 1 INCREMENT BY 1;

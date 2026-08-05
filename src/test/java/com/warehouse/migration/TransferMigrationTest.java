@@ -73,7 +73,8 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
     void testTransferLinksAreValid() {
         log.info("=== Testing transfer links validity ===");
 
-        // Проверяем, что для всех TRANSFER записей существует связанная запись
+        // Исправленный SQL: приводим оба значения к тексту (text),
+        // чтобы PostgreSQL мог сравнить BIGINT и UUID.
         List<Object[]> results = entityManager.createNativeQuery(
                 "SELECT s.id, s.transfer_id, s.type "
                         + "FROM stock_movements s "
@@ -81,7 +82,7 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
                         + "AND s.transfer_id IS NOT NULL "
                         + "AND NOT EXISTS ("
                         + "    SELECT 1 FROM stock_movements s2 "
-                        + "    WHERE s2.id = s.transfer_id"
+                        + "    WHERE CAST(s2.id AS text) = CAST(s.transfer_id AS text)"
                         + ")"
         ).getResultList();
 
@@ -89,8 +90,10 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
 
         for (Object[] row : results) {
             Long id = ((Number) row[0]).longValue();
-            Long transferId = ((Number) row[1]).longValue();
+
+            String transferId = row[1] != null ? row[1].toString() : "null";
             String type = (String) row[2];
+
             log.warn("⚠️ Broken link: movement id={}, type={}, transferId={} not found",
                     id, type, transferId);
         }
@@ -101,6 +104,7 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
 
         log.info("✅ All transfer links are valid");
     }
+
 
     @Test
     void testAllDataCopiedCorrectly() {

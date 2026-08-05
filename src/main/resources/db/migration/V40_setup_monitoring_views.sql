@@ -1,0 +1,39 @@
+-- V49: Operational monitoring views for partitioned data
+
+CREATE OR REPLACE FUNCTION monitor_stock_movements_partitions()
+    RETURNS TABLE
+            (
+                PARTITION_NAME TEXT,
+                PARTITION_SIZE TEXT,
+                ROW_COUNT      BIGINT,
+                PARTITION_DATE DATE
+            )
+AS
+$$
+BEGIN
+    RETURN QUERY
+        SELECT inhrelid::REGCLASS::TEXT,
+               PG_SIZE_PRETTY(PG_TOTAL_RELATION_SIZE(inhrelid)),
+               (SELECT COUNT(*) FROM pg_stat_all_tables WHERE relid = inhrelid),
+               (REGEXP_MATCH(inhrelid::REGCLASS::TEXT,
+                             E'stock_movements_p(\\d{4}_\\d{2})'))[1]::TEXT::DATE
+        FROM pg_inherits
+        WHERE inhparent = 'stock_movements'::REGCLASS
+        ORDER BY partition_date DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE VIEW stock_movements_partition_stats AS
+SELECT *
+FROM monitor_stock_movements_partitions();
+
+DO
+$$
+    BEGIN
+        RAISE NOTICE '========================================';
+        RAISE NOTICE 'Migration completed successfully!';
+        RAISE NOTICE 'New partitioned table: stock_movements';
+        RAISE NOTICE 'Monitor partitions: SELECT * FROM stock_movements_partition_stats;';
+        RAISE NOTICE '========================================';
+    END
+$$;

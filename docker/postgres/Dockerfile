@@ -10,6 +10,8 @@ RUN apt-get update && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
-RUN echo "shared_preload_libraries = 'pg_partman_bgw, pg_cron'" >> /usr/share/postgresql/postgresql.conf.sample
+RUN echo "shared_preload_libraries = 'pg_partman_bgw, pg_cron'" >> /usr/share/postgresql/postgresql.conf.sample && \
+    echo "cron.database_name = 'warehouse'" >> /usr/share/postgresql/postgresql.conf.sample
+
 
 COPY init-scripts/ /docker-entrypoint-initdb.d/

@@ -1,6 +1,7 @@
--- V27: Create indexes on partitioned table
+-- V38: Create optimized indexes
 
-DO $$
+DO
+$$
     BEGIN
         IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_stock_movements_item_id') THEN
             ALTER INDEX idx_stock_movements_item_id RENAME TO idx_stock_movements_archive_item_id;
@@ -20,17 +21,18 @@ DO $$
         IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_stock_movements_warehouse_date') THEN
             ALTER INDEX idx_stock_movements_warehouse_date RENAME TO idx_stock_movements_archive_warehouse_date;
         END IF;
-    END $$;
+    END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_stock_movements_item_id
-    ON ONLY stock_movements(item_id);
+    ON stock_movements (item_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_user_id
-    ON ONLY stock_movements(user_id);
+    ON stock_movements (user_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_warehouse_id
-    ON ONLY stock_movements(warehouse_id);
+    ON stock_movements (warehouse_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_created_at
-    ON ONLY stock_movements(created_at DESC);
+    ON stock_movements (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_item_date
-    ON ONLY stock_movements(item_id, created_at DESC);
+    ON stock_movements (item_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_warehouse_date
-    ON ONLY stock_movements(warehouse_id, created_at DESC);
+    ON stock_movements (warehouse_id, created_at DESC);

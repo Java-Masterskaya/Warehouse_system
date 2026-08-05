@@ -1,4 +1,4 @@
--- V29: Archive management after successful verification
+-- V39: Archive management after successful verification
 DO $$
     DECLARE
         old_count bigint;
