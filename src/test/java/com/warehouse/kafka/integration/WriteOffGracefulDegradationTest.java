@@ -37,6 +37,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
@@ -54,43 +56,57 @@ import static org.mockito.Mockito.when;
 class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
 
     @Autowired
-    private StockMovementService stockMovementService;
+    private StockMovementService        stockMovementService;
     @Autowired
-    private OutboxEventRepository outboxEventRepository;
+    private OutboxEventRepository       outboxEventRepository;
     @Autowired
-    private ItemRepository itemRepository;
+    private ItemRepository              itemRepository;
     @Autowired
-    private UserRepository userRepository;
+    private UserRepository              userRepository;
     @Autowired
-    private StockRepository stockRepository;
+    private StockRepository             stockRepository;
     @Autowired
-    private CategoryRepository categoryRepository;
+    private CategoryRepository          categoryRepository;
     @Autowired
-    private WarehouseRepository warehouseRepository;
+    private WarehouseRepository         warehouseRepository;
     @Autowired
-    private BatchRepository batchRepository;
+    private BatchRepository             batchRepository;
     @Autowired
-    private StockMovementRepository stockMovementRepository;
+    private StockMovementRepository     stockMovementRepository;
     @Autowired
-    private StockReserveRepository stockReserveRepository;
+    private StockReserveRepository      stockReserveRepository;
     @Autowired
-    private StockAlertRepository stockAlertRepository;
+    private StockAlertRepository        stockAlertRepository;
     @Autowired
     private PurchaseOrderItemRepository purchaseOrderItemRepository;
     @Autowired
-    private PurchaseOrderRepository purchaseOrderRepository;
+    private PurchaseOrderRepository     purchaseOrderRepository;
     @Autowired
-    private OutboxEventRelay outboxEventRelay;
+    private OutboxEventRelay            outboxEventRelay;
     @Autowired
-    private CircuitBreakerRegistry circuitBreakerRegistry;
+    private CircuitBreakerRegistry      circuitBreakerRegistry;
 
     @MockitoBean
     private KafkaTemplate<String, Object> kafkaTemplate;
 
-    private Item testItem;
-    private User testUser;
-    private Long testItemId;
+    private Item      testItem;
+    private User      testUser;
+    private Long      testItemId;
     private Warehouse defaultWarehouse;
+
+    // Создаем флаг, который по умолчанию false (Kafka работает)
+    static boolean kafkaDown = false;
+
+    @DynamicPropertySource
+    static void overrideKafkaProperties(DynamicPropertyRegistry registry) {
+        // Динамически подставляем адрес в зависимости от флага
+        registry.add("spring.kafka.bootstrap-servers", () -> {
+            if (kafkaDown) {
+                return "localhost:1"; // Ломаем адрес только для этого теста
+            }
+            return System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092");
+        });
+    }
 
     @BeforeEach
     void setUp() {
@@ -111,7 +127,8 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         Category category = categoryRepository.save(Category.builder().name("Test").build());
 
         defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
-                .orElseThrow(() -> new IllegalStateException("Default warehouse not configured"));
+                                              .orElseThrow(() -> new IllegalStateException(
+                                                      "Default warehouse not configured"));
 
         testItem = new Item();
         testItem.setSku("SKU-GRACE-" + System.currentTimeMillis());
@@ -139,44 +156,50 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         testItemId = testItem.getId();
 
         testUser = userRepository.findByUsername("admin")
-                .orElseGet(() -> {
-                    User user = new User();
-                    user.setUsername("admin");
-                    user.setPassword("encoded");
-                    user.setRole(Role.ROLE_ADMIN);
-                    user.setActive(true);
-                    return userRepository.save(user);
-                });
+                                 .orElseGet(() -> {
+                                     User user = new User();
+                                     user.setUsername("admin");
+                                     user.setPassword("encoded");
+                                     user.setRole(Role.ROLE_ADMIN);
+                                     user.setActive(true);
+                                     return userRepository.save(user);
+                                 });
     }
 
     @Test
     void shouldSaveOutboxEventsAndOpenCircuitBreakerWhenKafkaIsDown() {
-        UserContext ctx = new UserContext(testUser.getId(), testUser.getUsername());
+        kafkaDown = true;
+        try {
+            UserContext ctx = new UserContext(testUser.getId(), testUser.getUsername());
 
-        for (int i = 0; i < 7; i++) {
-            WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 1);
-            StockMovementResponse response = stockMovementService.writeOffReceipt(request, ctx);
-            assertThat(response.lowStockAlert()).isTrue();
-        }
+            for (int i = 0; i < 7; i++) {
+                WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 1);
+                StockMovementResponse response = stockMovementService.writeOffReceipt(request, ctx);
+                assertThat(response.lowStockAlert()).isTrue();
+            }
 
-        List<OutboxEvent> pendingEvents = outboxEventRepository.findAll();
-        assertThat(pendingEvents).hasSize(7);
-        pendingEvents.forEach(event -> assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING));
+            List<OutboxEvent> pendingEvents = outboxEventRepository.findAll();
+            assertThat(pendingEvents).hasSize(7);
+            pendingEvents.forEach(event -> assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING));
 
-        CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("kafkaProducer");
-        Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
-            .pollInterval(Duration.ofMillis(100))
-            .untilAsserted(() ->
-                assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN)
+            outboxEventRelay.relayPendingEvents();
+
+            CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("kafkaProducer");
+            Awaitility.await()
+                      .atMost(Duration.ofSeconds(5))
+                      .pollInterval(Duration.ofMillis(100))
+                      .untilAsserted(() ->
+                              assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN)
+                );
+
+            List<OutboxEvent> updatedEvents = outboxEventRepository.findAll();
+            assertThat(updatedEvents).hasSize(7);
+            updatedEvents.forEach(event ->
+                    assertThat(event.getStatus()).isIn(OutboxStatus.FAILED, OutboxStatus.PENDING)
             );
 
-        outboxEventRelay.relayPendingEvents();
-
-        List<OutboxEvent> updatedEvents = outboxEventRepository.findAll();
-        assertThat(updatedEvents).hasSize(7);
-        updatedEvents.forEach(event ->
-                assertThat(event.getStatus()).isIn(OutboxStatus.FAILED, OutboxStatus.PENDING)
-        );
+        } finally {
+            kafkaDown = false;
+        }
     }
 }
