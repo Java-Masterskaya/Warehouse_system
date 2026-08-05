@@ -39,9 +39,9 @@ make backup-restore
 
 ## Вариант 2: Пошаговое восстановление вручную
 
-### Шаг 1. Остановить приложение
+### Шаг 1. Остановить трафик и обе реплики
 ```bash
-docker compose stop warehouse-app
+docker compose stop nginx warehouse-app-1 warehouse-app-2
 ```
 
 ### Шаг 2. Удалить старый том БД (⚠️ необратимо!)
@@ -116,13 +116,20 @@ docker compose exec postgres psql -U warehouse_user -d warehouse \
 
 ### Шаг 7. Запустить приложение
 ```bash
-docker compose up -d warehouse-app
+docker compose up -d warehouse-app-1 warehouse-app-2 nginx
 ```
 
 ### Шаг 8. Проверить работоспособность
 ```bash
-# Health check
-curl -s http://localhost:8081/actuator/health/readiness | jq
+# Readiness обеих реплик
+APP1_PORT="$(docker compose port warehouse-app-1 8081 | awk -F: '{print $NF}')"
+APP2_PORT="$(docker compose port warehouse-app-2 8081 | awk -F: '{print $NF}')"
+curl -s "http://localhost:${APP1_PORT}/actuator/health/readiness" | jq
+curl -s "http://localhost:${APP2_PORT}/actuator/health/readiness" | jq
+
+# Public nginx
+PUBLIC_PORT="$(docker compose port nginx 80 | awk -F: '{print $NF}')"
+curl -fsS "http://localhost:${PUBLIC_PORT}/nginx-health"
 
 # Данные на месте
 docker compose exec postgres psql -U warehouse_user -d warehouse \
@@ -146,9 +153,9 @@ Successfully validated all migrations
 Если том не потерян, а нужно просто откатить данные на момент бэкапа:
 
 ```bash
-docker compose stop warehouse-app
+docker compose stop nginx warehouse-app-1 warehouse-app-2
 docker compose exec postgres-backup sh -c 'LATEST=$(ls -1t /backups/*.dump* | head -n1); /restore.sh "$LATEST"'
-docker compose start warehouse-app
+docker compose start warehouse-app-1 warehouse-app-2 nginx
 ```
 
 ---

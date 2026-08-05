@@ -2,7 +2,7 @@ groups:
   - name: warehouse-alerts
     rules:
       - alert: Brute-force login
-        expr: increase(warehouse_auth_login_failure_total[1m]) > 5
+        expr: sum(increase(warehouse_auth_login_failure_total[1m])) > 5
         labels:
           severity: warning
         annotations:
@@ -10,7 +10,7 @@ groups:
           description: "Login failures: {{ $value | humanize }} in the last minute"
 
       - alert: Rejected write-off rate high
-        expr: increase(warehouse_movements_writeoff_rejected_total[5m]) > 2
+        expr: sum(increase(warehouse_movements_writeoff_rejected_total[5m])) > 2
         labels:
           severity: warning
         annotations:
@@ -18,26 +18,44 @@ groups:
           description: "Rejected write-offs: {{ $value | humanize }} in the last 5 minutes"
 
       - alert: Low-stock alert spike
-        expr: increase(warehouse_stock_low_alert_total[5m]) > 2
+        expr: sum(increase(warehouse_stock_low_alert_total[5m])) > 2
         labels:
           severity: info
         annotations:
           summary: "Low-stock alert spike"
           description: "Low-stock alerts: {{ $value | humanize }} in the last 5 minutes"
 
-      - alert: App down
+      - alert: Warehouse app replica down
         expr: up{job="warehouse-app"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Warehouse app replica is down"
+          description: "Replica {{ $labels.replica }} has been down for more than 1 minute"
+
+      - alert: Warehouse app all replicas down
+        expr: sum(up{job="warehouse-app"}) == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Warehouse app is down"
-          description: "App warehouse-app has been down for more than 1 minute"
+          summary: "All Warehouse app replicas are down"
+          description: "No Warehouse app replica has been reachable for more than 1 minute"
+
+      - alert: Warehouse public endpoint down
+        expr: up{job="warehouse-nginx"} == 0 or probe_success{job="warehouse-nginx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Warehouse public endpoint is down"
+          description: "nginx has not served its health endpoint for more than 1 minute"
 
       - alert: JVM heap > 90%
-        expr: sum by (job) (jvm_memory_used_bytes{area="heap", id!="G1 Eden Space", id!="G1 Survivor Space"}) / sum by (job) (jvm_memory_max_bytes{area="heap", id!="G1 Eden Space", id!="G1 Survivor Space"}) > 0.9
+        expr: sum by (instance, replica) (jvm_memory_used_bytes{area="heap", id!="G1 Eden Space", id!="G1 Survivor Space"}) / sum by (instance, replica) (jvm_memory_max_bytes{area="heap", id!="G1 Eden Space", id!="G1 Survivor Space"}) > 0.9
         labels:
           severity: warning
         annotations:
-          summary: "JVM heap usage > 90%"
-          description: "JVM heap usage is {{ $value | humanizePercentage }}"
+          summary: "JVM heap usage > 90% on {{ $labels.replica }}"
+          description: "JVM heap usage on {{ $labels.replica }} is {{ $value | humanizePercentage }}"

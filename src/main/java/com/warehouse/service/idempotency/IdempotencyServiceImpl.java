@@ -19,6 +19,7 @@ import com.warehouse.repository.UserRepository;
 import com.warehouse.security.util.TokenHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -287,6 +288,11 @@ public class IdempotencyServiceImpl implements IdempotencyService {
     @Override
     @Transactional
     @Scheduled(cron = "${app.idempotency.cleanup-cron:0 0 * * * *}")
+    @SchedulerLock(
+            name = "cleanExpiredIdempotencyKeys",
+            lockAtLeastFor = "PT1M",
+            lockAtMostFor = "PT30M"
+    )
     public int cleanExpiredKeys() {
         int deleted = idempotencyKeyRepository.deleteExpiredKeys(LocalDateTime.now());
         if (deleted > 0) {

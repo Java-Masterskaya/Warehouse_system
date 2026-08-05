@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <springProperty scope="context" name="application" source="spring.application.name"
+    <springProperty name="application" source="spring.application.name"
                     defaultValue="warehouse-system"/>
+    <springProperty name="instance" source="app.instance-id"
+                    defaultValue="local"/>
 
     <!-- Человекочитаемый формат для dev-профиля (локальная разработка) -->
     <springProfile name="dev | default">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%mdc{traceId:-}] [%mdc{spanId:-}] - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [instance=${instance}] %logger{36} [%mdc{traceId:-}] [%mdc{spanId:-}] - %msg%n</pattern>
             </encoder>
         </appender>
         <root level="INFO">
@@ -19,7 +21,7 @@
     <springProfile name="stg | prod">
         <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-                <customFields>{"application":"${application}"}</customFields>
+                <customFields>{"application":"${application}","instance":"${instance}"}</customFields>
                 <includeMdcKeyName>traceId</includeMdcKeyName>
                 <includeMdcKeyName>spanId</includeMdcKeyName>
                 <fieldNames>

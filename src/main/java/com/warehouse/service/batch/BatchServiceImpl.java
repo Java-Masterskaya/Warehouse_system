@@ -1,5 +1,6 @@
 package com.warehouse.service.batch;
 
+import com.warehouse.batch.BatchCleanupActor;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.Stock;
@@ -8,13 +9,16 @@ import com.warehouse.exception.EntityNotFoundException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.service.reservation.StockAvailabilityService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -30,6 +34,9 @@ public class BatchServiceImpl implements BatchService {
     BatchRepository batchRepository;
     StockRepository stockRepository;
     StockAvailabilityService availabilityService;
+    UserRepository userRepository;
+    ExpiredBatchCleanupService expiredBatchCleanupService;
+    CacheManager cacheManager;
 
     @Override
     @Transactional
@@ -85,9 +92,14 @@ public class BatchServiceImpl implements BatchService {
     }
 
     @Override
-    @Transactional
-    @CacheEvict(value = "item", allEntries = true)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public int clearExpiredBatches(LocalDateTime now) {
+        Long actorId = userRepository.findByUsername(BatchCleanupActor.USERNAME)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Batch cleanup actor is not configured: " + BatchCleanupActor.USERNAME
+                ))
+                .getId();
+
         List<BatchScope> scopes = batchRepository.findExpiredScopesWithQuantity(now).stream()
                 .map(scope -> new BatchScope(scope.getItemId(), scope.getWarehouseId()))
                 .sorted(Comparator.comparing(BatchScope::warehouseId).thenComparing(BatchScope::itemId))
@@ -95,32 +107,39 @@ public class BatchServiceImpl implements BatchService {
 
         int clearedBatches = 0;
         for (BatchScope scope : scopes) {
-            Stock stock = lockStock(scope.itemId(), scope.warehouseId());
-            List<Batch> expiredBatches = batchRepository.findExpiredByItemAndWarehouseForUpdate(
-                    scope.itemId(),
-                    scope.warehouseId(),
-                    now
-            );
-            if (expiredBatches.isEmpty()) {
-                continue;
-            }
-
-            int expiredQuantity = sumQuantity(expiredBatches);
-            if (stock.getQuantity() < expiredQuantity) {
-                throw new IllegalStateException(
-                        "Batch quantity exceeds stock for item " + scope.itemId()
-                                + " at warehouse " + scope.warehouseId()
+            try {
+                int clearedInScope = expiredBatchCleanupService.clearScope(
+                        scope.itemId(),
+                        scope.warehouseId(),
+                        actorId,
+                        now
+                );
+                clearedBatches += clearedInScope;
+                if (clearedInScope > 0) {
+                    evictItemCache(scope.itemId());
+                }
+            } catch (RuntimeException exception) {
+                log.error(
+                        "Failed to clear expired batches: itemId={}, warehouseId={}",
+                        scope.itemId(),
+                        scope.warehouseId(),
+                        exception
                 );
             }
-
-            expiredBatches.forEach(batch -> batch.setQuantity(0));
-            batchRepository.saveAll(expiredBatches);
-            stock.setQuantity(stock.getQuantity() - expiredQuantity);
-            stockRepository.save(stock);
-            clearedBatches += expiredBatches.size();
         }
 
         return clearedBatches;
+    }
+
+    private void evictItemCache(Long itemId) {
+        try {
+            Cache itemCache = cacheManager.getCache("item");
+            if (itemCache != null) {
+                itemCache.evict(itemId);
+            }
+        } catch (RuntimeException exception) {
+            log.error("Failed to evict item cache after expired batch cleanup: itemId={}", itemId, exception);
+        }
     }
 
     private int writeOff(

@@ -1,12 +1,14 @@
 package com.warehouse.batch.integration;
 
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.batch.BatchCleanupActor;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.TransferStockRequest;
 import com.warehouse.dto.request.movement.WriteOffStockRequest;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.MovementType;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -63,8 +66,12 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
 
     private Warehouse defaultWarehouse;
     private Warehouse secondWarehouse;
+    private Category category;
     private Item item;
     private UserContext userContext;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -76,7 +83,7 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
                 .defaultWarehouse(false)
                 .build());
 
-        Category category = categoryRepository.saveAndFlush(Category.builder()
+        category = categoryRepository.saveAndFlush(Category.builder()
                 .name("DOM5 category " + suffix)
                 .build());
 
@@ -98,6 +105,14 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
                 .active(true)
                 .build());
         userContext = new UserContext(user.getId(), user.getUsername());
+
+        userRepository.findByUsername(BatchCleanupActor.USERNAME)
+                .orElseGet(() -> userRepository.saveAndFlush(User.builder()
+                        .username(BatchCleanupActor.USERNAME)
+                        .password("!disabled-system-actor!")
+                        .role(Role.ROLE_USER)
+                        .active(false)
+                        .build()));
     }
 
     @Test
@@ -222,6 +237,125 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
         assertThat(batchRepository.findById(defaultExpired.getId()).orElseThrow().getQuantity()).isZero();
         assertThat(batchRepository.findById(secondExpired.getId()).orElseThrow().getQuantity()).isZero();
         assertStocksMatchBatchTotals();
+
+        var history = stockMovementService.getItemMovementHistory(
+                item.getId(),
+                MovementType.EXPIRED,
+                0,
+                10
+        );
+        assertThat(history.content())
+                .extracting(
+                        response -> response.type(),
+                        response -> response.quantity(),
+                        response -> response.performedBy(),
+                        response -> response.warehouseId()
+                )
+                .containsExactlyInAnyOrder(
+                        tuple(
+                                MovementType.EXPIRED,
+                                4,
+                                BatchCleanupActor.USERNAME,
+                                defaultWarehouse.getId()
+                        ),
+                        tuple(
+                                MovementType.EXPIRED,
+                                6,
+                                BatchCleanupActor.USERNAME,
+                                secondWarehouse.getId()
+                        )
+            );
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM stock_movements
+                        WHERE item_id = ?
+                          AND type = 'EXPIRED'
+                          AND batch_id IS NOT NULL
+                        """,
+                Long.class,
+                item.getId()
+        )).isZero();
+    }
+
+    @Test
+    void cleanupRollsBackFailedScopeAndContinuesWithNextScope() {
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        String suffix = UUID.randomUUID().toString();
+        Item successfulItem = itemRepository.saveAndFlush(Item.builder()
+                .sku("DOM5-success-" + suffix)
+                .name("DOM5 successful cleanup item")
+                .category(category)
+                .minStock(1)
+                .price(BigDecimal.TEN)
+                .cost(BigDecimal.ONE)
+                .active(true)
+                .build());
+
+        Batch failedBatch = batchService.createBatchAndIncreaseStock(
+                item,
+                defaultWarehouse,
+                4,
+                now.plusDays(1)
+        );
+        Batch successfulBatch = batchService.createBatchAndIncreaseStock(
+                successfulItem,
+                defaultWarehouse,
+                6,
+                now.plusDays(1)
+        );
+        failedBatch.setExpiryDate(now.minusDays(2));
+        successfulBatch.setExpiryDate(now.minusDays(1));
+        batchRepository.saveAllAndFlush(List.of(failedBatch, successfulBatch));
+
+        String constraintName = "test_reject_expired_cleanup_item";
+        jdbcTemplate.execute(
+                "ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS " + constraintName
+        );
+        jdbcTemplate.execute(
+                "ALTER TABLE stock_movements ADD CONSTRAINT " + constraintName
+                        + " CHECK (type <> 'EXPIRED' OR item_id <> " + item.getId() + ")"
+        );
+
+        try {
+            assertThat(batchService.clearExpiredBatches(now)).isGreaterThanOrEqualTo(1);
+        } finally {
+            jdbcTemplate.execute(
+                    "ALTER TABLE stock_movements DROP CONSTRAINT IF EXISTS " + constraintName
+            );
+        }
+
+        try {
+            assertThat(stockAt(defaultWarehouse).getQuantity()).isEqualTo(4);
+            assertThat(batchRepository.findById(failedBatch.getId()).orElseThrow().getQuantity())
+                    .isEqualTo(4);
+            assertThat(stockMovementCount(item.getId(), MovementType.EXPIRED)).isZero();
+
+            Stock successfulStock = stockRepository.findByItemIdAndWarehouseId(
+                    successfulItem.getId(),
+                    defaultWarehouse.getId()
+            ).orElseThrow();
+            assertThat(successfulStock.getQuantity()).isZero();
+            assertThat(batchRepository.findById(successfulBatch.getId()).orElseThrow().getQuantity())
+                    .isZero();
+            assertThat(stockMovementCount(successfulItem.getId(), MovementType.EXPIRED)).isEqualTo(1);
+            assertThat(jdbcTemplate.queryForObject(
+                    """
+                            SELECT quantity
+                            FROM stock_movements
+                            WHERE item_id = ?
+                              AND warehouse_id = ?
+                              AND type = 'EXPIRED'
+                            """,
+                    Integer.class,
+                    successfulItem.getId(),
+                    defaultWarehouse.getId()
+            )).isEqualTo(6);
+        } finally {
+            Batch persistedFailedBatch = batchRepository.findById(failedBatch.getId()).orElseThrow();
+            persistedFailedBatch.setExpiryDate(now.plusYears(1));
+            batchRepository.saveAndFlush(persistedFailedBatch);
+        }
     }
 
     private List<Batch> batchesAt(Warehouse warehouse) {
@@ -250,5 +384,19 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
                 item.getId(),
                 warehouse.getId()
         ).orElseThrow();
+    }
+
+    private long stockMovementCount(Long itemId, MovementType type) {
+        return jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM stock_movements
+                        WHERE item_id = ?
+                          AND type = ?
+                        """,
+                Long.class,
+                itemId,
+                type.name()
+        );
     }
 }

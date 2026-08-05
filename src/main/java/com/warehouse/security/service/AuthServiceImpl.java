@@ -5,36 +5,55 @@ import com.warehouse.dto.request.security.LogoutRequest;
 import com.warehouse.dto.request.security.RefreshRequest;
 import com.warehouse.dto.response.security.LoginResponse;
 import com.warehouse.dto.response.security.RefreshResponse;
-import com.warehouse.exception.InvalidTokenException;
-import com.warehouse.exception.TokenReuseException;
-import com.warehouse.metric.MetricService;
-import com.warehouse.security.util.JwtUtil;
-import com.warehouse.security.UserPrincipal;
+import com.warehouse.exception.RefreshInProgressException;
 import com.warehouse.exception.TooManyAttemptLoginException;
+import com.warehouse.lock.DistributedLock;
+import com.warehouse.lock.DistributedLockManager;
+import com.warehouse.metric.MetricService;
+import com.warehouse.security.UserPrincipal;
 import com.warehouse.security.model.TokenPair;
+import com.warehouse.security.util.JwtUtil;
+import com.warehouse.security.util.TokenHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
-
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
+    private static final String REFRESH_LOCK_NAME_PREFIX = "refresh-rotation:";
+    private static final long DEFAULT_REFRESH_LOCK_WAIT_TIMEOUT_MS = 5_000L;
+    private static final long DEFAULT_REFRESH_LOCK_TTL_MS = 30_000L;
+    private static final long DEFAULT_REFRESH_LOCK_RETRY_INTERVAL_MS = 50L;
+
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
+    private final TokenService tokenService;
     private final MetricService metricService;
     private final LoginAttemptService loginAttemptService;
-    private final TokenService tokenService;
+    private final DistributedLockManager distributedLockManager;
+
+    @Value("${app.jwt.refresh-lock.wait-timeout-ms:5000}")
+    private long refreshLockWaitTimeoutMs = DEFAULT_REFRESH_LOCK_WAIT_TIMEOUT_MS;
+
+    @Value("${app.jwt.refresh-lock.ttl-ms:30000}")
+    private long refreshLockTtlMs = DEFAULT_REFRESH_LOCK_TTL_MS;
+
+    @Value("${app.jwt.refresh-lock.retry-interval-ms:50}")
+    private long refreshLockRetryIntervalMs = DEFAULT_REFRESH_LOCK_RETRY_INTERVAL_MS;
 
     /**
      * {@inheritDoc}
@@ -106,18 +125,14 @@ public class AuthServiceImpl implements AuthService {
      *
      * <p>Процесс обновления:
      * <ol>
-     *   <li>Проверка валидности refresh токена в Redis</li>
-     *   <li>Проверка на повторное использование (защита от кражи)</li>
-     *   <li>Генерация новой пары токенов</li>
-     *   <li>Ротация refresh (старый удаляется, новый сохраняется)</li>
-     *   <li>Опциональный blacklist старого access</li>
+     *   <li>Проверка retry-результата завершенной ротации</li>
+     *   <li>Кластерная сериализация одинаковых запросов</li>
+     *   <li>Атомарная Redis-ротация и классификация повторного использования</li>
      * </ol>
      * </p>
      *
      * @param request запрос с refresh токеном и опционально старым access
      * @return ответ с новой парой токенов
-     * @throws InvalidTokenException если refresh токен невалиден
-     * @throws TokenReuseException   если обнаружено повторное использование refresh
      */
     @Override
     public RefreshResponse refresh(RefreshRequest request) {
@@ -125,70 +140,86 @@ public class AuthServiceImpl implements AuthService {
 
         String refreshToken = request.refreshToken();
 
-        // 1. СНАЧАЛА проверяем retry-cache
         Optional<TokenPair> cachedResult = tokenService.getRefreshRetryResult(refreshToken);
         if (cachedResult.isPresent()) {
-            TokenPair cachedPair = cachedResult.get();
             log.info("Refresh retry detected, returning cached tokens");
-            return new RefreshResponse(
-                    cachedPair.accessToken(),
-                    cachedPair.refreshToken(),
-                    jwtUtil.getExpirationMs()
-            );
+            return toRefreshResponse(cachedResult.get());
         }
 
-        // Check for token reuse
-        if (tokenService.isRefreshTokenReused(refreshToken)) {
-            log.warn("Refresh token reuse detected, revoking all tokens");
-            // Revoke entire chain
-            var payload = jwtUtil.parseRefreshToken(refreshToken);
-            payload.ifPresent(p -> {
-                tokenService.blacklistAllUserAccessTokens(p.userId());
-                tokenService.revokeAllUserTokens(p.userId());
-                log.warn("All tokens revoked for user: {} due to refresh token reuse", p.userId());
-            });
-            throw new TokenReuseException("Token reuse detected - all tokens revoked");
+        validateRefreshLockConfiguration();
+        String lockName = REFRESH_LOCK_NAME_PREFIX + TokenHashUtil.hashToken(refreshToken);
+        Duration lockTtl = Duration.ofMillis(refreshLockTtlMs);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(refreshLockWaitTimeoutMs);
+
+        while (true) {
+            Optional<DistributedLock> acquiredLock = distributedLockManager.tryAcquire(lockName, lockTtl);
+            if (acquiredLock.isPresent()) {
+                try (DistributedLock ignored = acquiredLock.get()) {
+                    Optional<TokenPair> resultAfterLock = tokenService.getRefreshRetryResult(refreshToken);
+                    if (resultAfterLock.isPresent()) {
+                        log.info("Concurrent refresh completed, returning cached tokens");
+                        return toRefreshResponse(resultAfterLock.get());
+                    }
+                    return rotateRefreshToken(refreshToken);
+                }
+            }
+
+            Optional<TokenPair> resultWhileWaiting = tokenService.getRefreshRetryResult(refreshToken);
+            if (resultWhileWaiting.isPresent()) {
+                log.info("Concurrent refresh completed while waiting, returning cached tokens");
+                return toRefreshResponse(resultWhileWaiting.get());
+            }
+
+            long remainingNanos = deadline - System.nanoTime();
+            if (remainingNanos <= 0) {
+                break;
+            }
+            waitBeforeLockRetry(remainingNanos);
         }
 
-        // Validate refresh token
-        if (!tokenService.validateRefreshToken(refreshToken)) {
-            log.warn("Invalid or expired refresh token");
-            throw new InvalidTokenException("Invalid or expired refresh token");
+        Optional<TokenPair> resultAfterTimeout = tokenService.getRefreshRetryResult(refreshToken);
+        if (resultAfterTimeout.isPresent()) {
+            return toRefreshResponse(resultAfterTimeout.get());
         }
+        throw new RefreshInProgressException("Refresh token rotation is already in progress");
+    }
 
-        // Parse refresh token
-        var payload = jwtUtil.parseRefreshToken(refreshToken);
-        if (payload.isEmpty()) {
-            throw new InvalidTokenException("Invalid refresh token");
-        }
+    private RefreshResponse rotateRefreshToken(String refreshToken) {
+        TokenPair newTokenPair = tokenService.rotateRefreshToken(refreshToken);
+        log.info("Refresh token rotated atomically");
 
-        var p = payload.get();
+        return toRefreshResponse(newTokenPair);
+    }
 
-        // Blacklist ALL old access tokens
-        tokenService.blacklistAllUserAccessTokens(p.userId());
-        log.info("All old access tokens blacklisted for user: {}", p.userId());
-
-        // Generate new token pair
-        TokenPair newTokenPair = tokenService.generateTokenPair(
-                p.username(),
-                p.userId(),
-                p.roles()
-        );
-
-        // Сохраняем результат в retry-cache (до ротации)
-        tokenService.saveRefreshRetryResult(refreshToken, newTokenPair);
-
-        // Rotate refresh token
-        tokenService.rotateRefreshToken(refreshToken);
-        log.info("Refresh token rotated for user: {}", p.userId());
-
-        log.info("Refresh token rotated, access blacklisted for user: {}", p.userId());
-
+    private RefreshResponse toRefreshResponse(TokenPair tokenPair) {
         return new RefreshResponse(
-                newTokenPair.accessToken(),
-                newTokenPair.refreshToken(),
+                tokenPair.accessToken(),
+                tokenPair.refreshToken(),
                 jwtUtil.getExpirationMs()
         );
+    }
+
+    private void validateRefreshLockConfiguration() {
+        if (refreshLockWaitTimeoutMs < 0) {
+            throw new IllegalStateException("Refresh lock wait timeout must not be negative");
+        }
+        if (refreshLockTtlMs <= 0) {
+            throw new IllegalStateException("Refresh lock TTL must be positive");
+        }
+        if (refreshLockRetryIntervalMs <= 0) {
+            throw new IllegalStateException("Refresh lock retry interval must be positive");
+        }
+    }
+
+    private void waitBeforeLockRetry(long remainingNanos) {
+        long retryNanos = TimeUnit.MILLISECONDS.toNanos(refreshLockRetryIntervalMs);
+        long sleepNanos = Math.min(retryNanos, remainingNanos);
+        try {
+            TimeUnit.NANOSECONDS.sleep(sleepNanos);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RefreshInProgressException("Interrupted while waiting for refresh token rotation");
+        }
     }
 
     /**
@@ -208,12 +239,8 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = request.refreshToken();
         String accessToken = request.accessToken();
 
-        // Revoke refresh token
-        tokenService.revokeRefreshToken(refreshToken);
-        log.info("Refresh token revoked");
-        // Blacklist access token
-        tokenService.blacklistAccessToken(accessToken);
-        log.info("Access token blacklisted");
+        tokenService.revokeTokenPair(refreshToken, accessToken);
+        log.info("Token pair revoked atomically");
         var payload = jwtUtil.parseRefreshToken(refreshToken);
         payload.ifPresent(p ->
                 log.info("User '{}' logged out successfully", p.userId())
