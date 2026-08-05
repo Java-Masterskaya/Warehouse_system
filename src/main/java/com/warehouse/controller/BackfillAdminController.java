@@ -2,6 +2,7 @@ package com.warehouse.controller;
 
 import com.warehouse.batch.ItemBarcodeBackfillJob;
 import com.warehouse.exception.BackfillAlreadyRunningException;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,7 +33,7 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/admin/backfill")
+@RequestMapping({ApiPaths.V1_BACKFILL_ROOT, ApiPaths.LEGACY_BACKFILL_ROOT})
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "Admin: Backfill", description = "Управление ручными backfill-операциями")
@@ -72,7 +73,7 @@ public class BackfillAdminController {
         Map<String, Object> body = Map.of(
                 "status", "STARTED",
                 "batchSize", batchSize,
-                "message", "Backfill запущен в фоне. Прогресс — GET /admin/backfill/barcode/status"
+                "message", "Backfill запущен в фоне. Прогресс - GET /api/v1/admin/backfill/barcode/status"
         );
         return ResponseEntity.accepted().body(body);
     }

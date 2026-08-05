@@ -1,6 +1,7 @@
 package com.warehouse.controller;
 
 import com.warehouse.kafka.service.DltReprocessingService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,7 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/admin/dlq/low-stock")
+@RequestMapping({
+    ApiPaths.V1_API_ROOT + "/admin/dlq/low-stock",
+    ApiPaths.LEGACY_API_ROOT + "/admin/dlq/low-stock"
+})
 @RequiredArgsConstructor
 @Tag(name = "DLQ Management", description = "Управление Dead Letter Queue (только ADMIN)")
 @SecurityRequirement(name = "bearerAuth")

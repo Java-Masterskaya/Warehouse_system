@@ -9,6 +9,7 @@ import com.warehouse.dto.response.item.ItemResponse;
 import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.service.category.CategoryService;
 import com.warehouse.service.item.ItemService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -37,7 +38,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/items")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/items", ApiPaths.LEGACY_API_ROOT + "/items"})
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Товары", description = "Управление каталогом товаров")
