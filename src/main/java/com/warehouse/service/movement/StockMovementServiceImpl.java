@@ -409,6 +409,10 @@ public class StockMovementServiceImpl implements StockMovementService {
         if (fromWarehouseId.equals(toWarehouseId)) {
             throw new InvalidMovementRequestException("Source and destination warehouses must be different");
         }
+        if (quantity <= 0) {
+            log.warn("Invalid quantity for stock transfer: itemId={}, quantity={}", itemId, quantity);
+            throw new InvalidMovementRequestException("Quantity must be greater than 0");
+        }
 
         Item item = itemCheckForExist(itemId);
         itemCheckForActive(item);
