@@ -26,6 +26,7 @@ import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.service.movement.StockMovementService;
@@ -54,6 +55,9 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
     private CategoryRepository categoryRepository;
 
     @Autowired
+    private StockAlertRepository stockAlertRepository;
+
+    @Autowired
     private StockMovementService stockMovementService;
 
     private Long itemId;
@@ -61,7 +65,8 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Очищаем таблицы
+        // Очищаем таблицы. stockAlertRepository чистим первой — на неё ссылается FK от items.
+        stockAlertRepository.deleteAllInBatch();
         stockMovementRepository.deleteAllInBatch();
         batchRepository.deleteAll();
         stockRepository.deleteAllInBatch();
