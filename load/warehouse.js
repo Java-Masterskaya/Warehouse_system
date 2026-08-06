@@ -21,7 +21,7 @@ function readSeedPassword() {
 }
 
 // Каждый VU — свой пользователь (loadtest-vu-N, см. seed.sh), иначе весь трафик
-// записи считается за одного 'admin' и упирается в rate-limit на /api/movements.
+// записи считается за одного 'admin' и упирается в rate-limit на /api/v1/movements.
 const VU_PASSWORD = __ENV.VU_PASSWORD || readSeedPassword() || 'LoadTest123!';
 const MAX_VUS = Number(__ENV.MAX_VUS || 50);
 // Та же категория, что создаёт load/seed.sh — teardown() трогает только эти товары,
@@ -94,7 +94,7 @@ function futureIsoDate(daysAhead) {
 
 export function setup() {
     const loginRes = http.post(
-        `${BASE_URL}/api/auth/login`,
+        `${BASE_URL}/api/v1/auth/login`,
         JSON.stringify({ username: APP_USERNAME, password: APP_PASSWORD }),
         { headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': fakeIp(0) } }
     );
@@ -106,7 +106,7 @@ export function setup() {
     }
 
     const itemsRes = http.get(
-        `${BASE_URL}/api/items?page=0&size=50&category=${LOAD_TEST_CATEGORY}`,
+        `${BASE_URL}/api/v1/items?page=0&size=50&category=${LOAD_TEST_CATEGORY}`,
         authHeaders(adminToken)
     );
     check(itemsRes, { 'setup items: 200': (r) => r.status === 200 });
@@ -125,7 +125,7 @@ export function setup() {
     for (let v = 1; v <= MAX_VUS; v++) {
         const username = `loadtest-vu-${v}`;
         const res = http.post(
-            `${BASE_URL}/api/auth/login`,
+            `${BASE_URL}/api/v1/auth/login`,
             JSON.stringify({ username, password: VU_PASSWORD }),
             { headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': fakeIp(v) } }
         );
@@ -155,7 +155,7 @@ export default function (data) {
     const myItemId = itemIds[(__VU - 1) % itemIds.length];
 
     group('list items', () => {
-        const res = http.get(`${BASE_URL}/api/items?page=0&size=20`, vuHeaders(token, okStatus));
+        const res = http.get(`${BASE_URL}/api/v1/items?page=0&size=20`, vuHeaders(token, okStatus));
         listDuration.add(res.timings.duration);
         check(res, { 'list: 200': (r) => r.status === 200 });
     });
@@ -164,7 +164,7 @@ export default function (data) {
     group('search items', () => {
         const searchTerm = `Item ${Math.floor(Math.random() * itemIds.length) + 1}`;
         const res = http.get(
-            `${BASE_URL}/api/items?page=0&size=20&search=${encodeURIComponent(searchTerm)}`,
+            `${BASE_URL}/api/v1/items?page=0&size=20&search=${encodeURIComponent(searchTerm)}`,
             vuHeaders(token, okStatus)
         );
         searchDuration.add(res.timings.duration);
@@ -173,7 +173,7 @@ export default function (data) {
     sleep(0.3);
 
     group('item detail', () => {
-        const res = http.get(`${BASE_URL}/api/items/${randomItemId}`, vuHeaders(token, okStatus));
+        const res = http.get(`${BASE_URL}/api/v1/items/${randomItemId}`, vuHeaders(token, okStatus));
         detailDuration.add(res.timings.duration);
         check(res, { 'detail: 200': (r) => r.status === 200 });
     });
@@ -181,7 +181,7 @@ export default function (data) {
 
     group('movement history', () => {
         const res = http.get(
-            `${BASE_URL}/api/movements/${randomItemId}/history?page=0&size=20`,
+            `${BASE_URL}/api/v1/movements/${randomItemId}/history?page=0&size=20`,
             vuHeaders(token, okStatus)
         );
         historyDuration.add(res.timings.duration);
@@ -192,7 +192,7 @@ export default function (data) {
     group('receive', () => {
         const idempotencyKey = `${runId}-vu${__VU}-iter${__ITER}-receive`;
         const res = http.post(
-            `${BASE_URL}/api/movements/receive`,
+            `${BASE_URL}/api/v1/movements/receive`,
             JSON.stringify({ itemId: myItemId, quantity: 20, expiryDate: futureIsoDate(30) }),
             vuHeaders(token, receiveStatus, idempotencyKey)
         );
@@ -207,7 +207,7 @@ export default function (data) {
     group('write-off', () => {
         const idempotencyKey = `${runId}-vu${__VU}-iter${__ITER}-writeoff`;
         const res = http.post(
-            `${BASE_URL}/api/movements/write-off`,
+            `${BASE_URL}/api/v1/movements/write-off`,
             JSON.stringify({ itemId: myItemId, quantity: 5 }),
             vuHeaders(token, writeOffStatus, idempotencyKey)
         );
@@ -227,7 +227,7 @@ export function teardown(data) {
 
     for (const itemId of itemIds) {
         const res = http.post(
-            `${BASE_URL}/api/inventory/stocktake`,
+            `${BASE_URL}/api/v1/inventory/stocktake`,
             JSON.stringify({ itemId, countedQuantity: 100, surplusExpiryDate: futureIsoDate(30) }),
             headers
         );
