@@ -43,6 +43,8 @@ import com.warehouse.service.reservation.StockAvailabilityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -76,6 +78,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -1368,6 +1371,67 @@ class StockMovementServiceImplTest {
         verify(stockRepository, never())
                 .findByItemAndWarehousesForUpdate(anyLong(), anyList());
         verify(stockMovementRepository, never()).saveAllAndFlush(anyList());
+    }
+
+    /**
+     * Перемещение с quantity &lt;= 0 отклоняется до похода в репозитории:
+     * ни один из репозиториев не вызывается.
+     *
+     * @param invalidQuantity непозитивное значение quantity, переданное в запрос перемещения
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1, -100})
+    void transferWithNonPositiveQuantityDoesNotTouchRepositories(int invalidQuantity) {
+        TransferStockRequest request = new TransferStockRequest(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID,
+                SECONDARY_WAREHOUSE_ID,
+                invalidQuantity
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        InvalidMovementRequestException exception = assertThrows(
+                InvalidMovementRequestException.class,
+                () -> stockMovementService.transfer(request, userContext)
+        );
+
+        assertEquals("Quantity must be greater than 0", exception.getMessage());
+        verifyNoInteractions(
+                itemRepository,
+                warehouseRepository,
+                stockRepository,
+                batchRepository,
+                stockMovementRepository
+        );
+    }
+
+    /**
+     * Перемещение с quantity = null (прямой вызов сервиса, минуя {@code @Valid} на контроллере)
+     * отклоняется доменной проверкой, а не падает с NullPointerException при unboxing'е.
+     */
+    @Test
+    void transferWithNullQuantityThrowsInvalidMovementRequestException() {
+        TransferStockRequest request = new TransferStockRequest(
+                ITEM_ID,
+                DEFAULT_WAREHOUSE_ID,
+                SECONDARY_WAREHOUSE_ID,
+                null
+        );
+        UserContext userContext = new UserContext(USER_ID, USERNAME);
+
+        InvalidMovementRequestException exception = assertThrows(
+                InvalidMovementRequestException.class,
+                () -> stockMovementService.transfer(request, userContext)
+        );
+
+        assertEquals("Quantity must be greater than 0", exception.getMessage());
+        verifyNoInteractions(
+                itemRepository,
+                warehouseRepository,
+                stockRepository,
+                batchRepository,
+                stockMovementRepository
+        );
     }
 
     /**

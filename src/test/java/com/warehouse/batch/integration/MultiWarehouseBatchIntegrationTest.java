@@ -9,6 +9,8 @@ import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
+import com.warehouse.entity.Reservation;
+import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
@@ -18,10 +20,12 @@ import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.service.batch.BatchService;
 import com.warehouse.service.movement.StockMovementService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +63,9 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
+    private StockReserveRepository reservationRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -72,6 +79,11 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @AfterEach
+    void deleteCreatedReservations() {
+        reservationRepository.deleteAllInBatch();
+    }
 
     @BeforeEach
     void setUp() {
@@ -307,6 +319,13 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
         failedBatch.setExpiryDate(now.minusDays(2));
         successfulBatch.setExpiryDate(now.minusDays(1));
         batchRepository.saveAllAndFlush(List.of(failedBatch, successfulBatch));
+        Reservation failedReservation = reservationRepository.saveAndFlush(Reservation.builder()
+                .stock(stockAt(defaultWarehouse))
+                .user(userRepository.getReferenceById(userContext.userId()))
+                .quantity(4)
+                .status(ReservationStatus.ACTIVE)
+                .expiredAt(now.plusDays(1))
+                .build());
 
         String constraintName = "test_reject_expired_cleanup_item";
         jdbcTemplate.execute(
@@ -329,6 +348,8 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
             assertThat(stockAt(defaultWarehouse).getQuantity()).isEqualTo(4);
             assertThat(batchRepository.findById(failedBatch.getId()).orElseThrow().getQuantity())
                     .isEqualTo(4);
+            assertThat(reservationRepository.findById(failedReservation.getId()).orElseThrow().getStatus())
+                    .isEqualTo(ReservationStatus.ACTIVE);
             assertThat(stockMovementCount(item.getId(), MovementType.EXPIRED)).isZero();
 
             Stock successfulStock = stockRepository.findByItemIdAndWarehouseId(
