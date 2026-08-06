@@ -330,6 +330,42 @@ make checkstyle
 - `./gradlew check`
 - CI/CD (GitHub Actions)
 
+### Property-based тесты инвариантов остатков (jqwik)
+
+Помимо примеров с конкретными числами, инварианты остатков склада проверяются на
+случайных последовательностях операций через [jqwik](https://jqwik.net/):
+
+- остаток ни на одном складе никогда не уходит в минус;
+- Σ(приходы) − Σ(успешных списаний) == текущий суммарный остаток товара по всем складам.
+
+```bash
+# Прогнать только property-тесты
+./gradlew test --tests "com.warehouse.service.property.*"
+```
+
+Тесты лежат в `src/test/java/com/warehouse/service/property/`:
+
+- `StockOperation` — одна операция случайной последовательности (приход/списание/перемещение);
+- `StockMovementTestHarness` — поднимает реальные `StockMovementServiceImpl`/`BatchServiceImpl`/
+  `StockAvailabilityService` поверх in-memory реализаций репозиториев (без Spring-контекста —
+  у jqwik нет официальной интеграции с Spring TestContext, а поднимать `ApplicationContext` на
+  каждый из тысяч прогонов property избыточно медленно). Атомарность под реальной БД (транзакции,
+  `@Version`, блокировки) отдельно покрыта Testcontainers-тестами
+  (`StockMovementAtomicityIntegrationTest`, `StockTransferControllerIntegrationTest`);
+- `StockInvariantsPropertyTest` — сами свойства (`@Property`, tries = 1000 каждое) и два
+  зафиксированных регрессионных примера (`@Example`), найденных расширением генератора:
+  списание раньше самого первого прихода на складе и перемещение с нулевым количеством оба
+  бросают не тот тип исключения, что ожидается для "недостаточно остатка" (см. Javadoc на
+  `writeOffBeforeAnyReceiptIsRejectedWithoutChangingState` и
+  `transferWithZeroQuantityIsRejectedWithoutChangingState`).
+
+Если property падает, jqwik сам сжимает (shrinking) контрпример до минимальной
+последовательности операций и печатает сид в отчёте — прогон с этим сидом детерминированно
+воспроизводит найденный кейс. Упавшие сэмплы дополнительно кэшируются локально в
+`.jqwik-database` (не коммитится, см. `.gitignore`) и повторно проверяются первыми при
+следующем запуске. Нарушение любого из двух инвариантов проваливает `./gradlew test` — и,
+соответственно, сборку.
+
 ## OpenAPI-контракт
 
 API описывается code-first: springdoc генерирует спеку из аннотаций контроллеров и DTO

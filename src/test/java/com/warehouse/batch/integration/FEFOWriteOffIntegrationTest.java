@@ -1,19 +1,5 @@
 package com.warehouse.batch.integration;
 
-import com.warehouse.repository.StockAlertRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
@@ -27,9 +13,22 @@ import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
 import com.warehouse.service.movement.StockMovementService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Интеграционный тест для проверки FEFO (First Expire First Out) списания.
@@ -55,16 +54,17 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
     private CategoryRepository categoryRepository;
 
     @Autowired
-    private StockMovementService stockMovementService;
+    private StockAlertRepository stockAlertRepository;
 
     @Autowired
-    private StockAlertRepository stockAlertRepository;
+    private StockMovementService stockMovementService;
 
     private Long itemId;
     private Long warehouseId;
 
     @BeforeEach
     void setUp() {
+        // Очищаем таблицы. stockAlertRepository чистим первой — на неё ссылается FK от items.
         stockAlertRepository.deleteAllInBatch();
         stockMovementRepository.deleteAllInBatch();
         batchRepository.deleteAll();
