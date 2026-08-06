@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate; // Добавлено
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,7 +44,7 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
             Long id = ((Number) row[0]).longValue();
             String type = (String) row[1];
 
-            String transferId = row[2] != null ? row[2].toString() : null;
+            String transferId = Objects.toString(row[2], null);
 
             if (transferId == null) {
                 nullTransferIdCount++;
@@ -72,7 +73,7 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
                         + "AND s.transfer_id IS NOT NULL "
                         + "AND NOT EXISTS ("
                         + "    SELECT 1 FROM stock_movements s2 "
-                        + "    WHERE CAST(s2.id AS text) = CAST(s.transfer_id AS text)"
+                        + "    WHERE CAST(s2.id AS TEXT) = CAST(s.transfer_id AS TEXT)"
                         + ")"
         ).getResultList();
 
@@ -81,7 +82,7 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
         for (Object[] row : results) {
             Long id = ((Number) row[0]).longValue();
 
-            String transferId = row[1] != null ? row[1].toString() : "null";
+            String transferId = Objects.toString(row[1], "null");
             String type = (String) row[2];
 
             log.warn("⚠️ Broken link: movement id={}, type={}, transferId={} not found",
@@ -100,7 +101,7 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
         log.info("=== Testing data copy integrity ===");
 
         Integer tableExists = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM information_schema.tables WHERE table_name = 'stock_movements_archive'",
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'stock_movements_archive'",
                 Integer.class
         );
 

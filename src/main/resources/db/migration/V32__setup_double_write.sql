@@ -5,15 +5,16 @@ CREATE OR REPLACE FUNCTION sync_insert_to_new()
 $$
 BEGIN
     INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity,
-                                     created_at, warehouse_id, transfer_id)
+                                     created_at, warehouse_id, transfer_id, batch_id)
     VALUES (new.id, new.item_id, new.user_id, new.type,
-            new.quantity, new.created_at, new.warehouse_id, new.transfer_id)
+            new.quantity, new.created_at, new.warehouse_id, new.transfer_id, new.batch_id)
     ON CONFLICT (id, created_at) DO UPDATE SET item_id      = excluded.item_id,
                                                user_id      = excluded.user_id,
                                                type         = excluded.type,
                                                quantity     = excluded.quantity,
                                                warehouse_id = excluded.warehouse_id,
-                                               transfer_id  = excluded.transfer_id;
+                                               transfer_id  = excluded.transfer_id,
+                                               batch_id     = excluded.batch_id;
 
     RETURN new;
 END;
@@ -30,21 +31,23 @@ BEGIN
         quantity     = new.quantity,
         warehouse_id = new.warehouse_id,
         transfer_id  = new.transfer_id,
+        batch_id     = new.batch_id,
         created_at   = new.created_at
     WHERE id = new.id
       AND created_at = new.created_at;
 
     IF NOT found THEN
         INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity,
-                                         created_at, warehouse_id, transfer_id)
+                                         created_at, warehouse_id, transfer_id, batch_id)
         VALUES (new.id, new.item_id, new.user_id, new.type,
-                new.quantity, new.created_at, new.warehouse_id, new.transfer_id)
+                new.quantity, new.created_at, new.warehouse_id, new.transfer_id, new.batch_id)
         ON CONFLICT (id, created_at) DO UPDATE SET item_id      = excluded.item_id,
                                                    user_id      = excluded.user_id,
                                                    type         = excluded.type,
                                                    quantity     = excluded.quantity,
                                                    warehouse_id = excluded.warehouse_id,
-                                                   transfer_id  = excluded.transfer_id;
+                                                   transfer_id  = excluded.transfer_id,
+                                                   batch_id     = excluded.batch_id;
     END IF;
 
     RETURN new;

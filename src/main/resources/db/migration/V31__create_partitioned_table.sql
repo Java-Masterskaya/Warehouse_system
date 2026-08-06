@@ -11,6 +11,7 @@ CREATE TABLE stock_movements_new
     quantity     INTEGER     NOT NULL,
     warehouse_id BIGINT      NOT NULL,
     transfer_id  UUID,
+    batch_id     BIGINT,
     created_at   TIMESTAMP   NOT NULL DEFAULT NOW(),
     PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
@@ -24,6 +25,12 @@ ALTER TABLE stock_movements_new
 ALTER TABLE stock_movements_new
     ADD CONSTRAINT fk_stock_movements_new_user
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT;
+ALTER TABLE stock_movements
+    ADD CONSTRAINT fk_stock_movements_batch_scope
+        FOREIGN KEY (batch_id, item_id, warehouse_id)
+            REFERENCES batches (id, item_id, warehouse_id)
+            ON DELETE RESTRICT;
+
 
 ALTER TABLE stock_movements_new
     ADD CONSTRAINT stock_movements_new_quantity_check
@@ -37,7 +44,10 @@ CREATE OR REPLACE FUNCTION check_stock_movements_id_unique()
     RETURNS TRIGGER AS
 $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM stock_movements_new WHERE id = new.id) THEN
+    EXECUTE FORMAT('SELECT 1 FROM %I WHERE id = $1 LIMIT 1', tg_table_name)
+        USING new.id;
+
+    IF found THEN
         RAISE EXCEPTION 'duplicate key value violates unique constraint on id: %', new.id;
     END IF;
     RETURN new;
@@ -59,7 +69,7 @@ SELECT public.create_parent(
                p_start_partition => TO_CHAR(DATE_TRUNC('month', NOW() - INTERVAL '1 year'), 'YYYY-MM-DD')
        );
 
-CREATE TABLE stock_movements_new_default PARTITION OF stock_movements_new DEFAULT;
+CREATE TABLE IF NOT EXISTS stock_movements_new_default PARTITION OF stock_movements_new DEFAULT;
 
 DO
 $$

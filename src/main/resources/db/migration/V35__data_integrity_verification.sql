@@ -26,6 +26,5 @@ $$
     END
 $$;
 
--- Создаем статистику для оптимизатора
 ANALYZE stock_movements;
 ANALYZE stock_movements_archive;

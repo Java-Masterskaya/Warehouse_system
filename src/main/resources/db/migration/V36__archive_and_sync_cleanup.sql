@@ -18,7 +18,7 @@ $$
         RAISE NOTICE 'Archiving data older than %', archive_date;
 
         INSERT INTO stock_movements (id, item_id, user_id, type, quantity,
-                                     created_at, warehouse_id, transfer_id)
+                                     created_at, warehouse_id, transfer_id, batch_id)
         SELECT id,
                item_id,
                user_id,
@@ -26,7 +26,8 @@ $$
                quantity,
                created_at,
                warehouse_id,
-               transfer_id
+               transfer_id,
+               batch_id
         FROM stock_movements_archive
         WHERE created_at >= archive_date
         ON CONFLICT (

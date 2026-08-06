@@ -2,7 +2,7 @@
 
 CREATE OR REPLACE FUNCTION migrate_stock_movements_batch(
     p_batch_size INT,
-    p_last_id INOUT BIGINT,
+    p_last_id BIGINT,
     p_max_id BIGINT
 )
     RETURNS TABLE
@@ -16,7 +16,7 @@ DECLARE
     current_rows_migrated INT;
 BEGIN
     INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity,
-                                     created_at, warehouse_id, transfer_id)
+                                     created_at, warehouse_id, transfer_id, batch_id)
     SELECT id,
            item_id,
            user_id,
@@ -24,7 +24,8 @@ BEGIN
            quantity,
            created_at,
            warehouse_id,
-           transfer_id
+           transfer_id,
+           batch_id
     FROM stock_movements
     WHERE id > p_last_id
       AND id <= p_max_id
@@ -50,11 +51,22 @@ $$
         new_last_id_in_batch BIGINT;
         start_time           TIMESTAMP;
         end_time             TIMESTAMP;
+        rec                  RECORD;
     BEGIN
         RAISE NOTICE 'Starting batch data migration...';
         start_time := CLOCK_TIMESTAMP();
 
+        IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'stock_movements' AND relkind = 'r') THEN
+            RAISE NOTICE 'Table stock_movements does not exist, skipping migration';
+            RETURN;
+        END IF;
+
         SELECT COALESCE(MAX(id), 0) INTO max_id FROM stock_movements;
+
+        IF max_id = 0 THEN
+            RAISE NOTICE 'No data to migrate in stock_movements';
+            RETURN;
+        END IF;
 
         CREATE INDEX IF NOT EXISTS idx_stock_movements_id_temp ON stock_movements (id);
 
