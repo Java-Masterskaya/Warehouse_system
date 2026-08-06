@@ -94,15 +94,13 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
     private Long      testItemId;
     private Warehouse defaultWarehouse;
 
-    // Создаем флаг, который по умолчанию false (Kafka работает)
     static boolean kafkaDown = false;
 
     @DynamicPropertySource
     static void overrideKafkaProperties(DynamicPropertyRegistry registry) {
-        // Динамически подставляем адрес в зависимости от флага
         registry.add("spring.kafka.bootstrap-servers", () -> {
             if (kafkaDown) {
-                return "localhost:1"; // Ломаем адрес только для этого теста
+                return "localhost:1";
             }
             return System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092");
         });

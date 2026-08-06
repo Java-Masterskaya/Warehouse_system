@@ -42,7 +42,6 @@ public class CsvExportServiceImpl implements CsvExportService {
                                     sanitizeText(item.category()), item.quantity(),
                                     item.price());
                         } catch (IOException e) {
-                            // Если клиент разорвал соединение — бросаем специальное исключение
                             throw new UncheckedIOException(e);
                         }
                     });

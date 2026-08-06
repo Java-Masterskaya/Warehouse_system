@@ -1,18 +1,17 @@
 package com.warehouse.service.import_export;
 
 import com.warehouse.dto.request.item.ItemImportRowDto;
+import com.warehouse.dto.response.error.ImportErrorAccumulator;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.exception.EntityNotFoundException;
-import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.WarehouseRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -20,89 +19,81 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class ChunkService {
 
     private final WarehouseRepository warehouseRepository;
-    private final CategoryRepository  categoryRepository;
     private final JdbcTemplate        jdbcTemplate;
+    private final TransactionTemplate requiresNewTxTemplate;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int saveInBatches(
-            List<CsvItemParserService.ValidRowHolder> validRows,
-            List<ItemImportErrorDto> chunkErrors,
-            Map<String, Category> categoryMap
+    public ChunkService(
+            WarehouseRepository warehouseRepository,
+            JdbcTemplate jdbcTemplate,
+            PlatformTransactionManager transactionManager
     ) {
-        int executed = 0;
-
-        if (validRows.isEmpty()) {
-            return executed;
-        }
-
-        Warehouse defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
-                                                        .orElseThrow(() -> new IllegalStateException(
-                                                                "Default warehouse is not configured"));
-
-        String insertItemsSql = """
-                    INSERT INTO items (sku, name, category_id, price, cost)
-                    VALUES (?, ?, ?, ?, ?)
-                """;
-
-        String insertStockSql = """
-                    INSERT INTO stock (item_id, quantity, warehouse_id)
-                    VALUES (?, 0, ?)
-                """;
-
-        try {
-            executed = executeBatchSave(validRows, defaultWarehouse, insertItemsSql, insertStockSql, categoryMap);
-        } catch (DataIntegrityViolationException e) {
-            for (CsvItemParserService.ValidRowHolder holder : validRows) {
-                ItemImportRowDto item = holder.dto();
-                try {
-                    Long categoryId = getCategoryId(item.category(), categoryMap); // вынесли отдельно
-
-                    jdbcTemplate.update(
-                            insertItemsSql,
-                            item.sku(),
-                            item.name(),
-                            categoryId,
-                            item.price(),
-                            item.cost()
-                    );
-
-                    Long itemId = jdbcTemplate.queryForObject(
-                            "SELECT id FROM items WHERE sku = ?",
-                            Long.class,
-                            item.sku()
-                    );
-
-                    if (itemId != null) {
-                        jdbcTemplate.update(insertStockSql, itemId, defaultWarehouse.getId());
-                    }
-
-                } catch (DataIntegrityViolationException ex) {
-                    chunkErrors.add(new ItemImportErrorDto(
-                            holder.rowNumber(),
-                            item.sku(),
-                            "Товар с SKU '" + item.sku() + "' уже существует в базе данных (параллельный импорт)"
-                    ));
-                } catch (Exception ex) {
-                    chunkErrors.add(new ItemImportErrorDto(
-                            holder.rowNumber(),
-                            item.sku(),
-                            "Ошибка сохранения строки: " + ex.getMessage()
-                    ));
-                }
-            }
-        }
-        return executed;
+        this.warehouseRepository   = warehouseRepository;
+        this.jdbcTemplate          = jdbcTemplate;
+        this.requiresNewTxTemplate = new TransactionTemplate(transactionManager);
+        this.requiresNewTxTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
-    private int executeBatchSave(
+    private static final String INSERT_ITEM_SQL = """
+                INSERT INTO items (sku, name, category_id, price, cost)
+                VALUES (?, ?, ?, ?, ?)
+            """;
+
+    private static final String INSERT_STOCK_SQL = """
+                INSERT INTO stock (item_id, quantity, warehouse_id)
+                VALUES (?, 0, ?)
+            """;
+
+    public int saveChunk(
+            List<CsvItemParserService.ValidRowHolder> chunk,
+            ImportErrorAccumulator accumulator,
+            Map<String, Category> categoryMap
+    ) {
+        Warehouse defaultWarehouse;
+        try {
+            defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
+                                                  .orElseThrow(() -> new EntityNotFoundException(
+                                                          "Default warehouse is not configured"));
+        } catch (EntityNotFoundException e) {
+            accumulator.add(new ItemImportErrorDto(chunk.getFirst().rowNumber(), "", e.getMessage()));
+            return 0;
+        }
+
+        try {
+            int[] results = requiresNewTxTemplate.execute(status -> executeBatch(chunk,
+                    defaultWarehouse,
+                    categoryMap));
+            return countSuccesses(results);
+        } catch (Exception e) {
+            return saveOneByOne(chunk, accumulator, categoryMap, defaultWarehouse);
+        }
+    }
+
+    private int saveOneByOne(
+            List<CsvItemParserService.ValidRowHolder> chunk,
+            ImportErrorAccumulator accumulator,
+            Map<String, Category> categoryMap,
+            Warehouse defaultWarehouse
+    ) {
+        int imported = 0;
+        for (CsvItemParserService.ValidRowHolder row : chunk) {
+            try {
+                requiresNewTxTemplate.executeWithoutResult(status -> {
+                    saveSingleItemWithStock(row.dto(), categoryMap, defaultWarehouse);
+                });
+                imported++;
+            } catch (Exception e) {
+                accumulator.add(new ItemImportErrorDto(row.rowNumber(), row.dto().sku(), e.getMessage()));
+            }
+        }
+        return imported;
+    }
+
+    private int[] executeBatch(
             List<CsvItemParserService.ValidRowHolder> validRows,
             Warehouse defaultWarehouse,
-            String insertItemsSql,
-            String insertStockSql,
             Map<String, Category> categoryMap
     ) {
         List<Object[]> itemArgs = validRows.stream()
@@ -118,7 +109,7 @@ public class ChunkService {
                                            })
                                            .toList();
 
-        int[] updateStatuses = jdbcTemplate.batchUpdate(insertItemsSql, itemArgs);
+        int[] updateStatuses = jdbcTemplate.batchUpdate(INSERT_ITEM_SQL, itemArgs);
 
         List<String> skus = validRows.stream().map(h -> h.dto().sku()).toList();
         String placeholders = String.join(",", skus.stream().map(s -> "?").toList());
@@ -145,9 +136,37 @@ public class ChunkService {
                                              .toList();
 
         if (!stockArgs.isEmpty()) {
-            jdbcTemplate.batchUpdate(insertStockSql, stockArgs);
+            jdbcTemplate.batchUpdate(INSERT_STOCK_SQL, stockArgs);
         }
-        return Arrays.stream(Arrays.stream(updateStatuses).toArray()).filter((i) -> i > 0).toArray().length;
+        return updateStatuses;
+    }
+
+    private void saveSingleItemWithStock(
+            ItemImportRowDto dto,
+            Map<String, Category> categoryMap,
+            Warehouse defaultWarehouse
+    ) {
+        Long categoryId = getCategoryId(dto.category(), categoryMap);
+
+        Long itemId = jdbcTemplate.queryForObject(
+                INSERT_ITEM_SQL + " RETURNING id",
+                Long.class,
+                dto.sku(), dto.name(), categoryId, dto.price(), dto.cost()
+        );
+
+        jdbcTemplate.update(
+                INSERT_STOCK_SQL,
+                itemId, defaultWarehouse.getId()
+        );
+    }
+
+    private int countSuccesses(int[] result) {
+        if (result == null) {
+            return 0;
+        }
+        return (int) Arrays.stream(result)
+                           .filter(i -> i > 0 || i == java.sql.Statement.SUCCESS_NO_INFO)
+                           .count();
     }
 
     private Long getCategoryId(String cat, Map<String, Category> categoryMap) {

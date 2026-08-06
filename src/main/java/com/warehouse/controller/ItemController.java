@@ -44,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -170,7 +171,7 @@ public class ItemController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<StreamingResponseBody> exportItems(
             Authentication authentication,
-            @RequestParam(value = "active", required = false) Boolean active
+            @RequestParam(value = "active", required = false, defaultValue = "true") Boolean active
     ) {
         SecurityContext context = SecurityContextHolder.getContext();
         StreamingResponseBody responseBody = outputStream -> {
@@ -178,7 +179,11 @@ public class ItemController {
             try (OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
                 csvExportService.exportItems(writer, active);
             } catch (UncheckedIOException e) {
-                log.warn("Экспорт CSV был прерван клиентом: {}", e.getMessage());
+                if (e.getCause() instanceof IOException) {
+                    log.warn("Клиент прервал загрузку CSV файла (ClientAbortException)");
+                } else {
+                    log.error("Ошибка при стриминге CSV файла", e);
+                }
             } finally {
                 SecurityContextHolder.clearContext();
             }

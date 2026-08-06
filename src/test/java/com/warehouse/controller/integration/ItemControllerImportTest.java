@@ -1,6 +1,7 @@
 package com.warehouse.controller.integration;
 
 import com.warehouse.AbstractIntegrationTest;
+import com.warehouse.dto.response.error.ImportErrorAccumulator;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.service.import_export.CsvImportService;
@@ -16,7 +17,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -43,7 +43,7 @@ class ItemControllerImportTest extends AbstractIntegrationTest {
         String csvContent = "sku,name,category,price,cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00";
         MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv", csvContent.getBytes());
 
-        ItemImportResultDto expectedResponse = ItemImportResultDto.of(1, 1, List.of());
+        ItemImportResultDto expectedResponse = ItemImportResultDto.of(1, 1, new ImportErrorAccumulator());
         when(csvImportService.importItems(any())).thenReturn(expectedResponse);
 
         mockMvc.perform(
@@ -63,10 +63,11 @@ class ItemControllerImportTest extends AbstractIntegrationTest {
     void importItemsWithErrorsReturns200WithErrorsList()
             throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "items.csv", "text/csv",
-                "sku,name,category,price,cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00" .getBytes());
-
+                "sku,name,category,price,cost\nSKU-001,Ноутбук,Электроника,1000.00,800.00".getBytes());
+        ImportErrorAccumulator accumulator = new ImportErrorAccumulator();
         ItemImportErrorDto error = new ItemImportErrorDto(2, "SKU-EXISTS", "Товар с SKU 'SKU-EXISTS' уже существует");
-        ItemImportResultDto expectedResponse = ItemImportResultDto.of(2, 1, List.of(error));
+        accumulator.add(error);
+        ItemImportResultDto expectedResponse = ItemImportResultDto.of(2, 1, accumulator);
 
         when(csvImportService.importItems(any())).thenReturn(expectedResponse);
 

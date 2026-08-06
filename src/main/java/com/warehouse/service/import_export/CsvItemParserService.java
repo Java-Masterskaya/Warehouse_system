@@ -2,7 +2,7 @@ package com.warehouse.service.import_export;
 
 import com.warehouse.dto.request.item.ItemImportRowDto;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
-import com.warehouse.exception.ImportException;
+import com.warehouse.exception.ImportHeadersException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +62,8 @@ public class CsvItemParserService {
                 this.csvParser = new CSVParser(reader, format);
                 validateHeaders(csvParser.getHeaderNames());
                 this.recordIterator = csvParser.iterator();
+            } catch (ImportHeadersException e) {
+                throw e;
             } catch (Exception e) {
                 throw new IllegalArgumentException("Ошибка инициализации чтения CSV файла", e);
             }
@@ -197,7 +199,7 @@ public class CsvItemParserService {
                 && lowerCaseHeaders.contains("cost");
 
         if (!hasAllRequired) {
-            throw ImportException.ofHeaders();
+            throw ImportHeadersException.ofHeaders();
         }
     }
 

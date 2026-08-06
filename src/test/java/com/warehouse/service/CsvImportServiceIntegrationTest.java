@@ -28,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -217,6 +218,49 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         // 499 из первого чанка + 500 из второго = 999 успешно импортированных
         assertThat(result.imported()).isEqualTo(999);
         assertThat(itemRepository.count()).isEqualTo(999);
+    }
+
+    @Test
+    @DisplayName(
+            "При DB-конфликте уникальности SKU во время батча, транзакция не отменяет весь чанк и сохраняет остальные"
+                    + " товары")
+    void shouldFallbackToSingleInsertsWhenDbBatchFailsOnDuplicateKey() {
+        Category category = createCategory();
+
+        // Заранее сохраняем товар в БД, чтобы вызвать DataIntegrityViolationException во время jdbcTemplate
+        // .batchUpdate()
+        itemRepository.saveAndFlush(Item.builder()
+                                        .sku("DUPLICATE-SKU")
+                                        .name("Уже существующий")
+                                        .category(category)
+                                        .price(new BigDecimal("100.00"))
+                                        .cost(new BigDecimal("50.00"))
+                                        .build());
+
+        // Формируем CSV, где 2-я строка вызовет ошибку ограничения целостности в PostgreSQL на этапе вставки
+        String csvContent = """
+                SKU,Name,Category,Price,Cost
+                VALID-SKU-1,Первый товар,Категория,100.00,50.00
+                DUPLICATE-SKU,Товар дубликат,Категория,200.00,150.00
+                VALID-SKU-2,Второй товар,Категория,300.00,200.00
+                """;
+
+        MockMultipartFile file =
+                new MockMultipartFile("file", "items.csv", "text/csv", csvContent.getBytes(StandardCharsets.UTF_8));
+
+        ItemImportResultDto result = csvImportService.importItems(file);
+
+        // Должна зафиксироваться 1 ошибка базы данных
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().getFirst().sku()).isEqualTo("DUPLICATE-SKU");
+
+        // Фактически вставлены только 2 новые уникальные строки
+        assertThat(result.imported()).isEqualTo(2);
+
+        // Проверяем физическое наличие товаров в Postgres
+        assertThat(itemRepository.existsBySku("VALID-SKU-1")).isTrue();
+        assertThat(itemRepository.existsBySku("VALID-SKU-2")).isTrue();
     }
 
     private Category createCategory() {

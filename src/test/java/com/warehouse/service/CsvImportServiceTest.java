@@ -90,7 +90,7 @@ class CsvImportServiceTest {
         assertThat(result.imported()).isEqualTo(2);
         assertThat(result.errors()).isEmpty();
 
-        verify(chunkService).saveInBatches(
+        verify(chunkService) .saveChunk(
                 ArgumentMatchers.eq(List.of(row1, row2)),
                 any(),
                 any()
@@ -106,7 +106,7 @@ class CsvImportServiceTest {
                                                                          .hasMessageContaining("не может быть пустым");
 
         verify(csvItemParserService, never()).parseInChunks(any());
-        verify(chunkService, never()).saveInBatches(any(), any(), any());
+        verify(chunkService, never()).saveChunk(any(), any(), any());
     }
 
     @Test
@@ -119,7 +119,7 @@ class CsvImportServiceTest {
                                                                        .hasMessageContaining("CSV");
 
         verify(csvItemParserService, never()).parseInChunks(any());
-        verify(chunkService, never()).saveInBatches(any(), any(), any());
+        verify(chunkService, never()).saveChunk(any(), any(), any());
     }
 
     @Test
@@ -161,7 +161,7 @@ class CsvImportServiceTest {
         assertThat(categoryError.sku()).isEqualTo("SKU-ANOTHER");
         assertThat(categoryError.errorMessage()).contains("Category with name Неизвестная not found");
 
-        verify(chunkService).saveInBatches(
+        verify(chunkService).saveChunk(
                 ArgumentMatchers.eq(List.of(row1)),
                 any(),
                 any()

@@ -1,5 +1,6 @@
 package com.warehouse.dto.response.item;
 
+import com.warehouse.dto.response.error.ImportErrorAccumulator;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 
 import java.util.List;
@@ -17,18 +18,18 @@ public record ItemImportResultDto(int totalRows, int imported, int failed, List<
      * Создаёт объект результата импорта, автоматически рассчитывая
      * количество ошибок на основе размера списка {@code errors}.
      *
-     * @param totalRows общее количество обработанных строк
-     * @param imported  количество успешно импортированных элементов
-     * @param errors    список ошибок
+     * @param totalRows   общее количество обработанных строк
+     * @param imported    количество успешно импортированных элементов
+     * @param accumulator список ошибок
      * @return заполненный объект результата импорта
      */
-    public static ItemImportResultDto of(int totalRows, int imported, List<ItemImportErrorDto> errors) {
+    public static ItemImportResultDto of(int totalRows, int imported, ImportErrorAccumulator accumulator) {
         List<ItemImportErrorDto> safeErrors;
-        if (errors != null) {
-            safeErrors = errors;
+        if (accumulator != null) {
+            safeErrors = accumulator.getDetails();
         } else {
             safeErrors = List.of();
         }
-        return new ItemImportResultDto(totalRows, imported, safeErrors.size(), safeErrors);
+        return new ItemImportResultDto(totalRows, imported, accumulator.getTotalErrors(), safeErrors);
     }
 }

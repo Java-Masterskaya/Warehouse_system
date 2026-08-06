@@ -2,7 +2,7 @@ package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
-import com.warehouse.exception.ImportException;
+import com.warehouse.exception.ImportHeadersException;
 import com.warehouse.service.import_export.CsvItemParserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,8 +62,7 @@ public class CsvItemParserServiceTest extends AbstractIntegrationTest {
         InputStream inputStream = new ByteArrayInputStream(invalidCsvContent.getBytes(StandardCharsets.UTF_8));
 
         assertThatThrownBy(() -> csvItemParserService.parseInChunks(inputStream).iterator().hasNext())
-                .isInstanceOf(RuntimeException.class)
-                .hasCauseInstanceOf(ImportException.class);
+                .isInstanceOf(ImportHeadersException.class);
     }
 
     @Test
@@ -78,5 +77,33 @@ public class CsvItemParserServiceTest extends AbstractIntegrationTest {
         var iterator = chunksIterable.iterator();
         assertThat(iterator).isNotNull();
         assertThat(iterator.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Неполный набор обязательных колонок (отсутствует Cost) вызывает ошибку валидации заголовков")
+    void shouldThrowExceptionWhenSomeRequiredHeadersAreMissing() {
+        // Отсутствует обязательная колонка Cost
+        String missingCostHeaderCsv = """
+                SKU,Name,Category,Price
+                SKU-100,Товар 1,Электроника,150.00
+                """;
+
+        InputStream inputStream = new ByteArrayInputStream(missingCostHeaderCsv.getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> csvItemParserService.parseInChunks(inputStream).iterator().hasNext())
+                .satisfies(throwable -> {
+                    assertThat(throwable)
+                            .describedAs("Ожидалось исключение ImportHeadersException(напрямую или в cause)")
+                            .isInstanceOfAny(ImportHeadersException.class,
+                                    ImportHeadersException.class,
+                                    RuntimeException.class);
+
+                    boolean isCauseMatching = throwable.getCause() instanceof ImportHeadersException
+                            || throwable.getCause() instanceof ImportHeadersException;
+                    boolean isDirectMatching = throwable instanceof ImportHeadersException
+                            || throwable instanceof ImportHeadersException;
+
+                    assertThat(isCauseMatching || isDirectMatching).isTrue();
+                });
     }
 }
