@@ -4,6 +4,7 @@ import com.warehouse.controller.advice.GlobalExceptionHandler;
 import com.warehouse.dto.response.DltReprocessResponse;
 import com.warehouse.exception.DltReprocessingInProgressException;
 import com.warehouse.kafka.service.DltReprocessingService;
+import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,7 +41,7 @@ class DltReprocessControllerTest {
         when(dltReprocessingService.reprocessAllDltMessages())
                 .thenReturn(CompletableFuture.completedFuture(DltReprocessResponse.empty()));
 
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess"))
+        mockMvc.perform(post(ApiPaths.V1_API_ROOT + "/admin/dlq/low-stock/reprocess"))
                 .andExpect(status().isAccepted());
     }
 
@@ -49,7 +50,7 @@ class DltReprocessControllerTest {
         when(dltReprocessingService.reprocessAllDltMessages())
                 .thenThrow(new DltReprocessingInProgressException());
 
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess"))
+        mockMvc.perform(post(ApiPaths.V1_API_ROOT + "/admin/dlq/low-stock/reprocess"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("DLT_REPROCESSING_IN_PROGRESS"))
                 .andExpect(jsonPath("$.message").value("DLT reprocessing is already running"));

@@ -38,13 +38,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Интеграционный тест для проверки эндпоинтов управления товарами.
- * Тестирует POST /api/items (создание) и GET /api/items (список с фильтрацией, сортировкой, пагинацией).
+ * Тестирует POST /api/v1/items (создание) и GET /api/v1/items (список с фильтрацией, сортировкой, пагинацией).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 class ItemControllerTest extends AbstractIntegrationTest {
 
-    private static final String BASE_URL = "/api/items";
+    private static final String BASE_URL = V1_API_ROOT + "/items";
 
     @Autowired
     private MockMvc mockMvc;
@@ -112,7 +112,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-001", "Ноутбук Dell",
                 "Электроника", 5, BigDecimal.valueOf(1500.00), BigDecimal.valueOf(1000.00), null);
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -130,13 +130,13 @@ class ItemControllerTest extends AbstractIntegrationTest {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-DUP", "Товар",
                 "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -152,7 +152,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-002", "Товар",
                 "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
@@ -167,7 +167,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
         CreateItemRequest request = new CreateItemRequest("SKU-CTRL-003", "Товар",
                 "Категория", 0, BigDecimal.valueOf(100.00), BigDecimal.valueOf(50.00), null);
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -185,7 +185,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                  "price": 100.00, "cost": 50.00}
                 """;
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -203,7 +203,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                  "Категория", "minStock": -1, "price": 100.00, "cost": 50.00}
                 """;
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -322,7 +322,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
     }
 
     /**
-     * USER может получить список товаров (GET /api/items).
+     * USER может получить список товаров (GET /api/v1/items).
      */
     @Test
     void userTokenCanAccessGetItems() throws Exception {
@@ -369,7 +369,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 "Обновленный товар", "Обновленная категория", 10,
                 BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00), null);
 
-        mockMvc.perform(put("/api/items/" + item.getId())
+        mockMvc.perform(put(V1_API_ROOT + "/items/" + item.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -413,7 +413,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
         UpdateItemRequest request = new UpdateItemRequest(
                 "Товар", "Тест", 5, BigDecimal.ZERO, BigDecimal.ZERO, null);
 
-        mockMvc.perform(put("/api/items/" + item.getId())
+        mockMvc.perform(put(V1_API_ROOT + "/items/" + item.getId())
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -455,7 +455,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 "price": 150.00, "cost": 80.00}
                 """;
 
-        mockMvc.perform(put("/api/items/" + item.getId())
+        mockMvc.perform(put(V1_API_ROOT + "/items/" + item.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateBody))
                 .andExpect(status().isUnauthorized())
@@ -490,7 +490,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 "Обновленный товар", "Тест", 10,
                 BigDecimal.valueOf(150.00), BigDecimal.valueOf(80.00), null);
 
-        mockMvc.perform(put("/api/items/" + item.getId())
+        mockMvc.perform(put(V1_API_ROOT + "/items/" + item.getId())
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -537,7 +537,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 "minStock": 0, "price": -100.00, "cost": 50.00}
                 """;
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -555,7 +555,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 "minStock": 0, "price": 100.00, "cost": -50.00}
                 """;
 
-        mockMvc.perform(post("/api/items")
+        mockMvc.perform(post(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -589,7 +589,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 "price": -100.00, "cost": 50.00}
                 """;
 
-        mockMvc.perform(put("/api/items/" + itemId)
+        mockMvc.perform(put(V1_API_ROOT + "/items/" + itemId)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateBody))
@@ -623,7 +623,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
                 "price": 100.00, "cost": -50.00}
                 """;
 
-        mockMvc.perform(put("/api/items/" + itemId)
+        mockMvc.perform(put(V1_API_ROOT + "/items/" + itemId)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateBody))
@@ -672,7 +672,7 @@ class ItemControllerTest extends AbstractIntegrationTest {
 
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
-        String response = mockMvc.perform(post("/api/auth/login")
+        String response = mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())

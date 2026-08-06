@@ -323,7 +323,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     }
 
     private String obtainToken(String username, String password) throws Exception {
-        String response = mockMvc.perform(post("/api/auth/login")
+        String response = mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new LoginRequest(username, password))))
                 .andExpect(status().isOk())
@@ -542,7 +542,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         assertThat(itemRepository.findById(invalidItemId)).isPresent();
         log.info("Item created");
 
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post(V1_API_ROOT + "/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isAccepted());
@@ -642,7 +642,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Created {} items", totalMessages);
 
         // Phase 4: First reprocessing call (batch size = 5)
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post(V1_API_ROOT + "/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isAccepted());
@@ -676,7 +676,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Phase 5: Second reprocessing call
         waitForDltReprocessingToFinish();
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post(V1_API_ROOT + "/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isAccepted());
@@ -770,7 +770,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 });
 
         // Запускаем репроцессинг
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post(V1_API_ROOT + "/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isAccepted());
@@ -845,7 +845,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 });
 
         // Запускаем репроцессинг (batch size = 5, обработает все за один раз)
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post(V1_API_ROOT + "/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isAccepted());
@@ -927,12 +927,12 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         );
         log.info("Item created");
 
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post(V1_API_ROOT + "/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isAccepted());
 
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post(V1_API_ROOT + "/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isConflict())
@@ -953,7 +953,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         waitForDltReprocessingToFinish();
 
-        mockMvc.perform(post("/api/admin/dlq/low-stock/reprocess")
+        mockMvc.perform(post(V1_API_ROOT + "/admin/dlq/low-stock/reprocess")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isAccepted());

@@ -159,7 +159,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -183,7 +183,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + userToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -201,7 +201,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -217,7 +217,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 999L, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -237,7 +237,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -254,7 +254,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, 0, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -271,7 +271,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         ReceiveStockRequest request = new ReceiveStockRequest(
                 testItemId, -1, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -282,7 +282,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
-        String response = mockMvc.perform(post("/api/auth/login")
+        String response = mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -300,7 +300,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void adminTokenCanWriteOffStockAndStockQuantityDecreases() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -323,7 +323,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void userTokenCannotWriteOffStockReturns403() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                         .header("Authorization", "Bearer " + userToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -340,7 +340,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void noTokenCannotWriteOffStockReturns401() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -355,7 +355,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void writeOffNonExistentItemReturns404() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(999L, 5);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -374,7 +374,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 5);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -390,7 +390,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void writeOffInsufficientStockReturns422() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 15);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -407,7 +407,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void adminStocktakeDecreasesStock() throws Exception {
         StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
-        mockMvc.perform(post("/api/inventory/stocktake")
+        mockMvc.perform(post(V1_API_ROOT + "/inventory/stocktake")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
@@ -429,7 +429,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void userCannotStocktakeReturns403() throws Exception {
         StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
-        mockMvc.perform(post("/api/inventory/stocktake")
+        mockMvc.perform(post(V1_API_ROOT + "/inventory/stocktake")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
@@ -445,7 +445,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void noTokenCannotStocktakeReturns401() throws Exception {
         StocktakeRequest req = new StocktakeRequest(testItemId, 7, null);
 
-        mockMvc.perform(post("/api/inventory/stocktake")
+        mockMvc.perform(post(V1_API_ROOT + "/inventory/stocktake")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized())
@@ -459,7 +459,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void writeOffZeroQuantityValidationErrorReturns400() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 0);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -475,7 +475,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     void writeOffNegativeQuantityValidationErrorReturns400() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, -1);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -485,7 +485,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Идемпотентность POST /api/movements/receive")
+    @DisplayName("Идемпотентность POST /api/v1/movements/receive")
     class IdempotencyReceiveTests {
 
         private String idempotencyKey;
@@ -501,7 +501,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         void firstRequestWithKeyCreatesMovement() throws Exception {
             ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
-            MvcResult result = mockMvc.perform(post("/api/movements/receive")
+            MvcResult result = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", idempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -528,7 +528,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
             // Первый запрос
-            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult firstResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", idempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -542,7 +542,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             Thread.sleep(100);
 
             // Второй запрос с тем же ключом
-            MvcResult secondResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult secondResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", idempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -570,7 +570,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             // Первый запрос с quantity=5
             ReceiveStockRequest firstRequest = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
+            mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", idempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -581,7 +581,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             ReceiveStockRequest secondRequest = new ReceiveStockRequest(testItemId,
                     10, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
+            mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", idempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -603,7 +603,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
 
             // Первый запрос с key1
-            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult firstResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", key1)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -612,7 +612,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andReturn();
 
             // Второй запрос с key2
-            MvcResult secondResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult secondResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", key2)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -642,7 +642,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         void requestWithoutKeyReturnsBadRequest() throws Exception {
             ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
-            mockMvc.perform(post("/api/movements/receive")
+            mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -665,7 +665,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                 executor.submit(() -> {
                     try {
                         latch.await();
-                        mockMvc.perform(post("/api/movements/receive")
+                        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                                         .header("Authorization", "Bearer " + adminToken)
                                         .header("Idempotency-Key", key)
                                         .contentType(MediaType.APPLICATION_JSON)
@@ -692,7 +692,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Идемпотентность POST /api/movements/write-off")
+    @DisplayName("Идемпотентность POST /api/v1/movements/write-off")
     class IdempotencyWriteOffTests {
 
         private String idempotencyKey;
@@ -708,7 +708,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
         void firstWriteOffRequestWithKeyCreatesMovement() throws Exception {
             WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 3);
 
-            mockMvc.perform(post("/api/movements/write-off")
+            mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", idempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -729,7 +729,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 3);
 
             // Первый запрос
-            MvcResult firstResult = mockMvc.perform(post("/api/movements/write-off")
+            MvcResult firstResult = mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", idempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -743,7 +743,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             Thread.sleep(100);
 
             // Второй запрос
-            MvcResult secondResult = mockMvc.perform(post("/api/movements/write-off")
+            MvcResult secondResult = mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", idempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -797,7 +797,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
 
             // Первый пользователь с ключом
-            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult firstResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -809,7 +809,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .get("movementId").asText();
 
             // Второй пользователь с тем же ключом
-            MvcResult secondResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult secondResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + secondUserToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -838,7 +838,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
 
             // POST /receive с ключом
-            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult firstResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -852,7 +852,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(testItemId, 3);
 
             // POST /write-off с тем же ключом
-            MvcResult secondResult = mockMvc.perform(post("/api/movements/write-off")
+            MvcResult secondResult = mockMvc.perform(post(V1_API_ROOT + "/movements/write-off")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -881,7 +881,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
             // Первый пользователь создает движение с ключом
-            MvcResult firstResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult firstResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -894,7 +894,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
 
             // Второй пользователь с тем же ключом — должен создать СВОЕ движение,
             // а не получить кеш первого
-            MvcResult secondResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult secondResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + secondUserToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -923,7 +923,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
             ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 3, LocalDateTime.now().plusDays(1));
 
             // Первый пользователь создает движение
-            mockMvc.perform(post("/api/movements/receive")
+            mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -931,7 +931,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .andExpect(status().isOk());
 
             // Второй пользователь с тем же ключом — создает свое движение
-            MvcResult secondFirstResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult secondFirstResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + secondUserToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -943,7 +943,7 @@ class StockMovementControllerTest extends AbstractIntegrationTest {
                     .get("movementId").asText();
 
             // Второй пользователь повторяет запрос с тем же ключом
-            MvcResult secondDuplicateResult = mockMvc.perform(post("/api/movements/receive")
+            MvcResult secondDuplicateResult = mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + secondUserToken)
                             .header("Idempotency-Key", testIdempotencyKey)
                             .contentType(MediaType.APPLICATION_JSON)

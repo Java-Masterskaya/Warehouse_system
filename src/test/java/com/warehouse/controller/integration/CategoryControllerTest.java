@@ -42,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class CategoryControllerTest extends AbstractIntegrationTest {
 
-    private static final String BASE_URL = "/api/categories";
+    private static final String BASE_URL = V1_API_ROOT + "/categories";
 
     @Autowired
     private MockMvc mockMvc;

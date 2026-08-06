@@ -140,7 +140,7 @@ class BatchControllerTest extends AbstractIntegrationTest {
         LocalDateTime expiryDate = LocalDateTime.now().plusDays(30);
         ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, expiryDate);
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -188,7 +188,7 @@ class BatchControllerTest extends AbstractIntegrationTest {
         LocalDateTime expiryDate1 = LocalDateTime.now().plusDays(30);
         ReceiveStockRequest request1 = new ReceiveStockRequest(testItemId, 5, expiryDate1);
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -198,7 +198,7 @@ class BatchControllerTest extends AbstractIntegrationTest {
         LocalDateTime expiryDate2 = LocalDateTime.now().plusDays(60);
         ReceiveStockRequest request2 = new ReceiveStockRequest(testItemId, 3, expiryDate2);
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -229,7 +229,7 @@ class BatchControllerTest extends AbstractIntegrationTest {
 
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
-        String response = mockMvc.perform(post("/api/auth/login")
+        String response = mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())

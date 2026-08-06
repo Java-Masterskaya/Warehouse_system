@@ -132,7 +132,8 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         ReserveRequest request = new ReserveRequest(5, 1);
 
-        mockMvc.perform(post("/api/stock/{id}/reserve", item.getId()).header("Authorization", "Bearer " + adminToken)
+        mockMvc.perform(post(V1_API_ROOT + "/stock/{id}/reserve", item.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.itemId").value(item.getId()))
                 .andExpect(jsonPath("$.quantity").value(5)).andExpect(jsonPath("$.status").value("ACTIVE"));
@@ -150,7 +151,8 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         ReserveRequest request = new ReserveRequest(5, 1);
 
-        mockMvc.perform(post("/api/stock/{id}/reserve", item.getId()).header("Authorization", "Bearer " + userToken)
+        mockMvc.perform(post(V1_API_ROOT + "/stock/{id}/reserve", item.getId())
+                        .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
     }
@@ -160,7 +162,8 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         ReserveRequest request = new ReserveRequest(20, 1);
 
-        mockMvc.perform(post("/api/stock/{id}/reserve", item.getId()).header("Authorization", "Bearer " + adminToken)
+        mockMvc.perform(post(V1_API_ROOT + "/stock/{id}/reserve", item.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnprocessableEntity());
 
@@ -174,7 +177,8 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         ReservationActionRequest request = new ReservationActionRequest(reservation.getId());
 
-        mockMvc.perform(post("/api/stock/{id}/release", item.getId()).header("Authorization", "Bearer " + adminToken)
+        mockMvc.perform(post(V1_API_ROOT + "/stock/{id}/release", item.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELED"));
 
@@ -192,7 +196,8 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         ReservationActionRequest request = new ReservationActionRequest(reservation.getId());
 
-        mockMvc.perform(post("/api/stock/{id}/write-off", item.getId()).header("Authorization", "Bearer " + adminToken)
+        mockMvc.perform(post(V1_API_ROOT + "/stock/{id}/write-off", item.getId())
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONSUMED"));
 

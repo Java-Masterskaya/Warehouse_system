@@ -103,7 +103,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     void loginSuccessReturnsTokens() throws Exception {
         LoginRequest request = new LoginRequest("admin", "secret");
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -117,7 +117,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     void loginWrongPasswordReturns401() throws Exception {
         LoginRequest request = new LoginRequest("admin", "wrongpassword");
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
@@ -129,7 +129,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     void loginUnknownUserReturns401() throws Exception {
         LoginRequest request = new LoginRequest("nobody", "secret");
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
@@ -148,7 +148,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         createRequest.setPassword(password);
         createRequest.setRole(Role.ROLE_USER);
 
-        mockMvc.perform(post("/api/users")
+        mockMvc.perform(post(V1_API_ROOT + "/users")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
@@ -156,14 +156,14 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         // Deactivate user
         User user = userRepository.findByUsername(username).orElseThrow();
-        mockMvc.perform(delete("/api/users/" + user.getId())
+        mockMvc.perform(delete(V1_API_ROOT + "/users/" + user.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
 
         // Try to login
         LoginRequest loginRequest = new LoginRequest(username, password);
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isUnauthorized())
@@ -175,7 +175,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Access protected endpoint without token returns 401")
     void accessProtectedWithoutToken() throws Exception {
-        mockMvc.perform(get("/api/items"))
+        mockMvc.perform(get(V1_API_ROOT + "/items"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
     }
@@ -183,7 +183,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Access protected endpoint with invalid token returns 401")
     void accessProtectedWithInvalidToken() throws Exception {
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer invalidtoken"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
@@ -193,7 +193,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @DisplayName("Access protected endpoint with expired token returns 401")
     void accessProtectedWithExpiredToken() throws Exception {
         String expiredToken = createExpiredToken("admin", List.of("ROLE_ADMIN"));
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + expiredToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
@@ -209,7 +209,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Access protected endpoint with valid token returns OK")
     void accessProtectedWithValidToken() throws Exception {
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
     }
@@ -223,7 +223,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         userRequest.setPassword("testpassword123");
         userRequest.setRole(Role.ROLE_USER);
 
-        mockMvc.perform(post("/api/users")
+        mockMvc.perform(post(V1_API_ROOT + "/users")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userRequest)))
@@ -238,7 +238,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         anotherRequest.setPassword("anotherpassword123");
         anotherRequest.setRole(Role.ROLE_USER);
 
-        mockMvc.perform(post("/api/users")
+        mockMvc.perform(post(V1_API_ROOT + "/users")
                         .header("Authorization", "Bearer " + userTokenForTest)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(anotherRequest)))
@@ -252,7 +252,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     void refreshTokenShouldReturnNewAccessToken() throws Exception {
         // 1. Отправляем refresh запрос
         RefreshRequest request = new RefreshRequest(userRefreshToken);
-        String response = mockMvc.perform(post("/api/auth/refresh")
+        String response = mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -274,12 +274,12 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .isNotEqualTo(userRefreshToken);
 
         // 3. Проверяем, что старый access токен отозван
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isUnauthorized());
 
         // 4. Проверяем, что новый access токен работает
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + refreshResponse.accessToken()))
                 .andExpect(status().isOk());
     }
@@ -293,7 +293,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         // 2. Первый refresh - получаем новые токены
         RefreshRequest firstRequest = new RefreshRequest(oldRefresh);
-        String firstResponse = mockMvc.perform(post("/api/auth/refresh")
+        String firstResponse = mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(firstRequest)))
                 .andExpect(status().isOk())
@@ -317,7 +317,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         // 5. Пытаемся использовать старый refresh - кеша нет → TOKEN_REUSE
         RefreshRequest reuseRequest = new RefreshRequest(oldRefresh);
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reuseRequest)))
                 .andExpect(status().isUnauthorized())
@@ -329,7 +329,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     void refreshTokenReuseShouldRevokeAllTokens() throws Exception {
         // 1. Первый refresh
         RefreshRequest firstRequest = new RefreshRequest(userRefreshToken);
-        String firstResponse = mockMvc.perform(post("/api/auth/refresh")
+        String firstResponse = mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(firstRequest)))
                 .andExpect(status().isOk())
@@ -341,7 +341,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         // 2. Второй запрос (ретрай) - возвращает кеш (TTL = 2 секунды)
         RefreshRequest retryRequest = new RefreshRequest(userRefreshToken);
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(retryRequest)))
                 .andExpect(status().isOk());
@@ -351,14 +351,14 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         // 4. Третий запрос - кеша нет → TOKEN_REUSE
         RefreshRequest reuseRequest = new RefreshRequest(userRefreshToken);
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reuseRequest)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("TOKEN_REUSE"));
 
         // 5. Проверяем, что новый access токен тоже отозван
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + firstTokens.accessToken()))
                 .andExpect(status().isUnauthorized());
     }
@@ -368,7 +368,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     void refreshRetryShouldReturnCachedTokens() throws Exception {
         // 1. Первый refresh
         RefreshRequest firstRequest = new RefreshRequest(userRefreshToken);
-        String firstResponse = mockMvc.perform(post("/api/auth/refresh")
+        String firstResponse = mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(firstRequest)))
                 .andExpect(status().isOk())
@@ -380,7 +380,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
         // 2. Сразу делаем второй запрос (ретрай) - должен вернуть те же токены из кеша
         RefreshRequest retryRequest = new RefreshRequest(userRefreshToken);
-        String retryResponse = mockMvc.perform(post("/api/auth/refresh")
+        String retryResponse = mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(retryRequest)))
                 .andExpect(status().isOk())
@@ -397,7 +397,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         // 3. Делаем третий запрос (еще один ретрай через 1 секунду) - все еще кеш
         Thread.sleep(1000);
         RefreshRequest thirdRequest = new RefreshRequest(userRefreshToken);
-        String thirdResponse = mockMvc.perform(post("/api/auth/refresh")
+        String thirdResponse = mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(thirdRequest)))
                 .andExpect(status().isOk())
@@ -416,12 +416,12 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @DisplayName("Refresh token should NOT work as access token")
     void refreshTokenShouldNotWorkAsAccessToken() throws Exception {
         // 1. Проверяем, что обычный access токен работает
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
 
         // 2. Проверяем, что refresh токен НЕ работает как access
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminRefreshToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
@@ -430,9 +430,9 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Refresh token should work only for refresh endpoint")
     void refreshTokenShouldWorkOnlyForRefreshEndpoint() throws Exception {
-        // 1. Проверяем, что refresh токен работает на /api/auth/refresh
+        // 1. Проверяем, что refresh токен работает на /api/v1/auth/refresh
         RefreshRequest refreshRequest = new RefreshRequest(adminRefreshToken);
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest)))
                 .andExpect(status().isOk())
@@ -440,7 +440,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty());
 
         // 2. Проверяем, что refresh токен НЕ работает на защищенном эндпоинте
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + adminRefreshToken))
                 .andExpect(status().isUnauthorized());
     }
@@ -451,26 +451,26 @@ class AuthControllerTest extends AbstractIntegrationTest {
     @DisplayName("Logout should revoke tokens")
     void logoutShouldRevokeTokens() throws Exception {
         // Проверяем, что токен работает
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk());
 
         // Логаут
         LogoutRequest logoutRequest = new LogoutRequest(userToken, userRefreshToken);
-        mockMvc.perform(post("/api/auth/logout")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/logout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(logoutRequest)))
                 .andExpect(status().isOk());
 
         // Access token должен быть blacklisted
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
 
         // Refresh token должен быть revoked
         RefreshRequest refreshRequest = new RefreshRequest(userRefreshToken);
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest)))
                 .andExpect(status().isUnauthorized())
@@ -491,7 +491,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         createRequest.setPassword(password);
         createRequest.setRole(Role.ROLE_USER);
 
-        mockMvc.perform(post("/api/users")
+        mockMvc.perform(post(V1_API_ROOT + "/users")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest)))
@@ -506,7 +506,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         User user = userRepository.findByUsername(username).orElseThrow();
 
         // Проверяем, что токен работает
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + userTokenForTest))
                 .andExpect(status().isOk());
 
@@ -515,7 +515,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
         assertTrue(isValidBefore, "Refresh token should be valid before deactivation");
 
         // Деактивируем пользователя через DELETE
-        mockMvc.perform(delete("/api/users/" + user.getId())
+        mockMvc.perform(delete(V1_API_ROOT + "/users/" + user.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
 
@@ -524,14 +524,14 @@ class AuthControllerTest extends AbstractIntegrationTest {
         assertFalse(isValidAfter, "Refresh token should be revoked after deactivation");
 
         // Access token должен быть blacklisted мгновенно
-        mockMvc.perform(get("/api/items")
+        mockMvc.perform(get(V1_API_ROOT + "/items")
                         .header("Authorization", "Bearer " + userTokenForTest))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
 
         // Refresh token должен быть revoked (возвращать 401)
         RefreshRequest refreshRequest = new RefreshRequest(userRefreshForTest);
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(refreshRequest)))
                 .andExpect(status().isUnauthorized())
@@ -542,7 +542,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
 
     private LoginResponse loginAndGetTokens(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
-        String response = mockMvc.perform(post("/api/auth/login")
+        String response = mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
