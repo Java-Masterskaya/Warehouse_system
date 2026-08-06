@@ -25,7 +25,7 @@ ALTER TABLE stock_movements_new
 ALTER TABLE stock_movements_new
     ADD CONSTRAINT fk_stock_movements_new_user
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE RESTRICT;
-ALTER TABLE stock_movements
+ALTER TABLE stock_movements_new
     ADD CONSTRAINT fk_stock_movements_new_batch_scope
         FOREIGN KEY (batch_id, item_id, warehouse_id)
             REFERENCES batches (id, item_id, warehouse_id)

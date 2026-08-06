@@ -14,6 +14,7 @@ AS
 $$
 DECLARE
     current_rows_migrated INT;
+    actual_last_id        BIGINT;
 BEGIN
     INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity,
                                      created_at, warehouse_id, transfer_id, batch_id)
@@ -34,9 +35,17 @@ BEGIN
     ON CONFLICT (id, created_at) DO NOTHING;
 
     GET DIAGNOSTICS current_rows_migrated = ROW_COUNT;
-    p_last_id := (SELECT COALESCE(MAX(id), p_last_id) FROM stock_movements_new WHERE id > p_last_id);
 
-    RETURN QUERY SELECT current_rows_migrated, p_last_id;
+    SELECT COALESCE(MAX(id), p_last_id)
+    INTO actual_last_id
+    FROM (SELECT id
+          FROM stock_movements
+          WHERE id > p_last_id
+            AND id <= p_max_id
+          ORDER BY id
+          LIMIT p_batch_size) AS batch_range;
+
+    RETURN QUERY SELECT current_rows_migrated, actual_last_id;
 END;
 $$ LANGUAGE plpgsql;
 
