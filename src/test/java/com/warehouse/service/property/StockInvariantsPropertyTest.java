@@ -1,5 +1,7 @@
 package com.warehouse.service.property;
 
+import com.warehouse.dto.request.movement.TransferStockRequest;
+import com.warehouse.exception.InvalidMovementRequestException;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
 import net.jqwik.api.Combinators;
@@ -11,6 +13,7 @@ import net.jqwik.api.Provide;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Property-based тесты (jqwik) для инвариантов остатков склада. Задача QA-6: проверять
@@ -106,28 +109,26 @@ class StockInvariantsPropertyTest {
 
     /**
      * Регрессия кейса, найденного при расширении диапазона {@code quantity} для TRANSFER до
-     * границы 0 наравне с приходом/списанием. Перемещение с {@code quantity=0} приводило к
+     * границы 0 наравне с приходом/списанием: перемещение с {@code quantity=0} приводило к
      * необработанному {@code StockMovementInvariantException} вместо ожидаемого доменного
-     * отказа: в отличие от {@code registerReceipt}/{@code BatchServiceImpl.writeOff},
-     * {@code StockMovementServiceImpl.transfer} не делает собственную проверку
-     * {@code quantity <= 0} — полагается только на {@code @Positive} в
-     * {@code TransferStockRequest}, которую enforces {@code @Valid} на контроллере (этот
-     * harness вызывает сервис напрямую, минуя контроллер). Запрос доходит до
-     * {@code stockMovementRepository.saveAllAndFlush} и отклоняется только
-     * {@code @PrePersist}-инвариантом {@code StockMovement}. Сам инвариант остатка при этом
-     * не нарушается — состояние не меняется, — но для property-теста это означало неотловленное
-     * исключение, роняющее прогон. Это известное ограничение defense-in-depth в
-     * {@code transfer()} (см. комментарий в {@link StockMovementTestHarness#transfer}),
-     * намеренно не исправляемое в рамках этого PR — зафиксировано здесь как детерминированный
-     * пример, чтобы не потерять найденный кейс.
+     * отказа, потому что {@code StockMovementServiceImpl.transfer} полагался только на
+     * {@code @Positive} в {@code TransferStockRequest}, которую enforces {@code @Valid} на
+     * контроллере (этот harness вызывает сервис напрямую, минуя контроллер). Гэп закрыт в
+     * QA-8: {@code transfer()} теперь сам отклоняет {@code quantity <= 0} доменным
+     * {@link InvalidMovementRequestException} до похода в репозиторий, симметрично
+     * {@code registerReceipt}. Тест обновлён вместе с фиксом — проверяет не просто отказ, а
+     * конкретный тип и сообщение исключения, чтобы не откатиться обратно на неявное поведение.
      */
     @Example
     void transferWithZeroQuantityIsRejectedWithoutChangingState() {
         StockMovementTestHarness harness = new StockMovementTestHarness();
+        TransferStockRequest zeroQuantityTransfer = new TransferStockRequest(
+                harness.itemId(), harness.warehouseId(0), harness.warehouseId(1), 0);
 
-        boolean applied = harness.apply(StockOperation.transfer(0, 1, 0));
+        assertThatThrownBy(() -> harness.service().transfer(zeroQuantityTransfer, harness.userContext()))
+                .isInstanceOf(InvalidMovementRequestException.class)
+                .hasMessage("Quantity must be greater than 0");
 
-        assertThat(applied).isFalse();
         assertAllWarehousesNonNegative(harness, StockOperation.transfer(0, 1, 0));
         assertBalanceInvariant(harness, StockOperation.transfer(0, 1, 0));
     }
