@@ -1376,6 +1376,8 @@ class StockMovementServiceImplTest {
     /**
      * Перемещение с quantity &lt;= 0 отклоняется до похода в репозитории:
      * ни один из репозиториев не вызывается.
+     *
+     * @param invalidQuantity непозитивное значение quantity, переданное в запрос перемещения
      */
     @ParameterizedTest
     @ValueSource(ints = {0, -1, -100})
