@@ -1,5 +1,9 @@
 package com.warehouse.service;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
@@ -21,8 +25,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
@@ -31,6 +38,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -44,6 +52,8 @@ class ExpiredBatchCleanupServiceTest {
     private static final long WAREHOUSE_ID = 20L;
     private static final long ACTOR_ID = 30L;
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 7, 31, 12, 0);
+    private static final String CANCELLATION_LOG_MESSAGE =
+            "Reservations canceled during expired batch cleanup";
 
     @Mock
     private BatchRepository batchRepository;
@@ -135,12 +145,51 @@ class ExpiredBatchCleanupServiceTest {
                 .thenReturn(List.of(newerReservation, olderReservation));
         when(userRepository.getReferenceById(ACTOR_ID)).thenReturn(actor);
 
-        service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
+        Logger logger = (Logger) LoggerFactory.getLogger(ExpiredBatchCleanupService.class);
+        ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+        logAppender.start();
+        logger.addAppender(logAppender);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
+            assertThat(logAppender.list)
+                    .noneMatch(event -> event.getMessage().startsWith(CANCELLATION_LOG_MESSAGE));
+            assertThat(TransactionSynchronizationManager.getSynchronizations()).hasSize(1);
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+            logger.detachAppender(logAppender);
+            logAppender.stop();
+        }
 
         assertThat(newerReservation.getStatus()).isEqualTo(ReservationStatus.CANCELED);
         assertThat(olderReservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE);
         assertThat(stock.getQuantity()).isEqualTo(7);
         verify(stockReserveRepository).saveAll(List.of(newerReservation));
+        assertThat(logAppender.list)
+                .filteredOn(event -> event.getMessage().startsWith(CANCELLATION_LOG_MESSAGE))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                    assertThat(event.getMessage()).startsWith(CANCELLATION_LOG_MESSAGE);
+                    assertThat(event.getFormattedMessage())
+                            .contains(CANCELLATION_LOG_MESSAGE)
+                            .contains("itemId=10")
+                            .contains("warehouseId=20")
+                            .contains("reservationIds=[2]")
+                            .contains("canceledQuantity=3")
+                            .contains("remainingStockQuantity=7");
+                    assertThat(event.getKeyValuePairs())
+                            .extracting(pair -> pair.key, pair -> pair.value)
+                            .containsExactlyInAnyOrder(
+                                    tuple("itemId", ITEM_ID),
+                                    tuple("warehouseId", WAREHOUSE_ID),
+                                    tuple("reservationIds", List.of(2L)),
+                                    tuple("canceledQuantity", 3L),
+                                    tuple("remainingStockQuantity", 7)
+                        );
+                });
     }
 
     @Test

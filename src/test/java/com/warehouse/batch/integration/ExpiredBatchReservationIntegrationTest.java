@@ -183,6 +183,37 @@ class ExpiredBatchReservationIntegrationTest extends AbstractIntegrationTest {
         assertExpiredAudit(stockBeforeCleanup - stockAfterCleanup);
     }
 
+    @Test
+    void reservationApiUsesDefaultWarehouseWhenItemHasMultipleStocks() {
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        Warehouse secondaryWarehouse = warehouseRepository.saveAndFlush(Warehouse.builder()
+                .name("Issue 151 secondary " + UUID.randomUUID())
+                .defaultWarehouse(false)
+                .build());
+        batchService.createBatchAndIncreaseStock(item, warehouse, 5, now.plusDays(30));
+        batchService.createBatchAndIncreaseStock(item, secondaryWarehouse, 20, now.plusDays(30));
+
+        ReservationResponse response = stockReserveService.reserve(
+                item.getId(),
+                new ReserveRequest(3, 30),
+                userContext
+        );
+
+        Long reservationWarehouseId = jdbcTemplate.queryForObject(
+                """
+                        SELECT s.warehouse_id
+                        FROM reserves r
+                        JOIN stock s ON s.id = r.stock_id
+                        WHERE r.id = ?
+                        """,
+                Long.class,
+                response.id()
+        );
+        assertThat(reservationWarehouseId).isEqualTo(warehouse.getId());
+        assertThat(reservationWarehouseId).isNotEqualTo(secondaryWarehouse.getId());
+        assertThat(warehouse.isDefaultWarehouse()).isTrue();
+    }
+
     private Stock stock() {
         return stockRepository.findByItemIdAndWarehouseId(item.getId(), warehouse.getId()).orElseThrow();
     }

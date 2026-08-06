@@ -18,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -67,7 +69,7 @@ public class ExpiredBatchCleanupService {
         }
 
         int remainingStockQuantity = stock.getQuantity() - expiredQuantity;
-        reconcileActiveReservations(stock, remainingStockQuantity, now);
+        List<Reservation> canceledReservations = reconcileActiveReservations(stock, remainingStockQuantity, now);
 
         expiredBatches.forEach(batch -> batch.setQuantity(0));
         batchRepository.saveAll(expiredBatches);
@@ -86,6 +88,7 @@ public class ExpiredBatchCleanupService {
                 .build();
         stockMovementRepository.saveAndFlush(movement);
 
+        logCanceledReservations(itemId, warehouseId, canceledReservations, remainingStockQuantity);
         log.info(
                 "Expired batches cleared: itemId={}, warehouseId={}, batches={}, quantity={}, movementId={}",
                 itemId,
@@ -111,14 +114,19 @@ public class ExpiredBatchCleanupService {
      * @param stock locked stock scope
      * @param remainingStockQuantity physical quantity after batch expiration
      * @param now cleanup timestamp
+     * @return whole reservations canceled from newest to oldest
      */
-    private void reconcileActiveReservations(Stock stock, int remainingStockQuantity, LocalDateTime now) {
+    private List<Reservation> reconcileActiveReservations(
+            Stock stock,
+            int remainingStockQuantity,
+            LocalDateTime now
+    ) {
         List<Reservation> activeReservations = stockReserveRepository.findActiveByStockForUpdate(stock, now);
         long activeReservedQuantity = activeReservations.stream()
                 .mapToLong(Reservation::getQuantity)
                 .reduce(0L, Math::addExact);
         if (activeReservedQuantity <= remainingStockQuantity) {
-            return;
+            return List.of();
         }
 
         List<Reservation> canceledReservations = new ArrayList<>();
@@ -131,6 +139,50 @@ public class ExpiredBatchCleanupService {
             }
         }
         stockReserveRepository.saveAll(canceledReservations);
+        return List.copyOf(canceledReservations);
+    }
+
+    private void logCanceledReservations(
+            Long itemId,
+            Long warehouseId,
+            List<Reservation> canceledReservations,
+            int remainingStockQuantity
+    ) {
+        if (canceledReservations.isEmpty()) {
+            return;
+        }
+
+        List<Long> reservationIds = canceledReservations.stream()
+                .map(Reservation::getId)
+                .toList();
+        long canceledQuantity = canceledReservations.stream()
+                .mapToLong(Reservation::getQuantity)
+                .reduce(0L, Math::addExact);
+        Runnable emitLog = () -> log.atWarn()
+                .addKeyValue("itemId", itemId)
+                .addKeyValue("warehouseId", warehouseId)
+                .addKeyValue("reservationIds", reservationIds)
+                .addKeyValue("canceledQuantity", canceledQuantity)
+                .addKeyValue("remainingStockQuantity", remainingStockQuantity)
+                .log(
+                        "Reservations canceled during expired batch cleanup: itemId={}, warehouseId={}, "
+                                + "reservationIds={}, canceledQuantity={}, remainingStockQuantity={}",
+                        itemId,
+                        warehouseId,
+                        reservationIds,
+                        canceledQuantity,
+                        remainingStockQuantity
+                );
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    emitLog.run();
+                }
+            });
+            return;
+        }
+        emitLog.run();
     }
 
     private int sumQuantity(List<Batch> batches) {
