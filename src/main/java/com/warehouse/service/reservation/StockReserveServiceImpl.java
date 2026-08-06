@@ -60,7 +60,7 @@ public class StockReserveServiceImpl implements StockReserveService {
     public ReservationResponse reserve(Long itemId, ReserveRequest request, UserContext ctx) {
         int quantity = request.quantity();
 
-        Stock stock = lockStock(itemId);
+        Stock stock = lockDefaultStock(itemId);
 
         int available = availabilityService.getAvailable(stock);
         if (available < quantity) {
@@ -84,7 +84,7 @@ public class StockReserveServiceImpl implements StockReserveService {
     @CacheEvict(value = "item", key = "#itemId")
     public ReservationResponse release(Long itemId, ReservationActionRequest request, UserContext ctx) {
         // Lock stock to serialize reservation modifications.
-        lockStock(itemId);
+        lockDefaultStock(itemId);
         Reservation reservation = getActiveReservation(request.reservationId(), itemId);
         updateReservationStatus(reservation, ReservationStatus.CANCELED);
         metricService.increment("warehouse.reservation.release.total");
@@ -96,7 +96,7 @@ public class StockReserveServiceImpl implements StockReserveService {
     @CacheEvict(value = "item", key = "#itemId")
     public ReservationResponse writeOff(Long itemId, ReservationActionRequest request, UserContext ctx) {
         // Lock stock to serialize reservation modifications.
-        Stock stock = lockStock(itemId);
+        Stock stock = lockDefaultStock(itemId);
 
         Reservation reservation = getActiveReservation(request.reservationId(), itemId);
         batchService.writeOffReservedByFEFO(
@@ -140,7 +140,16 @@ public class StockReserveServiceImpl implements StockReserveService {
         }
     }
 
-    private Stock lockStock(Long itemId) {
+    /**
+     * Locks the default-warehouse stock used by the current reservation API.
+     * Reservation endpoints do not accept a warehouse identifier, so every reservation created here
+     * must remain attached to this exact stock scope. A future multi-warehouse API must lock the selected
+     * warehouse stock before reading or changing its reservations.
+     *
+     * @param itemId item identifier
+     * @return locked default-warehouse stock
+     */
+    private Stock lockDefaultStock(Long itemId) {
         return stockRepository.findByItemIdForUpdate(itemId).orElseThrow(() -> {
             log.warn("Stock not found: itemId={}", itemId);
             throw EntityNotFoundException.forId("Item", itemId);
