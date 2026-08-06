@@ -98,35 +98,53 @@ make up
 
 | Метод    | Путь                                             | Описание                            |
 |----------|--------------------------------------------------|-------------------------------------|
-| `GET`    | `/api/items`                                     | Список товаров (фильтр, поиск)      |
-| `POST`   | `/api/items`                                     | Создать товар                       |
-| `PUT`    | `/api/items/{id}`                                | Редактировать товар                 |
-| `DELETE` | `/api/items/{id}`                                | Удалить товар                       |
-| `GET`    | `/api/items/{itemId}`                            | Карточка и остатки по складам       |
-| `GET`    | `/api/items/categories`                          | Список категорий                    |
-| `POST`   | `/api/categories`                                | Создать категорию                   |
-| `GET`    | `/api/categories/{categoryId}`                   | Получить категорию по ID            |
-| `PUT`    | `/api/categories/{categoryId}`                   | Обновить категорию                  |
-| `DELETE` | `/api/categories/{categoryId}`                   | Удалить категорию                   |
-| `GET`    | `/api/warehouses`                                | Список складов                      |
-| `POST`   | `/api/warehouses`                                | Создать склад                       |
-| `POST`   | `/api/movements/receive`                         | Зарегистрировать поступление        |
-| `POST`   | `/api/movements/write-off`                       | Списать товар                       |
-| `POST`   | `/api/movements/transfer`                        | Перевести товар между складами      |
-| `GET`    | `/api/movements/{itemId}/history`                | История движения                    |
-| `POST`   | `/api/inventory/stocktake`                       | Инвентаризация                      |
-| `POST`   | `/api/purchase-orders`                           | Создать заказ поставщику            |
-| `GET`    | `/api/purchase-orders`                           | Получить список заказов поставщикам |
-| `GET`    | `/api/purchase-orders/{purchaseOrderId}`         | Получить заказ поставщику по ID     |
-| `POST`   | `/api/purchase-orders/{purchaseOrderId}/place`   | Разместить заказ у поставщика       |
-| `POST`   | `/api/purchase-orders/{purchaseOrderId}/receive` | Принять товар по заказу поставки    |
-| `POST`   | `/api/admin/dlq/low-stock/reprocess`             | Реобработка DLT                     |
-| `POST`   | `/api/stock/{itemId}/reserve`                    | Резервирование остатков             |
-| `POST`   | `/api/stock/{itemId}/release`                    | Отмена резервирования               |
-| `POST`   | `/api/stock/{itemId}/write-off`                  | Выкуп резерва                       |
-| `GET`    | `/api/reports/low-stock`                         | Товары ниже общего минимума         |
-| `GET`    | `/api/reports/stock-valuation`                   | Общая стоимость остатков            |
-| `GET`    | `/api/reports/expiring?days=N`                   | Партии с истекающим сроком          |
+| `GET`    | `/api/v1/items`                                     | Список товаров (фильтр, поиск)      |
+| `POST`   | `/api/v1/items`                                     | Создать товар                       |
+| `PUT`    | `/api/v1/items/{id}`                                | Редактировать товар                 |
+| `DELETE` | `/api/v1/items/{id}`                                | Удалить товар                       |
+| `GET`    | `/api/v1/items/{itemId}`                            | Карточка и остатки по складам       |
+| `GET`    | `/api/v1/items/categories`                          | Список категорий                    |
+| `POST`   | `/api/v1/categories`                                | Создать категорию                   |
+| `GET`    | `/api/v1/categories/{categoryId}`                   | Получить категорию по ID            |
+| `PUT`    | `/api/v1/categories/{categoryId}`                   | Обновить категорию                  |
+| `DELETE` | `/api/v1/categories/{categoryId}`                   | Удалить категорию                   |
+| `GET`    | `/api/v1/warehouses`                                | Список складов                      |
+| `POST`   | `/api/v1/warehouses`                                | Создать склад                       |
+| `POST`   | `/api/v1/movements/receive`                         | Зарегистрировать поступление        |
+| `POST`   | `/api/v1/movements/write-off`                       | Списать товар                       |
+| `POST`   | `/api/v1/movements/transfer`                        | Перевести товар между складами      |
+| `GET`    | `/api/v1/movements/{itemId}/history`                | История движения                    |
+| `POST`   | `/api/v1/inventory/stocktake`                       | Инвентаризация                      |
+| `POST`   | `/api/v1/purchase-orders`                           | Создать заказ поставщику            |
+| `GET`    | `/api/v1/purchase-orders`                           | Получить список заказов поставщикам |
+| `GET`    | `/api/v1/purchase-orders/{purchaseOrderId}`         | Получить заказ поставщику по ID     |
+| `POST`   | `/api/v1/purchase-orders/{purchaseOrderId}/place`   | Разместить заказ у поставщика       |
+| `POST`   | `/api/v1/purchase-orders/{purchaseOrderId}/receive` | Принять товар по заказу поставки    |
+| `POST`   | `/api/v1/admin/dlq/low-stock/reprocess`             | Реобработка DLT                     |
+| `POST`   | `/api/v1/stock/{itemId}/reserve`                    | Резервирование остатков             |
+| `POST`   | `/api/v1/stock/{itemId}/release`                    | Отмена резервирования               |
+| `POST`   | `/api/v1/stock/{itemId}/write-off`                  | Выкуп резерва                       |
+| `GET`    | `/api/v1/reports/low-stock`                         | Товары ниже общего минимума         |
+| `GET`    | `/api/v1/reports/stock-valuation`                   | Общая стоимость остатков            |
+| `GET`    | `/api/v1/reports/expiring?days=N`                   | Партии с истекающим сроком          |
+
+## Версионирование API
+
+Канонический HTTP API использует path versioning. Текущая версия доступна под
+префиксом `/api/v1`: версия задается в controller mappings и отражается в
+генерируемом OpenAPI-контракте. Swagger показывает только канонические пути v1.
+
+При несовместимом изменении контракта новые эндпоинты будут опубликованы под
+`/api/v2`. Версия через заголовок
+`Accept: application/vnd.warehouse.v2+json` не используется. Явный сегмент пути
+упрощает маршрутизацию, ключи кеша, observability в логах, трассировках и метриках,
+а также сопровождение OpenAPI и контрактных тестов.
+
+Legacy aliases без версии временно доступны до `Thu, 05 Aug 2027 00:00:00 GMT`.
+Их ответы содержат `Deprecation: true` и
+`Sunset: Thu, 05 Aug 2027 00:00:00 GMT`. Legacy и v1 aliases одной операции
+используют общий идентификатор идемпотентности, поэтому переход между двумя
+путями не позволяет повторно выполнить запрос с тем же ключом.
 
 ## Партии и сроки годности
 
@@ -139,7 +157,7 @@ DOM-5 хранит физический остаток как набор пар�
 - Перевод между складами сохраняет срок годности каждой перенесенной части партии.
 - Положительная разница инвентаризации требует `surplusExpiryDate` и создает отдельную партию.
 - Ежедневная задача обнуляет просроченные партии и уменьшает остаток именно их склада.
-- Отчет `/api/reports/expiring?days=N` показывает истекающие партии с товаром и складом.
+- Отчет `/api/v1/reports/expiring?days=N` показывает истекающие партии с товаром и складом.
 
 ## Несколько складов
 
@@ -155,7 +173,7 @@ DOM-5 хранит физический остаток как набор пар�
 Пример перевода, доступного только роли `ADMIN`:
 
 ```http
-POST /api/movements/transfer
+POST /api/v1/movements/transfer
 Authorization: Bearer <access-token>
 Content-Type: application/json
 ```
@@ -330,6 +348,42 @@ make checkstyle
 - `./gradlew check`
 - CI/CD (GitHub Actions)
 
+### Property-based тесты инвариантов остатков (jqwik)
+
+Помимо примеров с конкретными числами, инварианты остатков склада проверяются на
+случайных последовательностях операций через [jqwik](https://jqwik.net/):
+
+- остаток ни на одном складе никогда не уходит в минус;
+- Σ(приходы) − Σ(успешных списаний) == текущий суммарный остаток товара по всем складам.
+
+```bash
+# Прогнать только property-тесты
+./gradlew test --tests "com.warehouse.service.property.*"
+```
+
+Тесты лежат в `src/test/java/com/warehouse/service/property/`:
+
+- `StockOperation` — одна операция случайной последовательности (приход/списание/перемещение);
+- `StockMovementTestHarness` — поднимает реальные `StockMovementServiceImpl`/`BatchServiceImpl`/
+  `StockAvailabilityService` поверх in-memory реализаций репозиториев (без Spring-контекста —
+  у jqwik нет официальной интеграции с Spring TestContext, а поднимать `ApplicationContext` на
+  каждый из тысяч прогонов property избыточно медленно). Атомарность под реальной БД (транзакции,
+  `@Version`, блокировки) отдельно покрыта Testcontainers-тестами
+  (`StockMovementAtomicityIntegrationTest`, `StockTransferControllerIntegrationTest`);
+- `StockInvariantsPropertyTest` — сами свойства (`@Property`, tries = 1000 каждое) и два
+  зафиксированных регрессионных примера (`@Example`), найденных расширением генератора:
+  списание раньше самого первого прихода на складе и перемещение с нулевым количеством оба
+  бросают не тот тип исключения, что ожидается для "недостаточно остатка" (см. Javadoc на
+  `writeOffBeforeAnyReceiptIsRejectedWithoutChangingState` и
+  `transferWithZeroQuantityIsRejectedWithoutChangingState`).
+
+Если property падает, jqwik сам сжимает (shrinking) контрпример до минимальной
+последовательности операций и печатает сид в отчёте — прогон с этим сидом детерминированно
+воспроизводит найденный кейс. Упавшие сэмплы дополнительно кэшируются локально в
+`.jqwik-database` (не коммитится, см. `.gitignore`) и повторно проверяются первыми при
+следующем запуске. Нарушение любого из двух инвариантов проваливает `./gradlew test` — и,
+соответственно, сборку.
+
 ## OpenAPI-контракт
 
 API описывается code-first: springdoc генерирует спеку из аннотаций контроллеров и DTO
@@ -501,7 +555,8 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 
 ### Получение токена
 
-`POST /api/auth/login`  
+`POST /api/v1/auth/login`
+
 Тело:
 
 ```json
@@ -528,7 +583,8 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 | expiresIn | Время жизни access токена в миллисекундах.                                                                  |
 
 ### Обновление access токена
-`POST /api/auth/refresh`  
+`POST /api/v1/auth/refresh`
+
 Тело:
 ```json
 {
@@ -546,7 +602,8 @@ KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 Примечание: При каждом обновлении создаётся новая пара токенов. Старый refresh токен становится недействительным (ротация). Все старые access токены пользователя автоматически добавляются в blacklist.
 
 ### Выход из системы
-`POST /api/auth/logout`  
+`POST /api/v1/auth/logout`
+
 Тело:
 ```json
 {

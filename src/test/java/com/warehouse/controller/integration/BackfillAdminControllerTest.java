@@ -23,9 +23,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 class BackfillAdminControllerTest extends AbstractIntegrationTest {
 
-    private static final String BACKFILL_URL = "/admin/backfill/barcode";
-    private static final String BACKFILL_STATUS_URL = "/admin/backfill/barcode/status";
-    private static final String BACKFILL_STOP_URL = "/admin/backfill/barcode/stop";
+    private static final String BACKFILL_URL = V1_BACKFILL_ROOT + "/barcode";
+    private static final String BACKFILL_STATUS_URL = V1_BACKFILL_ROOT + "/barcode/status";
+    private static final String BACKFILL_STOP_URL = V1_BACKFILL_ROOT + "/barcode/stop";
 
     @Autowired
     private MockMvc mockMvc;

@@ -5,6 +5,7 @@ import com.warehouse.dto.request.item.CreateItemRequest;
 import com.warehouse.entity.Category;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Проверяет, что ответы {@code /api/items/**} соответствуют зафиксированному OpenAPI-контракту:
+ * Проверяет, что ответы {@code /api/v1/items/**} соответствуют зафиксированному OpenAPI-контракту:
  * и успешные (200/201), и ошибочные (400/401/403/404/409) ответы должны совпадать со схемами
  * из {@code src/test/resources/openapi/warehouse.json}.
  */
@@ -27,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class ItemApiContractTest extends AbstractOpenApiContractTest {
 
-    private static final String BASE_URL = "/api/items";
+    private static final String BASE_URL = ApiPaths.V1_API_ROOT + "/items";
 
     @Autowired
     private ObjectMapper objectMapper;

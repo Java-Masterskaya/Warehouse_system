@@ -6,6 +6,7 @@ import com.warehouse.dto.request.reservation.ReserveRequest;
 import com.warehouse.dto.response.reservation.ReservationResponse;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.reservation.StockReserveService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,7 +27,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/stock")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/stock", ApiPaths.LEGACY_API_ROOT + "/stock"})
 @RequiredArgsConstructor
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

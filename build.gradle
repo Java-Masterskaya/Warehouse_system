@@ -86,6 +86,13 @@ dependencies {
     testImplementation "org.testcontainers:redpanda:${testcontainersVersion}"
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 
+    // Property-based tests (складские инварианты на случайных последовательностях операций)
+    // jqwik 1.9.2 запрашивает junit-platform 1.11.3, что укладывается в версию,
+    // управляемую BOM Spring Boot (junit-jupiter 5.11.4 -> platform 1.11.4),
+    // поэтому принудительное выравнивание версий junit-platform не требуется.
+    testImplementation 'net.jqwik:jqwik:1.9.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     testRuntimeOnly 'com.h2database:h2'
 }
 

@@ -29,6 +29,7 @@ import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.service.movement.StockMovementService;
@@ -55,6 +56,9 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private StockAlertRepository stockAlertRepository;
 
     @Autowired
     private StockMovementService stockMovementService;

@@ -62,7 +62,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
 
-    private static final String TRANSFER_URL = "/api/movements/transfer";
+    private static final String TRANSFER_URL = V1_API_ROOT + "/movements/transfer";
     private static final int INITIAL_SOURCE_QUANTITY = 10;
 
     @Autowired
@@ -213,7 +213,7 @@ class StockTransferControllerIntegrationTest extends AbstractIntegrationTest {
             );
         assertThat(countMovements()).isEqualTo(2);
 
-        mockMvc.perform(get("/api/movements/{itemId}/history", item.getId())
+        mockMvc.perform(get(V1_API_ROOT + "/movements/{itemId}/history", item.getId())
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))

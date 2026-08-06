@@ -34,7 +34,7 @@ keyset-индексов. Поэтому pending-миграции barcode пер�
   **В `db/migration/` его кладём только для таблиц < 100 000 строк** (см. ниже) —
   Flyway не видит файлы в `pending/`, так что по умолчанию он никуда не применяется сам по себе.
 - Java-код (ItemServiceImpl генерирует barcode автоматически через `ItemBarcodeGenerator`)
-- ItemBarcodeBackfillJob + `/admin/backfill/barcode` (на случай, если таблица большая)
+- ItemBarcodeBackfillJob + `/api/v1/admin/backfill/barcode` (на случай, если таблица большая)
 
 **Проверка перед деплоем:**
 - [ ] `SELECT COUNT(*) FROM items;` - определить, нужен ли V31 в этом деплое
@@ -46,8 +46,8 @@ keyset-индексов. Поэтому pending-миграции barcode пер�
 - [ ] Старый код продолжает работать (не знает про barcode — OK)
 - [ ] Новый код создаёт товары с barcode (одним INSERT — см. ниже)
 - [ ] Если V31 не деплоился (таблица большая) - запустить backfill джобой:
-      `POST /admin/backfill/barcode` (асинхронно, возвращает `202` сразу;
-      прогресс — `GET /admin/backfill/barcode/status`)
+      `POST /api/v1/admin/backfill/barcode` (асинхронно, возвращает `202` сразу;
+      прогресс - `GET /api/v1/admin/backfill/barcode/status`)
 - [ ] Проверить: `SELECT COUNT(*) FROM items WHERE barcode IS NULL;` → `0`
 
 ### Этап 2: Contract (V32 + V33 + V34) - ОТДЕЛЬНО!
@@ -56,7 +56,7 @@ keyset-индексов. Поэтому pending-миграции barcode пер�
 1. ВСЕ инстансы приложения обновлены (старый код, который не пишет barcode, больше не работает)
 2. `SELECT COUNT(*) FROM items WHERE barcode IS NULL;` → `0`
 3. **Дублей нет**: `SELECT barcode, COUNT(*) FROM items GROUP BY barcode HAVING COUNT(*) > 1;` → `0` строк
-4. Backfill завершен (V31 применен либо `GET /admin/backfill/barcode/status` показывает `COMPLETE`)
+4. Backfill завершен (V31 применен либо `GET /api/v1/admin/backfill/barcode/status` показывает `COMPLETE`)
 
 **Что деплоится:**
 - `V32` - `SET NOT NULL`
@@ -90,13 +90,13 @@ keyset-индексов. Поэтому pending-миграции barcode пер�
 
 2. **Запустить Java-job (асинхронно):**
    ```bash
-   curl -X POST "http://app/admin/backfill/barcode?batchSize=500" \
+   curl -X POST "http://app/api/v1/admin/backfill/barcode?batchSize=500" \
      -H "Authorization: Bearer $ADMIN_TOKEN"
    ```
 
 3. **Следить за прогрессом:**
    ```bash
-   curl "http://app/admin/backfill/barcode/status" \
+   curl "http://app/api/v1/admin/backfill/barcode/status" \
      -H "Authorization: Bearer $ADMIN_TOKEN"
    ```
    Джоба идемпотентна — можно перезапускать, если прервалась. Повторный запуск

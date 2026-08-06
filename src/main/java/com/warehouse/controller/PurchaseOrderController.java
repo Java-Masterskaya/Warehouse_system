@@ -7,6 +7,7 @@ import com.warehouse.dto.response.PageResponse;
 import com.warehouse.dto.response.purchaseorder.PurchaseOrderResponse;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.purchaseorder.PurchaseOrderService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,7 +27,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/purchase-orders")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/purchase-orders", ApiPaths.LEGACY_API_ROOT + "/purchase-orders"})
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Заказы поставщикам", description = "Управление заказами поставки")

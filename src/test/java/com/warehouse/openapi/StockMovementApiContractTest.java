@@ -11,6 +11,7 @@ import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,13 +28,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Проверяет, что ответы {@code /api/movements/**} соответствуют зафиксированному
+ * Проверяет, что ответы {@code /api/v1/movements/**} соответствуют зафиксированному
  * OpenAPI-контракту: успешные (200) и ошибочные (401/403/404/422) ответы должны совпадать
  * со схемами из {@code src/test/resources/openapi/warehouse.json}.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 class StockMovementApiContractTest extends AbstractOpenApiContractTest {
+
+    private static final String BASE_URL = ApiPaths.V1_API_ROOT + "/movements";
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -86,7 +89,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
     void registerReceiptSuccessMatchesContract() throws Exception {
         ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(BASE_URL + "/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -99,7 +102,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
     void registerReceiptNonExistentItemMatchesContract() throws Exception {
         ReceiveStockRequest request = new ReceiveStockRequest(999999999L, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(BASE_URL + "/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -112,7 +115,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
     void registerReceiptNoTokenMatchesContract() throws Exception {
         ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(BASE_URL + "/receive")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
@@ -123,7 +126,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
     void registerReceiptUserTokenMatchesContract() throws Exception {
         ReceiveStockRequest request = new ReceiveStockRequest(testItemId, 5, LocalDateTime.now().plusDays(1));
 
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(BASE_URL + "/receive")
                         .header("Authorization", "Bearer " + userToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -135,7 +138,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
     void writeOffInsufficientStockMatchesContract() throws Exception {
         WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 999);
 
-        mockMvc.perform(post("/api/movements/write-off")
+        mockMvc.perform(post(BASE_URL + "/write-off")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -146,7 +149,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
 
     @Test
     void getMovementHistoryMatchesContract() throws Exception {
-        mockMvc.perform(get("/api/movements/" + testItemId + "/history")
+        mockMvc.perform(get(BASE_URL + "/" + testItemId + "/history")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(openApiContract());
@@ -154,7 +157,7 @@ class StockMovementApiContractTest extends AbstractOpenApiContractTest {
 
     @Test
     void getMovementHistoryCursorMatchesContract() throws Exception {
-        mockMvc.perform(get("/api/movements/" + testItemId + "/history")
+        mockMvc.perform(get(BASE_URL + "/" + testItemId + "/history")
                         .param("cursor", "")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())

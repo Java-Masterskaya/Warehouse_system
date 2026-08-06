@@ -114,11 +114,11 @@ WHERE barcode IS NULL;
 отвечает `202 Accepted` и не держит HTTP-соединение на время всего backfill.
 
 ```bash
-curl -X POST "http://app/admin/backfill/barcode?batchSize=500" \
+curl -X POST "http://app/api/v1/admin/backfill/barcode?batchSize=500" \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 
 # прогресс/результат:
-curl "http://app/admin/backfill/barcode/status" \
+curl "http://app/api/v1/admin/backfill/barcode/status" \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.response.error.ErrorResponse;
 import com.warehouse.security.JwtAuthFilter;
 import com.warehouse.security.RateLimitFilter;
+import com.warehouse.web.ApiPaths;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,9 +80,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/auth/login",
-                                "/api/auth/refresh",
-                                "/api/auth/logout"
+                                ApiPaths.LEGACY_API_ROOT + "/auth/login",
+                                ApiPaths.LEGACY_API_ROOT + "/auth/refresh",
+                                ApiPaths.LEGACY_API_ROOT + "/auth/logout",
+                                ApiPaths.V1_API_ROOT + "/auth/login",
+                                ApiPaths.V1_API_ROOT + "/auth/refresh",
+                                ApiPaths.V1_API_ROOT + "/auth/logout"
                         ).permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()

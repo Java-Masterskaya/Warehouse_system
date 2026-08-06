@@ -2,9 +2,13 @@ package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.batch.BatchCleanupActor;
+import com.warehouse.dto.UserContext;
+import com.warehouse.dto.request.reservation.ReservationActionRequest;
+import com.warehouse.dto.request.reservation.ReserveRequest;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
+import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Role;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.User;
@@ -14,9 +18,12 @@ import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.batch.BatchService;
+import com.warehouse.service.reservation.StockReserveService;
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,6 +35,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -68,6 +76,12 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
     private BatchRepository batchRepository;
 
     @Autowired
+    private StockReserveRepository stockReserveRepository;
+
+    @Autowired
+    private StockReserveService stockReserveService;
+
+    @Autowired
     private CategoryRepository categoryRepository;
 
     @Autowired
@@ -78,6 +92,11 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @AfterEach
+    void deleteCreatedReservations() {
+        stockReserveRepository.deleteAllInBatch();
+    }
 
     /**
      * Проверяет, что параллельные списания одного товара не приводят к oversell.
@@ -233,6 +252,101 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
+    @Test
+    void reservedWriteOffAndCleanupSerializeOnStockLock() throws Exception {
+        LocalDateTime cleanupTime = LocalDateTime.now().withNano(0);
+        Warehouse warehouse = defaultWarehouse();
+        Item item = createItem();
+        Stock stock = createStock(item, warehouse, 10);
+
+        Batch expiredBatch = batchRepository.findByItemIdAndWarehouseIdOrderByExpiryDateAsc(
+                item.getId(),
+                warehouse.getId()
+        ).getFirst();
+        expiredBatch.setQuantity(4);
+        expiredBatch = batchRepository.saveAndFlush(expiredBatch);
+
+        Batch usableBatch = batchRepository.saveAndFlush(Batch.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(6)
+                .expiryDate(cleanupTime.plusDays(30))
+                .build());
+
+        User user = createUser();
+        UserContext userContext = new UserContext(user.getId(), user.getUsername());
+        Long reservationToCancelId = stockReserveService.reserve(
+                item.getId(),
+                new ReserveRequest(4, 1),
+                userContext
+        ).id();
+        Long reservationToConsumeId = stockReserveService.reserve(
+                item.getId(),
+                new ReserveRequest(3, 1),
+                userContext
+        ).id();
+        expiredBatch.setExpiryDate(cleanupTime.minusDays(1));
+        batchRepository.saveAndFlush(expiredBatch);
+        ensureBatchCleanupActor();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        Future<ReservationStatus> reservedWriteOff = null;
+        Future<Integer> cleanup = null;
+        try (Connection blockedBatchConnection = dataSource.getConnection()) {
+            blockedBatchConnection.setAutoCommit(false);
+            lockBatch(blockedBatchConnection, usableBatch.getId());
+
+            reservedWriteOff = executor.submit(() -> stockReserveService.writeOff(
+                    item.getId(),
+                    new ReservationActionRequest(reservationToConsumeId),
+                    userContext
+            ).status());
+
+            Awaitility.await()
+                    .atMost(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .until(() -> stockLockIsHeld(stock.getId()));
+
+            cleanup = executor.submit(() -> batchService.clearExpiredBatches(cleanupTime));
+
+            Awaitility.await()
+                    .atMost(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .until(this::hasBlockedStockLockWaiter);
+            assertThat(cleanup.isDone()).isFalse();
+
+            blockedBatchConnection.rollback();
+
+            assertThat(reservedWriteOff.get(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    .isEqualTo(ReservationStatus.CONSUMED);
+            assertThat(cleanup.get(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    .isGreaterThanOrEqualTo(1);
+
+            Stock persistedStock = stockRepository.findById(stock.getId()).orElseThrow();
+            int activeReserved = stockReserveRepository.findActiveReserveSumByStock(
+                    persistedStock,
+                    ReservationStatus.ACTIVE,
+                    LocalDateTime.now()
+            );
+
+            assertThat(persistedStock.getQuantity()).isEqualTo(3);
+            assertThat(activeReserved).isLessThanOrEqualTo(persistedStock.getQuantity());
+            assertThat(stockReserveRepository.findById(reservationToConsumeId).orElseThrow().getStatus())
+                    .isEqualTo(ReservationStatus.CONSUMED);
+            assertThat(stockReserveRepository.findById(reservationToCancelId).orElseThrow().getStatus())
+                    .isEqualTo(ReservationStatus.CANCELED);
+            assertThat(expiredMovementCount(item.getId())).isEqualTo(1);
+            assertThat(expiredMovementQuantity(item.getId())).isEqualTo(4);
+            assertStockMatchesBatchTotal(item.getId(), warehouse.getId());
+        } finally {
+            if (reservedWriteOff != null && !reservedWriteOff.isDone()) {
+                reservedWriteOff.cancel(true);
+            }
+            if (cleanup != null && !cleanup.isDone()) {
+                cleanup.cancel(true);
+            }
+            executor.shutdownNow();
+        }
+    }
+
     private boolean writeOffAfterStart(CountDownLatch ready,
                                        CountDownLatch start,
                                        Long itemId,
@@ -311,6 +425,15 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
         return itemRepository.saveAndFlush(item);
     }
 
+    private User createUser() {
+        return userRepository.saveAndFlush(User.builder()
+                .username("batch-concurrency-" + UUID.randomUUID())
+                .password("sOme1@@@")
+                .role(Role.ROLE_ADMIN)
+                .active(true)
+                .build());
+    }
+
     private Stock createStock(Item item, Warehouse warehouse, int quantity) {
         Stock stock = new Stock();
         stock.setItem(item);
@@ -359,6 +482,19 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
         );
     }
 
+    private int expiredMovementQuantity(Long itemId) {
+        return jdbcTemplate.queryForObject(
+                """
+                        SELECT COALESCE(SUM(quantity), 0)
+                        FROM stock_movements
+                        WHERE item_id = ?
+                          AND type = 'EXPIRED'
+                        """,
+                Integer.class,
+                itemId
+        );
+    }
+
     private int stockQuantity(Item item, Warehouse warehouse) {
         return stockRepository.findByItemIdAndWarehouseId(item.getId(), warehouse.getId())
                 .orElseThrow()
@@ -386,6 +522,51 @@ class BatchServiceConcurrencyIntegrationTest extends AbstractIntegrationTest {
                 assertThat(result.next()).isTrue();
             }
         }
+    }
+
+    private void lockBatch(Connection connection, Long batchId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT id FROM batches WHERE id = ? FOR UPDATE"
+        )) {
+            statement.setLong(1, batchId);
+            try (ResultSet result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+            }
+        }
+    }
+
+    private boolean stockLockIsHeld(Long stockId) throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                lockStock(connection, stockId, true);
+                connection.rollback();
+                return false;
+            } catch (SQLException exception) {
+                connection.rollback();
+                if ("55P03".equals(exception.getSQLState())) {
+                    return true;
+                }
+                throw exception;
+            }
+        }
+    }
+
+    private boolean hasBlockedStockLockWaiter() {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                """
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM pg_stat_activity
+                            WHERE datname = current_database()
+                              AND pid <> pg_backend_pid()
+                              AND wait_event_type = 'Lock'
+                              AND query ILIKE '%from stock%'
+                              AND query ILIKE '%for no key update%'
+                        )
+                        """,
+                Boolean.class
+        ));
     }
 
     private void assertStockMatchesBatchTotal(Long itemId, Long warehouseId) {

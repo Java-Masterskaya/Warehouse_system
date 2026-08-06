@@ -50,7 +50,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(StockMovementHistoryCursorIntegrationTest.SqlCaptureConfiguration.class)
 class StockMovementHistoryCursorIntegrationTest extends AbstractIntegrationTest {
 
-    private static final String HISTORY_URL = "/api/movements/{itemId}/history";
+    private static final String HISTORY_URL = V1_API_ROOT + "/movements/{itemId}/history";
     private static final LocalDateTime SHARED_CREATED_AT =
             LocalDateTime.of(2026, 1, 15, 12, 0, 0, 123_000_000);
 

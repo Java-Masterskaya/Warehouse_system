@@ -2,6 +2,7 @@ package com.warehouse.controller;
 
 import com.warehouse.dto.response.OutboxDltReprocessResponse;
 import com.warehouse.kafka.outbox.OutboxDltReprocessingService;
+import com.warehouse.web.ApiPaths;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
  * которые не удалось отправить после maxRetries попыток.
  */
 @RestController
-@RequestMapping("/api/outbox/dlt")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/outbox/dlt", ApiPaths.LEGACY_API_ROOT + "/outbox/dlt"})
 @RequiredArgsConstructor
 @Slf4j
 public class OutboxDltReprocessController {
