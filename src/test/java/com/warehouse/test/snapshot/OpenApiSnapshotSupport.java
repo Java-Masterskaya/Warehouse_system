@@ -2,6 +2,9 @@ package com.warehouse.test.snapshot;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
@@ -10,6 +13,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -52,6 +57,9 @@ public final class OpenApiSnapshotSupport {
     private static final Path SNAPSHOT_SOURCE_FILE = resolveSnapshotSourceFile();
 
     private static final int MAX_REPORTED_DIFFERENCES = 40;
+
+    /** Поля, чьи массивы по JSON Schema являются неупорядоченными наборами. */
+    private static final Set<String> UNORDERED_ARRAY_FIELDS = Set.of("oneOf", "anyOf");
 
     private OpenApiSnapshotSupport() {
     }
@@ -100,13 +108,14 @@ public final class OpenApiSnapshotSupport {
             return;
         }
 
-        JsonNode committedSpec = readCommittedSnapshot(objectMapper);
-        if (committedSpec.equals(liveSpec)) {
+        JsonNode committedSpec = canonicalize(readCommittedSnapshot(objectMapper));
+        JsonNode actualSpec = canonicalize(liveSpec);
+        if (committedSpec.equals(actualSpec)) {
             return;
         }
 
         List<String> differences = new ArrayList<>();
-        diff("", committedSpec, liveSpec, differences);
+        diff("", committedSpec, actualSpec, differences);
         throw new AssertionError(buildFailureMessage(differences));
     }
 
@@ -142,6 +151,52 @@ public final class OpenApiSnapshotSupport {
             message.append("  ... и ещё ").append(differences.size() - MAX_REPORTED_DIFFERENCES).append('\n');
         }
         return message.toString();
+    }
+
+    /**
+     * Приводит спеку к каноническому виду, чтобы сравнение не зависело от несущественного порядка.
+     *
+     * <p>{@code oneOf} и {@code anyOf} — по JSON Schema неупорядоченные наборы альтернатив:
+     * springdoc собирает их в порядке, который меняется между прогонами (зависит от того,
+     * какие тестовые классы поднимали контекст раньше). Позиционное сравнение таких массивов
+     * делало тест нестабильным при зелёном по сути контракте.
+     *
+     * <p>Остальные массивы ({@code parameters}, {@code enum}, {@code tags}) не сортируются
+     * намеренно: там порядок может быть значимым, и его изменение должно ронять тест.
+     *
+     * @param node узел спеки
+     * @return копия узла с отсортированными неупорядоченными массивами
+     */
+    private static JsonNode canonicalize(JsonNode node) {
+        if (node.isObject()) {
+            ObjectNode result = JsonNodeFactory.instance.objectNode();
+            List<String> fieldNames = new ArrayList<>();
+            node.fieldNames().forEachRemaining(fieldNames::add);
+            Collections.sort(fieldNames);
+            for (String fieldName : fieldNames) {
+                JsonNode child = canonicalize(node.get(fieldName));
+                if (UNORDERED_ARRAY_FIELDS.contains(fieldName) && child.isArray()) {
+                    child = sortArray(child);
+                }
+                result.set(fieldName, child);
+            }
+            return result;
+        }
+        if (node.isArray()) {
+            ArrayNode result = JsonNodeFactory.instance.arrayNode();
+            node.forEach(element -> result.add(canonicalize(element)));
+            return result;
+        }
+        return node;
+    }
+
+    private static JsonNode sortArray(JsonNode array) {
+        List<JsonNode> elements = new ArrayList<>();
+        array.forEach(elements::add);
+        elements.sort(Comparator.comparing(JsonNode::toString));
+        ArrayNode result = JsonNodeFactory.instance.arrayNode();
+        elements.forEach(result::add);
+        return result;
     }
 
     private static void diff(String path, JsonNode expected, JsonNode actual, List<String> out) {
