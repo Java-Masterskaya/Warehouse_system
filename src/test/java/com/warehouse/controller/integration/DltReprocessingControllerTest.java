@@ -370,8 +370,8 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
             consumer.seekToBeginning(partitions);
 
             int emptyPolls = 0;
-            while (emptyPolls < 3) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+            while (emptyPolls < 2) {
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(200));
                 if (records.isEmpty()) {
                     emptyPolls++;
                 } else {
@@ -521,7 +521,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Sent event with invalid itemId={}", invalidItemId);
 
         await().atMost(45, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages()).isNotEmpty();
                 });
@@ -550,7 +550,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("DLT reprocessing started");
 
         await().atMost(15, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     assertThat(alerts).isNotEmpty();
@@ -570,7 +570,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем что DLT пуст (записи удалены после репроцессинга)
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages())
                             .as("DLT should be empty after reprocessing and deletion")
@@ -615,7 +615,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // Phase 2: Wait for all messages in DLT
         AtomicInteger lastDltCount = new AtomicInteger(0);
         await().atMost(120, TimeUnit.SECONDS)
-                .pollInterval(3, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     int count = messages.size();
@@ -651,7 +651,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Wait for first 5 messages to be processed
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -664,7 +664,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Check: 5 messages remain in DLT (batch size = 5, processed first 5)
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     int remaining = readAllDltMessages().size();
                     assertThat(remaining)
@@ -685,7 +685,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Wait for remaining 5 messages
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -700,7 +700,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Phase 6: Verify DLT is empty after second reprocessing and deletion
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     assertThat(messages)
@@ -743,7 +743,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем первый StockAlert
         await().atMost(15, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -763,7 +763,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем, что сообщение в DLT
         await().atMost(10, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> dltMessages = readAllDltMessages();
                     assertThat(dltMessages).isNotEmpty();
@@ -837,7 +837,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем DLT сообщения (должно быть ровно 5)
         await().atMost(10, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     int dltCount = readAllDltMessages().size();
                     log.info("DLT message count: {}", dltCount);
@@ -853,7 +853,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем все StockAlerts (должно быть ровно 4 - по одному на каждый уникальный item)
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -912,7 +912,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем сообщение в DLT
         await().atMost(45, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages()).isNotEmpty();
                 });
@@ -940,7 +940,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем завершения обработки и появления StockAlert
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -981,7 +981,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         }
 
         await().atMost(timeoutSeconds, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     if (expectedCount == 0) {
