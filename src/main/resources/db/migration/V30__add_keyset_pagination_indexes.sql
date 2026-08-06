@@ -1,4 +1,4 @@
-DROP INDEX CONCURRENTLY IF EXISTS idx_items_active_name_id;
+DROP INDEX IF EXISTS idx_items_active_name_id;
 CREATE INDEX idx_items_active_name_id
     ON items (name, id)
     WHERE is_active = TRUE;

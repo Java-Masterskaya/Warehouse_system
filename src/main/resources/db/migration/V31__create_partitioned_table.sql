@@ -33,6 +33,23 @@ ALTER TABLE stock_movements_new
                 ) AND quantity > 0) OR (type = 'ADJUSTMENT' AND quantity <> 0)
             );
 
+CREATE OR REPLACE FUNCTION check_stock_movements_id_unique()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    IF EXISTS (SELECT 1 FROM stock_movements_new WHERE id = new.id) THEN
+        RAISE EXCEPTION 'duplicate key value violates unique constraint on id: %', new.id;
+    END IF;
+    RETURN new;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_stock_movements_id_unique
+    BEFORE INSERT
+    ON stock_movements_new
+    FOR EACH ROW
+EXECUTE FUNCTION check_stock_movements_id_unique();
+
 SELECT public.create_parent(
                p_parent_table => 'public.stock_movements_new',
                p_control => 'created_at',
