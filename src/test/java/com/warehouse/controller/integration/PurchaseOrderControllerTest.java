@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class PurchaseOrderControllerTest extends AbstractIntegrationTest {
 
-    private static final String BASE_URL = "/api/purchase-orders";
+    private static final String BASE_URL = V1_API_ROOT + "/purchase-orders";
 
     @Autowired
     private MockMvc mockMvc;
@@ -358,7 +358,7 @@ class PurchaseOrderControllerTest extends AbstractIntegrationTest {
 
         LoginRequest request = new LoginRequest(username, password);
 
-        String response = mockMvc.perform(post("/api/auth/login")
+        String response = mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())

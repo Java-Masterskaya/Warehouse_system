@@ -71,9 +71,9 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
      */
     @Test
     void adminSeesFullErrorMessageForEntityNotFound() throws Exception {
-        Long nonExistentId = 999999L;
+        Long nonExistentId = Long.MAX_VALUE;
 
-        mockMvc.perform(get("/api/items/{itemId}", nonExistentId)
+        mockMvc.perform(get(V1_API_ROOT + "/items/{itemId}", nonExistentId)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"))
@@ -85,9 +85,9 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
      */
     @Test
     void userSeesGenericErrorMessageForEntityNotFound() throws Exception {
-        Long nonExistentId = 999999L;
+        Long nonExistentId = Long.MAX_VALUE;
 
-        mockMvc.perform(get("/api/items/{itemId}", nonExistentId)
+        mockMvc.perform(get(V1_API_ROOT + "/items/{itemId}", nonExistentId)
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("ENTITY_NOT_FOUND"))
@@ -106,7 +106,7 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
         request.setPassword("password123");
         request.setRole(Role.ROLE_USER);
 
-        mockMvc.perform(get("/api/users")
+        mockMvc.perform(get(V1_API_ROOT + "/users")
                         .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("ACCESS_DENIED"))
@@ -114,7 +114,7 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String obtainToken(String username, String password) throws Exception {
-        return objectMapper.readTree(mockMvc.perform(post("/api/auth/login")
+        return objectMapper.readTree(mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new LoginRequest(username, password))))
                 .andExpect(status().isOk())

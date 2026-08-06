@@ -4,6 +4,7 @@ import com.warehouse.dto.request.supplier.CreateSupplierRequest;
 import com.warehouse.dto.request.supplier.UpdateSupplierRequest;
 import com.warehouse.dto.response.supplier.SupplierResponse;
 import com.warehouse.service.supplier.SupplierService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/suppliers")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/suppliers", ApiPaths.LEGACY_API_ROOT + "/suppliers"})
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Поставщики", description = "Управление поставщиками")

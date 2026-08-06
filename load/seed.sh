@@ -15,7 +15,7 @@ VU_PASSWORD_FILE="$(dirname "$0")/.vu-password"
 # Пароль VU-пользователей не хардкодим. Приоритет:
 # 1) явно передан через env — используем его;
 # 2) уже есть load/.vu-password с прошлого запуска — переиспользуем (пользователи
-#    loadtest-vu-* создаются один раз, POST /api/users для уже существующих —
+#    loadtest-vu-* создаются один раз, POST /api/v1/users для уже существующих -
 #    no-op, так что новый случайный пароль тут только сломает логин в k6);
 # 3) иначе — генерируем случайный и сохраняем на будущее (в git не попадает,
 #    см. .gitignore).
@@ -34,7 +34,7 @@ printf '%s' "$VU_PASSWORD" > "$VU_PASSWORD_FILE"
 SEED_RUN_ID="seed-$(date +%s)-$$"
 
 echo "Логин как $APP_USERNAME..."
-TOKEN=$(curl -s -X POST "$BASE_URL/api/auth/login" \
+TOKEN=$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"username\":\"$APP_USERNAME\",\"password\":\"$APP_PASSWORD\"}" \
   | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
@@ -46,7 +46,7 @@ fi
 
 echo "Создаю $MAX_VUS тестовых пользователей (по одному на VU, чтобы не упереться в rate-limit по username)..."
 for v in $(seq 1 "$MAX_VUS"); do
-  USER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/users" \
+  USER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/v1/users" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d "{\"username\":\"loadtest-vu-$v\",\"password\":\"$VU_PASSWORD\",\"role\":\"ROLE_ADMIN\"}")
@@ -59,7 +59,7 @@ for v in $(seq 1 "$MAX_VUS"); do
 done
 
 echo "Создаю категорию $CATEGORY (если ещё нет)..."
-curl -s -X POST "$BASE_URL/api/categories" \
+curl -s -X POST "$BASE_URL/api/v1/categories" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"$CATEGORY\"}" > /dev/null
@@ -69,7 +69,7 @@ EXPIRY=$(date -u -d "+30 days" +"%Y-%m-%dT%H:%M:%S")
 CREATED=0
 
 for i in $(seq 1 "$ITEM_COUNT"); do
-  RESP=$(curl -s -X POST "$BASE_URL/api/items" \
+  RESP=$(curl -s -X POST "$BASE_URL/api/v1/items" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d "{\"sku\":\"SKU-LOAD-$i\",\"name\":\"Load Test Item $i\",\"category\":\"$CATEGORY\",\"minStock\":0,\"price\":100.00,\"cost\":50.00}")
@@ -81,7 +81,7 @@ for i in $(seq 1 "$ITEM_COUNT"); do
     continue
   fi
 
-  RECEIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/movements/receive" \
+  RECEIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/v1/movements/receive" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -H "Idempotency-Key: ${SEED_RUN_ID}-item${i}-receive" \

@@ -12,6 +12,7 @@ import com.warehouse.entity.User;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.util.JwtUtil;
 import com.warehouse.test.snapshot.OpenApiSnapshotSupport;
+import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -110,7 +111,7 @@ abstract class AbstractOpenApiContractTest extends AbstractIntegrationTest {
 
     protected String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
-        String response = mockMvc.perform(post("/api/auth/login")
+        String response = mockMvc.perform(post(ApiPaths.V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())

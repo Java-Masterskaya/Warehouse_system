@@ -116,7 +116,7 @@ cleanup() {
             --request POST \
             --header 'Content-Type: application/json' \
             --data-binary "@$logout_payload" \
-            "$BASE_URL/api/auth/logout" \
+            "$BASE_URL/api/v1/auth/logout" \
             >/dev/null 2>&1
     fi
     if [[ -n "$temporary_directory" && -d "$temporary_directory" ]]; then
@@ -172,7 +172,7 @@ for _ in {1..60}; do
             --request POST \
             --header 'Content-Type: application/json' \
             --data-binary "@$login_payload" \
-            "$BASE_URL/api/auth/login" \
+            "$BASE_URL/api/v1/auth/login" \
             || true
     )"
 
@@ -240,7 +240,7 @@ for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
             --dump-header "$request_headers" \
             --write-out '%{http_code}' \
             --header "@$auth_header" \
-            "$BASE_URL/api/items?size=1"
+            "$BASE_URL/api/v1/items?size=1"
     )"
     [[ "$request_status" == "200" ]] || fail "Authenticated request $attempt returned HTTP $request_status"
     assert_no_set_cookie "$request_headers" "Authenticated request $attempt"

@@ -4,6 +4,7 @@ import com.warehouse.dto.request.user.UserCreateRequest;
 import com.warehouse.dto.response.user.UserResponse;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.user.UserService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/users", ApiPaths.LEGACY_API_ROOT + "/users"})
 @RequiredArgsConstructor
 @Tag(name = "Пользователи", description = "Управление пользователями (только ADMIN)")
 @SecurityRequirement(name = "bearerAuth")

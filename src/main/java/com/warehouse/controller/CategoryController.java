@@ -4,6 +4,7 @@ import com.warehouse.dto.request.category.CreateCategoryRequest;
 import com.warehouse.dto.request.category.UpdateCategoryRequest;
 import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.service.category.CategoryService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/categories")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/categories", ApiPaths.LEGACY_API_ROOT + "/categories"})
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Категории", description = "Управление категориями товаров")

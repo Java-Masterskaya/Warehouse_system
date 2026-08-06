@@ -65,18 +65,18 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
         String jsonBody = objectMapper.writeValueAsString(request);
 
         // Лимит в конфиге = 2 попытки. Обычный пользователь делает их успешно в пределах лимита (Критерий 4)
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonBody))
                 .andExpect(status().isUnauthorized()); // Имитация BadCredentials, но рейт-лимит пропустил
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonBody))
                 .andExpect(status().isUnauthorized());
 
         // 3-я (N+1) попытка в рамках текущего окна -> Блокировка 429 (Критерий 1)
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonBody))
                 .andExpect(status().isTooManyRequests())
@@ -91,17 +91,17 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
         String jsonBody = objectMapper.writeValueAsString(request);
 
         // Имитируем Instance 1 (используем текущий менеджер)
-        mockMvc.perform(post("/api/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());
 
         // Имитируем Instance 2: создаем абсолютно новый независимый ProxyManager,
         // подключенный к тому же Redis (как будто это второй под в Kubernetes)
         // Он запрашивает тот же ключ 'rl:login:user:cluster_user'
-        mockMvc.perform(post("/api/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());
 
         // 3-й запрос через первый инстанс падает в 429, так как второй инстанс тоже забирал токены из общего Redis
-        mockMvc.perform(post("/api/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isTooManyRequests());
     }
 
@@ -121,7 +121,7 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
 
         // 1. Выполняем 3 разрешенных запроса на ваш эндпоинт
         for (int i = 0; i < 3; i++) {
-            mockMvc.perform(post("/api/movements/receive")
+            mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                             .header("Authorization", "Bearer " + adminToken)
                             .header("Idempotency-Key", UUID.randomUUID().toString())
                             .contentType(MediaType.APPLICATION_JSON)
@@ -133,7 +133,7 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
         verify(movementService, times(3)).registerReceipt(any(), any());
 
         // 3. 4-й запрос превышает лимит
-        mockMvc.perform(post("/api/movements/receive")
+        mockMvc.perform(post(V1_API_ROOT + "/movements/receive")
                         .header("Authorization", "Bearer " + adminToken)
                         .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -146,7 +146,7 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
 
     private String obtainToken(String username, String password) throws Exception {
         LoginRequest request = new LoginRequest(username, password);
-        String response = mockMvc.perform(post("/api/auth/login")
+        String response = mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -163,18 +163,18 @@ public class RateLimitIntegrationTest extends AbstractIntegrationTest {
         String jsonBody = objectMapper.writeValueAsString(request);
 
         // Вычерпываем лимит (2 запроса)
-        mockMvc.perform(post("/api/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON));
-        mockMvc.perform(post("/api/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON));
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON));
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON));
 
         // Проверяем, что сейчас заблокировано
-        mockMvc.perform(post("/api/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isTooManyRequests());
 
         // Ждем 2 секунды (время окна `duration: 2s` из настроек BaseRateLimitIT для сброса)
         TimeUnit.SECONDS.sleep(2);
 
         // Окно плавно регенерировалось (Sliding/Greedy refill). Запрос снова разрешен!
-        mockMvc.perform(post("/api/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(post(V1_API_ROOT + "/auth/login").content(jsonBody).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized()); // Ошибка пароля, но НЕ 429!
     }
 }

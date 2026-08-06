@@ -161,7 +161,7 @@ class ActuatorSecurityTest extends AbstractIntegrationTest {
     }
 
     private String obtainAdminToken(String username, String password) throws Exception {
-        return objectMapper.readTree(mockMvc.perform(post("/api/auth/login")
+        return objectMapper.readTree(mockMvc.perform(post(V1_API_ROOT + "/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new LoginRequest(username, password))))
                 .andExpect(status().isOk())

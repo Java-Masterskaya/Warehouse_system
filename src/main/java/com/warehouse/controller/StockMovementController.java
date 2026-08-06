@@ -13,6 +13,7 @@ import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.idempotency.IdempotencyService;
 import com.warehouse.service.movement.StockMovementService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -40,7 +41,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/movements")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/movements", ApiPaths.LEGACY_API_ROOT + "/movements"})
 @RequiredArgsConstructor
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

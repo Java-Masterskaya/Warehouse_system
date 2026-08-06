@@ -2,6 +2,7 @@ package com.warehouse.openapi;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.warehouse.dto.request.security.LoginRequest;
+import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -12,7 +13,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Проверяет, что ответы {@code /api/auth/login} соответствуют зафиксированному
+ * Проверяет, что ответы {@code /api/v1/auth/login} соответствуют зафиксированному
  * OpenAPI-контракту: успех (200), неверные креды (401), ошибка валидации (400)
  * и блокировка по rate-limiting (429) должны совпадать со схемами
  * из {@code src/test/resources/openapi/warehouse.json}.
@@ -21,6 +22,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class AuthApiContractTest extends AbstractOpenApiContractTest {
 
+    private static final String LOGIN_URL = ApiPaths.V1_API_ROOT + "/auth/login";
+
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -28,7 +31,7 @@ class AuthApiContractTest extends AbstractOpenApiContractTest {
     void loginSuccessMatchesContract() throws Exception {
         LoginRequest request = new LoginRequest("admin", "secret");
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(LOGIN_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -39,7 +42,7 @@ class AuthApiContractTest extends AbstractOpenApiContractTest {
     void loginWrongPasswordMatchesContract() throws Exception {
         LoginRequest request = new LoginRequest("admin", "wrongpassword");
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(LOGIN_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
@@ -52,7 +55,7 @@ class AuthApiContractTest extends AbstractOpenApiContractTest {
                 {"username": "", "password": "secret"}
                 """;
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(LOGIN_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
@@ -66,16 +69,16 @@ class AuthApiContractTest extends AbstractOpenApiContractTest {
         String jsonBody = objectMapper.writeValueAsString(request);
 
         // Тестовый лимит для логина по username = 2 попытки (см. AbstractIntegrationTest).
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(LOGIN_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonBody))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(LOGIN_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonBody))
                 .andExpect(status().isUnauthorized());
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post(LOGIN_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonBody))
                 .andExpect(status().isTooManyRequests())
