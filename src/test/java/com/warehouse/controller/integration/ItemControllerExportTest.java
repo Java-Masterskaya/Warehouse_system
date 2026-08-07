@@ -2,6 +2,7 @@ package com.warehouse.controller.integration;
 
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.entity.Category;
+import com.warehouse.entity.Item;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
@@ -10,8 +11,6 @@ import com.warehouse.repository.PurchaseOrderRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.StockReserveRepository;
-import com.warehouse.service.import_export.CsvExportService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,12 +19,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,22 +47,17 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
     private CategoryRepository categoryRepository;
 
     @Autowired
-    private CsvExportService csvExportService;
-
-    @Autowired
     private ItemRepository itemRepository;
 
     @Autowired
     private StockMovementRepository movementRepository;
 
     @Autowired
-    private StockReserveRepository reserveRepository;
-
-    @Autowired
     private StockRepository stockRepository;
 
     @Autowired
     private StockAlertRepository    stockAlertRepository;
+
     @Autowired
     private PurchaseOrderRepository purchaseOrderRepository;
 
@@ -72,9 +66,6 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
 
     @Autowired
     private BatchRepository batchRepository;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     @AfterEach
@@ -174,4 +165,47 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
 
         mockMvc.perform(multipart("/api/items/import").file(csvFile)).andExpect(status().isOk());
     }
-}
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("Экспорт без параметра active не выгружает неактивные товары")
+    void exportWithoutActiveParamShouldExcludeInactiveItems() throws Exception {
+        Category category = categoryRepository.findByNameIgnoreCase("Категория").orElseGet(() -> {
+            Category c = new Category();
+            c.setName("Категория");
+            return categoryRepository.saveAndFlush(c);
+        });
+
+        itemRepository.save(Item.builder()
+                                .sku("SKU-ACTIVE")
+                                .name("Активный товар")
+                                .category(category)
+                                .minStock(0)
+                                .active(true)
+                                .price(new BigDecimal("100.00"))
+                                .cost(new BigDecimal("50.00"))
+                                .build());
+
+        itemRepository.save(Item.builder()
+                                .sku("SKU-INACTIVE")
+                                .name("Неактивный товар")
+                                .category(category)
+                                .minStock(0)
+                                .active(false)
+                                .price(new BigDecimal("200.00"))
+                                .cost(new BigDecimal("100.00"))
+                                .build());
+
+        MvcResult mvcResult = mockMvc.perform(get("/api/items/export"))
+                                     .andExpect(request().asyncStarted())
+                                     .andReturn();
+
+        MvcResult dispatched = mockMvc.perform(asyncDispatch(mvcResult))
+                                      .andExpect(status().isOk())
+                                      .andReturn();
+
+        String csv = dispatched.getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(csv).contains("SKU-ACTIVE");
+        assertThat(csv).doesNotContain("SKU-INACTIVE");
+    }}
