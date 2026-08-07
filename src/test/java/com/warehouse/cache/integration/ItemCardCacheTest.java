@@ -9,7 +9,6 @@ import com.warehouse.entity.Stock;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,9 +37,6 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
-    private StockMovementRepository stockMovementRepository;
-
-    @Autowired
     private ItemService itemService;
 
     @Autowired
@@ -58,11 +54,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     void setUp() {
         cacheManager.getCache("item").clear();
 
-        stockMovementRepository.deleteAllInBatch();
-        batchRepository.deleteAll();
-        stockRepository.deleteAllInBatch();
-        itemRepository.deleteAllInBatch();
-        categoryRepository.deleteAllInBatch();
+        cleanDomainData();
 
         Category electronics = categoryRepository.save(
                 Category.builder()

@@ -15,6 +15,7 @@ import com.warehouse.repository.UserRepository;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.security.service.TokenService;
 import com.warehouse.service.user.UserService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -57,6 +59,16 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     private String accessToken;
     private String refreshToken;
 
+    /**
+     * Админы, деактивированные ради сценария «остались два последних админа».
+     *
+     * <p>{@link #deactivateAllAdminsExcept(User, User)} гасит всех остальных админов в базе —
+     * иначе защита от деактивации последнего админа не сработает и тест потеряет смысл.
+     * Под раздачу попадает общий {@code admin} из миграции V5, а база у интеграционных
+     * тестов одна на весь прогон: без восстановления все следующие классы получают 401 на логине.
+     */
+    private final List<User> deactivatedAdmins = new ArrayList<>();
+
     @BeforeEach
     void setUp() {
         // Create test user for token tests
@@ -72,6 +84,15 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         var tokenPair = tokenService.generateTokenPair(testUser.getUsername(), testUser.getId(), roles);
         accessToken  = tokenPair.accessToken();
         refreshToken = tokenPair.refreshToken();
+    }
+
+    @AfterEach
+    void restoreDeactivatedAdmins() {
+        deactivatedAdmins.forEach(admin -> userRepository.findById(admin.getId()).ifPresent(found -> {
+            found.setActive(true);
+            userRepository.save(found);
+        }));
+        deactivatedAdmins.clear();
     }
 
     // ==================== EXISTING TEST ====================
@@ -361,7 +382,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
                       .filter(user -> !user.getId().equals(firstAdmin.getId()))
                       .filter(user -> !user.getId().equals(secondAdmin.getId())).forEach(user -> {
                           user.setActive(false);
-                          userRepository.save(user);
+                          deactivatedAdmins.add(userRepository.save(user));
                       });
     }
 }

@@ -26,9 +26,8 @@ import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementService;
 
 /**
@@ -49,28 +48,29 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
     private BatchRepository batchRepository;
 
     @Autowired
-    private StockMovementRepository stockMovementRepository;
-
-    @Autowired
     private CategoryRepository categoryRepository;
-
-    @Autowired
-    private StockAlertRepository stockAlertRepository;
 
     @Autowired
     private StockMovementService stockMovementService;
 
+    @Autowired
+    private UserRepository userRepository;
+
     private Long itemId;
     private Long warehouseId;
 
+    /**
+     * Контекст пользователя с реальным id из базы.
+     *
+     * <p>Раньше здесь стояла захардкоженная единица. Она совпадает с id админа
+     * из миграции V5 только до тех пор, пока эту строку никто не пересоздавал;
+     * после — движение по складу падает на {@code stock_movements_user_id_fkey}.
+     */
+    private UserContext adminContext;
+
     @BeforeEach
     void setUp() {
-        // Очищаем таблицы. stockAlertRepository чистим первой — на неё ссылается FK от items.
-        stockAlertRepository.deleteAllInBatch();
-        stockMovementRepository.deleteAllInBatch();
-        batchRepository.deleteAll();
-        stockRepository.deleteAllInBatch();
-        itemRepository.deleteAllInBatch();
+        cleanDomainData();
 
         Category category = categoryRepository.findByNameIgnoreCase("Тестовая категория FEFO")
                 .orElseGet(() -> categoryRepository.save(
@@ -100,6 +100,11 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 
         itemId = item.getId();
         warehouseId = stock.getWarehouse().getId();
+
+        adminContext = userRepository.findByUsername("admin")
+                .map(user -> new UserContext(user.getId(), user.getUsername()))
+                .orElseThrow(() -> new IllegalStateException(
+                        "Учётка admin из миграции V5 не найдена"));
     }
 
     /**
@@ -116,17 +121,17 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
         // Партия 1: срок годности через 1 день (самая ранняя)
         ReceiveStockRequest receipt1 = new ReceiveStockRequest(
                 itemId, 10, now.plusDays(1));
-        stockMovementService.registerReceipt(receipt1, new UserContext(1L, "admin"));
+        stockMovementService.registerReceipt(receipt1, adminContext);
 
         // Партия 2: срок годности через 7 дней
         ReceiveStockRequest receipt2 = new ReceiveStockRequest(
                 itemId, 20, now.plusDays(7));
-        stockMovementService.registerReceipt(receipt2, new UserContext(1L, "admin"));
+        stockMovementService.registerReceipt(receipt2, adminContext);
 
         // Партия 3: срок годности через 30 дней (самая поздняя)
         ReceiveStockRequest receipt3 = new ReceiveStockRequest(
                 itemId, 30, now.plusDays(30));
-        stockMovementService.registerReceipt(receipt3, new UserContext(1L, "admin"));
+        stockMovementService.registerReceipt(receipt3, adminContext);
 
         // Проверяем, что все партии созданы
         List<Batch> batches = batchRepository.findByItemIdAndWarehouseIdOrderByExpiryDateAsc(
@@ -140,7 +145,7 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
         // Act - Списываем 15 единиц
         WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(itemId, 15);
         StockMovementResponse response = stockMovementService.writeOffReceipt(
-                writeOffRequest, new UserContext(1L, "admin"));
+                writeOffRequest, adminContext);
 
         // Assert 1 - Проверяем ответ движения
         assertThat(response.lowStockAlert()).isFalse();
@@ -176,20 +181,20 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 
         ReceiveStockRequest receipt1 = new ReceiveStockRequest(
                 itemId, 10, now.plusDays(1));
-        stockMovementService.registerReceipt(receipt1, new UserContext(1L, "admin"));
+        stockMovementService.registerReceipt(receipt1, adminContext);
 
         ReceiveStockRequest receipt2 = new ReceiveStockRequest(
                 itemId, 20, now.plusDays(7));
-        stockMovementService.registerReceipt(receipt2, new UserContext(1L, "admin"));
+        stockMovementService.registerReceipt(receipt2, adminContext);
 
         ReceiveStockRequest receipt3 = new ReceiveStockRequest(
                 itemId, 30, now.plusDays(30));
-        stockMovementService.registerReceipt(receipt3, new UserContext(1L, "admin"));
+        stockMovementService.registerReceipt(receipt3, adminContext);
 
         // Act - Списываем 45 единиц (гасим первые 2 партии полностью и часть третьей)
         WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(itemId, 45);
         StockMovementResponse response = stockMovementService.writeOffReceipt(
-                writeOffRequest, new UserContext(1L, "admin"));
+                writeOffRequest, adminContext);
 
         // Assert 1 - Проверяем ответ
         assertThat(response.stockAfter()).isEqualTo(15); // 60 - 45 = 15
@@ -222,17 +227,17 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 
         ReceiveStockRequest receipt1 = new ReceiveStockRequest(
                 itemId, 10, now.plusDays(1));
-        stockMovementService.registerReceipt(receipt1, new UserContext(1L, "admin"));
+        stockMovementService.registerReceipt(receipt1, adminContext);
 
         ReceiveStockRequest receipt2 = new ReceiveStockRequest(
                 itemId, 20, now.plusDays(7));
-        stockMovementService.registerReceipt(receipt2, new UserContext(1L, "admin"));
+        stockMovementService.registerReceipt(receipt2, adminContext);
 
         // Act & Assert - Пытаемся списать больше, чем доступно (35 > 30)
         WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(itemId, 35);
 
         InsufficientStockException exception = assertThrows(InsufficientStockException.class, () -> {
-            stockMovementService.writeOffReceipt(writeOffRequest, new UserContext(1L, "admin"));
+            stockMovementService.writeOffReceipt(writeOffRequest, adminContext);
         });
 
         assertThat(exception.getMessage()).contains("Insufficient stock");

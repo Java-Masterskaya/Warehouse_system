@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -31,6 +32,9 @@ public abstract class AbstractIntegrationTest {
 
     @Autowired
     protected WarehouseRepository warehouseRepository;
+
+    @Autowired
+    protected JdbcTemplate testJdbcTemplate;
 
     static final PostgreSQLContainer<?> postgres =
             new PostgreSQLContainer<>("postgres:16-alpine");
@@ -80,18 +84,52 @@ public abstract class AbstractIntegrationTest {
         return redpanda;
     }
 
+    /**
+     * Удаляет доменные данные в порядке, безопасном по внешним ключам.
+     *
+     * <p>База у интеграционных тестов общая — контейнер поднимается один раз на весь прогон.
+     * Класс, который чистит лишь часть графа, падает на внешнем ключе, как только сосед
+     * оставил после себя ссылающиеся строки.
+     *
+     * <p>Порядок получен опытным путём: каждая таблица добавлена сюда потому, что её
+     * отсутствие роняло конкретный тест. Сверху те, кто ссылается, снизу те, на кого ссылаются.
+     *
+     * <p>{@code users} и {@code warehouses} не трогаем — они засеяны миграциями и общие для всех.
+     */
+    protected void cleanDomainData() {
+        testJdbcTemplate.update("DELETE FROM stock_alerts");
+        testJdbcTemplate.update("DELETE FROM reserves");
+        testJdbcTemplate.update("DELETE FROM purchase_order_items");
+        testJdbcTemplate.update("DELETE FROM purchase_orders");
+        testJdbcTemplate.update("DELETE FROM stock_movements");
+        testJdbcTemplate.update("DELETE FROM batches");
+        testJdbcTemplate.update("DELETE FROM stock");
+        testJdbcTemplate.update("DELETE FROM items");
+        testJdbcTemplate.update("DELETE FROM categories");
+    }
+
     protected Warehouse defaultWarehouse() {
         return warehouseRepository.findByDefaultWarehouseTrue()
                 .orElseThrow(() -> new IllegalStateException("Default warehouse is not configured"));
     }
 
+    /**
+     * Сбрасывает состояние Redis перед каждым тестом — прежде всего корзины rate limiting.
+     *
+     * <p>Раньше здесь удалялись ключи по шаблону {@code rl:*} через {@code StringRedisTemplate}.
+     * Корзины пишет bucket4j отдельным соединением с {@code ByteArrayCodec}, и до них выборка
+     * не доставала: лимит логина по IP (10 попыток на 2 секунды) копился через весь прогон.
+     * Пока тесты были медленными, это не проявлялось; после ускорения классы, где
+     * каждый тест логинится, стали упираться в лимит и получать 429 вместо 200.
+     *
+     * <p>{@code flushDb} чистит независимо от того, как и чем ключ сериализован.
+     * {@code RateLimitIntegrationTest} давно делает ровно это и работает стабильно.
+     */
     @BeforeEach
     void clearRateLimitKeys() {
-        // Очищаем Redis ключи rate limiting перед каждым тестом
-        // Используем keys() для получения всех ключей с префиксом rl: и удаляем их
-        java.util.Set<String> keys = redisTemplate.keys("rl:*");
-        if (keys != null) {
-            redisTemplate.delete(keys);
-        }
+        java.util.Objects.requireNonNull(redisTemplate.getConnectionFactory())
+                .getConnection()
+                .serverCommands()
+                .flushDb();
     }
 }

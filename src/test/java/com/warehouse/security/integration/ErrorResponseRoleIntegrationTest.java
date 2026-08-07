@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -43,6 +44,9 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private String adminToken;
     private String userToken;
 
@@ -53,7 +57,10 @@ class ErrorResponseRoleIntegrationTest extends AbstractIntegrationTest {
         User testUser = userRepository.findByUsername("testuser").orElseGet(() -> {
             User user = new User();
             user.setUsername("testuser");
-            user.setPassword("password");
+            // Пароль обязательно хэшируем: класс создаёт общего testuser, если его ещё нет,
+            // а соседи логинятся под ним по паролю. С сырой строкой BCrypt не совпадёт
+            // и они получат 401 — но только если этот класс попал в очередь первым.
+            user.setPassword(passwordEncoder.encode("password"));
             user.setRole(Role.ROLE_USER);
             user.setActive(true);
             return userRepository.save(user);

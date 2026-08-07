@@ -85,6 +85,10 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Класс проверяет резервы через reservationRepository.findAll(): без очистки
+        // в выборку попадают чужие резервы, и ассерты уезжают («ожидали 5, получили 7»,
+        // «Expecting empty»). Своих данных класс до этого вообще не изолировал.
+        cleanDomainData();
 
         category = categoryRepository.findByNameIgnoreCase("test")
                 .orElseGet(() -> categoryRepository.save(

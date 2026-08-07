@@ -60,9 +60,7 @@ class ItemServiceRedisFallbackIntegrationTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
-        categoryRepository.deleteAll();
+        cleanDomainData();
 
         Category category = categoryRepository.save(
                 Category.builder().name("Test").build()

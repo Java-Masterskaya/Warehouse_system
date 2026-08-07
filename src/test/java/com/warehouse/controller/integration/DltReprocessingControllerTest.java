@@ -23,8 +23,8 @@ import com.warehouse.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -146,36 +146,16 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         jdbcTemplate.update("DELETE FROM stock");
         jdbcTemplate.update("DELETE FROM items");
         jdbcTemplate.update("DELETE FROM categories");
-        jdbcTemplate.update("DELETE FROM users");
+        // Пользователей не удаляем, а приводим к нужному состоянию на месте.
+        // Прежний DELETE + INSERT выдавал учёткам новые id. Логин после этого работал,
+        // поэтому правка выглядела безобидной, но соседние классы держат id админа
+        // в UserContext и падали на stock_movements_user_id_fkey.
+        // Полный DELETE FROM users сносил вдобавок и чужие учётки.
+        upsertUser("admin", passwordEncoder.encode("secret"), Role.ROLE_ADMIN, true);
+        upsertUser("testuser", passwordEncoder.encode("password"), Role.ROLE_USER, true);
+        upsertUser(BatchCleanupActor.USERNAME, "!disabled-system-actor!", Role.ROLE_USER, false);
 
-        // Очищаем последовательно, чтобы убрать дубликаты (DELETE + INSERT работает быстрее)
-        jdbcTemplate.update("ALTER SEQUENCE stock_alerts_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE items_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE categories_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE users_id_seq RESTART WITH 1");
-
-        resetConsumerGroupOffsets();
-
-        User admin = new User();
-        admin.setUsername("admin");
-        admin.setPassword(passwordEncoder.encode("secret"));
-        admin.setRole(Role.ROLE_ADMIN);
-        admin.setActive(true);
-        userRepository.save(admin);
-
-        User user = new User();
-        user.setUsername("testuser");
-        user.setPassword(passwordEncoder.encode("password"));
-        user.setRole(Role.ROLE_USER);
-        user.setActive(true);
-        userRepository.save(user);
-
-        User batchCleanupActor = new User();
-        batchCleanupActor.setUsername(BatchCleanupActor.USERNAME);
-        batchCleanupActor.setPassword("!disabled-system-actor!");
-        batchCleanupActor.setRole(Role.ROLE_USER);
-        batchCleanupActor.setActive(false);
-        userRepository.save(batchCleanupActor);
+        purgeDlt();
 
         testCategory = categoryRepository.save(
                 Category.builder()
@@ -215,6 +195,24 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Setup completed");
     }
 
+    /**
+     * Приводит учётку к нужному состоянию, сохраняя её id.
+     *
+     * @param username        логин учётки
+     * @param encodedPassword уже захэшированный пароль
+     * @param role            роль
+     * @param active          признак активности
+     * @return сохранённая учётка
+     */
+    private User upsertUser(String username, String encodedPassword, Role role, boolean active) {
+        User user = userRepository.findByUsername(username).orElseGet(User::new);
+        user.setUsername(username);
+        user.setPassword(encodedPassword);
+        user.setRole(role);
+        user.setActive(active);
+        return userRepository.save(user);
+    }
+
     @AfterEach
     void waitForDltReprocessingToFinish() {
         await().atMost(30, TimeUnit.SECONDS)
@@ -231,74 +229,18 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     }
 
     /**
-     * Удаляет и пересоздаёт DLT топик для гарантии чистого состояния.
+     * Приводит DLT к чистому состоянию перед тестом.
+     *
+     * <p>Топик живёт весь прогон и накапливает сообщения — и чужие, и оставленные
+     * предыдущими методами этого же класса. Прежний вариант лишь перематывал offset
+     * группы на 0, поэтому каждый следующий тест переобрабатывал всё накопленное:
+     * счётчики алертов уезжали («ожидали 5, получили 6»).
+     *
+     * <p>Пересоздавать топик, как делалось до ускорения QA-7, слишком дорого —
+     * удаление с ожиданием занимало секунды на каждый тест. {@code deleteRecords}
+     * обрезает топик сразу, а offset группы ставится на новый конец.
      */
-    private void deleteAndRecreateDltTopic() {
-        try (AdminClient adminClient = createAdminClient()) {
-            var existingTopics = adminClient.listTopics().names().get();
-
-            if (existingTopics.contains(DLT_TOPIC)) {
-                log.debug("Deleting existing DLT topic: {}", DLT_TOPIC);
-
-                // Сначала удаляем consumer group, чтобы сбросить оффсеты
-                try {
-                    adminClient.deleteConsumerGroups(Collections.singletonList(REPROCESS_GROUP_ID)).all().get();
-                    log.debug("Deleted consumer group: {}", REPROCESS_GROUP_ID);
-                } catch (Exception e) {
-                    log.debug("Could not delete consumer group (may not exist): {}", e.getMessage());
-                }
-
-                // Удаляем топик
-                adminClient.deleteTopics(Collections.singletonList(DLT_TOPIC)).all().get();
-
-                // Ждём, пока топик действительно удалится (увеличиваем таймаут)
-                await().atMost(30, TimeUnit.SECONDS)
-                        .pollInterval(500, TimeUnit.MILLISECONDS)
-                        .until(() -> {
-                            try {
-                                var topics = adminClient.listTopics().names().get();
-                                boolean deleted = !topics.contains(DLT_TOPIC);
-                                if (deleted) {
-                                    log.debug("DLT topic successfully deleted");
-                                }
-                                return deleted;
-                            } catch (Exception e) {
-                                log.debug("Error checking topic deletion: {}", e.getMessage());
-                                return false;
-                            }
-                        });
-                log.debug("DLT topic deleted");
-            }
-
-            // Создаём топик с 1 партицией
-            NewTopic newTopic = new NewTopic(DLT_TOPIC, 1, (short) 1);
-            adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
-            log.debug("Created DLT topic: {} with 1 partition", DLT_TOPIC);
-
-            // Ждём создания топика
-            await().atMost(10, TimeUnit.SECONDS)
-                    .pollInterval(200, TimeUnit.MILLISECONDS)
-                    .until(() -> {
-                        try {
-                            var topics = adminClient.listTopics().names().get();
-                            return topics.contains(DLT_TOPIC);
-                        } catch (Exception e) {
-                            return false;
-                        }
-                    });
-
-            // Дополнительная задержка для стабилизации
-            Thread.sleep(1000);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to recreate DLT topic", e);
-        }
-    }
-
-    /**
-     * Сбрасывает offset consumer group в начало для чистого старта.
-     */
-    private void resetConsumerGroupOffsets() {
+    private void purgeDlt() {
         try (AdminClient adminClient = createAdminClient()) {
             var existingTopics = adminClient.listTopics().names().get();
             if (!existingTopics.contains(DLT_TOPIC)) {
@@ -307,18 +249,26 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
             var topicDesc = adminClient.describeTopics(Collections.singletonList(DLT_TOPIC))
                     .allTopicNames().get();
-            int partitionCount = topicDesc.get(DLT_TOPIC).partitions().size();
 
+            Map<TopicPartition, OffsetSpec> endSpecs = new HashMap<>();
+            topicDesc.get(DLT_TOPIC).partitions().forEach(partition ->
+                    endSpecs.put(new TopicPartition(DLT_TOPIC, partition.partition()), OffsetSpec.latest()));
+
+            var endOffsets = adminClient.listOffsets(endSpecs).all().get();
+
+            Map<TopicPartition, RecordsToDelete> toDelete = new HashMap<>();
             Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndMetadata> offsets = new HashMap<>();
-            for (int i = 0; i < partitionCount; i++) {
-                offsets.put(new TopicPartition(DLT_TOPIC, i),
-                        new org.apache.kafka.clients.consumer.OffsetAndMetadata(0));
-            }
+            endOffsets.forEach((partition, info) -> {
+                toDelete.put(partition, RecordsToDelete.beforeOffset(info.offset()));
+                offsets.put(partition,
+                        new org.apache.kafka.clients.consumer.OffsetAndMetadata(info.offset()));
+            });
 
+            adminClient.deleteRecords(toDelete).all().get();
             adminClient.alterConsumerGroupOffsets(REPROCESS_GROUP_ID, offsets).all().get();
-            log.debug("Reset offsets for group {} to beginning", REPROCESS_GROUP_ID);
+            log.debug("Purged DLT, group {} moved to the end of the topic", REPROCESS_GROUP_ID);
         } catch (Exception e) {
-            log.trace("Could not reset offsets (group may not exist yet): {}", e.getMessage());
+            log.trace("Could not purge DLT (topic or group may not exist yet): {}", e.getMessage());
         }
     }
 
