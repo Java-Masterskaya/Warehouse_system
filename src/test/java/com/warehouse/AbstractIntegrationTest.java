@@ -1,6 +1,7 @@
 package com.warehouse;
 
 import com.warehouse.entity.Warehouse;
+import com.warehouse.postgres.PostgresTestImage;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,12 +37,8 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected WarehouseRepository warehouseRepository;
 
-    private static final DockerImageName POSTGRES_IMAGE =
-            DockerImageName.parse("warehouse_system-postgres:latest")
-                    .asCompatibleSubstituteFor("postgres");
-
     static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>(POSTGRES_IMAGE)
+            new PostgreSQLContainer<>(PostgresTestImage.IMAGE)
                     .withDatabaseName("warehouse")
                     .withUsername("postgres")
                     .withPassword("postgres")

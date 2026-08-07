@@ -1,5 +1,6 @@
 package com.warehouse.migration;
 
+import com.warehouse.postgres.PostgresTestImage;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class WarehouseMigrationIntegrationTest {
     @SuppressWarnings("resource")
     @Container
     private static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>(POSTGRES_IMAGE)
+            new PostgreSQLContainer<>(PostgresTestImage.IMAGE)
                     .withDatabaseName("warehouse")
                     .withUsername("postgres")
                     .withPassword("postgres")
