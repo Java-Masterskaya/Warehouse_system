@@ -32,29 +32,9 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Check Docker
+      - name: Build, test and check
         run: |
-          docker --version
-          docker info
-          docker system df
-
-      - name: Configure Testcontainers
-        run: |
-          echo "TESTCONTAINERS_RYUK_DISABLED=true" >> $GITHUB_ENV
-          echo "TESTCONTAINERS_REUSE_ENABLE=true" >> $GITHUB_ENV
-          echo "TESTCONTAINERS_CHECKS_TIMEOUT=120" >> $GITHUB_ENV
-          echo "DOCKER_HOST=unix:///var/run/docker.sock" >> $GITHUB_ENV
-
-      - name: Run all tests
-        run: |
-          ./gradlew test --no-daemon \
-            -Dtestcontainers.ryuk.disabled=true \
-            -Dtestcontainers.reuse.enable=true \
-            -Dtestcontainers.checks.timeout=120
-
-      - name: Build JAR
-        run: |
-          ./gradlew assemble --no-daemon
+          ./gradlew clean build --no-daemon
 
       - name: Build Docker image
         run: docker build --tag warehouse-system:${{ github.sha }} .
