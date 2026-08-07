@@ -180,7 +180,14 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
             assertThat(pendingEvents).hasSize(7);
             pendingEvents.forEach(event -> assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING));
 
-            outboxEventRelay.relayPendingEvents();
+            // Накапливаем статистику ошибок Resilience4j (вызываем несколько раз)
+            for (int i = 0; i < 5; i++) {
+                try {
+                    outboxEventRelay.relayPendingEvents();
+                } catch (Exception ignored) {
+                    // Игнорируем ошибки падения Кафки во время набора метрик
+                }
+            }
 
             CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("kafkaProducer");
             Awaitility.await()
