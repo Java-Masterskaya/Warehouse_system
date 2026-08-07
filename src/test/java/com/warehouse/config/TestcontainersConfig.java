@@ -12,12 +12,21 @@ public class TestcontainersConfig {
     @Bean
     @ServiceConnection
     public PostgreSQLContainer<?> postgresContainer() {
-        try (PostgreSQLContainer<?> container = new PostgreSQLContainer<>(
+        PostgreSQLContainer<?> container = new PostgreSQLContainer<>(
                 DockerImageName.parse("ghcr.io/dbsystel/postgresql-partman:16")
                         .asCompatibleSubstituteFor("postgres")
-        )) {
-            container.withInitScript("init.sql");
-            return container;
-        }
+        );
+
+        container.withInitScript("init.sql");
+
+        container.withCommand(
+                "postgres",
+                "-c", "shared_preload_libraries=pg_partman_bgw,pg_cron",
+                "-c", "cron.database_name=test"
+        );
+
+        container.withReuse(true);
+
+        return container;
     }
 }
