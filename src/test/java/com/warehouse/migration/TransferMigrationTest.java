@@ -122,9 +122,15 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
         log.info("Records in stock_movements_archive: {}", oldCount);
         log.info("Records in stock_movements: {}", newCount);
 
-        assertThat(newCount)
-                .as("Records count mismatch: old=%d, new=%d", oldCount, newCount)
-                .isEqualTo(oldCount);
+        Long missingCount = ((Number) entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM stock_movements_archive a "
+                        + "WHERE NOT EXISTS (SELECT 1 FROM stock_movements n "
+                        + "WHERE n.id = a.id AND n.created_at = a.created_at)"
+        ).getSingleResult()).longValue();
+
+        assertThat(missingCount)
+                .as("Rows present in archive but missing in stock_movements")
+                .isZero();
 
         log.info("✅ All data copied correctly");
     }
