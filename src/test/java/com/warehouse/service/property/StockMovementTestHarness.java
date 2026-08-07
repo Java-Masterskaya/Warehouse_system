@@ -186,6 +186,45 @@ final class StockMovementTestHarness {
     }
 
     /**
+     * Продакшн-реализация сервиса, поднятая этим harness'ом — для тестов, которым нужно
+     * вызвать сервис напрямую и проверить конкретное исключение, а не свёрнутый в {@code
+     * boolean} результат {@link #apply}.
+     *
+     * @return {@code StockMovementService}, используемый {@link #apply}
+     */
+    StockMovementService service() {
+        return stockMovementService;
+    }
+
+    /**
+     * Контекст пользователя, от имени которого harness выполняет операции.
+     *
+     * @return {@code UserContext}, используемый {@link #apply}
+     */
+    UserContext userContext() {
+        return userContext;
+    }
+
+    /**
+     * Идентификатор единственного товара, с которым работает harness.
+     *
+     * @return id товара, созданного в конструкторе
+     */
+    Long itemId() {
+        return item.getId();
+    }
+
+    /**
+     * Идентификатор склада по индексу в пуле, созданном конструктором.
+     *
+     * @param warehouseIndex индекс склада в пуле
+     * @return id склада с этим индексом
+     */
+    Long warehouseId(int warehouseIndex) {
+        return warehousePool.get(warehouseIndex).getId();
+    }
+
+    /**
      * Применяет одну операцию к текущему состоянию склада через реальный
      * {@code StockMovementService}. Ожидаемые доменные отклонения (недостаточно остатка,
      * некорректное количество) перехватываются и трактуются как отсутствие изменений —
@@ -283,18 +322,9 @@ final class StockMovementTestHarness {
             );
             return true;
         } catch (InsufficientStockException | InvalidMovementRequestException rejected) {
-            return false;
-        } catch (StockMovementInvariantException zeroQuantityTransfer) {
-            // Перемещение с quantity=0: в отличие от registerReceipt()/BatchServiceImpl.writeOff(),
-            // StockMovementServiceImpl.transfer() не делает собственную проверку quantity<=0 —
-            // полагается только на @Positive в TransferStockRequest, которую enforces @Valid на
-            // контроллере (этот harness вызывает сервис напрямую, минуя контроллер). Запрос доходит
-            // до stockMovementRepository.saveAllAndFlush и отклоняется только @PrePersist-инвариантом
-            // StockMovement (см. persistMovement ниже), а не доменным исключением, как у
-            // receive/write-off. Состояние при этом не меняется, поэтому с точки зрения инвариантов
-            // остатка это тот же исход "операция не применена". Известное ограничение
-            // defense-in-depth в transfer(), намеренно не исправляемое в рамках этого PR — см.
-            // StockInvariantsPropertyTest.transferWithZeroQuantityIsRejectedWithoutChangingState.
+            // QA-8: StockMovementServiceImpl.transfer() теперь сам отклоняет quantity<=0
+            // доменным InvalidMovementRequestException, симметрично registerReceipt() —
+            // до похода в репозиторий, а не на @PrePersist-инварианте StockMovement.
             return false;
         }
     }

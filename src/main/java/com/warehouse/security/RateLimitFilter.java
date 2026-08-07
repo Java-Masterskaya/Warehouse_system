@@ -1,6 +1,7 @@
 package com.warehouse.security;
 
 import com.warehouse.security.config.RateLimitProperties;
+import com.warehouse.web.ApiPaths;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
@@ -25,6 +26,11 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
+
+    private static final String LEGACY_LOGIN_PATH = ApiPaths.LEGACY_API_ROOT + "/auth/login";
+    private static final String V1_LOGIN_PATH = ApiPaths.V1_API_ROOT + "/auth/login";
+    private static final String LEGACY_MOVEMENTS_PATH = ApiPaths.LEGACY_API_ROOT + "/movements";
+    private static final String V1_MOVEMENTS_PATH = ApiPaths.V1_API_ROOT + "/movements";
 
     private final RateLimitProperties properties;
     private final ProxyManager<byte[]> proxyManager;
@@ -53,12 +59,19 @@ public class RateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(requestToProcess, response);
     }
 
-    private boolean isLoginRequest(String path, String method) {
-        return "/api/auth/login".equals(path) && "POST".equalsIgnoreCase(method);
+    static boolean isLoginRequest(String path, String method) {
+        boolean loginPath = LEGACY_LOGIN_PATH.equals(path) || V1_LOGIN_PATH.equals(path);
+        return loginPath && "POST".equalsIgnoreCase(method);
     }
 
-    private boolean isMovementsWriteRequest(String path, String method) {
-        return path.startsWith("/api/movements") && isWriteMethod(method);
+    static boolean isMovementsWriteRequest(String path, String method) {
+        boolean movementsPath = isPathAtOrBelow(path, LEGACY_MOVEMENTS_PATH)
+                || isPathAtOrBelow(path, V1_MOVEMENTS_PATH);
+        return movementsPath && isWriteMethod(method);
+    }
+
+    private static boolean isPathAtOrBelow(String path, String root) {
+        return path.equals(root) || path.startsWith(root + "/");
     }
 
     private boolean isLoginRateLimited(String ip, HttpServletResponse response) throws IOException {
@@ -122,7 +135,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     // Метод проверяет, имеем ли мы дело с write-эндпоинтом
-    private boolean isWriteMethod(String method) {
+    private static boolean isWriteMethod(String method) {
         return "POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method)
                 || "PATCH".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method);
     }

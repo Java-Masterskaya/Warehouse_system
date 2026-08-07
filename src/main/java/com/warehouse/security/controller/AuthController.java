@@ -6,6 +6,7 @@ import com.warehouse.dto.request.security.RefreshRequest;
 import com.warehouse.dto.response.security.LoginResponse;
 import com.warehouse.dto.response.security.RefreshResponse;
 import com.warehouse.security.service.AuthService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/auth", ApiPaths.LEGACY_API_ROOT + "/auth"})
 @RequiredArgsConstructor
 @Tag(name = "Аутентификация", description = "Управление аутентификацией и токенами")
 public class AuthController {

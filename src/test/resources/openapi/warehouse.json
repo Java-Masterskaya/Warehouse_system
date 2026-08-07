@@ -50,7 +50,7 @@
     "description" : "Управление складами"
   } ],
   "paths" : {
-    "/api/suppliers/{supplierId}" : {
+    "/api/v1/suppliers/{supplierId}" : {
       "get" : {
         "tags" : [ "Поставщики" ],
         "summary" : "Карточка поставщика",
@@ -129,8 +129,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -139,8 +139,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -252,8 +252,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -262,8 +262,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -365,8 +365,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -375,8 +375,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -394,7 +394,7 @@
         } ]
       }
     },
-    "/api/items/{itemId}" : {
+    "/api/v1/items/{itemId}" : {
       "get" : {
         "tags" : [ "Товары" ],
         "summary" : "Карточка товара",
@@ -473,8 +473,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -483,8 +483,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -596,8 +596,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -606,8 +606,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -709,8 +709,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -719,8 +719,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -738,7 +738,7 @@
         } ]
       }
     },
-    "/api/categories/{categoryId}" : {
+    "/api/v1/categories/{categoryId}" : {
       "get" : {
         "tags" : [ "Категории" ],
         "summary" : "Получить категорию",
@@ -817,8 +817,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -827,8 +827,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -940,8 +940,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -950,8 +950,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1053,8 +1053,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1063,8 +1063,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1082,7 +1082,7 @@
         } ]
       }
     },
-    "/api/warehouses" : {
+    "/api/v1/warehouses" : {
       "get" : {
         "tags" : [ "Склады" ],
         "summary" : "Список складов",
@@ -1152,8 +1152,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1162,8 +1162,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1269,8 +1269,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1279,8 +1279,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1305,7 +1305,7 @@
         } ]
       }
     },
-    "/api/users" : {
+    "/api/v1/users" : {
       "get" : {
         "tags" : [ "Пользователи" ],
         "summary" : "Список всех пользователей",
@@ -1375,8 +1375,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1385,8 +1385,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1492,8 +1492,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1502,8 +1502,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1528,7 +1528,7 @@
         } ]
       }
     },
-    "/api/suppliers" : {
+    "/api/v1/suppliers" : {
       "get" : {
         "tags" : [ "Поставщики" ],
         "summary" : "Список поставщиков",
@@ -1598,8 +1598,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1608,8 +1608,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1715,8 +1715,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1725,8 +1725,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1751,7 +1751,7 @@
         } ]
       }
     },
-    "/api/stock/{itemId}/write-off" : {
+    "/api/v1/stock/{itemId}/write-off" : {
       "post" : {
         "tags" : [ "Резервирование остатков" ],
         "summary" : "Выкуп резерва",
@@ -1840,8 +1840,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1850,8 +1850,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1876,7 +1876,7 @@
         } ]
       }
     },
-    "/api/stock/{itemId}/reserve" : {
+    "/api/v1/stock/{itemId}/reserve" : {
       "post" : {
         "tags" : [ "Резервирование остатков" ],
         "summary" : "Резервирование остатков",
@@ -1965,8 +1965,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1975,8 +1975,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2001,7 +2001,7 @@
         } ]
       }
     },
-    "/api/stock/{itemId}/release" : {
+    "/api/v1/stock/{itemId}/release" : {
       "post" : {
         "tags" : [ "Резервирование остатков" ],
         "summary" : "Отмена резервирования",
@@ -2090,8 +2090,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2100,8 +2100,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2126,7 +2126,247 @@
         } ]
       }
     },
-    "/api/purchase-orders" : {
+    "/api/v1/purchase-orders/{purchaseOrderId}/receive" : {
+      "post" : {
+        "tags" : [ "Заказы поставщикам" ],
+        "summary" : "Принять товар по заказу поставки",
+        "operationId" : "receivePurchaseOrder",
+        "parameters" : [ {
+          "name" : "purchaseOrderId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReceivePurchaseOrderRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PurchaseOrderResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/purchase-orders/{purchaseOrderId}/place" : {
+      "post" : {
+        "tags" : [ "Заказы поставщикам" ],
+        "summary" : "Разместить заказ у поставщика",
+        "operationId" : "placePurchaseOrder",
+        "parameters" : [ {
+          "name" : "purchaseOrderId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PurchaseOrderResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/purchase-orders" : {
       "get" : {
         "tags" : [ "Заказы поставщикам" ],
         "summary" : "Список заказов поставщикам",
@@ -2215,8 +2455,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2225,8 +2465,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2329,8 +2569,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2339,8 +2579,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2365,247 +2605,7 @@
         } ]
       }
     },
-    "/api/purchase-orders/{purchaseOrderId}/receive" : {
-      "post" : {
-        "tags" : [ "Заказы поставщикам" ],
-        "summary" : "Принять товар по заказу поставки",
-        "operationId" : "receivePurchaseOrder",
-        "parameters" : [ {
-          "name" : "purchaseOrderId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ReceivePurchaseOrderRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422" : {
-            "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ValidationErrorResponse"
-                  }, {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  } ]
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429" : {
-            "description" : "Too Many Requests",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PurchaseOrderResponse"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ]
-      }
-    },
-    "/api/purchase-orders/{purchaseOrderId}/place" : {
-      "post" : {
-        "tags" : [ "Заказы поставщикам" ],
-        "summary" : "Разместить заказ у поставщика",
-        "operationId" : "placePurchaseOrder",
-        "parameters" : [ {
-          "name" : "purchaseOrderId",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int64"
-          }
-        } ],
-        "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422" : {
-            "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ValidationErrorResponse"
-                  }, {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  } ]
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429" : {
-            "description" : "Too Many Requests",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PurchaseOrderResponse"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ]
-      }
-    },
-    "/api/outbox/dlt/reprocess" : {
+    "/api/v1/outbox/dlt/reprocess" : {
       "post" : {
         "tags" : [ "outbox-dlt-reprocess-controller" ],
         "operationId" : "reprocessAll",
@@ -2674,8 +2674,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2684,8 +2684,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2707,7 +2707,7 @@
         }
       }
     },
-    "/api/movements/write-off" : {
+    "/api/v1/movements/write-off" : {
       "post" : {
         "tags" : [ "Движения товара" ],
         "summary" : "Списать товар",
@@ -2795,8 +2795,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2805,8 +2805,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2831,7 +2831,7 @@
         } ]
       }
     },
-    "/api/movements/transfer" : {
+    "/api/v1/movements/transfer" : {
       "post" : {
         "tags" : [ "Движения товара" ],
         "summary" : "Перевести товар между складами",
@@ -2911,8 +2911,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2921,8 +2921,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2947,7 +2947,7 @@
         } ]
       }
     },
-    "/api/movements/receive" : {
+    "/api/v1/movements/receive" : {
       "post" : {
         "tags" : [ "Движения товара" ],
         "summary" : "Зарегистрировать поступление",
@@ -3035,8 +3035,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3045,8 +3045,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3071,7 +3071,7 @@
         } ]
       }
     },
-    "/api/items" : {
+    "/api/v1/items" : {
       "get" : {
         "tags" : [ "Товары" ],
         "summary" : "Список товаров",
@@ -3204,8 +3204,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3214,8 +3214,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3318,8 +3318,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3328,8 +3328,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3354,7 +3354,7 @@
         } ]
       }
     },
-    "/api/inventory/stocktake" : {
+    "/api/v1/inventory/stocktake" : {
       "post" : {
         "tags" : [ "Инвентаризация" ],
         "summary" : "Провести инвентаризацию",
@@ -3434,8 +3434,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3444,8 +3444,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3470,7 +3470,7 @@
         } ]
       }
     },
-    "/api/categories" : {
+    "/api/v1/categories" : {
       "post" : {
         "tags" : [ "Категории" ],
         "summary" : "Создать категорию",
@@ -3550,8 +3550,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3560,8 +3560,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3586,7 +3586,7 @@
         } ]
       }
     },
-    "/api/auth/refresh" : {
+    "/api/v1/auth/refresh" : {
       "post" : {
         "tags" : [ "Аутентификация" ],
         "summary" : "Обновить access токен",
@@ -3667,8 +3667,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3677,8 +3677,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3700,7 +3700,7 @@
         }
       }
     },
-    "/api/auth/logout" : {
+    "/api/v1/auth/logout" : {
       "post" : {
         "tags" : [ "Аутентификация" ],
         "summary" : "Выйти из системы",
@@ -3781,8 +3781,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3791,8 +3791,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3807,7 +3807,7 @@
         }
       }
     },
-    "/api/auth/login" : {
+    "/api/v1/auth/login" : {
       "post" : {
         "tags" : [ "Аутентификация" ],
         "summary" : "Войти в систему",
@@ -3888,8 +3888,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3898,8 +3898,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3921,7 +3921,7 @@
         }
       }
     },
-    "/api/admin/dlq/low-stock/reprocess" : {
+    "/api/v1/admin/dlq/low-stock/reprocess" : {
       "post" : {
         "tags" : [ "DLQ Management" ],
         "summary" : "Асинхронная реобработка DLT",
@@ -3992,8 +3992,97 @@
               }
             }
           },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/admin/backfill/barcode/stop" : {
+      "post" : {
+        "tags" : [ "Admin: Backfill" ],
+        "summary" : "Остановить backfill штрихкодов",
+        "operationId" : "stopBackfill",
+        "responses" : {
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4012,8 +4101,28 @@
               }
             }
           },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "200" : {
-            "description" : "OK"
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -4021,7 +4130,7 @@
         } ]
       }
     },
-    "/admin/backfill/barcode" : {
+    "/api/v1/admin/backfill/barcode" : {
       "post" : {
         "tags" : [ "Admin: Backfill" ],
         "summary" : "Запустить backfill штрихкодов (асинхронно)",
@@ -4102,8 +4211,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4112,8 +4221,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4141,116 +4250,7 @@
         } ]
       }
     },
-    "/admin/backfill/barcode/stop" : {
-      "post" : {
-        "tags" : [ "Admin: Backfill" ],
-        "summary" : "Остановить backfill штрихкодов",
-        "operationId" : "stopBackfill",
-        "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422" : {
-            "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Bad Request",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "oneOf" : [ {
-                    "$ref" : "#/components/schemas/ValidationErrorResponse"
-                  }, {
-                    "$ref" : "#/components/schemas/ErrorResponse"
-                  } ]
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "500" : {
-            "description" : "Internal Server Error",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "429" : {
-            "description" : "Too Many Requests",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ]
-      }
-    },
-    "/api/reports/stock-valuation" : {
+    "/api/v1/reports/stock-valuation" : {
       "get" : {
         "tags" : [ "Отчёты" ],
         "summary" : "Оценка складских запасов",
@@ -4321,8 +4321,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4331,8 +4331,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4357,7 +4357,7 @@
         } ]
       }
     },
-    "/api/reports/low-stock" : {
+    "/api/v1/reports/low-stock" : {
       "get" : {
         "tags" : [ "Отчёты" ],
         "summary" : "Товары ниже минимального остатка",
@@ -4427,8 +4427,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4437,8 +4437,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4463,7 +4463,7 @@
         } ]
       }
     },
-    "/api/reports/expiring" : {
+    "/api/v1/reports/expiring" : {
       "get" : {
         "tags" : [ "Отчёты" ],
         "summary" : "Партии с истекающим сроком годности",
@@ -4545,8 +4545,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4555,8 +4555,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4581,7 +4581,7 @@
         } ]
       }
     },
-    "/api/purchase-orders/{purchaseOrderId}" : {
+    "/api/v1/purchase-orders/{purchaseOrderId}" : {
       "get" : {
         "tags" : [ "Заказы поставщикам" ],
         "summary" : "Получить заказ поставщику",
@@ -4660,8 +4660,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4670,8 +4670,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4696,7 +4696,7 @@
         } ]
       }
     },
-    "/api/outbox/dlt/count" : {
+    "/api/v1/outbox/dlt/count" : {
       "get" : {
         "tags" : [ "outbox-dlt-reprocess-controller" ],
         "operationId" : "countDltEvents",
@@ -4765,8 +4765,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4775,8 +4775,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4799,7 +4799,7 @@
         }
       }
     },
-    "/api/movements/{itemId}/history" : {
+    "/api/v1/movements/{itemId}/history" : {
       "get" : {
         "tags" : [ "Движения товара" ],
         "operationId" : "getItemMovementHistory",
@@ -4915,8 +4915,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4925,8 +4925,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4951,7 +4951,7 @@
         } ]
       }
     },
-    "/api/items/categories" : {
+    "/api/v1/items/categories" : {
       "get" : {
         "tags" : [ "Товары" ],
         "summary" : "Список категорий",
@@ -5021,8 +5021,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5031,8 +5031,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5060,7 +5060,7 @@
         } ]
       }
     },
-    "/admin/backfill/barcode/status" : {
+    "/api/v1/admin/backfill/barcode/status" : {
       "get" : {
         "tags" : [ "Admin: Backfill" ],
         "summary" : "Статус backfill штрихкодов",
@@ -5130,8 +5130,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5140,8 +5140,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5169,7 +5169,7 @@
         } ]
       }
     },
-    "/api/users/{userId}" : {
+    "/api/v1/users/{userId}" : {
       "delete" : {
         "tags" : [ "Пользователи" ],
         "summary" : "Деактивировать пользователя",
@@ -5249,8 +5249,8 @@
               }
             }
           },
-          "500" : {
-            "description" : "Internal Server Error",
+          "429" : {
+            "description" : "Too Many Requests",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5259,8 +5259,8 @@
               }
             }
           },
-          "429" : {
-            "description" : "Too Many Requests",
+          "500" : {
+            "description" : "Internal Server Error",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5572,34 +5572,33 @@
           }
         }
       },
-      "CreatePurchaseOrderItemRequest" : {
-        "required" : [ "itemId" ],
+      "ReceivePurchaseOrderItemRequest" : {
+        "required" : [ "expiryDate", "purchaseOrderItemId" ],
         "type" : "object",
         "properties" : {
-          "itemId" : {
+          "purchaseOrderItemId" : {
             "type" : "integer",
             "format" : "int64"
           },
-          "orderedQty" : {
+          "quantity" : {
             "minimum" : 1,
             "type" : "integer",
             "format" : "int32"
+          },
+          "expiryDate" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
-      "CreatePurchaseOrderRequest" : {
-        "required" : [ "supplierId" ],
+      "ReceivePurchaseOrderRequest" : {
         "type" : "object",
         "properties" : {
-          "supplierId" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
           "items" : {
             "minItems" : 1,
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/CreatePurchaseOrderItemRequest"
+              "$ref" : "#/components/schemas/ReceivePurchaseOrderItemRequest"
             }
           }
         }
@@ -5668,33 +5667,34 @@
           }
         }
       },
-      "ReceivePurchaseOrderItemRequest" : {
-        "required" : [ "expiryDate", "purchaseOrderItemId" ],
+      "CreatePurchaseOrderItemRequest" : {
+        "required" : [ "itemId" ],
         "type" : "object",
         "properties" : {
-          "purchaseOrderItemId" : {
+          "itemId" : {
             "type" : "integer",
             "format" : "int64"
           },
-          "quantity" : {
+          "orderedQty" : {
             "minimum" : 1,
             "type" : "integer",
             "format" : "int32"
-          },
-          "expiryDate" : {
-            "type" : "string",
-            "format" : "date-time"
           }
         }
       },
-      "ReceivePurchaseOrderRequest" : {
+      "CreatePurchaseOrderRequest" : {
+        "required" : [ "supplierId" ],
         "type" : "object",
         "properties" : {
+          "supplierId" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "items" : {
             "minItems" : 1,
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/ReceivePurchaseOrderItemRequest"
+              "$ref" : "#/components/schemas/CreatePurchaseOrderItemRequest"
             }
           }
         }
@@ -6275,61 +6275,6 @@
           }
         }
       },
-      "ItemCursorPageResponse" : {
-        "required" : [ "content", "hasNext", "nextCursor" ],
-        "type" : "object",
-        "properties" : {
-          "content" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/ItemResponse"
-            }
-          },
-          "nextCursor" : {
-            "type" : "string",
-            "nullable" : true
-          },
-          "hasNext" : {
-            "type" : "boolean"
-          }
-        }
-      },
-      "ItemOffsetPageResponse" : {
-        "required" : [ "content", "page", "size", "totalElements", "totalPages" ],
-        "type" : "object",
-        "properties" : {
-          "content" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/ItemResponse"
-            }
-          },
-          "totalElements" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "totalPages" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "page" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "size" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }
-      },
-      "ItemPaginationResponse" : {
-        "type" : "object",
-        "oneOf" : [ {
-          "$ref" : "#/components/schemas/ItemOffsetPageResponse"
-        }, {
-          "$ref" : "#/components/schemas/ItemCursorPageResponse"
-        } ]
-      },
       "ItemDetailsResponse" : {
         "required" : [ "available", "barcode", "category", "cost", "createdAt", "currentStock", "id", "isActive", "minStock", "name", "price", "reserved", "sku", "updatedAt", "warehouseStocks" ],
         "type" : "object",
@@ -6415,6 +6360,61 @@
             "format" : "int64"
           }
         }
+      },
+      "ItemCursorPageResponse" : {
+        "required" : [ "content", "hasNext", "nextCursor" ],
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ItemResponse"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ItemOffsetPageResponse" : {
+        "required" : [ "content", "page", "size", "totalElements", "totalPages" ],
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ItemResponse"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ItemPaginationResponse" : {
+        "type" : "object",
+        "oneOf" : [ {
+          "$ref" : "#/components/schemas/ItemOffsetPageResponse"
+        }, {
+          "$ref" : "#/components/schemas/ItemCursorPageResponse"
+        } ]
       }
     },
     "securitySchemes" : {

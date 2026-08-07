@@ -7,7 +7,7 @@
 --
 -- Если строк >= 100 000 - НЕ копировать этот файл никогда. Вместо этого:
 --   1. Задеплоить только V27 + V28 (nullable-колонка + sequence) + Java-код.
---   2. Запустить ItemBarcodeBackfillJob через POST /admin/backfill/barcode
+--   2. Запустить ItemBarcodeBackfillJob через POST /api/v1/admin/backfill/barcode
 --      (батчами, короткими транзакциями - см. docs/database-migrations.md).
 --   3. Дождаться SELECT COUNT(*) FROM items WHERE barcode IS NULL; → 0.
 --   4. Только затем - V32 (contract).

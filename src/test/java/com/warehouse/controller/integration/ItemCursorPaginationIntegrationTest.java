@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(ItemCursorPaginationIntegrationTest.SqlCaptureConfiguration.class)
 class ItemCursorPaginationIntegrationTest extends AbstractIntegrationTest {
 
-    private static final String BASE_URL = "/api/items";
+    private static final String BASE_URL = V1_API_ROOT + "/items";
     private static final int PAGE_SIZE = 2;
 
     @Autowired

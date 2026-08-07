@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 class WarehouseControllerTest extends AbstractIntegrationTest {
 
-    private static final String BASE_URL = "/api/warehouses";
+    private static final String BASE_URL = V1_API_ROOT + "/warehouses";
 
     @Autowired
     private MockMvc mockMvc;

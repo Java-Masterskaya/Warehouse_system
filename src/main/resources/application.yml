@@ -78,6 +78,9 @@ spring:
 
 app:
   instance-id: ${INSTANCE_ID:${HOSTNAME:local}}
+  api:
+    deprecation:
+      sunset: "Thu, 05 Aug 2027 00:00:00 GMT"
   audit:
     retention:
       # 1.5 года (18 месяцев) для покрытия закрытия фин. года и проверок в Q1

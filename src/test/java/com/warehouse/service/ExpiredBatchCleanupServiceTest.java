@@ -1,8 +1,14 @@
 package com.warehouse.service;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.warehouse.entity.Batch;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.MovementType;
+import com.warehouse.entity.Reservation;
+import com.warehouse.entity.ReservationStatus;
 import com.warehouse.entity.Stock;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
@@ -10,6 +16,7 @@ import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.batch.ExpiredBatchCleanupService;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,8 +25,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
@@ -28,6 +38,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -40,12 +52,17 @@ class ExpiredBatchCleanupServiceTest {
     private static final long WAREHOUSE_ID = 20L;
     private static final long ACTOR_ID = 30L;
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 7, 31, 12, 0);
+    private static final String CANCELLATION_LOG_MESSAGE =
+            "Reservations canceled during expired batch cleanup";
 
     @Mock
     private BatchRepository batchRepository;
 
     @Mock
     private StockRepository stockRepository;
+
+    @Mock
+    private StockReserveRepository stockReserveRepository;
 
     @Mock
     private StockMovementRepository stockMovementRepository;
@@ -62,6 +79,7 @@ class ExpiredBatchCleanupServiceTest {
         service = new ExpiredBatchCleanupService(
                 batchRepository,
                 stockRepository,
+                stockReserveRepository,
                 stockMovementRepository,
                 userRepository
         );
@@ -105,6 +123,127 @@ class ExpiredBatchCleanupServiceTest {
         assertThat(movement.getBatch()).isNull();
         verify(batchRepository).saveAll(batches);
         verify(stockRepository).save(stock);
+    }
+
+    @Test
+    void shouldCancelWholeNewestReservationAndKeepOlderReservation() {
+        Stock stock = Stock.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(10)
+                .build();
+        Batch expiredBatch = batch(3, NOW.minusDays(1));
+        Reservation olderReservation = reservation(1L, 5, NOW.minusHours(2));
+        Reservation newerReservation = reservation(2L, 3, NOW.minusHours(1));
+        User actor = User.builder().id(ACTOR_ID).build();
+
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(ITEM_ID, WAREHOUSE_ID, NOW))
+                .thenReturn(List.of(expiredBatch));
+        when(stockReserveRepository.findActiveByStockForUpdate(stock, NOW))
+                .thenReturn(List.of(newerReservation, olderReservation));
+        when(userRepository.getReferenceById(ACTOR_ID)).thenReturn(actor);
+
+        Logger logger = (Logger) LoggerFactory.getLogger(ExpiredBatchCleanupService.class);
+        ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+        logAppender.start();
+        logger.addAppender(logAppender);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
+            assertThat(logAppender.list)
+                    .noneMatch(event -> event.getMessage().startsWith(CANCELLATION_LOG_MESSAGE));
+            assertThat(TransactionSynchronizationManager.getSynchronizations()).hasSize(1);
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+            logger.detachAppender(logAppender);
+            logAppender.stop();
+        }
+
+        assertThat(newerReservation.getStatus()).isEqualTo(ReservationStatus.CANCELED);
+        assertThat(olderReservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE);
+        assertThat(stock.getQuantity()).isEqualTo(7);
+        verify(stockReserveRepository).saveAll(List.of(newerReservation));
+        assertThat(logAppender.list)
+                .filteredOn(event -> event.getMessage().startsWith(CANCELLATION_LOG_MESSAGE))
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                    assertThat(event.getMessage()).startsWith(CANCELLATION_LOG_MESSAGE);
+                    assertThat(event.getFormattedMessage())
+                            .contains(CANCELLATION_LOG_MESSAGE)
+                            .contains("itemId=10")
+                            .contains("warehouseId=20")
+                            .contains("reservationIds=[2]")
+                            .contains("canceledQuantity=3")
+                            .contains("remainingStockQuantity=7");
+                    assertThat(event.getKeyValuePairs())
+                            .extracting(pair -> pair.key, pair -> pair.value)
+                            .containsExactlyInAnyOrder(
+                                    tuple("itemId", ITEM_ID),
+                                    tuple("warehouseId", WAREHOUSE_ID),
+                                    tuple("reservationIds", List.of(2L)),
+                                    tuple("canceledQuantity", 3L),
+                                    tuple("remainingStockQuantity", 7)
+                        );
+                });
+    }
+
+    @Test
+    void shouldKeepAllReservationsWhenTheyFitRemainingStockExactly() {
+        Stock stock = Stock.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(10)
+                .build();
+        Batch expiredBatch = batch(2, NOW.minusDays(1));
+        Reservation olderReservation = reservation(1L, 5, NOW.minusHours(2));
+        Reservation newerReservation = reservation(2L, 3, NOW.minusHours(1));
+        User actor = User.builder().id(ACTOR_ID).build();
+
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(ITEM_ID, WAREHOUSE_ID, NOW))
+                .thenReturn(List.of(expiredBatch));
+        when(stockReserveRepository.findActiveByStockForUpdate(stock, NOW))
+                .thenReturn(List.of(newerReservation, olderReservation));
+        when(userRepository.getReferenceById(ACTOR_ID)).thenReturn(actor);
+
+        service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
+
+        assertThat(newerReservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE);
+        assertThat(olderReservation.getStatus()).isEqualTo(ReservationStatus.ACTIVE);
+        verify(stockReserveRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void shouldUseOnlyPhysicalExpiredQuantityForMovementWhenReservationIsCanceled() {
+        Stock stock = Stock.builder()
+                .item(item)
+                .warehouse(warehouse)
+                .quantity(10)
+                .build();
+        Batch expiredBatch = batch(2, NOW.minusDays(1));
+        Reservation reservation = reservation(1L, 9, NOW.minusHours(1));
+        User actor = User.builder().id(ACTOR_ID).build();
+
+        when(stockRepository.findByItemIdAndWarehouseIdForUpdate(ITEM_ID, WAREHOUSE_ID))
+                .thenReturn(Optional.of(stock));
+        when(batchRepository.findExpiredByItemAndWarehouseForUpdate(ITEM_ID, WAREHOUSE_ID, NOW))
+                .thenReturn(List.of(expiredBatch));
+        when(stockReserveRepository.findActiveByStockForUpdate(stock, NOW))
+                .thenReturn(List.of(reservation));
+        when(userRepository.getReferenceById(ACTOR_ID)).thenReturn(actor);
+
+        service.clearScope(ITEM_ID, WAREHOUSE_ID, ACTOR_ID, NOW);
+
+        ArgumentCaptor<StockMovement> movementCaptor = ArgumentCaptor.forClass(StockMovement.class);
+        verify(stockMovementRepository).saveAndFlush(movementCaptor.capture());
+        assertThat(reservation.getStatus()).isEqualTo(ReservationStatus.CANCELED);
+        assertThat(movementCaptor.getValue().getQuantity()).isEqualTo(2);
     }
 
     @Test
@@ -203,6 +342,17 @@ class ExpiredBatchCleanupServiceTest {
                 .warehouse(warehouse)
                 .quantity(quantity)
                 .expiryDate(expiryDate)
+                .build();
+    }
+
+    private Reservation reservation(Long id, int quantity, LocalDateTime createdAt) {
+        return Reservation.builder()
+                .id(id)
+                .stock(Stock.builder().item(item).warehouse(warehouse).build())
+                .quantity(quantity)
+                .status(ReservationStatus.ACTIVE)
+                .createdAt(createdAt)
+                .expiredAt(NOW.plusDays(1))
                 .build();
     }
 }

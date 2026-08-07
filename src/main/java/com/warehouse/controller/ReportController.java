@@ -6,6 +6,7 @@ import com.warehouse.dto.response.report.LowStockItem;
 import com.warehouse.dto.response.report.LowStockReportResponse;
 import com.warehouse.dto.response.valuation.StockValuationResponse;
 import com.warehouse.service.report.ReportService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,7 +28,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/reports")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/reports", ApiPaths.LEGACY_API_ROOT + "/reports"})
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "Отчёты", description = "Аналитические отчёты (только ADMIN)")

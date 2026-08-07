@@ -1,12 +1,11 @@
 package com.warehouse;
 
-import com.warehouse.config.TestcontainersConfig;
 import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.WarehouseRepository;
+import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -29,8 +28,10 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  * всегда имеет актуальные адреса.
  */
 @AutoConfigureMockMvc
-@Import(TestcontainersConfig.class)
 public abstract class AbstractIntegrationTest {
+
+    protected static final String V1_API_ROOT = ApiPaths.V1_API_ROOT;
+    protected static final String V1_BACKFILL_ROOT = ApiPaths.V1_BACKFILL_ROOT;
 
     @Autowired
     protected WarehouseRepository warehouseRepository;

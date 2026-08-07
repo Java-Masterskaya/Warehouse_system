@@ -3,6 +3,7 @@ package com.warehouse.controller;
 import com.warehouse.dto.request.warehouse.CreateWarehouseRequest;
 import com.warehouse.dto.response.warehouse.WarehouseResponse;
 import com.warehouse.service.warehouse.WarehouseService;
+import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/warehouses")
+@RequestMapping({ApiPaths.V1_API_ROOT + "/warehouses", ApiPaths.LEGACY_API_ROOT + "/warehouses"})
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Склады", description = "Управление складами")
