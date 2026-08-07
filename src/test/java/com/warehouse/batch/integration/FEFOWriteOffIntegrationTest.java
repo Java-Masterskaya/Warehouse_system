@@ -1,21 +1,5 @@
 package com.warehouse.batch.integration;
 
-import com.warehouse.repository.PurchaseOrderItemRepository;
-import com.warehouse.repository.PurchaseOrderRepository;
-import com.warehouse.repository.StockAlertRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
@@ -29,10 +13,24 @@ import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.PurchaseOrderItemRepository;
+import com.warehouse.repository.PurchaseOrderRepository;
 import com.warehouse.repository.StockAlertRepository;
-import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockMovementRepository;
+import com.warehouse.repository.StockRepository;
 import com.warehouse.service.movement.StockMovementService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Интеграционный тест для проверки FEFO (First Expire First Out) списания.
@@ -56,9 +54,6 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
-
-    @Autowired
-    private StockAlertRepository stockAlertRepository;
 
     @Autowired
     private StockMovementService stockMovementService;
@@ -87,11 +82,11 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
         itemRepository.deleteAllInBatch();
 
         Category category = categoryRepository.findByNameIgnoreCase("Тестовая категория FEFO")
-                .orElseGet(() -> categoryRepository.save(
-                        Category.builder()
-                                .name("Тестовая категория FEFO")
-                                .build()
-                ));
+                                              .orElseGet(() -> categoryRepository.save(
+                                                      Category.builder()
+                                                              .name("Тестовая категория FEFO")
+                                                              .build()
+                                              ));
 
         // Создаем товар
         Item item = new Item();
@@ -112,7 +107,7 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
         stock.setQuantity(0);
         stockRepository.save(stock);
 
-        itemId = item.getId();
+        itemId      = item.getId();
         warehouseId = stock.getWarehouse().getId();
     }
 
