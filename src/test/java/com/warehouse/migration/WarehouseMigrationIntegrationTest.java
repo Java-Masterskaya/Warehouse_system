@@ -49,7 +49,6 @@ class WarehouseMigrationIntegrationTest {
                             "-c", "cron.database_name=warehouse"
                     );
 
-
     @Test
     void migrationPreservesLegacyStockMovementAndReservation() throws Exception {
         migrateToV18();
