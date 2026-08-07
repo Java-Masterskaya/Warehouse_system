@@ -56,7 +56,7 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
-    private StockAlertRepository    stockAlertRepository;
+    private StockAlertRepository stockAlertRepository;
 
     @Autowired
     private PurchaseOrderRepository purchaseOrderRepository;
@@ -169,7 +169,8 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     @DisplayName("Экспорт без параметра active не выгружает неактивные товары")
-    void exportWithoutActiveParamShouldExcludeInactiveItems() throws Exception {
+    void exportWithoutActiveParamShouldExcludeInactiveItems()
+            throws Exception {
         Category category = categoryRepository.findByNameIgnoreCase("Категория").orElseGet(() -> {
             Category c = new Category();
             c.setName("Категория");
@@ -208,4 +209,5 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
 
         assertThat(csv).contains("SKU-ACTIVE");
         assertThat(csv).doesNotContain("SKU-INACTIVE");
-    }}
+    }
+}
