@@ -1,4 +1,4 @@
--- V39: Archive management after successful verification
+-- V40: Archive management after successful verification
 
 ANALYZE stock_movements_archive;
 

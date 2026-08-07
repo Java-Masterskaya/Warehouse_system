@@ -31,34 +31,32 @@ ALTER TABLE stock_movements_new
             REFERENCES batches (id, item_id, warehouse_id)
             ON DELETE RESTRICT;
 
-
 ALTER TABLE stock_movements_new
     ADD CONSTRAINT stock_movements_new_quantity_check
         CHECK (
             (type IN (
-                      'RECEIVE', 'WRITE_OFF', 'TRANSFER_OUT', 'TRANSFER_IN'
-                ) AND quantity > 0) OR (type = 'ADJUSTMENT' AND quantity <> 0)
+                      'RECEIVE',
+                      'WRITE_OFF',
+                      'EXPIRED',
+                      'TRANSFER_OUT',
+                      'TRANSFER_IN'
+                ) AND quantity > 0)
+                OR (type = 'ADJUSTMENT' AND quantity <> 0)
             );
 
-CREATE OR REPLACE FUNCTION check_stock_movements_id_unique()
-    RETURNS TRIGGER AS
-$$
-BEGIN
-    EXECUTE FORMAT('SELECT 1 FROM %I WHERE id = $1 LIMIT 1', tg_table_name)
-        USING new.id;
+ALTER TABLE stock_movements_new
+    ADD CONSTRAINT stock_movements_new_type_check
+        CHECK (type IN (
+                        'RECEIVE',
+                        'WRITE_OFF',
+                        'EXPIRED',
+                        'ADJUSTMENT',
+                        'TRANSFER_OUT',
+                        'TRANSFER_IN'
+            ));
 
-    IF found THEN
-        RAISE EXCEPTION 'duplicate key value violates unique constraint on id: %', new.id;
-    END IF;
-    RETURN new;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_check_stock_movements_id_unique
-    BEFORE INSERT
-    ON stock_movements_new
-    FOR EACH ROW
-EXECUTE FUNCTION check_stock_movements_id_unique();
+ALTER TABLE stock_movements_new
+    ADD CONSTRAINT stock_movements_new_id_unique UNIQUE (id, created_at);
 
 SELECT public.create_parent(
                p_parent_table => 'public.stock_movements_new',

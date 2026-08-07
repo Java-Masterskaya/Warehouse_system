@@ -1,4 +1,4 @@
--- V35: Post-migration data integrity check
+-- V36: Post-migration data integrity check
 DO
 $$
     DECLARE

@@ -30,14 +30,25 @@ class WarehouseMigrationIntegrationTest {
     private static final int LEGACY_QUANTITY = 37;
     private static final long LEGACY_VERSION = 4L;
 
+    private static final DockerImageName POSTGRES_IMAGE =
+            DockerImageName.parse("warehouse_system-postgres:latest")
+                    .asCompatibleSubstituteFor("postgres");
+
     @SuppressWarnings("resource")
     @Container
     private static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>(
-                    DockerImageName.parse("ghcr.io/dbsystel/postgresql-partman:16")
-                            .asCompatibleSubstituteFor("postgres")
-            )
-                    .withInitScript("init.sql");
+            new PostgreSQLContainer<>(POSTGRES_IMAGE)
+                    .withDatabaseName("warehouse")
+                    .withUsername("postgres")
+                    .withPassword("postgres")
+                    .withReuse(true)
+                    .withInitScript("init.sql")
+                    .withCommand(
+                            "postgres",
+                            "-c", "shared_preload_libraries=pg_partman_bgw,pg_cron",
+                            "-c", "cron.database_name=warehouse"
+                    );
+
 
     @Test
     void migrationPreservesLegacyStockMovementAndReservation() throws Exception {
@@ -95,12 +106,13 @@ class WarehouseMigrationIntegrationTest {
         Flyway flyway = Flyway.configure()
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                 .locations("classpath:db/migration")
+                .mixed(true)
                 .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
                 .load();
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("40");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("41");
     }
 
     private void assertKeysetPaginationIndexes() throws SQLException {

@@ -1,4 +1,4 @@
--- V37: Setup pg_partman retention and maintenance, and pg_cron scheduling
+-- V38: Setup pg_partman retention and maintenance, and pg_cron scheduling
 
 DO
 $$

@@ -44,7 +44,14 @@ public abstract class AbstractIntegrationTest {
             new PostgreSQLContainer<>(POSTGRES_IMAGE)
                     .withDatabaseName("warehouse")
                     .withUsername("postgres")
-                    .withPassword("postgres");
+                    .withPassword("postgres")
+                    .withReuse(true)
+                    .withInitScript("init.sql")
+                    .withCommand(
+                            "postgres",
+                            "-c", "shared_preload_libraries=pg_partman_bgw,pg_cron",
+                            "-c", "cron.database_name=warehouse"
+                    );
 
     static final RedpandaContainer redpanda =
             new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"));

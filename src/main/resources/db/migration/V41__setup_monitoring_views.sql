@@ -1,4 +1,4 @@
--- V40: Operational monitoring views for partitioned data
+-- V41: Operational monitoring views for partitioned data
 
 CREATE OR REPLACE FUNCTION monitor_stock_movements_partitions()
     RETURNS TABLE
@@ -14,7 +14,7 @@ BEGIN
     RETURN QUERY
         SELECT inhrelid::REGCLASS::TEXT,
                PG_SIZE_PRETTY(PG_TOTAL_RELATION_SIZE(inhrelid)),
-               (SELECT COUNT(*) FROM pg_stat_all_tables WHERE relid = inhrelid),
+               COALESCE((SELECT n_live_tup FROM pg_stat_all_tables WHERE relid = inhrelid), 0),
                CASE
                    WHEN inhrelid::REGCLASS::TEXT ~ E'stock_movements(_new)?_p(\\d{4})_(\\d{2})'
                        THEN TO_DATE(
