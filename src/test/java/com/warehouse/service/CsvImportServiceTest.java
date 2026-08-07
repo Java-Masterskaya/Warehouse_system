@@ -84,13 +84,15 @@ class CsvImportServiceTest {
                 category1,
                 category2));
 
+        when(chunkService.saveChunk(any(), any(), any())).thenReturn(2);
+
         ItemImportResultDto result = csvImportService.importItems(multipartFile);
 
         assertThat(result.totalRows()).isEqualTo(2);
         assertThat(result.imported()).isEqualTo(2);
         assertThat(result.errors()).isEmpty();
 
-        verify(chunkService) .saveChunk(
+        verify(chunkService).saveChunk(
                 ArgumentMatchers.eq(List.of(row1, row2)),
                 any(),
                 any()
@@ -144,6 +146,8 @@ class CsvImportServiceTest {
         when(csvItemParserService.parseInChunks(any(InputStream.class))).thenReturn(List.of(chunk));
         when(itemRepository.findAllSkusIn(any())).thenReturn(List.of("SKU-EXISTS"));
         when(categoryRepository.findAllByNameIgnoreCaseIn(any())).thenReturn(List.of(existingCategory));
+
+        when(chunkService.saveChunk(any(), any(), any())).thenReturn(1);
 
         ItemImportResultDto result = csvImportService.importItems(file);
 

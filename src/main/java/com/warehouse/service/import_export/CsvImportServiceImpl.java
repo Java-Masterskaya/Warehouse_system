@@ -92,14 +92,14 @@ public class CsvImportServiceImpl implements CsvImportService {
                 }
 
                 if (!validHoldersToSave.isEmpty()) {
-                    chunkService.saveChunk(validHoldersToSave, accumulator, categoryMap);
-                    totalImported += validHoldersToSave.size();
+                    int imported = chunkService.saveChunk(validHoldersToSave, accumulator, categoryMap);
+                    totalImported += imported;
                 }
             }
             log.info("Успешно импортировано {} товаров из CSV", totalImported);
             int hidden = accumulator.getTotalErrors() - accumulator.getDetails().size();
             if (hidden > 0) {
-                accumulator.add(new ItemImportErrorDto(-1, "", "И еще " + hidden + " ошибок скрыто."));
+                accumulator.addNote(new ItemImportErrorDto(-1, "", "И еще " + hidden + " ошибок скрыто."));
             }
             return ItemImportResultDto.of(totalRows, totalImported, accumulator);
 

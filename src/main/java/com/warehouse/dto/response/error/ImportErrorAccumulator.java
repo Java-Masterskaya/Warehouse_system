@@ -17,6 +17,10 @@ public class ImportErrorAccumulator {
         }
     }
 
+    public void addNote(ItemImportErrorDto note) {
+        details.add(note);
+    }
+
     public int getTotalErrors() {
         return totalErrors;
     }
