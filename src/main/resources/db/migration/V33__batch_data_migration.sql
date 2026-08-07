@@ -1,109 +1,100 @@
 -- V33: Batch data migration to minimize I/O impact and avoid long transactions
 
-CREATE OR REPLACE FUNCTION migrate_stock_movements_batch(
-    p_batch_size INT,
-    p_last_id BIGINT,
-    p_max_id BIGINT
+CREATE OR REPLACE PROCEDURE migrate_stock_movements_batch_controlled(
+    p_batch_size INT DEFAULT 10000
 )
-    RETURNS TABLE
-            (
-                ROWS_MIGRATED INT,
-                NEW_LAST_ID   BIGINT
-            )
+    LANGUAGE plpgsql
 AS
 $$
 DECLARE
-    current_rows_migrated INT;
-    actual_last_id        BIGINT;
+    last_id              BIGINT := 0;
+    max_id               BIGINT;
+    total_rows_migrated  BIGINT := 0;
+    rows_in_batch        INT;
+    new_last_id_in_batch BIGINT;
+    start_time           TIMESTAMP;
+    end_time             TIMESTAMP;
+    batch_counter        INT    := 0;
 BEGIN
-    INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity,
-                                     created_at, warehouse_id, transfer_id, batch_id)
-    SELECT id,
-           item_id,
-           user_id,
-           type,
-           quantity,
-           created_at,
-           warehouse_id,
-           transfer_id,
-           batch_id
-    FROM stock_movements
-    WHERE id > p_last_id
-      AND id <= p_max_id
-    ORDER BY id
-    LIMIT p_batch_size
-    ON CONFLICT (id, created_at) DO NOTHING;
+    RAISE NOTICE 'Начинаем пакетную миграцию данных...';
+    start_time := CLOCK_TIMESTAMP();
 
-    GET DIAGNOSTICS current_rows_migrated = ROW_COUNT;
+    IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'stock_movements' AND relkind = 'r') THEN
+        RAISE NOTICE 'Таблица stock_movements не существует, пропускаем миграцию';
+        RETURN;
+    END IF;
 
-    SELECT COALESCE(MAX(id), p_last_id)
-    INTO actual_last_id
-    FROM (SELECT id
-          FROM stock_movements
-          WHERE id > p_last_id
-            AND id <= p_max_id
-          ORDER BY id
-          LIMIT p_batch_size) AS batch_range;
+    SELECT COALESCE(MAX(id), 0) INTO max_id FROM stock_movements;
 
-    RETURN QUERY SELECT current_rows_migrated, actual_last_id;
-END;
-$$ LANGUAGE plpgsql;
+    IF max_id = 0 THEN
+        RAISE NOTICE 'Нет данных для миграции в stock_movements';
+        RETURN;
+    END IF;
 
-DO
-$$
-    DECLARE
-        batch_size           INT    := 10000;
-        last_id              BIGINT := 0;
-        max_id               BIGINT;
-        total_rows_migrated  BIGINT := 0;
-        rows_in_batch        INT;
-        new_last_id_in_batch BIGINT;
-        start_time           TIMESTAMP;
-        end_time             TIMESTAMP;
-        rec                  RECORD;
-    BEGIN
-        RAISE NOTICE 'Starting batch data migration...';
-        start_time := CLOCK_TIMESTAMP();
+    CREATE INDEX IF NOT EXISTS idx_stock_movements_id_temp ON stock_movements (id);
 
-        IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'stock_movements' AND relkind = 'r') THEN
-            RAISE NOTICE 'Table stock_movements does not exist, skipping migration';
-            RETURN;
-        END IF;
+    COMMIT;
 
-        SELECT COALESCE(MAX(id), 0) INTO max_id FROM stock_movements;
+    WHILE last_id < max_id
+        LOOP
+            BEGIN
+                INSERT INTO stock_movements_new (id, item_id, user_id, type, quantity,
+                                                 created_at, warehouse_id, transfer_id, batch_id)
+                SELECT id,
+                       item_id,
+                       user_id,
+                       type,
+                       quantity,
+                       created_at,
+                       warehouse_id,
+                       transfer_id,
+                       batch_id
+                FROM stock_movements
+                WHERE id > last_id
+                  AND id <= max_id
+                ORDER BY id
+                LIMIT p_batch_size
+                ON CONFLICT (id, created_at) DO NOTHING;
 
-        IF max_id = 0 THEN
-            RAISE NOTICE 'No data to migrate in stock_movements';
-            RETURN;
-        END IF;
+                GET DIAGNOSTICS rows_in_batch = ROW_COUNT;
 
-        CREATE INDEX IF NOT EXISTS idx_stock_movements_id_temp ON stock_movements (id);
-
-        WHILE last_id < max_id
-            LOOP
-                SELECT *
-                INTO rows_in_batch, new_last_id_in_batch
-                FROM migrate_stock_movements_batch(batch_size, last_id, max_id);
+                SELECT COALESCE(MAX(id), last_id)
+                INTO new_last_id_in_batch
+                FROM (SELECT id
+                      FROM stock_movements
+                      WHERE id > last_id
+                        AND id <= max_id
+                      ORDER BY id
+                      LIMIT p_batch_size) AS batch_range;
 
                 total_rows_migrated := total_rows_migrated + rows_in_batch;
-
-                IF rows_in_batch = 0 THEN
-                    EXIT;
-                END IF;
-
                 last_id := new_last_id_in_batch;
+                batch_counter := batch_counter + 1;
 
-                RAISE NOTICE 'Migrated % rows. Total: %. Last ID: %', rows_in_batch, total_rows_migrated, last_id;
+                RAISE NOTICE 'Батч %. Перенесено % строк. Всего: %. Последний ID: %',
+                    batch_counter, rows_in_batch, total_rows_migrated, last_id;
+
+                COMMIT;
 
                 PERFORM PG_SLEEP(0.05);
 
-            END LOOP;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    RAISE WARNING 'Ошибка в батче %: %. Откатываем...', batch_counter, sqlerrm;
+                    ROLLBACK;
+                    RAISE;
+            END;
+        END LOOP;
 
-        DROP INDEX IF EXISTS idx_stock_movements_id_temp;
+    DROP INDEX IF EXISTS idx_stock_movements_id_temp;
+    COMMIT;
 
-        DROP FUNCTION migrate_stock_movements_batch(INT, BIGINT, BIGINT);
-
-        end_time := CLOCK_TIMESTAMP();
-        RAISE NOTICE 'Batch data migration finished. Total rows migrated: %. Duration: %', total_rows_migrated, (end_time - start_time);
-    END
+    end_time := CLOCK_TIMESTAMP();
+    RAISE NOTICE 'Миграция завершена. Всего перенесено строк: %. Длительность: %',
+        total_rows_migrated, (end_time - start_time);
+END;
 $$;
+
+CALL migrate_stock_movements_batch_controlled(10000);
+
+DROP PROCEDURE IF EXISTS migrate_stock_movements_batch_controlled(INT);
