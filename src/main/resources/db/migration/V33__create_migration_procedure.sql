@@ -8,7 +8,6 @@ AS
 $$
 DECLARE
     v_last_id             BIGINT  := 0;
-    v_max_id              BIGINT;
     v_total_rows_migrated BIGINT  := 0;
     v_rows_in_batch       INT;
     v_batch_counter       INT     := 0;
@@ -22,14 +21,14 @@ BEGIN
         RETURN;
     END IF;
 
-    SELECT COALESCE(MAX(id), 0) INTO v_max_id FROM stock_movements;
-
-    IF v_max_id = 0 THEN
+    IF NOT EXISTS (SELECT 1 FROM stock_movements LIMIT 1) THEN
         RAISE NOTICE 'Нет данных для миграции в stock_movements';
         RETURN;
     END IF;
 
-    RAISE NOTICE 'Начинаем пакетную миграцию данных. Всего записей: %', v_max_id;
+    SELECT COALESCE(MAX(id), 0) INTO v_last_id FROM stock_movements_new;
+
+    RAISE NOTICE 'Начинаем пакетную миграцию данных. Стартуем с ID: %', v_last_id;
     v_start_time := CLOCK_TIMESTAMP();
 
     WHILE v_has_more_rows
@@ -37,81 +36,61 @@ BEGIN
             v_batch_start_time := CLOCK_TIMESTAMP();
             v_batch_counter := v_batch_counter + 1;
 
-            BEGIN
-                WITH batch_data AS (SELECT id,
-                                           item_id,
-                                           user_id,
-                                           type,
-                                           quantity,
-                                           created_at,
-                                           warehouse_id,
-                                           transfer_id,
-                                           batch_id
-                                    FROM stock_movements
-                                    WHERE id > v_last_id
-                                    ORDER BY id
-                                    LIMIT p_batch_size)
-                INSERT
-                INTO stock_movements_new (id, item_id, user_id, type, quantity,
-                                          created_at, warehouse_id, transfer_id, batch_id)
-                SELECT id,
-                       item_id,
-                       user_id,
-                       type,
-                       quantity,
-                       created_at,
-                       warehouse_id,
-                       transfer_id,
-                       batch_id
-                FROM batch_data
-                ON CONFLICT (id, created_at) DO NOTHING;
+            WITH batch_data AS (SELECT id,
+                                       item_id,
+                                       user_id,
+                                       type,
+                                       quantity,
+                                       created_at,
+                                       warehouse_id,
+                                       transfer_id,
+                                       batch_id
+                                FROM stock_movements
+                                WHERE id > v_last_id
+                                ORDER BY id
+                                LIMIT p_batch_size)
+            INSERT
+            INTO stock_movements_new (id, item_id, user_id, type, quantity,
+                                      created_at, warehouse_id, transfer_id, batch_id)
+            SELECT id,
+                   item_id,
+                   user_id,
+                   type,
+                   quantity,
+                   created_at,
+                   warehouse_id,
+                   transfer_id,
+                   batch_id
+            FROM batch_data
+            ON CONFLICT (id, created_at) DO NOTHING;
 
-                GET DIAGNOSTICS v_rows_in_batch = ROW_COUNT;
+            GET DIAGNOSTICS v_rows_in_batch = ROW_COUNT;
 
-                SELECT COALESCE(MAX(id), v_last_id)
-                INTO v_last_id
-                FROM stock_movements
-                WHERE id > v_last_id
-                LIMIT p_batch_size;
+            SELECT MAX(id)
+            INTO v_last_id
+            FROM (SELECT id
+                  FROM stock_movements
+                  WHERE id > v_last_id
+                  ORDER BY id
+                  LIMIT p_batch_size) t;
 
-                v_total_rows_migrated := v_total_rows_migrated + v_rows_in_batch;
+            v_total_rows_migrated := v_total_rows_migrated + v_rows_in_batch;
 
-                v_batch_end_time := CLOCK_TIMESTAMP();
-                RAISE NOTICE 'Батч %: перенесено % строк, всего: %, последний ID: %, время: % ms',
-                    v_batch_counter, v_rows_in_batch, v_total_rows_migrated,
-                    v_last_id, EXTRACT(EPOCH FROM (v_batch_end_time - v_batch_start_time)) * 1000;
+            v_batch_end_time := CLOCK_TIMESTAMP();
+            RAISE NOTICE 'Батч %: перенесено % строк, всего: %, последний ID: %, время: % ms',
+                v_batch_counter, v_rows_in_batch, v_total_rows_migrated,
+                v_last_id, EXTRACT(EPOCH FROM (v_batch_end_time - v_batch_start_time)) * 1000;
 
-                IF p_sleep_ms > 0 THEN
-                    PERFORM PG_SLEEP(p_sleep_ms::FLOAT / 1000);
-                END IF;
+            COMMIT;
 
-                SELECT COUNT(*) > 0
-                INTO v_has_more_rows
-                FROM stock_movements
-                WHERE id > v_last_id;
+            IF p_sleep_ms > 0 THEN
+                PERFORM PG_SLEEP(p_sleep_ms::FLOAT / 1000);
+            END IF;
 
-                IF v_has_more_rows AND v_rows_in_batch = 0 THEN
-                    RAISE NOTICE 'Обнаружена проблема: есть данные, но строки не вставлены. Принудительный выход.';
-                    v_has_more_rows := FALSE;
-                END IF;
-
-            EXCEPTION
-                WHEN OTHERS THEN
-                    RAISE WARNING 'Ошибка в батче %: %, SQLSTATE: %',
-                        v_batch_counter, sqlerrm, sqlstate;
-
-                    SELECT COALESCE(MAX(id), v_last_id)
-                    INTO v_last_id
-                    FROM stock_movements
-                    WHERE id > v_last_id
-                    LIMIT p_batch_size;
-
-                    RAISE WARNING 'Пропускаем до ID: %', v_last_id;
-
-                    IF sqlstate = '23505' OR sqlstate = '42P01' THEN
-                        RAISE EXCEPTION 'Критическая ошибка миграции: %', sqlerrm;
-                    END IF;
-            END;
+            SELECT COUNT(*) > 0
+            INTO v_has_more_rows
+            FROM stock_movements
+            WHERE id > v_last_id;
         END LOOP;
 
     RAISE NOTICE '✅ Миграция успешно завершена. Всего перенесено строк: %, время: % сек',

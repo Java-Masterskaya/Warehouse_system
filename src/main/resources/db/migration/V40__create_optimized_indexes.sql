@@ -1,4 +1,4 @@
--- V39: Create optimized indexes
+-- V40: Create optimized indexes
 
 DO
 $$

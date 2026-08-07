@@ -1,4 +1,4 @@
--- V41: Operational monitoring views for partitioned data
+-- V42: Operational monitoring views for partitioned data
 
 CREATE OR REPLACE FUNCTION monitor_stock_movements_partitions()
     RETURNS TABLE

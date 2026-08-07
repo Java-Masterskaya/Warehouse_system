@@ -1,4 +1,4 @@
--- V37: Move residual data to partitions and cleanup
+-- V38: Move residual data to partitions and cleanup
 
 DO
 $$
