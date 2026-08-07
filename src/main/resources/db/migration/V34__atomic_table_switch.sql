@@ -1,4 +1,4 @@
--- V24: Atomic table rename for 100% Zero-Downtime switch
+-- V34: Atomic table rename for 100% Zero-Downtime switch
 
 DO $$
     DECLARE

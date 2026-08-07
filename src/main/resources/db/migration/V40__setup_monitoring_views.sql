@@ -15,10 +15,18 @@ BEGIN
         SELECT inhrelid::REGCLASS::TEXT,
                PG_SIZE_PRETTY(PG_TOTAL_RELATION_SIZE(inhrelid)),
                (SELECT COUNT(*) FROM pg_stat_all_tables WHERE relid = inhrelid),
-               TO_DATE((REGEXP_MATCH(inhrelid::REGCLASS::TEXT, E'stock_movements_p(\\d{4}_\\d{2})'))[1], 'YYYY_MM')
+               CASE
+                   WHEN inhrelid::REGCLASS::TEXT ~ E'stock_movements(_new)?_p(\\d{4})_(\\d{2})'
+                       THEN TO_DATE(
+                           (REGEXP_MATCH(inhrelid::REGCLASS::TEXT, E'stock_movements(_new)?_p(\\d{4})_(\\d{2})'))[2] ||
+                           '_' ||
+                           (REGEXP_MATCH(inhrelid::REGCLASS::TEXT, E'stock_movements(_new)?_p(\\d{4})_(\\d{2})'))[3],
+                           'YYYY_MM')
+                   ELSE NULL
+                   END AS partition_date
         FROM pg_inherits
         WHERE inhparent = 'stock_movements'::REGCLASS
-        ORDER BY partition_date DESC;
+        ORDER BY partition_date DESC NULLS LAST;
 END;
 $$ LANGUAGE plpgsql;
 
