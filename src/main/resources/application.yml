@@ -15,7 +15,12 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
-
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 500
+        order_inserts: true
+        order_updates: true
   flyway:
     enabled: true
     postgresql:
@@ -24,6 +29,14 @@ spring:
   data:
     redis:
       timeout: 500ms
+  mvc:
+    async:
+      request-timeout: 180000 # 3 минуты
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
 
   kafka:
     producer:

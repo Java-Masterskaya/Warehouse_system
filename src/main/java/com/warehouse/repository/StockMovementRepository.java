@@ -1,14 +1,19 @@
 package com.warehouse.repository;
 
+import com.warehouse.dto.response.movement.StockMovementExportDto;
 import com.warehouse.dto.response.movement.StockMovementHistoryResponse;
 import com.warehouse.entity.MovementType;
 import com.warehouse.entity.StockMovement;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.util.stream.Stream;
 
 @Repository
 public interface StockMovementRepository extends JpaRepository<StockMovement, Long> {
@@ -45,6 +50,23 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             @Param("type") MovementType type,
             Pageable pageable
     );
+
+    @QueryHints(value = @QueryHint(name = org.hibernate.annotations.QueryHints.FETCH_SIZE, value = "500"))
+    @Query("""
+                select new com.warehouse.dto.response.movement.StockMovementExportDto(
+                    sm.item.sku,
+                    sm.item.name,
+                    sm.warehouse.name,
+                    sm.type,
+                    sm.quantity,
+                    sm.user.username,
+                    sm.createdAt,
+                    sm.transferId
+                )
+                from StockMovement sm
+                order by sm.createdAt desc
+            """)
+    Stream<StockMovementExportDto> streamAllForExport();
 
     StockMovement findTopByOrderByIdDesc();
 }

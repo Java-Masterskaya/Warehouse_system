@@ -37,9 +37,7 @@ public interface ItemMapper {
     @Mapping(target = "reserved", source = "reserved")
     @Mapping(target = "warehouseStocks", source = "warehouseStocks")
     ItemDetailsResponse mapProjectionToDetailsResponse(
-            ItemDetailsProjection projection,
-            long available,
-            long reserved,
+            ItemDetailsProjection projection, long available, long reserved,
             List<WarehouseStockResponse> warehouseStocks
     );
 }

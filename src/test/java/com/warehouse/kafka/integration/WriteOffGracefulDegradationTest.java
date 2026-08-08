@@ -54,42 +54,42 @@ import static org.mockito.Mockito.when;
 class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
 
     @Autowired
-    private StockMovementService stockMovementService;
+    private StockMovementService        stockMovementService;
     @Autowired
-    private OutboxEventRepository outboxEventRepository;
+    private OutboxEventRepository       outboxEventRepository;
     @Autowired
-    private ItemRepository itemRepository;
+    private ItemRepository              itemRepository;
     @Autowired
-    private UserRepository userRepository;
+    private UserRepository              userRepository;
     @Autowired
-    private StockRepository stockRepository;
+    private StockRepository             stockRepository;
     @Autowired
-    private CategoryRepository categoryRepository;
+    private CategoryRepository          categoryRepository;
     @Autowired
-    private WarehouseRepository warehouseRepository;
+    private WarehouseRepository         warehouseRepository;
     @Autowired
-    private BatchRepository batchRepository;
+    private BatchRepository             batchRepository;
     @Autowired
-    private StockMovementRepository stockMovementRepository;
+    private StockMovementRepository     stockMovementRepository;
     @Autowired
-    private StockReserveRepository stockReserveRepository;
+    private StockReserveRepository      stockReserveRepository;
     @Autowired
-    private StockAlertRepository stockAlertRepository;
+    private StockAlertRepository        stockAlertRepository;
     @Autowired
     private PurchaseOrderItemRepository purchaseOrderItemRepository;
     @Autowired
-    private PurchaseOrderRepository purchaseOrderRepository;
+    private PurchaseOrderRepository     purchaseOrderRepository;
     @Autowired
-    private OutboxEventRelay outboxEventRelay;
+    private OutboxEventRelay            outboxEventRelay;
     @Autowired
-    private CircuitBreakerRegistry circuitBreakerRegistry;
+    private CircuitBreakerRegistry      circuitBreakerRegistry;
 
     @MockitoBean
     private KafkaTemplate<String, Object> kafkaTemplate;
 
-    private Item testItem;
-    private User testUser;
-    private Long testItemId;
+    private Item      testItem;
+    private User      testUser;
+    private Long      testItemId;
     private Warehouse defaultWarehouse;
 
     @BeforeEach
@@ -111,7 +111,8 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         Category category = categoryRepository.save(Category.builder().name("Test").build());
 
         defaultWarehouse = warehouseRepository.findByDefaultWarehouseTrue()
-                .orElseThrow(() -> new IllegalStateException("Default warehouse not configured"));
+                                              .orElseThrow(() -> new IllegalStateException(
+                                                      "Default warehouse not configured"));
 
         testItem = new Item();
         testItem.setSku("SKU-GRACE-" + System.currentTimeMillis());
@@ -139,14 +140,14 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         testItemId = testItem.getId();
 
         testUser = userRepository.findByUsername("admin")
-                .orElseGet(() -> {
-                    User user = new User();
-                    user.setUsername("admin");
-                    user.setPassword("encoded");
-                    user.setRole(Role.ROLE_ADMIN);
-                    user.setActive(true);
-                    return userRepository.save(user);
-                });
+                                 .orElseGet(() -> {
+                                     User user = new User();
+                                     user.setUsername("admin");
+                                     user.setPassword("encoded");
+                                     user.setRole(Role.ROLE_ADMIN);
+                                     user.setActive(true);
+                                     return userRepository.save(user);
+                                 });
     }
 
     @Test
@@ -163,14 +164,20 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         assertThat(pendingEvents).hasSize(7);
         pendingEvents.forEach(event -> assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING));
 
-        outboxEventRelay.relayPendingEvents();
+        for (int i = 0; i < 5; i++) {
+            try {
+                outboxEventRelay.relayPendingEvents();
+            } catch (Exception ignored) {
+                // Игнорируем ошибки падения Кафки во время набора метрик
+            }
+        }
 
         CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("kafkaProducer");
         Awaitility.await()
-            .atMost(Duration.ofSeconds(5))
-            .pollInterval(Duration.ofMillis(100))
-            .untilAsserted(() ->
-                assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN)
+                  .atMost(Duration.ofSeconds(5))
+                  .pollInterval(Duration.ofMillis(100))
+                  .untilAsserted(() ->
+                          assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN)
             );
 
         List<OutboxEvent> updatedEvents = outboxEventRepository.findAll();
@@ -178,5 +185,6 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
         updatedEvents.forEach(event ->
                 assertThat(event.getStatus()).isIn(OutboxStatus.FAILED, OutboxStatus.PENDING)
         );
+
     }
 }
