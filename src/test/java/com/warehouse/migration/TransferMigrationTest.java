@@ -73,7 +73,10 @@ public class TransferMigrationTest extends AbstractIntegrationTest {
                         + "AND s.transfer_id IS NOT NULL "
                         + "AND NOT EXISTS ("
                         + "    SELECT 1 FROM stock_movements s2 "
-                        + "    WHERE CAST(s2.id AS TEXT) = CAST(s.transfer_id AS TEXT)"
+                        + "    WHERE s2.transfer_id = s.transfer_id "
+                        + "      AND s2.id <> s.id "
+                        + "      AND s2.type IN ('TRANSFER_OUT', 'TRANSFER_IN') "
+                        + "      AND s2.type <> s.type"
                         + ")"
         ).getResultList();
 

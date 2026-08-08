@@ -54,6 +54,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -73,6 +74,7 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class StockMovementServiceImpl implements StockMovementService {
 
+    private static final Duration DEFAULT_HISTORY_WINDOW = Duration.ofDays(90);
     private static final String HISTORY_CURSOR_ENDPOINT = "movement-history";
     private static final String HISTORY_CURSOR_SORT = "createdAt";
     private static final String HISTORY_CURSOR_DIRECTION = "desc";
@@ -229,7 +231,7 @@ public class StockMovementServiceImpl implements StockMovementService {
     @Override
     public PageResponse<StockMovementHistoryResponse> getItemMovementHistory(
             Long itemId, MovementType type, int page,
-            int size
+            int size, boolean fullHistory
     ) {
         if (!itemRepository.existsById(itemId)) {
             log.warn("Item с id={} не найден", itemId);
@@ -237,9 +239,10 @@ public class StockMovementServiceImpl implements StockMovementService {
         }
 
         Pageable pageable = PageRequest.of(page, size);
+        LocalDateTime fromDate = fullHistory ? null : LocalDateTime.now().minus(DEFAULT_HISTORY_WINDOW);
 
         Page<StockMovementHistoryResponse> history = stockMovementRepository.findHistoryByItemId(itemId, type,
-                pageable);
+                fromDate, pageable);
 
         return PageResponse.from(history);
     }
@@ -250,7 +253,8 @@ public class StockMovementServiceImpl implements StockMovementService {
             Long itemId,
             MovementType type,
             String cursor,
-            int size
+            int size,
+            boolean fullHistory
     ) {
         validateCursorPageSize(size);
         if (!itemRepository.existsById(itemId)) {
@@ -284,9 +288,12 @@ public class StockMovementServiceImpl implements StockMovementService {
             lastId = position.lastId();
         }
 
+        LocalDateTime fromDate = fullHistory ? null : LocalDateTime.now().minus(DEFAULT_HISTORY_WINDOW);
+
         List<StockMovement> movements = stockMovementKeysetRepository.findNextPage(
                 itemId,
                 type,
+                fromDate,
                 lastCreatedAt,
                 lastId,
                 size + 1

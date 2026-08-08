@@ -51,13 +51,14 @@ public interface StockMovementService {
      * @return страница с историей движений товара
      */
     PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId, MovementType type, int page,
-            int size);
+            int size, boolean fullHistory);
 
     CursorPageResponse<StockMovementHistoryResponse> getItemMovementHistoryByCursor(
             Long itemId,
             MovementType type,
             String cursor,
-            int size
+            int size,
+            boolean fullHistory
     );
 
     /**

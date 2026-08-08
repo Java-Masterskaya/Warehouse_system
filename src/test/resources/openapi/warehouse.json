@@ -4849,6 +4849,15 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "name" : "fullHistory",
+          "in" : "query",
+          "description" : "Return full history ignoring the default time window.",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
         } ],
         "responses" : {
           "401" : {
