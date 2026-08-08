@@ -39,6 +39,20 @@ class UserControllerTest extends AbstractIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    /**
+     * Собственные учётки класса.
+     *
+     * <p>Раньше здесь брался общий {@code admin} из миграции V5, и тест
+     * {@link #adminCanDeactivateAnotherAdmin()} оставлял его деактивированным.
+     * Любой класс, вставший в очередь после этого, получал 401 на логине —
+     * при случайном порядке падало от полусотни тестов и больше.
+     *
+     * <p>Имена уникальны для этого класса, поэтому деактивация никого не задевает.
+     */
+    private static final String ADMIN_USERNAME = "usercontroller-admin";
+    private static final String SECOND_ADMIN_USERNAME = "usercontroller-admin2";
+    private static final String PASSWORD = "secret";
+
     private User admin;
     private User secondAdmin;
 
@@ -47,11 +61,11 @@ class UserControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        admin = createUser("admin", "secret", Role.ROLE_ADMIN);
-        secondAdmin = createUser("admin2", "secret", Role.ROLE_ADMIN);
+        admin = createUser(ADMIN_USERNAME, PASSWORD, Role.ROLE_ADMIN);
+        secondAdmin = createUser(SECOND_ADMIN_USERNAME, PASSWORD, Role.ROLE_ADMIN);
 
-        adminToken = obtainToken("admin", "secret");
-        secondAdminToken = obtainToken("admin2", "secret");
+        adminToken = obtainToken(ADMIN_USERNAME, PASSWORD);
+        secondAdminToken = obtainToken(SECOND_ADMIN_USERNAME, PASSWORD);
     }
 
     @Test

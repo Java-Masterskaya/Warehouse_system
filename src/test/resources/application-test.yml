@@ -40,11 +40,25 @@ redis:
     item-ttl-minutes: 5
 
 app:
+  # Фоновые джобы выключены: они ходят в ту же общую базу, что и интеграционные тесты,
+  # и, срабатывая посреди чужого теста, дают невоспроизводимые падения.
+  scheduling:
+    enabled: false
+  # Ретраи Kafka: поведение то же (3 попытки, затем DLT), убрано только ожидание между ними.
+  # Боевые 1000ms x2 дают 3 секунды на сообщение и ничего не проверяют в тестах.
+  kafka:
+    retry:
+      initial-interval-ms: 50
+      multiplier: 1.0
+      max-interval-ms: 100
+      max-attempts: 3
   jwt:
     secret: test-secret-key-that-is-at-least-256-bits-long
     expiration-ms: 86400000
     refresh-expiration-ms: 604800000
-    refresh-retry-ttl-seconds: 3
+    # Окно ретрая refresh укорочено с боевых 3 секунд: тесты проверяют сам факт истечения
+    # кеша, а не конкретную длительность, и ждать три секунды в каждом из них незачем.
+    refresh-retry-ttl-seconds: 1
   idempotency:
     ttl-hours: 1
     required: true

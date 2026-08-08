@@ -14,12 +14,9 @@ import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.entity.User;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockAlertRepository;
-import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.security.UserPrincipal;
-import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.service.item.ItemService;
 import com.warehouse.service.movement.StockMovementService;
 import org.junit.jupiter.api.AfterEach;
@@ -53,19 +50,10 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
-    private StockMovementRepository stockMovementRepository;
-
-    @Autowired
-    private StockReserveRepository reserveRepository;
-
-    @Autowired
     private ItemService itemService;
 
     @Autowired
     private StockMovementService stockMovementService;
-
-    @Autowired
-    private StockAlertRepository stockAlertRepository;
 
     @Autowired
     private CategoryRepository categoryRepository;
@@ -79,19 +67,30 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     @Autowired
     private BatchRepository batchRepository;
 
+    /**
+     * Собственная учётка класса.
+     *
+     * <p>Раньше здесь переиспользовался общий {@code admin} из миграции V5, причём
+     * {@link #createActiveAdmin(String)} перезаписывал ему пароль на {@code password}.
+     * Соседние классы логинятся под {@code admin}/{@code secret} и после этого получали 401.
+     */
+    private static final String ADMIN_USERNAME = "cacheinvalidation-admin";
+
     private Long itemId;
+
+    /**
+     * Реальный id учётки из базы. Жёстко заданная единица ломалась, как только
+     * последовательность {@code users_id_seq} уходила вперёд: движение по складу
+     * падало на внешнем ключе {@code stock_movements_user_id_fkey}.
+     */
+    private Long adminUserId;
 
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
-        // Очищаем таблицы в правильном порядке, учитывая внешние ключи
-        stockMovementRepository.deleteAllInBatch();
-        batchRepository.deleteAll();
-        stockAlertRepository.deleteAll();
-        reserveRepository.deleteAll();
-        stockRepository.deleteAllInBatch();
-        itemRepository.deleteAllInBatch();
-        categoryRepository.deleteAllInBatch();
+        // Общая очистка вместо самописного списка: он не знал про purchase_order_items,
+        // и удаление items падало на внешнем ключе, стоило соседу оставить заказ поставщику.
+        cleanDomainData();
 
         Category electronics = categoryRepository.save(
                 Category.builder()
@@ -100,14 +99,18 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         );
 
         Item item = new Item();
-        item.setSku("SKU-001");
+        // SKU уникален на прогон: колонка под уникальным индексом, а данные переживают
+        // прогон при переиспользовании контейнеров. Суффикс в barcode — на будущее:
+        // уникальный индекс на него лежит в docs/migrations/pending.
+        String uniqueSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        item.setSku("SKU-CACHEINV-" + uniqueSuffix);
         item.setName("Ноутбук");
         item.setCategory(electronics);
         item.setMinStock(5);
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));
         item.setCost(BigDecimal.valueOf(1000.00));
-        item.setBarcode("ITEM-TEST-CACHEINV-001");
+        item.setBarcode("ITEM-TEST-CACHEINV-" + uniqueSuffix);
         itemRepository.save(item);
 
         Stock stock = new Stock();
@@ -178,7 +181,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         ReceiveStockRequest movementRequest = new ReceiveStockRequest(
                 itemId, 5, LocalDateTime.now().plusDays(1));
         stockMovementService.registerReceipt(movementRequest,
-                new com.warehouse.dto.UserContext(1L, "admin"));
+                adminContext());
 
         ItemDetailsResponse response = itemService.getItem(itemId);
         assertThat(response.getCurrentStock()).isEqualTo(15);
@@ -193,7 +196,7 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         ReceiveStockRequest receiptRequest = new ReceiveStockRequest(
                 itemId, 10, LocalDateTime.now().plusDays(1));
         stockMovementService.registerReceipt(receiptRequest,
-                new com.warehouse.dto.UserContext(1L, "admin"));
+                adminContext());
 
         // Проверяем, что приход сработал
         ItemDetailsResponse response1 = itemService.getItem(itemId);
@@ -202,14 +205,19 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
         // Теперь списываем
         WriteOffStockRequest writeOffRequest = new WriteOffStockRequest(itemId, 3);
         stockMovementService.writeOffReceipt(writeOffRequest,
-                new com.warehouse.dto.UserContext(1L, "admin"));
+                adminContext());
 
         ItemDetailsResponse response2 = itemService.getItem(itemId);
         assertThat(response2.getCurrentStock()).isEqualTo(17);
     }
 
+    private com.warehouse.dto.UserContext adminContext() {
+        return new com.warehouse.dto.UserContext(adminUserId, ADMIN_USERNAME);
+    }
+
     private void setAuthentification() {
-        User admin = createActiveAdmin("admin");
+        User admin = createActiveAdmin(ADMIN_USERNAME);
+        adminUserId = admin.getId();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 new UserPrincipal(admin.getId(), admin.getUsername(), admin.getPassword(), admin.isActive(),
                         List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))), null,

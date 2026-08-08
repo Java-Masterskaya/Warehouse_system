@@ -43,7 +43,7 @@ class CategoryServiceRedisFallbackIntegrationTest extends AbstractIntegrationTes
 
     @BeforeEach
     void setUp() {
-        categoryRepository.deleteAll();
+        cleanDomainData();
         categoryRepository.save(Category.builder().name("Books").build());
         categoryRepository.save(Category.builder().name("Electronics").build());
 

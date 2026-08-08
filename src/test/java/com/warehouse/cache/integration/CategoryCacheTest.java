@@ -3,11 +3,7 @@ package com.warehouse.cache.integration;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.response.category.CategoryResponse;
 import com.warehouse.entity.Category;
-import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
-import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockRepository;
 import com.warehouse.service.category.CategoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,18 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CategoryCacheTest extends AbstractIntegrationTest {
 
     @Autowired
-    private ItemRepository itemRepository;
-
-    @Autowired
-    private StockRepository stockRepository;
-
-    @Autowired
-    private BatchRepository batchRepository;
-
-    @Autowired
-    private StockMovementRepository stockMovementRepository;
-
-    @Autowired
     private CategoryService categoryService;
 
     @Autowired
@@ -48,11 +32,7 @@ class CategoryCacheTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        stockMovementRepository.deleteAllInBatch();
-        batchRepository.deleteAllInBatch();
-        stockRepository.deleteAllInBatch();
-        itemRepository.deleteAllInBatch();
-        categoryRepository.deleteAllInBatch();
+        cleanDomainData();
 
         categoryRepository.save(
                 Category.builder()

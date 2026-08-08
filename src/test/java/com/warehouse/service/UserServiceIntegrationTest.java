@@ -15,6 +15,7 @@ import com.warehouse.repository.UserRepository;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.security.service.TokenService;
 import com.warehouse.service.user.UserService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -57,6 +59,16 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     private String accessToken;
     private String refreshToken;
 
+    /**
+     * Админы, выключенные ради сценария «остались два последних админа».
+     *
+     * <p>{@link #deactivateAllAdminsExcept(User, User)} деактивирует всех остальных админов в базе —
+     * иначе защита от деактивации последнего админа не сработает и тест потеряет смысл.
+     * Заодно деактивируется общий {@code admin} из миграции V5, а база у интеграционных
+     * тестов одна на весь прогон: без восстановления все следующие классы получают 401 на логине.
+     */
+    private final List<User> deactivatedAdmins = new ArrayList<>();
+
     @BeforeEach
     void setUp() {
         // Create test user for token tests
@@ -72,6 +84,15 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         var tokenPair = tokenService.generateTokenPair(testUser.getUsername(), testUser.getId(), roles);
         accessToken  = tokenPair.accessToken();
         refreshToken = tokenPair.refreshToken();
+    }
+
+    @AfterEach
+    void restoreDeactivatedAdmins() {
+        deactivatedAdmins.forEach(admin -> userRepository.findById(admin.getId()).ifPresent(found -> {
+            found.setActive(true);
+            userRepository.save(found);
+        }));
+        deactivatedAdmins.clear();
     }
 
     // ==================== EXISTING TEST ====================
@@ -131,8 +152,12 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     void shouldCreateAuditRecordWhenUserCreated() throws Exception {
         User admin = createActiveAdmin("Admin_Creator");
 
+        // Имя уникально на прогон: при включённом переиспользовании контейнеров
+        // строка переживает перезапуск, и createUser отвергает дубликат.
+        String newUsername = "NewUserToAudit-" + System.nanoTime();
+
         UserCreateRequest createRequest = new UserCreateRequest();
-        createRequest.setUsername("NewUserToAudit");
+        createRequest.setUsername(newUsername);
         createRequest.setPassword("SuperSecret123!");
         createRequest.setRole(Role.ROLE_USER);
 
@@ -161,7 +186,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(audit.getOldValue()).isNull();
 
         assertThat(newNode).isNotNull();
-        assertThat(newNode.get("username").asText()).isEqualTo("NewUserToAudit");
+        assertThat(newNode.get("username").asText()).isEqualTo(newUsername);
         assertThat(newNode.get("role").asText()).isEqualTo(Role.ROLE_USER.name());
 
         assertThat(newNode.has("password")).isFalse();
@@ -171,9 +196,11 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     void shouldCreateAuditRecordWhenUserDeactivated() throws JsonProcessingException {
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
         User admin = createActiveAdmin("New admin");
+        // Имя уникально по той же причине: users не чистятся между прогонами.
+        String deactivatedUsername = "UserToDeactivate-" + System.nanoTime();
         User user = userRepository.save(
-                User.builder().username("User").password("User_pass").role(Role.ROLE_USER).active(true).createdAt(now)
-                    .build());
+                User.builder().username(deactivatedUsername).password("User_pass").role(Role.ROLE_USER)
+                    .active(true).createdAt(now).build());
 
         try {
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
@@ -361,7 +388,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
                       .filter(user -> !user.getId().equals(firstAdmin.getId()))
                       .filter(user -> !user.getId().equals(secondAdmin.getId())).forEach(user -> {
                           user.setActive(false);
-                          userRepository.save(user);
+                          deactivatedAdmins.add(userRepository.save(user));
                       });
     }
 }

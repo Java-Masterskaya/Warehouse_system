@@ -23,8 +23,8 @@ import com.warehouse.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -47,7 +47,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -74,7 +73,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Tag("integration")
 @SpringBootTest(classes = WarehouseApp.class)
 @ActiveProfiles("test")
-@Testcontainers
 class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
     @DynamicPropertySource
@@ -133,49 +131,23 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         log.info("Test setup...");
 
-        // Удаляем в правильном порядке (сначала зависимые таблицы), чтобы избежать ошибок внешних ключей
-        // Важно: static Testcontainers живут между запусками, поэтому leftover data
-        // из предыдущих тестов нарушает ассерты и уникальные индексы
-        jdbcTemplate.update("DELETE FROM stock_alerts");
-        jdbcTemplate.update("DELETE FROM stock_movements");
+        // Доменные таблицы чистим общим методом. Самописный список здесь не знал про
+        // purchase_order_items, и удаление items падало на внешнем ключе, стоило соседу
+        // (или предыдущему прогону при переиспользовании контейнеров) оставить заказ поставщику.
+        // Отдельно добавлены только таблицы, которых в общем методе нет.
         jdbcTemplate.update("DELETE FROM idempotency_keys");
-        jdbcTemplate.update("DELETE FROM batches");
         jdbcTemplate.update("DELETE FROM outbox");
-        jdbcTemplate.update("DELETE FROM reserves");
+        cleanDomainData();
+        // Пользователей не удаляем, а приводим к нужному состоянию на месте.
+        // Прежний DELETE + INSERT выдавал учёткам новые id. Логин после этого работал,
+        // поэтому правка выглядела безобидной, но соседние классы держат id админа
+        // в UserContext и падали на stock_movements_user_id_fkey.
+        // Полный DELETE FROM users удалял заодно и чужие учётки.
+        upsertUser("admin", passwordEncoder.encode("secret"), Role.ROLE_ADMIN, true);
+        upsertUser("testuser", passwordEncoder.encode("password"), Role.ROLE_USER, true);
+        upsertUser(BatchCleanupActor.USERNAME, "!disabled-system-actor!", Role.ROLE_USER, false);
 
-        jdbcTemplate.update("DELETE FROM stock");
-        jdbcTemplate.update("DELETE FROM items");
-        jdbcTemplate.update("DELETE FROM categories");
-        jdbcTemplate.update("DELETE FROM users");
-
-        // Очищаем последовательно, чтобы убрать дубликаты (DELETE + INSERT работает быстрее)
-        jdbcTemplate.update("ALTER SEQUENCE stock_alerts_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE items_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE categories_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE users_id_seq RESTART WITH 1");
-
-        resetConsumerGroupOffsets();
-
-        User admin = new User();
-        admin.setUsername("admin");
-        admin.setPassword(passwordEncoder.encode("secret"));
-        admin.setRole(Role.ROLE_ADMIN);
-        admin.setActive(true);
-        userRepository.save(admin);
-
-        User user = new User();
-        user.setUsername("testuser");
-        user.setPassword(passwordEncoder.encode("password"));
-        user.setRole(Role.ROLE_USER);
-        user.setActive(true);
-        userRepository.save(user);
-
-        User batchCleanupActor = new User();
-        batchCleanupActor.setUsername(BatchCleanupActor.USERNAME);
-        batchCleanupActor.setPassword("!disabled-system-actor!");
-        batchCleanupActor.setRole(Role.ROLE_USER);
-        batchCleanupActor.setActive(false);
-        userRepository.save(batchCleanupActor);
+        purgeDlt();
 
         testCategory = categoryRepository.save(
                 Category.builder()
@@ -215,6 +187,24 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Setup completed");
     }
 
+    /**
+     * Приводит учётку к нужному состоянию, сохраняя её id.
+     *
+     * @param username        логин учётки
+     * @param encodedPassword уже захэшированный пароль
+     * @param role            роль
+     * @param active          признак активности
+     * @return сохранённая учётка
+     */
+    private User upsertUser(String username, String encodedPassword, Role role, boolean active) {
+        User user = userRepository.findByUsername(username).orElseGet(User::new);
+        user.setUsername(username);
+        user.setPassword(encodedPassword);
+        user.setRole(role);
+        user.setActive(active);
+        return userRepository.save(user);
+    }
+
     @AfterEach
     void waitForDltReprocessingToFinish() {
         await().atMost(30, TimeUnit.SECONDS)
@@ -231,74 +221,18 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     }
 
     /**
-     * Удаляет и пересоздаёт DLT топик для гарантии чистого состояния.
+     * Приводит DLT к чистому состоянию перед тестом.
+     *
+     * <p>Топик живёт весь прогон и накапливает сообщения — и чужие, и оставленные
+     * предыдущими методами этого же класса. Прежний вариант лишь перематывал offset
+     * группы на 0, поэтому каждый следующий тест переобрабатывал всё накопленное:
+     * счётчики алертов расходились («ожидали 5, получили 6»).
+     *
+     * <p>Пересоздавать топик, как делалось до ускорения QA-7, слишком дорого —
+     * удаление с ожиданием занимало секунды на каждый тест. {@code deleteRecords}
+     * обрезает топик сразу, а offset группы ставится на новый конец.
      */
-    private void deleteAndRecreateDltTopic() {
-        try (AdminClient adminClient = createAdminClient()) {
-            var existingTopics = adminClient.listTopics().names().get();
-
-            if (existingTopics.contains(DLT_TOPIC)) {
-                log.debug("Deleting existing DLT topic: {}", DLT_TOPIC);
-
-                // Сначала удаляем consumer group, чтобы сбросить оффсеты
-                try {
-                    adminClient.deleteConsumerGroups(Collections.singletonList(REPROCESS_GROUP_ID)).all().get();
-                    log.debug("Deleted consumer group: {}", REPROCESS_GROUP_ID);
-                } catch (Exception e) {
-                    log.debug("Could not delete consumer group (may not exist): {}", e.getMessage());
-                }
-
-                // Удаляем топик
-                adminClient.deleteTopics(Collections.singletonList(DLT_TOPIC)).all().get();
-
-                // Ждём, пока топик действительно удалится (увеличиваем таймаут)
-                await().atMost(30, TimeUnit.SECONDS)
-                        .pollInterval(500, TimeUnit.MILLISECONDS)
-                        .until(() -> {
-                            try {
-                                var topics = adminClient.listTopics().names().get();
-                                boolean deleted = !topics.contains(DLT_TOPIC);
-                                if (deleted) {
-                                    log.debug("DLT topic successfully deleted");
-                                }
-                                return deleted;
-                            } catch (Exception e) {
-                                log.debug("Error checking topic deletion: {}", e.getMessage());
-                                return false;
-                            }
-                        });
-                log.debug("DLT topic deleted");
-            }
-
-            // Создаём топик с 1 партицией
-            NewTopic newTopic = new NewTopic(DLT_TOPIC, 1, (short) 1);
-            adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
-            log.debug("Created DLT topic: {} with 1 partition", DLT_TOPIC);
-
-            // Ждём создания топика
-            await().atMost(10, TimeUnit.SECONDS)
-                    .pollInterval(200, TimeUnit.MILLISECONDS)
-                    .until(() -> {
-                        try {
-                            var topics = adminClient.listTopics().names().get();
-                            return topics.contains(DLT_TOPIC);
-                        } catch (Exception e) {
-                            return false;
-                        }
-                    });
-
-            // Дополнительная задержка для стабилизации
-            Thread.sleep(1000);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to recreate DLT topic", e);
-        }
-    }
-
-    /**
-     * Сбрасывает offset consumer group в начало для чистого старта.
-     */
-    private void resetConsumerGroupOffsets() {
+    private void purgeDlt() {
         try (AdminClient adminClient = createAdminClient()) {
             var existingTopics = adminClient.listTopics().names().get();
             if (!existingTopics.contains(DLT_TOPIC)) {
@@ -307,18 +241,26 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
             var topicDesc = adminClient.describeTopics(Collections.singletonList(DLT_TOPIC))
                     .allTopicNames().get();
-            int partitionCount = topicDesc.get(DLT_TOPIC).partitions().size();
 
+            Map<TopicPartition, OffsetSpec> endSpecs = new HashMap<>();
+            topicDesc.get(DLT_TOPIC).partitions().forEach(partition ->
+                    endSpecs.put(new TopicPartition(DLT_TOPIC, partition.partition()), OffsetSpec.latest()));
+
+            var endOffsets = adminClient.listOffsets(endSpecs).all().get();
+
+            Map<TopicPartition, RecordsToDelete> toDelete = new HashMap<>();
             Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndMetadata> offsets = new HashMap<>();
-            for (int i = 0; i < partitionCount; i++) {
-                offsets.put(new TopicPartition(DLT_TOPIC, i),
-                        new org.apache.kafka.clients.consumer.OffsetAndMetadata(0));
-            }
+            endOffsets.forEach((partition, info) -> {
+                toDelete.put(partition, RecordsToDelete.beforeOffset(info.offset()));
+                offsets.put(partition,
+                        new org.apache.kafka.clients.consumer.OffsetAndMetadata(info.offset()));
+            });
 
+            adminClient.deleteRecords(toDelete).all().get();
             adminClient.alterConsumerGroupOffsets(REPROCESS_GROUP_ID, offsets).all().get();
-            log.debug("Reset offsets for group {} to beginning", REPROCESS_GROUP_ID);
+            log.debug("Purged DLT, group {} moved to the end of the topic", REPROCESS_GROUP_ID);
         } catch (Exception e) {
-            log.trace("Could not reset offsets (group may not exist yet): {}", e.getMessage());
+            log.trace("Could not purge DLT (topic or group may not exist yet): {}", e.getMessage());
         }
     }
 
@@ -370,8 +312,8 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
             consumer.seekToBeginning(partitions);
 
             int emptyPolls = 0;
-            while (emptyPolls < 3) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+            while (emptyPolls < 2) {
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(200));
                 if (records.isEmpty()) {
                     emptyPolls++;
                 } else {
@@ -521,7 +463,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Sent event with invalid itemId={}", invalidItemId);
 
         await().atMost(45, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages()).isNotEmpty();
                 });
@@ -550,7 +492,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("DLT reprocessing started");
 
         await().atMost(15, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     assertThat(alerts).isNotEmpty();
@@ -570,7 +512,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем что DLT пуст (записи удалены после репроцессинга)
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages())
                             .as("DLT should be empty after reprocessing and deletion")
@@ -615,7 +557,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // Phase 2: Wait for all messages in DLT
         AtomicInteger lastDltCount = new AtomicInteger(0);
         await().atMost(120, TimeUnit.SECONDS)
-                .pollInterval(3, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     int count = messages.size();
@@ -651,7 +593,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Wait for first 5 messages to be processed
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -664,7 +606,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Check: 5 messages remain in DLT (batch size = 5, processed first 5)
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     int remaining = readAllDltMessages().size();
                     assertThat(remaining)
@@ -685,7 +627,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Wait for remaining 5 messages
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -700,7 +642,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Phase 6: Verify DLT is empty after second reprocessing and deletion
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     assertThat(messages)
@@ -743,7 +685,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем первый StockAlert
         await().atMost(15, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -763,7 +705,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем, что сообщение в DLT
         await().atMost(10, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> dltMessages = readAllDltMessages();
                     assertThat(dltMessages).isNotEmpty();
@@ -776,8 +718,12 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isAccepted());
         log.info("Reprocessing triggered");
 
-        // Ждем завершения репроцессинга (появление второго вызова не должно создать дубликат)
-        Thread.sleep(5000);
+        // Ждём фактического завершения репроцессинга, а не фиксированные пять секунд.
+        // Свободный замок означает, что репроцессинг закончен: раньше проверять нечего,
+        // позже — просто трата времени. Условие то же, что в @AfterEach.
+        await().atMost(30, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(this::canAcquireAndReleaseReprocessLock);
 
         // ФИНАЛЬНАЯ ПРОВЕРКА: должен быть ровно ОДИН StockAlert
         List<StockAlert> allAlerts = stockAlertRepository.findAll();
@@ -837,7 +783,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем DLT сообщения (должно быть ровно 5)
         await().atMost(10, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     int dltCount = readAllDltMessages().size();
                     log.info("DLT message count: {}", dltCount);
@@ -853,7 +799,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем все StockAlerts (должно быть ровно 4 - по одному на каждый уникальный item)
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -912,7 +858,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем сообщение в DLT
         await().atMost(45, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages()).isNotEmpty();
                 });
@@ -940,7 +886,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем завершения обработки и появления StockAlert
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -981,7 +927,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         }
 
         await().atMost(timeoutSeconds, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     if (expectedCount == 0) {

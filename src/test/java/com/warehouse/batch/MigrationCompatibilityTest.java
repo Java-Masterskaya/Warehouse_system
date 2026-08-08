@@ -6,6 +6,7 @@ import com.warehouse.entity.Item;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,10 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       не приводит к дублю (см. {@code com.warehouse.service.item.ItemBarcodeGeneratorService}).</li>
  * </ol>
  * <p>
- * Изоляция между тестами: {@code @BeforeEach}/{@code deleteAll()} здесь не нужен потому, что
- * каждый тест использует уникальные SKU/barcode-префиксы и не пересекается по данным
- * с остальными. Если это когда-нибудь перестанет быть так — тесты начнут падать
- * друг на друге, и понадобится либо {@code @Transactional} на класс, либо ручная очистка.
+ * Изоляция между тестами: класс чистит доменные данные перед каждым тестом. Уникальных
+ * SKU здесь недостаточно, потому что проверки табличные: {@code existsByBarcodeIsNull()}
+ * и {@code rowsProcessed()} считают все строки, а не только созданные этим тестом.
+ * Любой товар без barcode, оставленный соседом, сбивает счётчик.
  */
 @SpringBootTest
 class MigrationCompatibilityTest extends AbstractIntegrationTest {
@@ -50,6 +51,11 @@ class MigrationCompatibilityTest extends AbstractIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @BeforeEach
+    void clearDomainData() {
+        cleanDomainData();
+    }
 
     @Test
     @DisplayName("Старый код: INSERT без barcode проходит (колонка nullable)")

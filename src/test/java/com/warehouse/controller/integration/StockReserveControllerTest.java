@@ -85,6 +85,10 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Класс проверяет резервы через reservationRepository.findAll(): без очистки
+        // в выборку попадают чужие резервы, и проверки расходятся («ожидали 5, получили 7»,
+        // «Expecting empty»). Своих данных класс до этого вообще не изолировал.
+        cleanDomainData();
 
         category = categoryRepository.findByNameIgnoreCase("test")
                 .orElseGet(() -> categoryRepository.save(
@@ -119,8 +123,18 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         User admin = userRepository.findByUsername("admin").orElseThrow();
 
+        // Пользователя именно сохраняем, а не собираем в памяти: прежний orElse(...) создавал
+        // объект с фиксированным id=1, и токен выписывался несуществующей учётке. Пока testuser
+        // всегда лежал в базе, ветка не срабатывала — теперь cleanDomainData() его удаляет.
         User user = userRepository.findByUsername("testuser")
-                .orElse(new User(1L, "testuser", "pass@12Word", Role.ROLE_USER, true, LocalDateTime.now()));
+                .orElseGet(() -> userRepository.save(
+                        User.builder()
+                            .username("testuser")
+                            .password("pass@12Word")
+                            .role(Role.ROLE_USER)
+                            .active(true)
+                            .createdAt(LocalDateTime.now())
+                            .build()));
 
         adminToken = jwtUtil.generateToken(admin.getUsername(), admin.getId(), List.of("ROLE_ADMIN"));
 

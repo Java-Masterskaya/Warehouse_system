@@ -11,11 +11,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.redpanda.RedpandaContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import java.time.LocalDateTime;
 import java.util.Properties;
@@ -29,12 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 /**
  * Интеграционный тест для проверки создания топика Kafka при старте.
  *
- * <p>Использует свой Redpanda контейнер (не shared), т.к. проверяет создание топика
- * при старте приложения. Для shared контейнера топик уже может существовать.
+ * <p>Работает на общем Redpanda из {@link AbstractIntegrationTest}. Свой контейнер здесь
+ * объявлялся, но не использовался: обращения идут через {@code getRedpanda()}, то есть
+ * к общему. Лишний контейнер (к тому же другой версии образа) поднимался впустую.
+ *
+ * <p>{@code @DirtiesContext} тоже убран — тест только читает метаданные топика и отправляет
+ * одно сообщение, бины не трогает. Он вытеснял общий Spring-контекст, заставляя
+ * следующий класс поднимать его заново.
  */
 @Tag("integration")
-@Testcontainers
-@DirtiesContext
 @SpringBootTest(classes = WarehouseApp.class)
 class KafkaTopicIntegrationTest extends AbstractIntegrationTest {
 
@@ -50,12 +48,6 @@ class KafkaTopicIntegrationTest extends AbstractIntegrationTest {
     private static final int CURRENT_STOCK = 2;
     private static final int MIN_STOCK = 5;
     private static final String TRIGGERED_BY = "admin";
-
-    @Container
-    static RedpandaContainer redpanda = new RedpandaContainer(
-            DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v24.2.1")
-    );
-
 
     /**
      * Топик создается с тремя партициями при старте приложения.

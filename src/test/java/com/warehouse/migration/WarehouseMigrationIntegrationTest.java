@@ -21,6 +21,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Verifies the real upgrade path from the single-warehouse schema at V18 to the multi-warehouse schema.
+ *
+ * <p>Единственный класс, которому свой Postgres действительно нужен: он применяет миграции
+ * по шагам начиная с V18 и проверяет, что данные переживают апгрейд. Общий контейнер
+ * уже обновлён до последней версии, воспроизвести на нём этот сценарий нельзя.
  */
 @Testcontainers
 class WarehouseMigrationIntegrationTest {

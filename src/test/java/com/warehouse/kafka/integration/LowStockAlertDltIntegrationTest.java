@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
@@ -49,7 +48,6 @@ import static org.awaitility.Awaitility.await;
 @Tag("integration")
 @TestPropertySource(properties = "bucket4j.enabled=false")
 @SpringBootTest(classes = WarehouseApp.class)
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -221,7 +219,7 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
         // then: ждем сообщение в DLT
         await().atMost(15, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(250, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 
@@ -287,7 +285,7 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
         // then: ждем достаточно долго, чтобы прошли все ретраи
         await().atMost(35, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(250, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 
@@ -348,7 +346,7 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
         // then: ждем DLT
         await().atMost(35, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(250, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 
@@ -386,7 +384,7 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
         // then
         await().atMost(35, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(250, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 
