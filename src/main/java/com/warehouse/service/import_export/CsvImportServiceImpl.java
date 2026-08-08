@@ -5,6 +5,7 @@ import com.warehouse.dto.response.error.ImportErrorAccumulator;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
+import com.warehouse.exception.IllegalFileImportException;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
@@ -110,12 +111,12 @@ public class CsvImportServiceImpl implements CsvImportService {
 
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Файл для импорта не может быть пустым");
+            throw new IllegalFileImportException("Файл для импорта не может быть пустым");
         }
 
         String filename = file.getOriginalFilename();
         if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
-            throw new IllegalArgumentException("Разрешена загрузка только CSV файлов");
+            throw new IllegalFileImportException("Разрешена загрузка только CSV файлов");
         }
     }
 }

@@ -37,8 +37,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
@@ -93,18 +91,6 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
     private User      testUser;
     private Long      testItemId;
     private Warehouse defaultWarehouse;
-
-    static boolean kafkaDown = false;
-
-    @DynamicPropertySource
-    static void overrideKafkaProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.kafka.bootstrap-servers", () -> {
-            if (kafkaDown) {
-                return "localhost:1";
-            }
-            return System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092");
-        });
-    }
 
     @BeforeEach
     void setUp() {
@@ -166,45 +152,39 @@ class WriteOffGracefulDegradationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldSaveOutboxEventsAndOpenCircuitBreakerWhenKafkaIsDown() {
-        kafkaDown = true;
-        try {
-            UserContext ctx = new UserContext(testUser.getId(), testUser.getUsername());
+        UserContext ctx = new UserContext(testUser.getId(), testUser.getUsername());
 
-            for (int i = 0; i < 7; i++) {
-                WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 1);
-                StockMovementResponse response = stockMovementService.writeOffReceipt(request, ctx);
-                assertThat(response.lowStockAlert()).isTrue();
+        for (int i = 0; i < 7; i++) {
+            WriteOffStockRequest request = new WriteOffStockRequest(testItemId, 1);
+            StockMovementResponse response = stockMovementService.writeOffReceipt(request, ctx);
+            assertThat(response.lowStockAlert()).isTrue();
+        }
+
+        List<OutboxEvent> pendingEvents = outboxEventRepository.findAll();
+        assertThat(pendingEvents).hasSize(7);
+        pendingEvents.forEach(event -> assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING));
+
+        for (int i = 0; i < 5; i++) {
+            try {
+                outboxEventRelay.relayPendingEvents();
+            } catch (Exception ignored) {
+                // Игнорируем ошибки падения Кафки во время набора метрик
             }
+        }
 
-            List<OutboxEvent> pendingEvents = outboxEventRepository.findAll();
-            assertThat(pendingEvents).hasSize(7);
-            pendingEvents.forEach(event -> assertThat(event.getStatus()).isEqualTo(OutboxStatus.PENDING));
-
-            // Накапливаем статистику ошибок Resilience4j (вызываем несколько раз)
-            for (int i = 0; i < 5; i++) {
-                try {
-                    outboxEventRelay.relayPendingEvents();
-                } catch (Exception ignored) {
-                    // Игнорируем ошибки падения Кафки во время набора метрик
-                }
-            }
-
-            CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("kafkaProducer");
-            Awaitility.await()
-                      .atMost(Duration.ofSeconds(5))
-                      .pollInterval(Duration.ofMillis(100))
-                      .untilAsserted(() ->
-                              assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN)
-                );
-
-            List<OutboxEvent> updatedEvents = outboxEventRepository.findAll();
-            assertThat(updatedEvents).hasSize(7);
-            updatedEvents.forEach(event ->
-                    assertThat(event.getStatus()).isIn(OutboxStatus.FAILED, OutboxStatus.PENDING)
+        CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("kafkaProducer");
+        Awaitility.await()
+                  .atMost(Duration.ofSeconds(5))
+                  .pollInterval(Duration.ofMillis(100))
+                  .untilAsserted(() ->
+                          assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN)
             );
 
-        } finally {
-            kafkaDown = false;
-        }
+        List<OutboxEvent> updatedEvents = outboxEventRepository.findAll();
+        assertThat(updatedEvents).hasSize(7);
+        updatedEvents.forEach(event ->
+                assertThat(event.getStatus()).isIn(OutboxStatus.FAILED, OutboxStatus.PENDING)
+        );
+
     }
 }

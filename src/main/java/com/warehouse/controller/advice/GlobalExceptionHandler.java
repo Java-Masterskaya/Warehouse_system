@@ -17,6 +17,7 @@ import com.warehouse.exception.IdempotencyConflictException;
 import com.warehouse.exception.IdempotencyKeyDuplicateException;
 import com.warehouse.exception.IdempotencyKeyRequiredException;
 import com.warehouse.exception.IdempotencyStorageException;
+import com.warehouse.exception.IllegalFileImportException;
 import com.warehouse.exception.ImportHeadersException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidCursorException;
@@ -353,6 +354,13 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleImportException(ImportHeadersException ex) {
         return new ErrorResponse("NOT_FOUND_IMPORTANT_HEADER_IN_FILE",
                 "Some of important headers was not found. Please check headers and retry.\n" + ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalFileImportException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIllegalFileImportException(IllegalFileImportException ex) {
+        return new ErrorResponse("ILLEGAL_FILE_IMPORT",
+                "Empty or not .csv file can not be imported.\n" + ex.getMessage());
     }
 
     private boolean isAdmin() {

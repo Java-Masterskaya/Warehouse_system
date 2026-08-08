@@ -4,6 +4,7 @@ import com.warehouse.dto.request.item.ItemImportRowDto;
 import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
+import com.warehouse.exception.IllegalFileImportException;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.WarehouseRepository;
@@ -104,7 +105,7 @@ class CsvImportServiceTest {
     void importItemsEmptyFileThrowsException() {
         MockMultipartFile emptyFile = new MockMultipartFile("file", "empty.csv", "text/csv", new byte[0]);
 
-        assertThatThrownBy(() -> csvImportService.importItems(emptyFile)).isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> csvImportService.importItems(emptyFile)).isInstanceOf(IllegalFileImportException.class)
                                                                          .hasMessageContaining("не может быть пустым");
 
         verify(csvItemParserService, never()).parseInChunks(any());
@@ -117,7 +118,7 @@ class CsvImportServiceTest {
         MockMultipartFile txtFile =
                 new MockMultipartFile("file", "items.txt", "text/plain", "some content".getBytes());
 
-        assertThatThrownBy(() -> csvImportService.importItems(txtFile)).isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> csvImportService.importItems(txtFile)).isInstanceOf(IllegalFileImportException.class)
                                                                        .hasMessageContaining("CSV");
 
         verify(csvItemParserService, never()).parseInChunks(any());
