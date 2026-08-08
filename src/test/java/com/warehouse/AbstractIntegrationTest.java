@@ -19,10 +19,22 @@ import org.testcontainers.utility.DockerImageName;
  * Абстрактный базовый класс для интеграционных тестов.
  * Управляет жизненным циклом тестовых контейнеров через static-блок.
  *
- * <p>Контейнеры запускаются один раз при загрузке контекста и живут до завершения JVM
- * (Ryuk автоматически останавливает их после завершения тестов).
+ * <p>Контейнеры запускаются один раз при загрузке класса и живут до завершения JVM.
  * Порты не меняются между тест-классами, поэтому кэшированный Spring-контекст
  * всегда имеет актуальные адреса.
+ *
+ * <p>Включён {@code withReuse(true)}: контейнеры переживают и сам прогон, если разработчик
+ * согласился на это у себя в {@code ~/.testcontainers.properties}:
+ *
+ * <pre>testcontainers.reuse.enable=true</pre>
+ *
+ * <p>Без этой строки флаг игнорируется и всё работает как раньше — Ryuk убирает контейнеры
+ * после прогона. Поэтому на CI поведение не меняется, а локально повторный запуск
+ * экономит время подъёма Postgres, Redpanda и Redis.
+ *
+ * <p>При включённом переиспользовании данные переживают прогон, так что рассчитывать
+ * на чистую базу нельзя: каждый класс приводит её в нужное состояние сам
+ * (см. {@link #cleanDomainData()}).
  */
 @AutoConfigureMockMvc
 public abstract class AbstractIntegrationTest {
@@ -37,14 +49,18 @@ public abstract class AbstractIntegrationTest {
     protected JdbcTemplate testJdbcTemplate;
 
     static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine");
+            new PostgreSQLContainer<>("postgres:16-alpine")
+                    .withReuse(true);
 
     static final RedpandaContainer redpanda =
-            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"));
+            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"))
+                    .withReuse(true);
 
     @SuppressWarnings("resource")
     static final GenericContainer<?> redis =
-            new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+            new GenericContainer<>("redis:7-alpine")
+                    .withExposedPorts(6379)
+                    .withReuse(true);
 
     static {
         postgres.start();
@@ -82,6 +98,15 @@ public abstract class AbstractIntegrationTest {
 
     protected static RedpandaContainer getRedpanda() {
         return redpanda;
+    }
+
+    /**
+     * Общий Postgres для тестов, которым нужна база, но не нужен Spring-контекст.
+     *
+     * @return контейнер, поднятый один раз на весь прогон
+     */
+    public static PostgreSQLContainer<?> getPostgres() {
+        return postgres;
     }
 
     /**

@@ -47,7 +47,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -74,7 +73,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Tag("integration")
 @SpringBootTest(classes = WarehouseApp.class)
 @ActiveProfiles("test")
-@Testcontainers
 class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
     @DynamicPropertySource
@@ -133,19 +131,13 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         log.info("Test setup...");
 
-        // Удаляем в правильном порядке (сначала зависимые таблицы), чтобы избежать ошибок внешних ключей
-        // Важно: static Testcontainers живут между запусками, поэтому leftover data
-        // из предыдущих тестов нарушает ассерты и уникальные индексы
-        jdbcTemplate.update("DELETE FROM stock_alerts");
-        jdbcTemplate.update("DELETE FROM stock_movements");
+        // Доменные таблицы чистим общим хелпером. Самописный список здесь не знал про
+        // purchase_order_items, и удаление items падало на внешнем ключе, стоило соседу
+        // (или предыдущему прогону при переиспользовании контейнеров) оставить заказ поставщику.
+        // Отдельно добавлены только таблицы, которых в общем хелпере нет.
         jdbcTemplate.update("DELETE FROM idempotency_keys");
-        jdbcTemplate.update("DELETE FROM batches");
         jdbcTemplate.update("DELETE FROM outbox");
-        jdbcTemplate.update("DELETE FROM reserves");
-
-        jdbcTemplate.update("DELETE FROM stock");
-        jdbcTemplate.update("DELETE FROM items");
-        jdbcTemplate.update("DELETE FROM categories");
+        cleanDomainData();
         // Пользователей не удаляем, а приводим к нужному состоянию на месте.
         // Прежний DELETE + INSERT выдавал учёткам новые id. Логин после этого работал,
         // поэтому правка выглядела безобидной, но соседние классы держат id админа

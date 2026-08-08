@@ -20,7 +20,6 @@ import com.warehouse.service.reservation.StockReserveService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,7 +31,6 @@ import java.util.concurrent.Future;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
-@Testcontainers
 class StockReserveConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -76,8 +74,11 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
                 .quantity(10)
                 .expiryDate(LocalDateTime.now().plusDays(30))
                 .build());
+        // Имя уникально на прогон: строка создаётся безусловно, а users между прогонами
+        // не чистятся — при переиспользовании контейнеров прибитое имя даёт duplicate key.
         User user = userRepository.save(
-                User.builder().username("name").password("sOme1@@@").role(Role.ROLE_ADMIN).build());
+                User.builder().username("reserve-concurrency-" + System.nanoTime())
+                    .password("sOme1@@@").role(Role.ROLE_ADMIN).build());
         ReserveRequest request = new ReserveRequest(7, 1);
         UserContext ctx = new UserContext(user.getId(), user.getUsername());
         ExecutorService executor = Executors.newFixedThreadPool(2);

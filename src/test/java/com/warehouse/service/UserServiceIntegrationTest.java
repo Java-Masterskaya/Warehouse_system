@@ -152,8 +152,12 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     void shouldCreateAuditRecordWhenUserCreated() throws Exception {
         User admin = createActiveAdmin("Admin_Creator");
 
+        // Имя уникально на прогон: при включённом переиспользовании контейнеров
+        // строка переживает перезапуск, и createUser отвергает дубликат.
+        String newUsername = "NewUserToAudit-" + System.nanoTime();
+
         UserCreateRequest createRequest = new UserCreateRequest();
-        createRequest.setUsername("NewUserToAudit");
+        createRequest.setUsername(newUsername);
         createRequest.setPassword("SuperSecret123!");
         createRequest.setRole(Role.ROLE_USER);
 
@@ -182,7 +186,7 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(audit.getOldValue()).isNull();
 
         assertThat(newNode).isNotNull();
-        assertThat(newNode.get("username").asText()).isEqualTo("NewUserToAudit");
+        assertThat(newNode.get("username").asText()).isEqualTo(newUsername);
         assertThat(newNode.get("role").asText()).isEqualTo(Role.ROLE_USER.name());
 
         assertThat(newNode.has("password")).isFalse();
@@ -192,9 +196,11 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     void shouldCreateAuditRecordWhenUserDeactivated() throws JsonProcessingException {
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
         User admin = createActiveAdmin("New admin");
+        // Имя уникально по той же причине: users не чистятся между прогонами.
+        String deactivatedUsername = "UserToDeactivate-" + System.nanoTime();
         User user = userRepository.save(
-                User.builder().username("User").password("User_pass").role(Role.ROLE_USER).active(true).createdAt(now)
-                    .build());
+                User.builder().username(deactivatedUsername).password("User_pass").role(Role.ROLE_USER)
+                    .active(true).createdAt(now).build());
 
         try {
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(

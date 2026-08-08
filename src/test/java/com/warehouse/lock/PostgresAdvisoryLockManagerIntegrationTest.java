@@ -1,24 +1,27 @@
 package com.warehouse.lock;
 
+import com.warehouse.AbstractIntegrationTest;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Проверяет advisory-локи на общем Postgres.
+ *
+ * <p>Свой контейнер здесь не нужен: имена локов уникальны ({@code UUID}), на чужие данные
+ * тест не смотрит. Отдельный Postgres добавлял к прогону лишний подъём контейнера.
+ * Spring-контекст классу тоже не нужен — берём контейнер напрямую.
+ */
 @Tag("integration")
-@Testcontainers
 class PostgresAdvisoryLockManagerIntegrationTest {
 
-    @Container
-    private static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:16-alpine");
+    private static final PostgreSQLContainer<?> POSTGRES = AbstractIntegrationTest.getPostgres();
 
     @Test
     void shouldKeepLockForSessionAndReleaseItIdempotently() {
