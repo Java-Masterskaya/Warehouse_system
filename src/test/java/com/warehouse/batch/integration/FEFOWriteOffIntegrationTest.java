@@ -81,14 +81,16 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
 
         // Создаем товар
         Item item = new Item();
-        item.setSku("SKU-FEO-001");
+        // SKU уникален на прогон: колонка под уникальным индексом. Суффикс в barcode — на будущее.
+        String itemSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        item.setSku("SKU-FEO-" + itemSuffix);
         item.setName("Тестовый товар для FEFO");
         item.setCategory(category);
         item.setMinStock(5);
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(100.00));
         item.setCost(BigDecimal.valueOf(50.00));
-        item.setBarcode("ITEM-TEST-FEFO-001");
+        item.setBarcode("ITEM-TEST-FEFO-" + itemSuffix);
         itemRepository.save(item);
 
         // Создаем stock для товара (необходим для registerReceipt)

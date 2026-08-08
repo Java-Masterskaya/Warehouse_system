@@ -63,14 +63,16 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         );
 
         Item item = new Item();
-        item.setSku("SKU-001");
+        // SKU уникален на прогон: колонка под уникальным индексом. Суффикс в barcode — на будущее.
+        String itemSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        item.setSku("SKU-ITEMCARD-" + itemSuffix);
         item.setName("Ноутбук");
         item.setCategory(electronics);
         item.setMinStock(5);
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));
         item.setCost(BigDecimal.valueOf(1000.00));
-        item.setBarcode("ITEM-TEST-CARDCACHE-001");
+        item.setBarcode("ITEM-TEST-CARDCACHE-" + itemSuffix);
         itemRepository.save(item);
 
         Stock stock = new Stock();

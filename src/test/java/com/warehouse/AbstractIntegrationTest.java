@@ -4,6 +4,7 @@ import com.warehouse.entity.Warehouse;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -14,6 +15,10 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Абстрактный базовый класс для интеграционных тестов.
@@ -35,9 +40,25 @@ import org.testcontainers.utility.DockerImageName;
  * <p>При включённом переиспользовании данные переживают прогон, так что рассчитывать
  * на чистую базу нельзя: каждый класс приводит её в нужное состояние сам
  * (см. {@link #cleanDomainData()}).
+ *
+ * <p>{@code @ResourceLock} сериализует наследников между собой при параллельном прогоне.
+ * Postgres, Redis и Kafka общие на весь прогон, и каждый класс вычищает их в
+ * {@code @BeforeEach} — два таких класса рядом затёрли бы данные друг друга посреди теста.
+ * Классы, которым Spring-контекст не нужен, замок не берут и идут параллельно.
  */
 @AutoConfigureMockMvc
+@ResourceLock(AbstractIntegrationTest.SHARED_INFRASTRUCTURE)
 public abstract class AbstractIntegrationTest {
+
+    /** Имя общего ресурса: база, кэш и брокер, поднятые один раз на весь прогон. */
+    public static final String SHARED_INFRASTRUCTURE = "warehouse-shared-infrastructure";
+
+    /**
+     * Учётки из миграций: {@code admin} — V5, {@code system-batch-cleanup} — V29.
+     * Всё остальное в {@code users} создано тестами и подлежит удалению.
+     */
+    private static final List<String> SEEDED_USERNAMES =
+            List.of("admin", "system-batch-cleanup");
 
     protected static final String V1_API_ROOT = ApiPaths.V1_API_ROOT;
     protected static final String V1_BACKFILL_ROOT = ApiPaths.V1_BACKFILL_ROOT;
@@ -119,7 +140,9 @@ public abstract class AbstractIntegrationTest {
      * <p>Порядок получен опытным путём: каждая таблица добавлена сюда потому, что её
      * отсутствие роняло конкретный тест. Сверху те, кто ссылается, снизу те, на кого ссылаются.
      *
-     * <p>{@code users} и {@code warehouses} не трогаем — они засеяны миграциями и общие для всех.
+     * <p>{@code warehouses} не трогаем — склады засеяны миграциями и общие для всех.
+     * В {@code users} остаются только засеянные учётки, всё созданное тестами удаляется:
+     * см. {@link #SEEDED_USERNAMES}.
      */
     protected void cleanDomainData() {
         testJdbcTemplate.update("DELETE FROM stock_alerts");
@@ -131,6 +154,26 @@ public abstract class AbstractIntegrationTest {
         testJdbcTemplate.update("DELETE FROM stock");
         testJdbcTemplate.update("DELETE FROM items");
         testJdbcTemplate.update("DELETE FROM categories");
+        cleanTestUsers();
+    }
+
+    /**
+     * Удаляет учётки, созданные тестами, оставляя засеянные миграциями.
+     *
+     * <p>Раньше {@code users} не чистил никто: таблица считалась общей, потому что в ней
+     * сидят учётки из миграций. В итоге строки с уникальными именами вида
+     * {@code atomic-test-<nanoTime>} копились между прогонами без ограничений —
+     * при переиспользовании контейнеров таблица росла бесконечно.
+     *
+     * <p>{@code idempotency_keys} удаляются здесь же: это третий внешний ключ на
+     * {@code users} помимо {@code reserves} и {@code stock_movements}, которые сняты выше.
+     */
+    private void cleanTestUsers() {
+        testJdbcTemplate.update("DELETE FROM idempotency_keys");
+        String placeholders = String.join(", ", Collections.nCopies(SEEDED_USERNAMES.size(), "?"));
+        testJdbcTemplate.update(
+                "DELETE FROM users WHERE username NOT IN (" + placeholders + ")",
+                SEEDED_USERNAMES.toArray());
     }
 
     protected Warehouse defaultWarehouse() {
@@ -142,8 +185,8 @@ public abstract class AbstractIntegrationTest {
      * Сбрасывает состояние Redis перед каждым тестом — прежде всего корзины rate limiting.
      *
      * <p>Раньше здесь удалялись ключи по шаблону {@code rl:*} через {@code StringRedisTemplate}.
-     * Корзины пишет bucket4j отдельным соединением с {@code ByteArrayCodec}, и до них выборка
-     * не доставала: лимит логина по IP (10 попыток на 2 секунды) копился через весь прогон.
+     * Корзины пишет bucket4j отдельным соединением с {@code ByteArrayCodec}, и выборка
+     * их не находила: лимит логина по IP (10 попыток на 2 секунды) копился через весь прогон.
      * Пока тесты были медленными, это не проявлялось; после ускорения классы, где
      * каждый тест логинится, стали упираться в лимит и получать 429 вместо 200.
      *
@@ -152,7 +195,7 @@ public abstract class AbstractIntegrationTest {
      */
     @BeforeEach
     void clearRateLimitKeys() {
-        java.util.Objects.requireNonNull(redisTemplate.getConnectionFactory())
+        Objects.requireNonNull(redisTemplate.getConnectionFactory())
                 .getConnection()
                 .serverCommands()
                 .flushDb();

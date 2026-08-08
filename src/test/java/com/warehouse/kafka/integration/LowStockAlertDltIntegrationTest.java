@@ -219,7 +219,7 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
         // then: ждем сообщение в DLT
         await().atMost(15, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(250, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 
@@ -285,7 +285,7 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
         // then: ждем достаточно долго, чтобы прошли все ретраи
         await().atMost(35, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(250, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 
@@ -346,7 +346,7 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
         // then: ждем DLT
         await().atMost(35, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(250, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 
@@ -384,7 +384,7 @@ class LowStockAlertDltIntegrationTest extends AbstractIntegrationTest {
 
         // then
         await().atMost(35, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(250, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> records = readAllDltMessages();
 

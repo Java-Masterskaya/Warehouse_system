@@ -131,10 +131,10 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         log.info("Test setup...");
 
-        // Доменные таблицы чистим общим хелпером. Самописный список здесь не знал про
+        // Доменные таблицы чистим общим методом. Самописный список здесь не знал про
         // purchase_order_items, и удаление items падало на внешнем ключе, стоило соседу
         // (или предыдущему прогону при переиспользовании контейнеров) оставить заказ поставщику.
-        // Отдельно добавлены только таблицы, которых в общем хелпере нет.
+        // Отдельно добавлены только таблицы, которых в общем методе нет.
         jdbcTemplate.update("DELETE FROM idempotency_keys");
         jdbcTemplate.update("DELETE FROM outbox");
         cleanDomainData();
@@ -142,7 +142,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // Прежний DELETE + INSERT выдавал учёткам новые id. Логин после этого работал,
         // поэтому правка выглядела безобидной, но соседние классы держат id админа
         // в UserContext и падали на stock_movements_user_id_fkey.
-        // Полный DELETE FROM users сносил вдобавок и чужие учётки.
+        // Полный DELETE FROM users удалял заодно и чужие учётки.
         upsertUser("admin", passwordEncoder.encode("secret"), Role.ROLE_ADMIN, true);
         upsertUser("testuser", passwordEncoder.encode("password"), Role.ROLE_USER, true);
         upsertUser(BatchCleanupActor.USERNAME, "!disabled-system-actor!", Role.ROLE_USER, false);
@@ -226,7 +226,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
      * <p>Топик живёт весь прогон и накапливает сообщения — и чужие, и оставленные
      * предыдущими методами этого же класса. Прежний вариант лишь перематывал offset
      * группы на 0, поэтому каждый следующий тест переобрабатывал всё накопленное:
-     * счётчики алертов уезжали («ожидали 5, получили 6»).
+     * счётчики алертов расходились («ожидали 5, получили 6»).
      *
      * <p>Пересоздавать топик, как делалось до ускорения QA-7, слишком дорого —
      * удаление с ожиданием занимало секунды на каждый тест. {@code deleteRecords}
@@ -718,8 +718,12 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isAccepted());
         log.info("Reprocessing triggered");
 
-        // Ждем завершения репроцессинга (появление второго вызова не должно создать дубликат)
-        Thread.sleep(5000);
+        // Ждём фактического завершения репроцессинга, а не фиксированные пять секунд.
+        // Свободный замок означает, что репроцессинг закончен: раньше проверять нечего,
+        // позже — просто трата времени. Условие то же, что в @AfterEach.
+        await().atMost(30, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(this::canAcquireAndReleaseReprocessLock);
 
         // ФИНАЛЬНАЯ ПРОВЕРКА: должен быть ровно ОДИН StockAlert
         List<StockAlert> allAlerts = stockAlertRepository.findAll();

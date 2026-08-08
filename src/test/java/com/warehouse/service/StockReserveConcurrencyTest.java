@@ -60,9 +60,13 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
             category = categoryRepository.findByNameIgnoreCase(categoryName).get();
         }
 
+        // SKU уникален на прогон: колонка под уникальным индексом, а при переиспользовании
+        // контейнеров строки переживают перезапуск. Суффикс в barcode — на будущее.
+        String itemSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
         Item item = itemRepository.save(
-                Item.builder().sku("12345676").name("name").category(category).minStock(0).active(true)
-                        .barcode("ITEM-TEST-RESERVECONC-001").build());
+                Item.builder().sku("SKU-RESERVE-" + itemSuffix).name("name").category(category)
+                    .minStock(0).active(true)
+                    .barcode("ITEM-TEST-RESERVECONC-" + itemSuffix).build());
         Stock stock = stockRepository.save(Stock.builder()
                 .item(item)
                 .warehouse(defaultWarehouse())
@@ -75,7 +79,7 @@ class StockReserveConcurrencyTest extends AbstractIntegrationTest {
                 .expiryDate(LocalDateTime.now().plusDays(30))
                 .build());
         // Имя уникально на прогон: строка создаётся безусловно, а users между прогонами
-        // не чистятся — при переиспользовании контейнеров прибитое имя даёт duplicate key.
+        // не чистятся — при переиспользовании контейнеров фиксированное имя даёт duplicate key.
         User user = userRepository.save(
                 User.builder().username("reserve-concurrency-" + System.nanoTime())
                     .password("sOme1@@@").role(Role.ROLE_ADMIN).build());

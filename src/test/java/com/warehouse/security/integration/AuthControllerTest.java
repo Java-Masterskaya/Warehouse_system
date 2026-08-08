@@ -311,9 +311,10 @@ class AuthControllerTest extends AbstractIntegrationTest {
                 .as("New refresh token should be different from old")
                 .isNotEqualTo(oldRefresh);
 
-        // 4. Ждем истечения retry-cache (60 секунд + небольшая задержка)
-        log.info("Waiting for retry-cache to expire (5 seconds)...");
-        Thread.sleep(5_000);
+        // 4. Ждём истечения retry-кеша: TTL в тестах 1 секунда (app.refresh-retry-ttl-seconds),
+        // берём полуторный запас. Задержка безопасна по направлению: на загруженной машине
+        // пауза только удлинится, а срок кеша истечёт тем вернее.
+        Thread.sleep(1_500);
 
         // 5. Пытаемся использовать старый refresh - кеша нет → TOKEN_REUSE
         RefreshRequest reuseRequest = new RefreshRequest(oldRefresh);
@@ -346,8 +347,8 @@ class AuthControllerTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(retryRequest)))
                 .andExpect(status().isOk());
 
-        // 3. Ждем истечения кеша (3 секунды + небольшая задержка)
-        Thread.sleep(5_000);
+        // 3. Ждём истечения кеша: TTL в тестах 1 секунда, берём полуторный запас.
+        Thread.sleep(1_500);
 
         // 4. Третий запрос - кеша нет → TOKEN_REUSE
         RefreshRequest reuseRequest = new RefreshRequest(userRefreshToken);
@@ -364,7 +365,7 @@ class AuthControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Refresh retry should return cached tokens within 3 seconds window")
+    @DisplayName("Refresh retry should return cached tokens within the retry window")
     void refreshRetryShouldReturnCachedTokens() throws Exception {
         // 1. Первый refresh
         RefreshRequest firstRequest = new RefreshRequest(userRefreshToken);
@@ -394,8 +395,10 @@ class AuthControllerTest extends AbstractIntegrationTest {
         assertThat(retryTokens.accessToken()).isEqualTo(firstTokens.accessToken());
         assertThat(retryTokens.refreshToken()).isEqualTo(firstTokens.refreshToken());
 
-        // 3. Делаем третий запрос (еще один ретрай через 1 секунду) - все еще кеш
-        Thread.sleep(1000);
+        // 3. Третий запрос — ещё один ретрай внутри того же окна, кеш должен сработать снова.
+        // Паузы здесь нет намеренно: утверждение «мы ещё внутри окна» тем вернее,
+        // чем меньше прошло времени. Прежние 300 мс при TTL в секунду были заявкой
+        // на падение под нагрузкой и ничего не проверяли.
         RefreshRequest thirdRequest = new RefreshRequest(userRefreshToken);
         String thirdResponse = mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)

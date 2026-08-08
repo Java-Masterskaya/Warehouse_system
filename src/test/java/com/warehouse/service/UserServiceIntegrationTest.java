@@ -60,11 +60,11 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     private String refreshToken;
 
     /**
-     * Админы, деактивированные ради сценария «остались два последних админа».
+     * Админы, выключенные ради сценария «остались два последних админа».
      *
-     * <p>{@link #deactivateAllAdminsExcept(User, User)} гасит всех остальных админов в базе —
+     * <p>{@link #deactivateAllAdminsExcept(User, User)} деактивирует всех остальных админов в базе —
      * иначе защита от деактивации последнего админа не сработает и тест потеряет смысл.
-     * Под раздачу попадает общий {@code admin} из миграции V5, а база у интеграционных
+     * Заодно деактивируется общий {@code admin} из миграции V5, а база у интеграционных
      * тестов одна на весь прогон: без восстановления все следующие классы получают 401 на логине.
      */
     private final List<User> deactivatedAdmins = new ArrayList<>();

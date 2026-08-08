@@ -18,10 +18,12 @@ import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.UserRepository;
+import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.service.batch.ExpiredBatchCleanupService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -45,7 +47,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Класс перехватывает логи через {@code ListAppender}, прицепленный к логгеру Logback.
+ * Контекст логирования один на JVM, и подъём чужого Spring-контекста переинициализирует
+ * его вместе с программно добавленными аппендерами: при параллельном прогоне список
+ * событий оказывался пустым. Замок разводит этот класс с теми, кто поднимает контекст.
+ */
 @ExtendWith(MockitoExtension.class)
+@ResourceLock(AbstractIntegrationTest.SHARED_INFRASTRUCTURE)
 class ExpiredBatchCleanupServiceTest {
 
     private static final long ITEM_ID = 10L;
