@@ -252,7 +252,8 @@ class StockMovementHistoryCursorIntegrationTest extends AbstractIntegrationTest 
         MockHttpServletRequestBuilder request = get(HISTORY_URL, itemId)
                 .header("Authorization", "Bearer " + adminToken)
                 .param("cursor", cursor)
-                .param("size", Integer.toString(size));
+                .param("size", Integer.toString(size))
+                .param("fullHistory", "true");
         if (type != null) {
             request.param("type", type.name());
         }

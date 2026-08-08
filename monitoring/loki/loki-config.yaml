@@ -10,6 +10,10 @@ common:
     instance_addr: 127.0.0.1
     kvstore:
       store: inmemory
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
 
 schema_config:
   configs:
@@ -22,9 +26,6 @@ schema_config:
         period: 24h
 
 storage_config:
-  filesystem:
-    chunks_directory: /loki/chunks
-    rules_directory: /loki/rules
   tsdb_shipper:
     active_index_directory: /loki/tsdb-index
     cache_location: /loki/tsdb-cache
@@ -43,6 +44,7 @@ compactor:
   working_directory: /loki/compactor
   compaction_interval: ${COMPACTION_INTERVAL:-10m}
   retention_enabled: ${RETENTION_DELETES_ENABLED:-true}
+  delete_request_store: filesystem
 
 query_scheduler:
   max_outstanding_requests_per_tenant: ${MAX_OUTSTANDING:-1000}

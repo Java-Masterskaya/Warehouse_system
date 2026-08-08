@@ -56,6 +56,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -74,6 +75,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -443,7 +445,8 @@ class StockMovementServiceImplTest {
     }
 
     /**
-     * История движения товара возвращается корректно.
+     * История движения товара за период по умолчанию возвращается корректно,
+     * fromDate вычисляется на основе окна по умолчанию.
      */
     @Test
     void getItemMovementHistorySuccess() {
@@ -451,6 +454,7 @@ class StockMovementServiceImplTest {
         MovementType type = MovementType.WRITE_OFF;
         int page = 0;
         int size = 20;
+        boolean fullHistory = false;
 
         StockMovementHistoryResponse movement =
                 new StockMovementHistoryResponse(
@@ -474,6 +478,7 @@ class StockMovementServiceImplTest {
         when(stockMovementRepository.findHistoryByItemId(
                 eq(itemId),
                 eq(type),
+                any(LocalDateTime.class),
                 any(Pageable.class)
         )).thenReturn(historyPage);
 
@@ -482,7 +487,8 @@ class StockMovementServiceImplTest {
                         itemId,
                         type,
                         page,
-                        size
+                        size,
+                        fullHistory
                 );
 
         assertEquals(1, result.content().size());
@@ -499,9 +505,73 @@ class StockMovementServiceImplTest {
         assertEquals("admin", response.performedBy());
 
         verify(itemRepository).existsById(itemId);
+
+        ArgumentCaptor<LocalDateTime> fromDateCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(stockMovementRepository).findHistoryByItemId(
                 eq(itemId),
                 eq(type),
+                fromDateCaptor.capture(),
+                any(Pageable.class)
+        );
+
+        LocalDateTime expectedFromDate = LocalDateTime.now().minusDays(90);
+        assertTrue(Duration.between(fromDateCaptor.getValue(), expectedFromDate).abs().toSeconds() < 5);
+    }
+
+    /**
+     * При запросе полной истории (fullHistory=true) fromDate не передаётся —
+     * ограничение окна снимается по явному запросу клиента.
+     */
+    @Test
+    void getItemMovementHistoryFullHistorySuccess() {
+        Long itemId = 1L;
+        MovementType type = MovementType.WRITE_OFF;
+        int page = 0;
+        int size = 20;
+        boolean fullHistory = true;
+
+        StockMovementHistoryResponse movement =
+                new StockMovementHistoryResponse(
+                        102L,
+                        MovementType.WRITE_OFF,
+                        10,
+                        "admin",
+                        LocalDateTime.of(2020, 1, 1, 0, 0)
+                );
+
+        Page<StockMovementHistoryResponse> historyPage =
+                new PageImpl<>(
+                        List.of(movement),
+                        PageRequest.of(page, size),
+                        1
+                );
+
+        when(itemRepository.existsById(itemId))
+                .thenReturn(true);
+
+        when(stockMovementRepository.findHistoryByItemId(
+                eq(itemId),
+                eq(type),
+                isNull(),
+                any(Pageable.class)
+        )).thenReturn(historyPage);
+
+        PageResponse<StockMovementHistoryResponse> result =
+                stockMovementService.getItemMovementHistory(
+                        itemId,
+                        type,
+                        page,
+                        size,
+                        fullHistory
+                );
+
+        assertEquals(1, result.content().size());
+
+        verify(itemRepository).existsById(itemId);
+        verify(stockMovementRepository).findHistoryByItemId(
+                eq(itemId),
+                eq(type),
+                isNull(),
                 any(Pageable.class)
         );
     }
@@ -515,6 +585,7 @@ class StockMovementServiceImplTest {
         MovementType type = MovementType.RECEIVE;
         int page = 0;
         int size = 20;
+        boolean fullHistory = false;
 
         when(itemRepository.existsById(itemId))
                 .thenReturn(false);
@@ -526,7 +597,8 @@ class StockMovementServiceImplTest {
                                 itemId,
                                 type,
                                 page,
-                                size
+                                size,
+                                fullHistory
                         )
                 );
 
@@ -539,6 +611,7 @@ class StockMovementServiceImplTest {
 
         verify(stockMovementRepository, never()).findHistoryByItemId(
                 anyLong(),
+                any(),
                 any(),
                 any(Pageable.class)
         );
@@ -560,12 +633,12 @@ class StockMovementServiceImplTest {
 
         when(itemRepository.existsById(ITEM_ID)).thenReturn(true);
         when(stockMovementKeysetRepository.findNextPage(
-                ITEM_ID, type, null, null, 3
+                eq(ITEM_ID), eq(type), any(LocalDateTime.class), isNull(), isNull(), eq(3)
         )).thenReturn(List.of(first, second, lookahead));
         when(cursorCodec.encode(context, createdAt.toString(), 2L)).thenReturn("next-cursor");
 
         CursorPageResponse<StockMovementHistoryResponse> result =
-                stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, type, "", 2);
+                stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, type, "", 2, false);
 
         assertEquals(List.of(3L, 2L), result.content().stream()
                 .map(StockMovementHistoryResponse::id)
@@ -588,11 +661,11 @@ class StockMovementServiceImplTest {
 
         assertThrows(
                 InvalidCursorException.class,
-                () -> stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, null, "cursor", 2)
+                () -> stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, null, "cursor", 2, false)
         );
 
         verify(stockMovementKeysetRepository, never()).findNextPage(
-                anyLong(), any(), any(), any(), anyInt()
+                anyLong(), any(), any(), any(), any(), anyInt()
         );
     }
 
@@ -611,11 +684,11 @@ class StockMovementServiceImplTest {
 
         assertThrows(
                 InvalidCursorException.class,
-                () -> stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, null, "cursor", 2)
+                () -> stockMovementService.getItemMovementHistoryByCursor(ITEM_ID, null, "cursor", 2, false)
         );
 
         verify(stockMovementKeysetRepository, never()).findNextPage(
-                anyLong(), any(), any(), any(), anyInt()
+                anyLong(), any(), any(), any(), any(), anyInt()
         );
     }
 

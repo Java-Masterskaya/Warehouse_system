@@ -1,11 +1,13 @@
 package com.warehouse.migration;
 
+import com.warehouse.postgres.PostgresTestImage;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -29,9 +31,24 @@ class WarehouseMigrationIntegrationTest {
     private static final int LEGACY_QUANTITY = 37;
     private static final long LEGACY_VERSION = 4L;
 
+    private static final DockerImageName POSTGRES_IMAGE =
+            DockerImageName.parse("warehouse_system-postgres:latest")
+                    .asCompatibleSubstituteFor("postgres");
+
+    @SuppressWarnings("resource")
     @Container
     private static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine");
+            new PostgreSQLContainer<>(PostgresTestImage.IMAGE)
+                    .withDatabaseName("warehouse")
+                    .withUsername("postgres")
+                    .withPassword("postgres")
+                    .withReuse(true)
+                    .withInitScript("init.sql")
+                    .withCommand(
+                            "postgres",
+                            "-c", "shared_preload_libraries=pg_partman_bgw,pg_cron",
+                            "-c", "cron.database_name=warehouse"
+                    );
 
     @Test
     void migrationPreservesLegacyStockMovementAndReservation() throws Exception {
@@ -89,12 +106,13 @@ class WarehouseMigrationIntegrationTest {
         Flyway flyway = Flyway.configure()
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                 .locations("classpath:db/migration")
+                .mixed(true)
                 .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
                 .load();
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("30");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("42");
     }
 
     private void assertKeysetPaginationIndexes() throws SQLException {

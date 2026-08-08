@@ -18,6 +18,7 @@ spring:
 
   flyway:
     enabled: true
+    mixed: true
     postgresql:
       transactional-lock: false
 

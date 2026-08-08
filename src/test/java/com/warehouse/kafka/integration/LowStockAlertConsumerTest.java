@@ -6,16 +6,16 @@ import com.warehouse.dto.event.LowStockAlertEvent;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
 import com.warehouse.entity.StockAlert;
-import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.BatchRepository;
+import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.OutboxEventRepository;
 import com.warehouse.repository.PurchaseOrderItemRepository;
 import com.warehouse.repository.PurchaseOrderRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.repository.StockRepository;
+import com.warehouse.repository.StockReserveRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -81,9 +81,12 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     OutboxEventRepository outboxEventRepository;
 
     private Long testItemId;
+    private String uniqueTestId;
 
     @BeforeEach
     void setUp() {
+        uniqueTestId = String.valueOf(System.currentTimeMillis());
+
         // Порядок важен: сначала зависимости (FK), потом родительские таблицы
         outboxEventRepository.deleteAll();
         stockAlertRepository.deleteAll();
@@ -95,6 +98,13 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
         stockRepository.deleteAll();
         itemRepository.deleteAll();
         categoryRepository.deleteAll();
+
+        await().pollDelay(Duration.ofMillis(500))
+                .pollInterval(Duration.ofMillis(100))
+                .atMost(Duration.ofSeconds(2))
+                .until(() -> true);
+
+        await().pollDelay(Duration.ofMillis(300)).until(() -> true);
 
         Category category = categoryRepository.save(
                 Category.builder()
@@ -114,6 +124,11 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
                 .build();
         item = itemRepository.save(item);
         testItemId = item.getId();
+
+        await().pollDelay(Duration.ofMillis(500))
+                .pollInterval(Duration.ofMillis(100))
+                .atMost(Duration.ofSeconds(3))
+                .until(() -> true);
     }
 
     /**
@@ -142,7 +157,7 @@ class LowStockAlertConsumerTest extends AbstractIntegrationTest {
     /**
      * Проверяет, что повторная доставка одного и того же сообщения из Kafka
      * не создает дубликат и не вызывает исключений.
-     *
+     * <p>
      * Это критичный сценарий: при сбое consumer'а после commit offset'а,
      * Kafka может доставить сообщение повторно. Уникальный индекс и INSERT IGNORE
      * должны пропустить дубликат без DataIntegrityViolationException.

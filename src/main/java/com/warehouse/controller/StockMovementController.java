@@ -131,11 +131,14 @@ public class StockMovementController {
      * Показывает историю движения указанного товара.
      * Поддерживает фильтрацию по типу движения и пагинацию результатов.
      *
-     * @param itemId идентификатор товара
-     * @param type   необязательный фильтр по типу движения
-     * @param page   номер страницы (начиная с 0)
-     * @param size   количество записей на странице
-     * @param cursor opaque keyset cursor, or an empty value for the first cursor page
+     * @param itemId      идентификатор товара
+     * @param type        необязательный фильтр по типу движения
+     * @param page        номер страницы (начиная с 0)
+     * @param size        количество записей на странице
+     * @param cursor      opaque keyset cursor, or an empty value for the first cursor page
+     * @param fullHistory если {@code true}, возвращает историю без ограничения по времени;
+     *                    по умолчанию используется окно последних 90 дней — полная история
+     *                    сканирует все партиции и должна запрашиваться осознанно
      * @return история движений товара в виде страницы результатов
      */
     @GetMapping("/{itemId}/history")
@@ -162,13 +165,15 @@ public class StockMovementController {
                     description = "Opaque keyset cursor. Supply an empty value to start cursor pagination.",
                     allowEmptyValue = true
             )
-            @RequestParam(required = false) String cursor) {
+            @RequestParam(required = false) String cursor,
+            @Parameter(description = "Return full history ignoring the default time window.")
+            @RequestParam(defaultValue = "false") boolean fullHistory) {
         if (cursor != null) {
             if (page != null) {
                 throw new InvalidCursorException();
             }
             return StockMovementHistoryPaginationResponse.from(
-                    stockMovementService.getItemMovementHistoryByCursor(itemId, type, cursor, size)
+                    stockMovementService.getItemMovementHistoryByCursor(itemId, type, cursor, size, fullHistory)
             );
         }
 
@@ -177,7 +182,7 @@ public class StockMovementController {
             requestedPage = page;
         }
         return StockMovementHistoryPaginationResponse.from(
-                stockMovementService.getItemMovementHistory(itemId, type, requestedPage, size)
+                stockMovementService.getItemMovementHistory(itemId, type, requestedPage, size, fullHistory)
         );
     }
 }
