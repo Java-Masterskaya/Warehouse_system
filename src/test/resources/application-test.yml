@@ -12,6 +12,11 @@ spring:
       hibernate:
         format_sql: true
         use_sql_comments: true
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 3MB
+      max-request-size: 3MB
   kafka:
     consumer:
       group-id: warehouse-alerts-test
@@ -50,3 +55,6 @@ app:
     required: true
     cleanup-cron: "0 0/1 * * * *"
     enforce-after: 2020-01-01  # Дата в прошлом
+  outbox:
+    scheduler:
+      enabled: false

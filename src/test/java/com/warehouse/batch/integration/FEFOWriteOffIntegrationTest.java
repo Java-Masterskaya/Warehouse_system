@@ -13,6 +13,8 @@ import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
+import com.warehouse.repository.PurchaseOrderItemRepository;
+import com.warehouse.repository.PurchaseOrderRepository;
 import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
@@ -54,29 +56,37 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
     private CategoryRepository categoryRepository;
 
     @Autowired
+    private StockMovementService stockMovementService;
+
+    @Autowired
     private StockAlertRepository stockAlertRepository;
 
     @Autowired
-    private StockMovementService stockMovementService;
+    private PurchaseOrderRepository purchaseOrderRepository;
+
+    @Autowired
+    private PurchaseOrderItemRepository purchaseOrderItemRepository;
 
     private Long itemId;
     private Long warehouseId;
 
     @BeforeEach
     void setUp() {
-        // Очищаем таблицы. stockAlertRepository чистим первой — на неё ссылается FK от items.
-        stockAlertRepository.deleteAllInBatch();
+        // Очищаем таблицы
+        purchaseOrderItemRepository.deleteAll();
+        purchaseOrderRepository.deleteAll();
+        stockAlertRepository.deleteAll();
         stockMovementRepository.deleteAllInBatch();
         batchRepository.deleteAll();
         stockRepository.deleteAllInBatch();
         itemRepository.deleteAllInBatch();
 
         Category category = categoryRepository.findByNameIgnoreCase("Тестовая категория FEFO")
-                .orElseGet(() -> categoryRepository.save(
-                        Category.builder()
-                                .name("Тестовая категория FEFO")
-                                .build()
-                ));
+                                              .orElseGet(() -> categoryRepository.save(
+                                                      Category.builder()
+                                                              .name("Тестовая категория FEFO")
+                                                              .build()
+                                              ));
 
         // Создаем товар
         Item item = new Item();
@@ -97,7 +107,7 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
         stock.setQuantity(0);
         stockRepository.save(stock);
 
-        itemId = item.getId();
+        itemId      = item.getId();
         warehouseId = stock.getWarehouse().getId();
     }
 

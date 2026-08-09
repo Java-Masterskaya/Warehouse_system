@@ -17,6 +17,8 @@ import com.warehouse.exception.IdempotencyConflictException;
 import com.warehouse.exception.IdempotencyKeyDuplicateException;
 import com.warehouse.exception.IdempotencyKeyRequiredException;
 import com.warehouse.exception.IdempotencyStorageException;
+import com.warehouse.exception.IllegalFileImportException;
+import com.warehouse.exception.ImportHeadersException;
 import com.warehouse.exception.InsufficientStockException;
 import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.exception.InvalidMovementRequestException;
@@ -29,9 +31,10 @@ import com.warehouse.exception.ReservationException;
 import com.warehouse.exception.ReservedBarcodeFormatException;
 import com.warehouse.exception.SelfDeactivationException;
 import com.warehouse.exception.StockMovementInvariantException;
-import com.warehouse.exception.TooManyAttemptLoginException;
 import com.warehouse.exception.StocktakeConflictException;
 import com.warehouse.exception.TokenReuseException;
+import com.warehouse.exception.TooManyAttemptLoginException;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -47,7 +50,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import jakarta.validation.ConstraintViolationException;
 
 import java.util.List;
 
@@ -77,7 +79,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PurchaseOrderOverReceiptException.class)
     @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
     public ErrorResponse handlePurchaseOrderOverReceipt(
-            PurchaseOrderOverReceiptException ex) {
+            PurchaseOrderOverReceiptException ex
+    ) {
         return new ErrorResponse("PURCHASE_ORDER_OVER_RECEIPT", ex.getMessage());
     }
 
@@ -139,7 +142,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidPurchaseOrderStatusException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleInvalidPurchaseOrderStatus(
-            InvalidPurchaseOrderStatusException ex) {
+            InvalidPurchaseOrderStatusException ex
+    ) {
         return new ErrorResponse("INVALID_PURCHASE_ORDER_STATUS", ex.getMessage());
     }
 
@@ -178,8 +182,9 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ValidationErrorResponse handleValidation(MethodArgumentNotValidException ex) {
         List<FieldError> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-                .map(fieldError -> new FieldError(fieldError.getField(), fieldError.getDefaultMessage()))
-                .toList();
+                                         .map(fieldError -> new FieldError(fieldError.getField(),
+                                                 fieldError.getDefaultMessage()))
+                                         .toList();
 
         return new ValidationErrorResponse("VALIDATION_ERROR", fieldErrors);
     }
@@ -289,8 +294,8 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
     public ResponseEntity<ErrorResponse> handleTooManyAttemptLogin(TooManyAttemptLoginException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getWaitTime()))
-                .body(new ErrorResponse("SECURITY_LOCKOUT_ERROR", ex.getMessage()));
+                             .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getWaitTime()))
+                             .body(new ErrorResponse("SECURITY_LOCKOUT_ERROR", ex.getMessage()));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -344,11 +349,25 @@ public class GlobalExceptionHandler {
                 "Concurrent request with same idempotency key detected. Please retry.");
     }
 
+    @ExceptionHandler(ImportHeadersException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleImportException(ImportHeadersException ex) {
+        return new ErrorResponse("NOT_FOUND_IMPORTANT_HEADER_IN_FILE",
+                "Some of important headers was not found. Please check headers and retry.\n" + ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalFileImportException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIllegalFileImportException(IllegalFileImportException ex) {
+        return new ErrorResponse("ILLEGAL_FILE_IMPORT",
+                "Empty or not .csv file can not be imported.\n" + ex.getMessage());
+    }
+
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null) {
             return auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                       .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         }
         return false;
     }
