@@ -8,17 +8,11 @@ import com.warehouse.entity.Role;
 import com.warehouse.entity.StockMovement;
 import com.warehouse.entity.User;
 import com.warehouse.entity.Warehouse;
-import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.PurchaseOrderItemRepository;
-import com.warehouse.repository.PurchaseOrderRepository;
-import com.warehouse.repository.StockAlertRepository;
 import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.repository.WarehouseRepository;
-import com.warehouse.service.import_export.CsvExportService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @AutoConfigureMockMvc
 @SpringBootTest
-public class StockMovementControllerExportTest extends AbstractIntegrationTest {
+class StockMovementControllerExportTest extends AbstractIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
@@ -63,35 +57,10 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private StockRepository stockRepository;
-
-    @Autowired
-    private CsvExportService csvExportService;
-
-    @Autowired
-    private StockAlertRepository stockAlertRepository;
-
-    @Autowired
-    private PurchaseOrderRepository purchaseOrderRepository;
-
-    @Autowired
-    private PurchaseOrderItemRepository purchaseOrderItemRepository;
-
-    @Autowired
-    private BatchRepository batchRepository;
-
     @BeforeEach
     @AfterEach
     void clearDatabase() {
-        purchaseOrderItemRepository.deleteAll();
-        purchaseOrderRepository.deleteAll();
-        stockAlertRepository.deleteAll();
-        movementRepository.deleteAll();
-        batchRepository.deleteAll();
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
-        categoryRepository.deleteAll();
+        cleanDomainData();
     }
 
     @Test
@@ -141,14 +110,10 @@ public class StockMovementControllerExportTest extends AbstractIntegrationTest {
             throws Exception {
         fillDb(10000, LocalDateTime.now());
 
-        System.out.println("DB count: " + movementRepository.count());
-        System.out.println("1: " + movementRepository.findById(1L));
-        System.out.println("99: " + movementRepository.findById(99L));
         MvcResult mvcResult = mockMvc.perform(get("/api/movements/export"))
                                      .andExpect(status().isOk())
                                      .andExpect(request().asyncStarted())
                                      .andReturn();
-        System.out.println("Async started: " + mvcResult.getRequest().isAsyncStarted());
 
         long startTime = System.currentTimeMillis();
         while (mvcResult.getRequest().getAsyncContext() != null && mvcResult.getRequest()
