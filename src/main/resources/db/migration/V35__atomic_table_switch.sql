@@ -5,7 +5,6 @@ $$
     DECLARE
         success              BOOLEAN := FALSE;
         current_lock_timeout TEXT;
-        trig_record          RECORD;
         fk_record            RECORD;
         archive_suffix       TEXT    := TO_CHAR(NOW(), 'YYYYMMDD_HH24MISS');
     BEGIN

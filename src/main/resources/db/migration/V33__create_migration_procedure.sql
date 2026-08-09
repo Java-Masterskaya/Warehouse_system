@@ -91,7 +91,6 @@ BEGIN
                 SELECT 1
                 FROM stock_movements
                 WHERE id > v_last_id
-                LIMIT 1
             )
             INTO v_has_more_rows;
         END LOOP;

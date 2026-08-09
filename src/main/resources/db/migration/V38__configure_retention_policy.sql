@@ -31,14 +31,16 @@ BEGIN
             );
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'Error during maintenance: %', sqlerrm;
+        RAISE WARNING 'Error during maintenance: %', sqlerrm;
 END;
 $$ LANGUAGE plpgsql;
 
 DO
 $$
 BEGIN
-    PERFORM cron.unschedule('maintain-stock-movements');
+    PERFORM cron.unschedule(jobid)
+    FROM cron.job
+    WHERE jobname = 'maintain-stock-movements';
 
     PERFORM cron.schedule(
         'maintain-stock-movements',
@@ -47,8 +49,5 @@ BEGIN
     );
 
     RAISE NOTICE 'pg_cron scheduled: maintain-stock-movements running daily at 2 AM';
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE NOTICE 'Failed to schedule pg_cron job: %', sqlerrm;
 END;
 $$;
