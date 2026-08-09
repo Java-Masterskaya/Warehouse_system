@@ -141,15 +141,6 @@ public class CsvItemParserService {
             }
         }
 
-        private void closeResources() {
-            try {
-                csvParser.close();
-                reader.close();
-                bomInputStream.close();
-            } catch (Exception ignored) {
-            }
-        }
-
         @Override
         public void close() {
             if (isClosed) {
