@@ -1,4 +1,4 @@
--- V31: Create partitioned table with pg_partman and DEFAULT partition
+-- V32: Create partitioned table with pg_partman and DEFAULT partition
 
 CREATE EXTENSION IF NOT EXISTS pg_partman;
 

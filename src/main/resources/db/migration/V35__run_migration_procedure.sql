@@ -1,4 +1,4 @@
--- V34: Выполнение пакетной миграции stock_movements
+-- V35: Выполнение пакетной миграции stock_movements
 
 CALL migrate_stock_movements_batch_controlled(10000, 50);
 

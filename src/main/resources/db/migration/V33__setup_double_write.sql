@@ -1,4 +1,4 @@
--- V32: Setup double-write with conflict handling
+-- V33: Setup double-write with conflict handling
 
 CREATE OR REPLACE FUNCTION sync_insert_to_new()
     RETURNS TRIGGER AS

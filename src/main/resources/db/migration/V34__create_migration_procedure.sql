@@ -1,4 +1,4 @@
--- V33: Создание процедуры для пакетной миграции
+-- V34: Создание процедуры для пакетной миграции
 CREATE OR REPLACE PROCEDURE migrate_stock_movements_batch_controlled(
     p_batch_size INT DEFAULT 10000,
     p_sleep_ms INT DEFAULT 50
