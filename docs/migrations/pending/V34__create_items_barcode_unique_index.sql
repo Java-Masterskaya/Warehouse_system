@@ -1,4 +1,4 @@
--- ВНИМАНИЕ: НЕ В db/migration/ - копировать вместе с V32, V34.
+-- ВНИМАНИЕ: НЕ В db/migration/ - копировать вместе с V33, V35.
 -- Требует spring.flyway.postgresql.transactional-lock: false (application.yml),
 -- иначе Flyway зависнет на старте (advisory lock держит открытую транзакцию).
 
