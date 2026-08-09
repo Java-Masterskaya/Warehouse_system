@@ -1,4 +1,8 @@
 -- V39: Setup pg_partman retention and maintenance, and pg_cron scheduling
+--
+-- DEPENDS ON: pg_cron extension must be installed before running this migration.
+-- The extension is typically installed in infrastructure init scripts.
+-- Without pg_cron, this migration will fail (fail-fast behavior).
 
 DO
 $$
