@@ -33,7 +33,7 @@ public class CsvItemParserService {
         return () -> new CsvChunkIterator(inputStream, validator);
     }
 
-    private class CsvChunkIterator implements Iterator<CsvChunk> {
+    private class CsvChunkIterator implements Iterator<CsvChunk>, AutoCloseable {
         private final BOMInputStream      bomInputStream;
         private final InputStreamReader   reader;
         private final CSVParser           csvParser;
@@ -42,6 +42,7 @@ public class CsvItemParserService {
 
         private final Set<String> seenSkusInFile = new HashSet<>();
         private       boolean     hasMore        = true;
+        private       boolean     isClosed       = false;
 
         CsvChunkIterator(InputStream inputStream, Validator validator) {
             this.validator = validator;
@@ -63,8 +64,10 @@ public class CsvItemParserService {
                 validateHeaders(csvParser.getHeaderNames());
                 this.recordIterator = csvParser.iterator();
             } catch (ImportHeadersException e) {
+                close();
                 throw e;
             } catch (Exception e) {
+                close();
                 throw new IllegalArgumentException("Ошибка инициализации чтения CSV файла", e);
             }
         }
@@ -72,7 +75,7 @@ public class CsvItemParserService {
         @Override
         public boolean hasNext() {
             if (!hasMore) {
-                closeResources();
+                close();
             }
             return hasMore;
         }
@@ -82,17 +85,21 @@ public class CsvItemParserService {
             List<ValidRowHolder> validRows = new ArrayList<>();
             List<ItemImportErrorDto> chunkErrors = new ArrayList<>();
             int currentChunkRows = 0;
+            try {
+                while (recordIterator.hasNext() && currentChunkRows < CHUNK_SIZE) {
+                    CSVRecord record = recordIterator.next();
+                    int fileRowNumber = (int) record.getRecordNumber() + 1;
+                    currentChunkRows++;
 
-            while (recordIterator.hasNext() && currentChunkRows < CHUNK_SIZE) {
-                CSVRecord record = recordIterator.next();
-                int fileRowNumber = (int) record.getRecordNumber() + 1;
-                currentChunkRows++;
+                    processRecord(record, fileRowNumber, validRows, chunkErrors);
+                }
 
-                processRecord(record, fileRowNumber, validRows, chunkErrors);
-            }
-
-            if (!recordIterator.hasNext()) {
-                hasMore = false;
+                if (!recordIterator.hasNext()) {
+                    hasMore = false;
+                }
+            } catch (Exception e) {
+                close();
+                throw e;
             }
 
             return new CsvChunk(validRows, chunkErrors, currentChunkRows);
@@ -134,11 +141,22 @@ public class CsvItemParserService {
             }
         }
 
-        private void closeResources() {
+        @Override
+        public void close() {
+            if (isClosed) {
+                return;
+            }
+            isClosed = true;
             try {
-                csvParser.close();
-                reader.close();
-                bomInputStream.close();
+                if (csvParser != null) {
+                    csvParser.close();
+                }
+                if (reader != null) {
+                    reader.close();
+                }
+                if (bomInputStream != null) {
+                    bomInputStream.close();
+                }
             } catch (Exception ignored) {
             }
         }

@@ -25,11 +25,13 @@ public record ItemImportResultDto(int totalRows, int imported, int failed, List<
      */
     public static ItemImportResultDto of(int totalRows, int imported, ImportErrorAccumulator accumulator) {
         List<ItemImportErrorDto> safeErrors;
+        int total = 0;
         if (accumulator != null) {
             safeErrors = accumulator.getDetails();
+            total = accumulator.getTotalErrors();
         } else {
             safeErrors = List.of();
         }
-        return new ItemImportResultDto(totalRows, imported, accumulator.getTotalErrors(), safeErrors);
+        return new ItemImportResultDto(totalRows, imported, total, safeErrors);
     }
 }
