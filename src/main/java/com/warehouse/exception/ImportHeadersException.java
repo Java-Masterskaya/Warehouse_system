@@ -6,6 +6,6 @@ public class ImportHeadersException extends RuntimeException {
     }
 
     public static ImportHeadersException ofHeaders() {
-        return new ImportHeadersException("Invalid headers. Expected:  Sku, Name, Category, Price, Cost.");
+        return new ImportHeadersException("Invalid headers. Expected: Sku, Name, Category, Price, Cost.");
     }
 }
