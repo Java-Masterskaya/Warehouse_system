@@ -76,17 +76,15 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     private Long itemId;
 
     /**
-     * Реальный id учётки из базы. Жёстко заданная единица ломалась, как только
-     * последовательность {@code users_id_seq} уходила вперёд: движение по складу
-     * падало на внешнем ключе {@code stock_movements_user_id_fkey}.
+     * Реальный id учётки из базы. Движение по складу ссылается на users через
+     * {@code stock_movements_user_id_fkey}, а {@code users_id_seq} между прогонами уходит
+     * вперёд, поэтому id нельзя задавать константой.
      */
     private Long adminUserId;
 
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
-        // Общая очистка вместо самописного списка: он не знал про purchase_order_items,
-        // и удаление items падало на внешнем ключе, стоило соседу оставить заказ поставщику.
         cleanDomainData();
 
         Category electronics = categoryRepository.save(
