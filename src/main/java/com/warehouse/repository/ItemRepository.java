@@ -1,23 +1,28 @@
 package com.warehouse.repository;
 
 import com.warehouse.dto.response.item.ItemDetailsProjection;
+import com.warehouse.dto.response.item.ItemExportDto;
 import com.warehouse.dto.response.valuation.CategoryValuation;
 import com.warehouse.entity.Item;
 import com.warehouse.repository.projection.LowStockProjection;
-import org.springframework.data.domain.Pageable;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
 
 @Repository
 public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificationExecutor<Item> {
@@ -63,20 +68,20 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
     Optional<ItemDetailsProjection> findWithStock(@Param("itemId") Long itemId);
 
     @Query("""
-        SELECT
-            i.id as id,
-            i.sku as sku,
-            i.name as name,
-            i.category.name as category,
-            COALESCE(SUM(s.quantity), 0) as currentStock,
-            i.minStock as minStock
-        FROM Item i
-        LEFT JOIN Stock s ON s.item.id = i.id
-        WHERE i.active = true
-        GROUP BY i.id, i.sku, i.name, i.category.name, i.minStock
-        HAVING COALESCE(SUM(s.quantity), 0) < i.minStock
-        ORDER BY (i.minStock - COALESCE(SUM(s.quantity), 0)) DESC
-        """)
+            SELECT
+                i.id as id,
+                i.sku as sku,
+                i.name as name,
+                i.category.name as category,
+                COALESCE(SUM(s.quantity), 0) as currentStock,
+                i.minStock as minStock
+            FROM Item i
+            LEFT JOIN Stock s ON s.item.id = i.id
+            WHERE i.active = true
+            GROUP BY i.id, i.sku, i.name, i.category.name, i.minStock
+            HAVING COALESCE(SUM(s.quantity), 0) < i.minStock
+            ORDER BY (i.minStock - COALESCE(SUM(s.quantity), 0)) DESC
+            """)
     List<LowStockProjection> findLowStockItems();
 
     /**
@@ -162,6 +167,25 @@ public interface ItemRepository extends JpaRepository<Item, Long>, JpaSpecificat
      *
      * @return следующее значение items_barcode_seq
      */
-    @Query(value = "SELECT nextval('items_barcode_seq')", nativeQuery = true)
+    @Query(value = "SELECT NEXTVAL('items_barcode_seq')", nativeQuery = true)
     Long nextBarcodeSequenceValue();
+
+    @QueryHints(value = @QueryHint(name = org.hibernate.annotations.QueryHints.FETCH_SIZE, value = "500"))
+    @Query("""
+                select new com.warehouse.dto.response.item.ItemExportDto(
+                    i.sku,
+                    i.name,
+                    i.category.name,
+                    coalesce(sum(s.quantity), 0L),
+                    i.price
+                )
+                from Item i
+                left join Stock s on s.item = i
+                where (:active is null or i.active = :active)
+                group by i.id, i.sku, i.name, i.category, i.price
+            """)
+    Stream<ItemExportDto> streamAllForExport(@Param("active") Boolean active);
+
+    @Query("select i.sku from Item i where i.sku in :skus")
+    List<String> findAllSkusIn(@Param("skus") Set<String> skus);
 }

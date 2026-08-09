@@ -1,18 +1,5 @@
 package com.warehouse.batch.integration;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.dto.UserContext;
 import com.warehouse.dto.request.movement.ReceiveStockRequest;
@@ -29,6 +16,18 @@ import com.warehouse.repository.ItemRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.repository.UserRepository;
 import com.warehouse.service.movement.StockMovementService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Интеграционный тест для проверки FEFO (First Expire First Out) списания.
@@ -60,9 +59,8 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
     private Long warehouseId;
 
     /**
-     * Контекст пользователя с реальным id из базы. Жёстко заданная единица совпадает с id
-     * админа только пока строку из миграции V5 никто не пересоздавал; после этого движение
-     * по складу падает на {@code stock_movements_user_id_fkey}.
+     * Контекст админа с реальным id из базы. Движение по складу ссылается на users через
+     * {@code stock_movements_user_id_fkey}, поэтому id нельзя задавать константой.
      */
     private UserContext adminContext;
 
@@ -98,7 +96,7 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
         stock.setQuantity(0);
         stockRepository.save(stock);
 
-        itemId = item.getId();
+        itemId      = item.getId();
         warehouseId = stock.getWarehouse().getId();
 
         adminContext = userRepository.findByUsername("admin")
@@ -110,7 +108,7 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
     /**
      * Проверяет, что FEFO списание гасит партии по возрастанию срока годности.
      * Создаем 3 партии с разными сроками годности и списываем меньшее количество,
-     * чтобы убедиться, что гасится самаяearliest партия.
+     * чтобы убедиться, что гасится самая ранняя партия.
      */
     @Test
     @DisplayName("Should write off batches in FEFO order (earliest expiry first)")
