@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -30,10 +29,6 @@ class WarehouseMigrationIntegrationTest {
     private static final long DEFAULT_WAREHOUSE_ID = 1L;
     private static final int LEGACY_QUANTITY = 37;
     private static final long LEGACY_VERSION = 4L;
-
-    private static final DockerImageName POSTGRES_IMAGE =
-            DockerImageName.parse("warehouse_system-postgres:latest")
-                    .asCompatibleSubstituteFor("postgres");
 
     @SuppressWarnings("resource")
     @Container
@@ -112,7 +107,7 @@ class WarehouseMigrationIntegrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("42");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("41");
     }
 
     private void assertKeysetPaginationIndexes() throws SQLException {

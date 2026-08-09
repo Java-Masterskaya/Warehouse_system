@@ -87,10 +87,13 @@ BEGIN
                 PERFORM PG_SLEEP(p_sleep_ms::FLOAT / 1000);
             END IF;
 
-            SELECT COUNT(*) > 0
-            INTO v_has_more_rows
-            FROM stock_movements
-            WHERE id > v_last_id;
+            SELECT EXISTS(
+                SELECT 1
+                FROM stock_movements
+                WHERE id > v_last_id
+                LIMIT 1
+            )
+            INTO v_has_more_rows;
         END LOOP;
 
     RAISE NOTICE '✅ Миграция успешно завершена. Всего перенесено строк: %, время: % сек',

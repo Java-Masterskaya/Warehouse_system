@@ -55,9 +55,6 @@ ALTER TABLE stock_movements_new
                         'TRANSFER_IN'
             ));
 
-ALTER TABLE stock_movements_new
-    ADD CONSTRAINT stock_movements_new_id_unique UNIQUE (id, created_at);
-
 SELECT public.create_parent(
                p_parent_table => 'public.stock_movements_new',
                p_control => 'created_at',

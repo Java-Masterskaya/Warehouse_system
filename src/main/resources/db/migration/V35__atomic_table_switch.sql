@@ -34,18 +34,6 @@ $$
                             RENAME TO stock_movements;
                     END IF;
 
-                    FOR trig_record IN
-                        SELECT tgname, PG_GET_TRIGGERDEF(oid) AS def
-                        FROM pg_trigger
-                        WHERE tgrelid = 'stock_movements_archive'::REGCLASS
-                          AND tgisinternal = FALSE
-                          AND tgname IN
-                              ('sync_insert_to_new_trigger', 'sync_update_to_new_trigger', 'sync_delete_to_new_trigger')
-                        LOOP
-                            EXECUTE FORMAT('DROP TRIGGER IF EXISTS %I ON stock_movements', trig_record.tgname);
-                            EXECUTE REPLACE(trig_record.def, 'stock_movements_archive', 'stock_movements');
-                        END LOOP;
-
                     FOR fk_record IN
                         SELECT conname,
                                conrelid::REGCLASS        AS table_name,

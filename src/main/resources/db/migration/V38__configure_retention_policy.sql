@@ -34,3 +34,21 @@ EXCEPTION
         RAISE NOTICE 'Error during maintenance: %', sqlerrm;
 END;
 $$ LANGUAGE plpgsql;
+
+DO
+$$
+BEGIN
+    PERFORM cron.unschedule('maintain-stock-movements');
+
+    PERFORM cron.schedule(
+        'maintain-stock-movements',
+        '0 2 * * *',
+        'SELECT maintain_stock_movements_partitions()'
+    );
+
+    RAISE NOTICE 'pg_cron scheduled: maintain-stock-movements running daily at 2 AM';
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Failed to schedule pg_cron job: %', sqlerrm;
+END;
+$$;
