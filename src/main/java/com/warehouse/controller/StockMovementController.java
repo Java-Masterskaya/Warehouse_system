@@ -12,6 +12,7 @@ import com.warehouse.entity.MovementType;
 import com.warehouse.exception.InvalidCursorException;
 import com.warehouse.security.UserPrincipal;
 import com.warehouse.service.idempotency.IdempotencyService;
+import com.warehouse.service.import_export.CsvExportService;
 import com.warehouse.service.movement.StockMovementService;
 import com.warehouse.web.ApiPaths;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,15 +21,20 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +45,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+
+import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping({ApiPaths.V1_API_ROOT + "/movements", ApiPaths.LEGACY_API_ROOT + "/movements"})
@@ -50,11 +61,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 public class StockMovementController {
 
-    private static final String RECEIVE_ENDPOINT = "/api/movements/receive";
+    private static final String RECEIVE_ENDPOINT   = "/api/movements/receive";
     private static final String WRITE_OFF_ENDPOINT = "/api/movements/write-off";
 
     StockMovementService stockMovementService;
-    IdempotencyService idempotencyService;
+    CsvExportService     csvExportService;
+    IdempotencyService   idempotencyService;
 
     @Operation(summary = "Зарегистрировать поступление")
     @PostMapping("/receive")
@@ -63,7 +75,8 @@ public class StockMovementController {
     public StockMovementResponse registerReceipt(
             @Valid @RequestBody ReceiveStockRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @AuthenticationPrincipal UserPrincipal currentUser) {
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
         log.debug("Received stock movement request: itemId={}, quantity={}, idempotencyKey={}",
                 request.itemId(), request.quantity(), idempotencyKey);
 
@@ -85,10 +98,12 @@ public class StockMovementController {
     @PostMapping("/write-off")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    public StockMovementResponse writeOffReceipt(@Valid @RequestBody WriteOffStockRequest request,
-                                                 @RequestHeader(value = "Idempotency-Key", required = false)
-                                                 String idempotencyKey,
-                                                 @AuthenticationPrincipal UserPrincipal currentUser) {
+    public StockMovementResponse writeOffReceipt(
+            @Valid @RequestBody WriteOffStockRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false)
+            String idempotencyKey,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
         log.debug("Received stock movement writeOff request: itemId={}, quantity={}, idempotencyKey={}",
                 request.itemId(), request.quantity(), idempotencyKey);
 
@@ -179,5 +194,30 @@ public class StockMovementController {
         return StockMovementHistoryPaginationResponse.from(
                 stockMovementService.getItemMovementHistory(itemId, type, requestedPage, size)
         );
+    }
+
+    @Operation(summary = "Экспорт журнала движения товаров")
+    @GetMapping("/export")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<StreamingResponseBody> exportMovements(Authentication authentication) {
+        SecurityContext context = SecurityContextHolder.getContext();
+        StreamingResponseBody responseBody = outputStream -> {
+            SecurityContextHolder.setContext(context);
+            try (OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
+                csvExportService.exportMovement(writer);
+            } catch (UncheckedIOException e) {
+                // Клиент отменил загрузку или обвалилась сеть — это нормальное поведение для стриминга
+                log.warn("Экспорт CSV был прерван клиентом: {}", e.getMessage());
+            } finally {
+                // 2. ОБЯЗАТЕЛЬНО очищаем контекст безопасности после завершения потока!
+                SecurityContextHolder.clearContext();
+            }
+        };
+
+        return ResponseEntity.ok()
+                             .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"movements.csv\"")
+                             .body(responseBody);
     }
 }

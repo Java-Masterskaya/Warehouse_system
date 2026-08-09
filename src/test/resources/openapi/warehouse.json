@@ -65,18 +65,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -87,16 +77,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -119,16 +99,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -141,6 +111,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -188,18 +188,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -210,16 +200,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -242,16 +222,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -264,6 +234,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -301,18 +301,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -323,16 +313,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -355,16 +335,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -377,6 +347,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -409,18 +409,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -431,16 +421,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -463,16 +443,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -485,6 +455,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -532,18 +532,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -554,16 +544,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -586,16 +566,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -608,6 +578,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -645,18 +645,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -667,16 +657,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -699,16 +679,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -721,6 +691,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -753,18 +753,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -775,16 +765,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -807,16 +787,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -829,6 +799,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -876,18 +876,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -898,16 +888,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -930,16 +910,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -952,6 +922,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -989,18 +989,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1011,16 +1001,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1043,16 +1023,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1065,6 +1035,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1088,18 +1088,8 @@
         "summary" : "Список складов",
         "operationId" : "getWarehouses",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1110,16 +1100,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1142,16 +1122,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1164,6 +1134,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1205,18 +1205,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1227,16 +1217,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1259,16 +1239,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1281,6 +1251,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1311,18 +1311,8 @@
         "summary" : "Список всех пользователей",
         "operationId" : "getAllUsers",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1333,16 +1323,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1365,16 +1345,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1387,6 +1357,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1428,18 +1428,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1450,16 +1440,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1482,16 +1462,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1504,6 +1474,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1534,18 +1534,8 @@
         "summary" : "Список поставщиков",
         "operationId" : "getSuppliers",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1556,16 +1546,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1588,16 +1568,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1610,6 +1580,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1651,18 +1651,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1673,16 +1663,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1705,16 +1685,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1727,6 +1697,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1776,18 +1776,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1798,16 +1788,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1830,16 +1810,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1852,6 +1822,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1901,18 +1901,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1923,16 +1913,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -1955,16 +1935,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -1977,6 +1947,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2026,18 +2026,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2048,16 +2038,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2080,16 +2060,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -2102,6 +2072,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2151,18 +2151,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2173,16 +2163,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2205,16 +2185,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -2227,6 +2197,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2266,18 +2266,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2288,16 +2278,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2320,16 +2300,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -2342,6 +2312,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2391,18 +2391,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2413,16 +2403,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2445,16 +2425,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -2467,6 +2437,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2505,18 +2505,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2527,16 +2517,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2559,16 +2539,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -2581,6 +2551,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2610,18 +2610,8 @@
         "tags" : [ "outbox-dlt-reprocess-controller" ],
         "operationId" : "reprocessAll",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2632,16 +2622,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2664,16 +2644,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -2686,6 +2656,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2731,18 +2731,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2753,16 +2743,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2785,16 +2765,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -2807,6 +2777,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2847,18 +2847,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2869,16 +2859,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2901,16 +2881,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -2923,6 +2893,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -2971,18 +2971,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3001,16 +2991,6 @@
               }
             }
           },
-          "409" : {
-            "description" : "Conflict",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "400" : {
             "description" : "Bad Request",
             "content" : {
@@ -3021,16 +3001,6 @@
                   }, {
                     "$ref" : "#/components/schemas/ErrorResponse"
                   } ]
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3055,12 +3025,164 @@
               }
             }
           },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "200" : {
             "description" : "OK",
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/StockMovementResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/items/import" : {
+      "post" : {
+        "tags" : [ "Товары" ],
+        "summary" : "Импорт товаров из csv",
+        "operationId" : "importItems",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "required" : [ "file" ],
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ItemImportResultDto"
                 }
               }
             }
@@ -3140,18 +3262,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3162,16 +3274,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3194,16 +3296,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -3216,6 +3308,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3254,18 +3376,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3276,16 +3388,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3308,16 +3410,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -3330,6 +3422,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3370,18 +3492,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3392,16 +3504,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3424,16 +3526,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -3446,6 +3538,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3486,18 +3608,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3508,16 +3620,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3540,16 +3642,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -3562,6 +3654,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3603,18 +3725,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3625,16 +3737,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3657,16 +3759,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -3679,6 +3771,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3717,18 +3839,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3739,16 +3851,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3771,16 +3873,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -3793,6 +3885,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3824,18 +3946,8 @@
           "required" : true
         },
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3846,16 +3958,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3878,16 +3980,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -3900,6 +3992,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3928,18 +4050,8 @@
         "description" : "Запускает асинхронную обработку всех сообщений из DLT и отправляет их обратно в основной топик",
         "operationId" : "reprocessDltMessages",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3950,16 +4062,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -3982,16 +4084,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4004,6 +4096,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4027,18 +4149,8 @@
         "summary" : "Остановить backfill штрихкодов",
         "operationId" : "stopBackfill",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4049,16 +4161,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4081,16 +4183,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4103,6 +4195,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4147,18 +4269,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4169,16 +4281,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4201,16 +4303,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4223,6 +4315,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4257,18 +4379,8 @@
         "description" : "Σ quantity × cost с разрезом по категориям. Доступно только ADMIN.",
         "operationId" : "getStockValuation",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4279,16 +4391,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4311,16 +4413,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4333,6 +4425,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4363,18 +4485,8 @@
         "summary" : "Товары ниже минимального остатка",
         "operationId" : "getLowStock",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4385,16 +4497,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4417,16 +4519,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4439,6 +4531,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4481,18 +4603,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4503,16 +4615,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4535,16 +4637,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4557,6 +4649,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4596,18 +4718,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4618,16 +4730,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4650,16 +4752,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4672,6 +4764,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4701,18 +4823,8 @@
         "tags" : [ "outbox-dlt-reprocess-controller" ],
         "operationId" : "countDltEvents",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4723,16 +4835,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4755,16 +4857,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4777,6 +4869,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4851,18 +4973,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4873,16 +4985,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4905,16 +5007,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -4927,6 +5019,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4951,24 +5073,14 @@
         } ]
       }
     },
-    "/api/v1/items/categories" : {
+    "/api/v1/movements/export" : {
       "get" : {
-        "tags" : [ "Товары" ],
-        "summary" : "Список категорий",
-        "operationId" : "getCategories",
+        "tags" : [ "Движения товара" ],
+        "summary" : "Экспорт журнала движения товаров",
+        "operationId" : "exportMovements",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -4979,16 +5091,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5011,12 +5113,117 @@
               }
             }
           },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "403" : {
             "description" : "Forbidden",
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StreamingResponseBody"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/items/export" : {
+      "get" : {
+        "tags" : [ "Товары" ],
+        "summary" : "Экспорт списка товаров",
+        "operationId" : "exportItems",
+        "parameters" : [ {
+          "name" : "active",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : true
+          }
+        } ],
+        "responses" : {
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
                 }
               }
             }
@@ -5033,6 +5240,142 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StreamingResponseBody"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ]
+      }
+    },
+    "/api/v1/items/categories" : {
+      "get" : {
+        "tags" : [ "Товары" ],
+        "summary" : "Список категорий",
+        "operationId" : "getCategories",
+        "responses" : {
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unprocessable Entity",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ValidationErrorResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ErrorResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5066,18 +5409,8 @@
         "summary" : "Статус backfill штрихкодов",
         "operationId" : "backfillStatus",
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5088,16 +5421,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5120,16 +5443,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -5142,6 +5455,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5185,18 +5528,8 @@
           }
         } ],
         "responses" : {
-          "401" : {
-            "description" : "Unauthorized",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404" : {
-            "description" : "Not Found",
+          "409" : {
+            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5207,16 +5540,6 @@
           },
           "422" : {
             "description" : "Unprocessable Entity",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409" : {
-            "description" : "Conflict",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5239,16 +5562,6 @@
               }
             }
           },
-          "403" : {
-            "description" : "Forbidden",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "429" : {
             "description" : "Too Many Requests",
             "content" : {
@@ -5261,6 +5574,36 @@
           },
           "500" : {
             "description" : "Internal Server Error",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
             "content" : {
               "*/*" : {
                 "schema" : {
@@ -5897,6 +6240,44 @@
           }
         }
       },
+      "ItemImportErrorDto" : {
+        "type" : "object",
+        "properties" : {
+          "rowNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sku" : {
+            "type" : "string"
+          },
+          "errorMessage" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ItemImportResultDto" : {
+        "type" : "object",
+        "properties" : {
+          "totalRows" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "imported" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "failed" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "errors" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ItemImportErrorDto"
+            }
+          }
+        }
+      },
       "CreateItemRequest" : {
         "required" : [ "cost", "price" ],
         "type" : "object",
@@ -6274,6 +6655,9 @@
             "nullable" : true
           }
         }
+      },
+      "StreamingResponseBody" : {
+        "type" : "object"
       },
       "ItemDetailsResponse" : {
         "required" : [ "available", "barcode", "category", "cost", "createdAt", "currentStock", "id", "isActive", "minStock", "name", "price", "reserved", "sku", "updatedAt", "warehouseStocks" ],

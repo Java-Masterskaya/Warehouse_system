@@ -94,7 +94,7 @@ class WarehouseMigrationIntegrationTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("30");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("31");
     }
 
     private void assertKeysetPaginationIndexes() throws SQLException {
