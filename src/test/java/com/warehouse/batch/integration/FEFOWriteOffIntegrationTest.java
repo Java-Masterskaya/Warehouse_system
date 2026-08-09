@@ -60,11 +60,9 @@ class FEFOWriteOffIntegrationTest extends AbstractIntegrationTest {
     private Long warehouseId;
 
     /**
-     * Контекст пользователя с реальным id из базы.
-     *
-     * <p>Раньше здесь стояла захардкоженная единица. Она совпадает с id админа
-     * из миграции V5 только до тех пор, пока эту строку никто не пересоздавал;
-     * после — движение по складу падает на {@code stock_movements_user_id_fkey}.
+     * Контекст пользователя с реальным id из базы. Жёстко заданная единица совпадает с id
+     * админа только пока строку из миграции V5 никто не пересоздавал; после этого движение
+     * по складу падает на {@code stock_movements_user_id_fkey}.
      */
     private UserContext adminContext;
 

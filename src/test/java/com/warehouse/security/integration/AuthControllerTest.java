@@ -396,9 +396,8 @@ class AuthControllerTest extends AbstractIntegrationTest {
         assertThat(retryTokens.refreshToken()).isEqualTo(firstTokens.refreshToken());
 
         // 3. Третий запрос — ещё один ретрай внутри того же окна, кеш должен сработать снова.
-        // Паузы здесь нет намеренно: утверждение «мы ещё внутри окна» тем вернее,
-        // чем меньше прошло времени. Прежние 300 мс при TTL в секунду были заявкой
-        // на падение под нагрузкой и ничего не проверяли.
+        // Паузы здесь нет намеренно: утверждение «мы ещё внутри окна» тем вернее, чем меньше
+        // прошло времени, а пауза при TTL в секунду только приближала бы тест к границе.
         RefreshRequest thirdRequest = new RefreshRequest(userRefreshToken);
         String thirdResponse = mockMvc.perform(post(V1_API_ROOT + "/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)

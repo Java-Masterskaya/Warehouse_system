@@ -68,11 +68,8 @@ class CacheInvalidationTest extends AbstractIntegrationTest {
     private BatchRepository batchRepository;
 
     /**
-     * Собственная учётка класса.
-     *
-     * <p>Раньше здесь переиспользовался общий {@code admin} из миграции V5, причём
-     * {@link #createActiveAdmin(String)} перезаписывал ему пароль на {@code password}.
-     * Соседние классы логинятся под {@code admin}/{@code secret} и после этого получали 401.
+     * Собственная учётка класса: {@link #createActiveAdmin(String)} перезаписывает пароль,
+     * а соседние классы логинятся под общим {@code admin} с другим паролем и получили бы 401.
      */
     private static final String ADMIN_USERNAME = "cacheinvalidation-admin";
 

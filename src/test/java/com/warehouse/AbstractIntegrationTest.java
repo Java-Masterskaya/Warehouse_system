@@ -69,24 +69,42 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected JdbcTemplate testJdbcTemplate;
 
-    static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine")
-                    .withReuse(true);
+    /**
+     * Контейнеры разнесены по отдельным холдерам: каждый поднимается только при обращении
+     * именно к нему, и тесту, которому нужна одна база, не приходится платить за Redpanda
+     * и Redis. Классам со Spring-контекстом это ничего не меняет — {@link #configure}
+     * трогает все три.
+     */
+    private static final class PostgresHolder {
+        static final PostgreSQLContainer<?> INSTANCE =
+                new PostgreSQLContainer<>("postgres:16-alpine")
+                        .withReuse(true);
 
-    static final RedpandaContainer redpanda =
-            new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"))
-                    .withReuse(true);
+        static {
+            INSTANCE.start();
+        }
+    }
 
-    @SuppressWarnings("resource")
-    static final GenericContainer<?> redis =
-            new GenericContainer<>("redis:7-alpine")
-                    .withExposedPorts(6379)
-                    .withReuse(true);
+    private static final class RedpandaHolder {
+        static final RedpandaContainer INSTANCE =
+                new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"))
+                        .withReuse(true);
 
-    static {
-        postgres.start();
-        redpanda.start();
-        redis.start();
+        static {
+            INSTANCE.start();
+        }
+    }
+
+    private static final class RedisHolder {
+        @SuppressWarnings("resource")
+        static final GenericContainer<?> INSTANCE =
+                new GenericContainer<>("redis:7-alpine")
+                        .withExposedPorts(6379)
+                        .withReuse(true);
+
+        static {
+            INSTANCE.start();
+        }
     }
 
     @Autowired
@@ -94,13 +112,13 @@ public abstract class AbstractIntegrationTest {
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.url", PostgresHolder.INSTANCE::getJdbcUrl);
+        registry.add("spring.datasource.username", PostgresHolder.INSTANCE::getUsername);
+        registry.add("spring.datasource.password", PostgresHolder.INSTANCE::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        registry.add("spring.kafka.bootstrap-servers", redpanda::getBootstrapServers);
-        registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
+        registry.add("spring.kafka.bootstrap-servers", RedpandaHolder.INSTANCE::getBootstrapServers);
+        registry.add("spring.data.redis.host", RedisHolder.INSTANCE::getHost);
+        registry.add("spring.data.redis.port", RedisHolder.INSTANCE::getFirstMappedPort);
         registry.add("spring.data.redis.password", () -> "");
 
         // Задаем тестовые лимиты: для тестов удобно использовать ультра-короткие окна (например, 1-2 секунды)
@@ -118,7 +136,7 @@ public abstract class AbstractIntegrationTest {
     }
 
     protected static RedpandaContainer getRedpanda() {
-        return redpanda;
+        return RedpandaHolder.INSTANCE;
     }
 
     /**
@@ -127,7 +145,7 @@ public abstract class AbstractIntegrationTest {
      * @return контейнер, поднятый один раз на весь прогон
      */
     public static PostgreSQLContainer<?> getPostgres() {
-        return postgres;
+        return PostgresHolder.INSTANCE;
     }
 
     /**
@@ -160,10 +178,9 @@ public abstract class AbstractIntegrationTest {
     /**
      * Удаляет учётки, созданные тестами, оставляя засеянные миграциями.
      *
-     * <p>Раньше {@code users} не чистил никто: таблица считалась общей, потому что в ней
-     * сидят учётки из миграций. В итоге строки с уникальными именами вида
-     * {@code atomic-test-<nanoTime>} копились между прогонами без ограничений —
-     * при переиспользовании контейнеров таблица росла бесконечно.
+     * <p>Без этого таблица растёт бесконечно: тесты дают учёткам уникальные имена вида
+     * {@code atomic-test-<nanoTime>}, а при переиспользовании контейнеров строки
+     * переживают прогон.
      *
      * <p>{@code idempotency_keys} удаляются здесь же: это третий внешний ключ на
      * {@code users} помимо {@code reserves} и {@code stock_movements}, которые сняты выше.
@@ -184,17 +201,16 @@ public abstract class AbstractIntegrationTest {
     /**
      * Сбрасывает состояние Redis перед каждым тестом — прежде всего корзины rate limiting.
      *
-     * <p>Раньше здесь удалялись ключи по шаблону {@code rl:*} через {@code StringRedisTemplate}.
-     * Корзины пишет bucket4j отдельным соединением с {@code ByteArrayCodec}, и выборка
-     * их не находила: лимит логина по IP (10 попыток на 2 секунды) копился через весь прогон.
-     * Пока тесты были медленными, это не проявлялось; после ускорения классы, где
-     * каждый тест логинится, стали упираться в лимит и получать 429 вместо 200.
+     * <p>Не удаляем ключи по шаблону {@code rl:*} через {@code StringRedisTemplate}: корзины
+     * пишет bucket4j отдельным соединением с {@code ByteArrayCodec}, и такая выборка их
+     * не находит. Лимит логина по IP тогда копится через весь прогон, и классы, где каждый
+     * тест логинится, получают 429 вместо 200.
      *
      * <p>{@code flushDb} чистит независимо от того, как и чем ключ сериализован.
      * {@code RateLimitIntegrationTest} давно делает ровно это и работает стабильно.
      */
     @BeforeEach
-    void clearRateLimitKeys() {
+    void flushRedisBeforeTest() {
         Objects.requireNonNull(redisTemplate.getConnectionFactory())
                 .getConnection()
                 .serverCommands()

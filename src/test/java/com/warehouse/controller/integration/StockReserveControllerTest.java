@@ -123,9 +123,8 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         User admin = userRepository.findByUsername("admin").orElseThrow();
 
-        // Пользователя именно сохраняем, а не собираем в памяти: прежний orElse(...) создавал
-        // объект с фиксированным id=1, и токен выписывался несуществующей учётке. Пока testuser
-        // всегда лежал в базе, ветка не срабатывала — теперь cleanDomainData() его удаляет.
+        // Пользователя сохраняем, а не собираем в памяти: cleanDomainData() удаляет testuser,
+        // и объект с выдуманным id дал бы токен несуществующей учётке.
         User user = userRepository.findByUsername("testuser")
                 .orElseGet(() -> userRepository.save(
                         User.builder()

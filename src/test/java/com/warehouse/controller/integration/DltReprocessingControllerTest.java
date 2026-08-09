@@ -81,6 +81,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     }
 
     private static final String MAIN_TOPIC = "low-stock-alerts";
+    /** Страховка от зависания, если брокер перестал отвечать: столько пустых опросов подряд. */
+    private static final int MAX_IDLE_POLLS = 25;
+
     private static final String DLT_TOPIC = "low-stock-alerts.DLT";
     private static final String REPROCESS_GROUP_ID = "dlt-reprocess-service";
     private static final String REPROCESS_LOCK_NAME = "kafka-dlt-low-stock-reprocess";
@@ -131,18 +134,14 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         log.info("Test setup...");
 
-        // Доменные таблицы чистим общим методом. Самописный список здесь не знал про
-        // purchase_order_items, и удаление items падало на внешнем ключе, стоило соседу
-        // (или предыдущему прогону при переиспользовании контейнеров) оставить заказ поставщику.
-        // Отдельно добавлены только таблицы, которых в общем методе нет.
-        jdbcTemplate.update("DELETE FROM idempotency_keys");
+        // Доменные таблицы и учётки чистит общий метод. Отдельно — только outbox,
+        // которого в нём нет.
         jdbcTemplate.update("DELETE FROM outbox");
         cleanDomainData();
-        // Пользователей не удаляем, а приводим к нужному состоянию на месте.
-        // Прежний DELETE + INSERT выдавал учёткам новые id. Логин после этого работал,
-        // поэтому правка выглядела безобидной, но соседние классы держат id админа
-        // в UserContext и падали на stock_movements_user_id_fkey.
-        // Полный DELETE FROM users удалял заодно и чужие учётки.
+
+        // admin и system-batch-cleanup чистку переживают как засеянные миграциями, и upsert
+        // обновляет их на месте: id админа должен оставаться прежним, соседние классы держат
+        // его в UserContext. testuser чистка удаляет, здесь он создаётся заново.
         upsertUser("admin", passwordEncoder.encode("secret"), Role.ROLE_ADMIN, true);
         upsertUser("testuser", passwordEncoder.encode("password"), Role.ROLE_USER, true);
         upsertUser(BatchCleanupActor.USERNAME, "!disabled-system-actor!", Role.ROLE_USER, false);
@@ -224,13 +223,12 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
      * Приводит DLT к чистому состоянию перед тестом.
      *
      * <p>Топик живёт весь прогон и накапливает сообщения — и чужие, и оставленные
-     * предыдущими методами этого же класса. Прежний вариант лишь перематывал offset
-     * группы на 0, поэтому каждый следующий тест переобрабатывал всё накопленное:
-     * счётчики алертов расходились («ожидали 5, получили 6»).
+     * предыдущими методами этого же класса. Просто перемотать offset группы на 0
+     * недостаточно: тест переобработает всё накопленное, и счётчики алертов разойдутся
+     * («ожидали 5, получили 6»).
      *
-     * <p>Пересоздавать топик, как делалось до ускорения QA-7, слишком дорого —
-     * удаление с ожиданием занимало секунды на каждый тест. {@code deleteRecords}
-     * обрезает топик сразу, а offset группы ставится на новый конец.
+     * <p>Пересоздавать топик тоже не годится — удаление с ожиданием стоит секунды на каждый
+     * тест. {@code deleteRecords} обрезает топик сразу, а offset группы ставится на новый конец.
      */
     private void purgeDlt() {
         try (AdminClient adminClient = createAdminClient()) {
@@ -309,15 +307,20 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                     .collect(Collectors.toList());
 
             consumer.assign(partitions);
+
+            // Читаем до конца топика, зафиксированного на момент вызова. Останавливаться
+            // «когда станет тихо» нельзя: брокер отвечает пусто и когда записи ещё идут,
+            // и проверки вида «в DLT осталось N» увидят меньше, чем есть.
+            Map<TopicPartition, Long> endOffsets = consumer.endOffsets(partitions);
             consumer.seekToBeginning(partitions);
 
-            int emptyPolls = 0;
-            while (emptyPolls < 2) {
+            int idlePolls = 0;
+            while (idlePolls < MAX_IDLE_POLLS && hasUnreadRecords(consumer, partitions, endOffsets)) {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(200));
                 if (records.isEmpty()) {
-                    emptyPolls++;
+                    idlePolls++;
                 } else {
-                    emptyPolls = 0;
+                    idlePolls = 0;
                     records.forEach(allRecords::add);
                 }
             }
@@ -335,6 +338,21 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         log.debug("DLT messages read: {}", allRecords.size());
         return allRecords;
+    }
+
+    /**
+     * Остались ли непрочитанные записи до зафиксированного конца топика.
+     *
+     * @param consumer    консьюмер с назначенными партициями
+     * @param partitions  партиции топика
+     * @param endOffsets  концы партиций на момент начала чтения
+     * @return {@code true}, если хотя бы в одной партиции позиция не дошла до конца
+     */
+    private boolean hasUnreadRecords(Consumer<String, String> consumer,
+                                     List<TopicPartition> partitions,
+                                     Map<TopicPartition, Long> endOffsets) {
+        return partitions.stream()
+                .anyMatch(partition -> consumer.position(partition) < endOffsets.getOrDefault(partition, 0L));
     }
 
     // ==================== Admin API Checks ====================
@@ -718,9 +736,8 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isAccepted());
         log.info("Reprocessing triggered");
 
-        // Ждём фактического завершения репроцессинга, а не фиксированные пять секунд.
         // Свободный замок означает, что репроцессинг закончен: раньше проверять нечего,
-        // позже — просто трата времени. Условие то же, что в @AfterEach.
+        // позже — трата времени. Условие то же, что в @AfterEach.
         await().atMost(30, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(this::canAcquireAndReleaseReprocessLock);

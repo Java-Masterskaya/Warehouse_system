@@ -40,14 +40,9 @@ class UserControllerTest extends AbstractIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     /**
-     * Собственные учётки класса.
-     *
-     * <p>Раньше здесь брался общий {@code admin} из миграции V5, и тест
-     * {@link #adminCanDeactivateAnotherAdmin()} оставлял его деактивированным.
-     * Любой класс, вставший в очередь после этого, получал 401 на логине —
-     * при случайном порядке падало от полусотни тестов и больше.
-     *
-     * <p>Имена уникальны для этого класса, поэтому деактивация никого не задевает.
+     * Собственные учётки класса: {@link #adminCanDeactivateAnotherAdmin()} деактивирует
+     * админа и не восстанавливает. С общим {@code admin} из миграции V5 без доступа
+     * остались бы все классы, которые пойдут следом.
      */
     private static final String ADMIN_USERNAME = "usercontroller-admin";
     private static final String SECOND_ADMIN_USERNAME = "usercontroller-admin2";
