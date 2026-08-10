@@ -94,14 +94,14 @@ SELECT setval('items_barcode_seq', COALESCE((SELECT MAX(id) FROM items), 1));
 
 ### Шаг 2 - backfill
 
-`V29`, `V30` и `V31` уже заняты активными миграциями аудита просроченных партий,
-keyset-индексов и уникального индекса по `items.sku`. Поэтому pending-миграции
-barcode используют номера `V32`-`V35`.
+Номера по `V42` включительно уже заняты активными миграциями: аудит просроченных партий
+(`V29`), keyset-индексы (`V30`), уникальный индекс по `items.sku` (`V31`) и партиционирование
+`stock_movements` (`V32`-`V42`). Поэтому pending-миграции barcode используют номера `V43`-`V46`.
 
 Оба варианта ниже лежат в `docs/migrations/pending/`, а не в `db/migration/` —
 Flyway их не видит, пока кто-то не скопирует нужный файл осознанно (см. выше).
 
-**Для таблиц < 100K** - копируем `V32__backfill_items_barcode.sql` в
+**Для таблиц < 100K** - копируем `V43__backfill_items_barcode.sql` в
 `db/migration/` и деплоим вместе с текущим набором активных миграций:
 
 ```sql
@@ -110,7 +110,7 @@ SET barcode = 'ITEM-' || lpad(nextval('items_barcode_seq')::text, 10, '0')
 WHERE barcode IS NULL;
 ```
 
-**Для таблиц >= 100K** - `V32` не трогаем вообще. Запускаем
+**Для таблиц >= 100K** - `V43` не трогаем вообще. Запускаем
 `ItemBarcodeBackfillJob` через админ-эндпоинт. Эндпоинт асинхронный: сразу
 отвечает `202 Accepted` и не держит HTTP-соединение на время всего backfill.
 
@@ -126,9 +126,9 @@ curl "http://app/api/v1/admin/backfill/barcode/status" \
 Джоба идемпотентна — можно перезапустить. Повторный запуск, пока предыдущий
 ещё выполняется, вернёт `409 Conflict` (не сбрасывает прогресс первого).
 
-### Шаг 3 - миграции V33, V34, V35
+### Шаг 3 - миграции V44, V45, V46
 
-Перед деплоем проверяем не только NULL, но и дубли (иначе V35 упадет):
+Перед деплоем проверяем не только NULL, но и дубли (иначе V46 упадет):
 
 ```sql
 SELECT COUNT(*) FROM items WHERE barcode IS NULL;
@@ -139,13 +139,13 @@ SELECT barcode, COUNT(*) FROM items GROUP BY barcode HAVING COUNT(*) > 1;
 ```
 
 ```sql
--- V33
+-- V44
 ALTER TABLE items ALTER COLUMN barcode SET NOT NULL;
 
--- V34 (требует spring.flyway.postgresql.transactional-lock: false)
+-- V45 (требует spring.flyway.postgresql.transactional-lock: false)
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uk_items_barcode ON items (barcode);
 
--- V35
+-- V46
 ALTER TABLE items ADD CONSTRAINT uk_items_barcode UNIQUE USING INDEX uk_items_barcode;
 ```
 
@@ -165,12 +165,12 @@ ALTER TABLE items ADD CONSTRAINT uk_items_barcode UNIQUE USING INDEX uk_items_ba
 [Backfill] - - - - - - - +------+- - - - - - - -  (заполняем NULL)
                          \      /
                           \    /
-[V33-V35] - - - - - - - - + - - - - - - - - - -  (NOT NULL + UNIQUE)
+[V44-V46] - - - - - - - - + - - - - - - - - - -  (NOT NULL + UNIQUE)
 ```
 
-- В промежутке между V27/V28 и V33-V35 старый и новый код работают одновременно.
+- В промежутке между V27/V28 и V44-V46 старый и новый код работают одновременно.
 - V27/V28 безопасны, потому что не ломают старый INSERT.
-- V33-V35 деплоятся только когда все инстансы уже новые (это отдельный деплой).
+- V44-V46 деплоятся только когда все инстансы уже новые (это отдельный деплой).
 
 ---
 
