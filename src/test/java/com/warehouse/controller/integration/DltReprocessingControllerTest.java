@@ -23,8 +23,8 @@ import com.warehouse.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -43,12 +43,10 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -75,8 +73,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Tag("integration")
 @SpringBootTest(classes = WarehouseApp.class)
 @ActiveProfiles("test")
-@Testcontainers
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
     @DynamicPropertySource
@@ -85,6 +81,9 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     }
 
     private static final String MAIN_TOPIC = "low-stock-alerts";
+    /** Страховка от зависания, если брокер перестал отвечать: столько пустых опросов подряд. */
+    private static final int MAX_IDLE_POLLS = 25;
+
     private static final String DLT_TOPIC = "low-stock-alerts.DLT";
     private static final String REPROCESS_GROUP_ID = "dlt-reprocess-service";
     private static final String REPROCESS_LOCK_NAME = "kafka-dlt-low-stock-reprocess";
@@ -135,63 +134,20 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     void setUp() throws Exception {
         log.info("Test setup...");
 
-        clearDltTopicSimple();
-        cleanupDatabase();
-        resetSequences();
-        resetConsumerGroupOffsets();
-        createTestUsers();
-        createTestCategoryAndItem();
-        createTestStockAndBatch();
-        generateTokens();
-
-        log.info("Setup completed");
-    }
-
-    private void cleanupDatabase() {
-        // Удаляем в правильном порядке (сначала зависимые таблицы)
-        jdbcTemplate.update("DELETE FROM stock_alerts");
-        jdbcTemplate.update("DELETE FROM stock_movements");
-        jdbcTemplate.update("DELETE FROM idempotency_keys");
-        jdbcTemplate.update("DELETE FROM batches");
+        // Доменные таблицы и учётки чистит общий метод. Отдельно — только outbox,
+        // которого в нём нет.
         jdbcTemplate.update("DELETE FROM outbox");
-        jdbcTemplate.update("DELETE FROM reserves");
-        jdbcTemplate.update("DELETE FROM stock");
-        jdbcTemplate.update("DELETE FROM items");
-        jdbcTemplate.update("DELETE FROM categories");
-        jdbcTemplate.update("DELETE FROM users");
-    }
+        cleanDomainData();
 
-    private void resetSequences() {
-        jdbcTemplate.update("ALTER SEQUENCE stock_alerts_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE items_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE categories_id_seq RESTART WITH 1");
-        jdbcTemplate.update("ALTER SEQUENCE users_id_seq RESTART WITH 1");
-    }
+        // admin и system-batch-cleanup чистку переживают как засеянные миграциями, и upsert
+        // обновляет их на месте: id админа должен оставаться прежним, соседние классы держат
+        // его в UserContext. testuser чистка удаляет, здесь он создаётся заново.
+        upsertUser("admin", passwordEncoder.encode("secret"), Role.ROLE_ADMIN, true);
+        upsertUser("testuser", passwordEncoder.encode("password"), Role.ROLE_USER, true);
+        upsertUser(BatchCleanupActor.USERNAME, "!disabled-system-actor!", Role.ROLE_USER, false);
 
-    private void createTestUsers() {
-        User admin = new User();
-        admin.setUsername("admin");
-        admin.setPassword(passwordEncoder.encode("secret"));
-        admin.setRole(Role.ROLE_ADMIN);
-        admin.setActive(true);
-        userRepository.save(admin);
+        purgeDlt();
 
-        User user = new User();
-        user.setUsername("testuser");
-        user.setPassword(passwordEncoder.encode("password"));
-        user.setRole(Role.ROLE_USER);
-        user.setActive(true);
-        userRepository.save(user);
-
-        User batchCleanupActor = new User();
-        batchCleanupActor.setUsername(BatchCleanupActor.USERNAME);
-        batchCleanupActor.setPassword("!disabled-system-actor!");
-        batchCleanupActor.setRole(Role.ROLE_USER);
-        batchCleanupActor.setActive(false);
-        userRepository.save(batchCleanupActor);
-    }
-
-    private void createTestCategoryAndItem() {
         testCategory = categoryRepository.save(
                 Category.builder()
                         .name("Категория")
@@ -208,9 +164,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .build();
         testItem = itemRepository.save(testItem);
         testItemId = testItem.getId();
-    }
 
-    private void createTestStockAndBatch() {
         Stock stock = Stock.builder()
                 .item(testItem)
                 .warehouse(defaultWarehouse())
@@ -223,13 +177,31 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         batch.setItem(testItem);
         batch.setWarehouse(defaultWarehouse());
         batch.setQuantity(5);
-        batch.setExpiryDate(LocalDateTime.now().plusDays(365));
+        batch.setExpiryDate(LocalDateTime.now().plusDays(365)); // Далекий срок годности
         batchRepository.save(batch);
-    }
 
-    private void generateTokens() throws Exception {
         adminToken = obtainToken("admin", "secret");
         userToken = obtainToken("testuser", "password");
+
+        log.info("Setup completed");
+    }
+
+    /**
+     * Приводит учётку к нужному состоянию, сохраняя её id.
+     *
+     * @param username        логин учётки
+     * @param encodedPassword уже захэшированный пароль
+     * @param role            роль
+     * @param active          признак активности
+     * @return сохранённая учётка
+     */
+    private User upsertUser(String username, String encodedPassword, Role role, boolean active) {
+        User user = userRepository.findByUsername(username).orElseGet(User::new);
+        user.setUsername(username);
+        user.setPassword(encodedPassword);
+        user.setRole(role);
+        user.setActive(active);
+        return userRepository.save(user);
     }
 
     @AfterEach
@@ -248,74 +220,17 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
     }
 
     /**
-     * Удаляет и пересоздаёт DLT топик для гарантии чистого состояния.
+     * Приводит DLT к чистому состоянию перед тестом.
+     *
+     * <p>Топик живёт весь прогон и накапливает сообщения — и чужие, и оставленные
+     * предыдущими методами этого же класса. Просто перемотать offset группы на 0
+     * недостаточно: тест переобработает всё накопленное, и счётчики алертов разойдутся
+     * («ожидали 5, получили 6»).
+     *
+     * <p>Пересоздавать топик тоже не годится — удаление с ожиданием стоит секунды на каждый
+     * тест. {@code deleteRecords} обрезает топик сразу, а offset группы ставится на новый конец.
      */
-    private void deleteAndRecreateDltTopic() {
-        try (AdminClient adminClient = createAdminClient()) {
-            var existingTopics = adminClient.listTopics().names().get();
-
-            if (existingTopics.contains(DLT_TOPIC)) {
-                log.debug("Deleting existing DLT topic: {}", DLT_TOPIC);
-
-                // Сначала удаляем consumer group, чтобы сбросить оффсеты
-                try {
-                    adminClient.deleteConsumerGroups(Collections.singletonList(REPROCESS_GROUP_ID)).all().get();
-                    log.debug("Deleted consumer group: {}", REPROCESS_GROUP_ID);
-                } catch (Exception e) {
-                    log.debug("Could not delete consumer group (may not exist): {}", e.getMessage());
-                }
-
-                // Удаляем топик
-                adminClient.deleteTopics(Collections.singletonList(DLT_TOPIC)).all().get();
-
-                // Ждём, пока топик действительно удалится (увеличиваем таймаут)
-                await().atMost(30, TimeUnit.SECONDS)
-                        .pollInterval(500, TimeUnit.MILLISECONDS)
-                        .until(() -> {
-                            try {
-                                var topics = adminClient.listTopics().names().get();
-                                boolean deleted = !topics.contains(DLT_TOPIC);
-                                if (deleted) {
-                                    log.debug("DLT topic successfully deleted");
-                                }
-                                return deleted;
-                            } catch (Exception e) {
-                                log.debug("Error checking topic deletion: {}", e.getMessage());
-                                return false;
-                            }
-                        });
-                log.debug("DLT topic deleted");
-            }
-
-            // Создаём топик с 1 партицией
-            NewTopic newTopic = new NewTopic(DLT_TOPIC, 1, (short) 1);
-            adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
-            log.debug("Created DLT topic: {} with 1 partition", DLT_TOPIC);
-
-            // Ждём создания топика
-            await().atMost(10, TimeUnit.SECONDS)
-                    .pollInterval(200, TimeUnit.MILLISECONDS)
-                    .until(() -> {
-                        try {
-                            var topics = adminClient.listTopics().names().get();
-                            return topics.contains(DLT_TOPIC);
-                        } catch (Exception e) {
-                            return false;
-                        }
-                    });
-
-            // Дополнительная задержка для стабилизации
-            Thread.sleep(1000);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to recreate DLT topic", e);
-        }
-    }
-
-    /**
-     * Сбрасывает offset consumer group в начало для чистого старта.
-     */
-    private void resetConsumerGroupOffsets() {
+    private void purgeDlt() {
         try (AdminClient adminClient = createAdminClient()) {
             var existingTopics = adminClient.listTopics().names().get();
             if (!existingTopics.contains(DLT_TOPIC)) {
@@ -324,18 +239,26 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
             var topicDesc = adminClient.describeTopics(Collections.singletonList(DLT_TOPIC))
                     .allTopicNames().get();
-            int partitionCount = topicDesc.get(DLT_TOPIC).partitions().size();
 
+            Map<TopicPartition, OffsetSpec> endSpecs = new HashMap<>();
+            topicDesc.get(DLT_TOPIC).partitions().forEach(partition ->
+                    endSpecs.put(new TopicPartition(DLT_TOPIC, partition.partition()), OffsetSpec.latest()));
+
+            var endOffsets = adminClient.listOffsets(endSpecs).all().get();
+
+            Map<TopicPartition, RecordsToDelete> toDelete = new HashMap<>();
             Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndMetadata> offsets = new HashMap<>();
-            for (int i = 0; i < partitionCount; i++) {
-                offsets.put(new TopicPartition(DLT_TOPIC, i),
-                        new org.apache.kafka.clients.consumer.OffsetAndMetadata(0));
-            }
+            endOffsets.forEach((partition, info) -> {
+                toDelete.put(partition, RecordsToDelete.beforeOffset(info.offset()));
+                offsets.put(partition,
+                        new org.apache.kafka.clients.consumer.OffsetAndMetadata(info.offset()));
+            });
 
+            adminClient.deleteRecords(toDelete).all().get();
             adminClient.alterConsumerGroupOffsets(REPROCESS_GROUP_ID, offsets).all().get();
-            log.debug("Reset offsets for group {} to beginning", REPROCESS_GROUP_ID);
+            log.debug("Purged DLT, group {} moved to the end of the topic", REPROCESS_GROUP_ID);
         } catch (Exception e) {
-            log.trace("Could not reset offsets (group may not exist yet): {}", e.getMessage());
+            log.trace("Could not purge DLT (topic or group may not exist yet): {}", e.getMessage());
         }
     }
 
@@ -384,15 +307,20 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                     .collect(Collectors.toList());
 
             consumer.assign(partitions);
+
+            // Читаем до конца топика, зафиксированного на момент вызова. Останавливаться
+            // «когда станет тихо» нельзя: брокер отвечает пусто и когда записи ещё идут,
+            // и проверки вида «в DLT осталось N» увидят меньше, чем есть.
+            Map<TopicPartition, Long> endOffsets = consumer.endOffsets(partitions);
             consumer.seekToBeginning(partitions);
 
-            int emptyPolls = 0;
-            while (emptyPolls < 3) {
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+            int idlePolls = 0;
+            while (idlePolls < MAX_IDLE_POLLS && hasUnreadRecords(consumer, partitions, endOffsets)) {
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(200));
                 if (records.isEmpty()) {
-                    emptyPolls++;
+                    idlePolls++;
                 } else {
-                    emptyPolls = 0;
+                    idlePolls = 0;
                     records.forEach(allRecords::add);
                 }
             }
@@ -410,6 +338,21 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         log.debug("DLT messages read: {}", allRecords.size());
         return allRecords;
+    }
+
+    /**
+     * Остались ли непрочитанные записи до зафиксированного конца топика.
+     *
+     * @param consumer    консьюмер с назначенными партициями
+     * @param partitions  партиции топика
+     * @param endOffsets  концы партиций на момент начала чтения
+     * @return {@code true}, если хотя бы в одной партиции позиция не дошла до конца
+     */
+    private boolean hasUnreadRecords(Consumer<String, String> consumer,
+                                     List<TopicPartition> partitions,
+                                     Map<TopicPartition, Long> endOffsets) {
+        return partitions.stream()
+                .anyMatch(partition -> consumer.position(partition) < endOffsets.getOrDefault(partition, 0L));
     }
 
     // ==================== Admin API Checks ====================
@@ -538,7 +481,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("Sent event with invalid itemId={}", invalidItemId);
 
         await().atMost(45, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages()).isNotEmpty();
                 });
@@ -567,7 +510,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         log.info("DLT reprocessing started");
 
         await().atMost(15, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     assertThat(alerts).isNotEmpty();
@@ -587,7 +530,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем что DLT пуст (записи удалены после репроцессинга)
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages())
                             .as("DLT should be empty after reprocessing and deletion")
@@ -632,7 +575,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         // Phase 2: Wait for all messages in DLT
         AtomicInteger lastDltCount = new AtomicInteger(0);
         await().atMost(120, TimeUnit.SECONDS)
-                .pollInterval(3, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     int count = messages.size();
@@ -668,7 +611,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Wait for first 5 messages to be processed
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -681,7 +624,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Check: 5 messages remain in DLT (batch size = 5, processed first 5)
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     int remaining = readAllDltMessages().size();
                     assertThat(remaining)
@@ -702,7 +645,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Wait for remaining 5 messages
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -717,7 +660,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Phase 6: Verify DLT is empty after second reprocessing and deletion
         await().atMost(30, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     assertThat(messages)
@@ -760,7 +703,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем первый StockAlert
         await().atMost(15, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -780,7 +723,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем, что сообщение в DLT
         await().atMost(10, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<ConsumerRecord<String, String>> dltMessages = readAllDltMessages();
                     assertThat(dltMessages).isNotEmpty();
@@ -793,8 +736,11 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isAccepted());
         log.info("Reprocessing triggered");
 
-        // Ждем завершения репроцессинга (появление второго вызова не должно создать дубликат)
-        Thread.sleep(5000);
+        // Свободный замок означает, что репроцессинг закончен: раньше проверять нечего,
+        // позже — трата времени. Условие то же, что в @AfterEach.
+        await().atMost(30, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(this::canAcquireAndReleaseReprocessLock);
 
         // ФИНАЛЬНАЯ ПРОВЕРКА: должен быть ровно ОДИН StockAlert
         List<StockAlert> allAlerts = stockAlertRepository.findAll();
@@ -854,7 +800,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Проверяем DLT сообщения (должно быть ровно 5)
         await().atMost(10, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     int dltCount = readAllDltMessages().size();
                     log.info("DLT message count: {}", dltCount);
@@ -870,7 +816,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем все StockAlerts (должно быть ровно 4 - по одному на каждый уникальный item)
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -929,7 +875,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем сообщение в DLT
         await().atMost(45, TimeUnit.SECONDS)
-                .pollInterval(2, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     assertThat(readAllDltMessages()).isNotEmpty();
                 });
@@ -957,7 +903,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
 
         // Ждем завершения обработки и появления StockAlert
         await().atMost(20, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     List<StockAlert> alerts = stockAlertRepository.findAll();
                     long count = alerts.stream()
@@ -998,7 +944,7 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         }
 
         await().atMost(timeoutSeconds, TimeUnit.SECONDS)
-                .pollInterval(1, TimeUnit.SECONDS)
+                .pollInterval(200, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     var messages = readAllDltMessages();
                     if (expectedCount == 0) {
@@ -1022,47 +968,4 @@ class DltReprocessingControllerTest extends AbstractIntegrationTest {
         return acquired.isPresent();
     }
 
-    private void clearDltTopicSimple() {
-        try (AdminClient adminClient = createAdminClient()) {
-            var existingTopics = adminClient.listTopics().names().get();
-            if (!existingTopics.contains(DLT_TOPIC)) {
-                log.debug("DLT topic does not exist, skipping cleanup");
-                return;
-            }
-
-            var topicDesc = adminClient.describeTopics(Collections.singletonList(DLT_TOPIC))
-                    .allTopicNames().get();
-            int partitionCount = topicDesc.get(DLT_TOPIC).partitions().size();
-
-            List<TopicPartition> partitions = IntStream.range(0, partitionCount)
-                    .mapToObj(i -> new TopicPartition(DLT_TOPIC, i))
-                    .collect(Collectors.toList());
-
-            try {
-                adminClient.deleteConsumerGroups(Collections.singletonList(REPROCESS_GROUP_ID))
-                        .all().get(5, TimeUnit.SECONDS);
-                log.debug("Deleted consumer group: {}", REPROCESS_GROUP_ID);
-            } catch (Exception e) {
-                log.debug("Could not delete consumer group (may not exist): {}", e.getMessage());
-            }
-
-            Map<TopicPartition, org.apache.kafka.clients.consumer.OffsetAndMetadata> offsets = new HashMap<>();
-            for (TopicPartition tp : partitions) {
-                offsets.put(tp, new org.apache.kafka.clients.consumer.OffsetAndMetadata(0));
-            }
-
-            try {
-                adminClient.alterConsumerGroupOffsets(REPROCESS_GROUP_ID, offsets).all().get(5, TimeUnit.SECONDS);
-                log.debug("Reset DLT offsets to 0 for group {}", REPROCESS_GROUP_ID);
-            } catch (Exception e) {
-                log.debug("Could not reset offsets: {}", e.getMessage());
-            }
-
-            Thread.sleep(500);
-
-            log.debug("DLT topic cleaned successfully");
-        } catch (Exception e) {
-            log.warn("Failed to clear DLT topic: {}", e.getMessage());
-        }
-    }
 }

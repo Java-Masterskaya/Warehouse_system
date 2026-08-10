@@ -22,6 +22,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Verifies the real upgrade path from the single-warehouse schema at V18 to the multi-warehouse schema.
+ *
+ * <p>Единственный класс, которому свой Postgres действительно нужен: он применяет миграции
+ * по шагам начиная с V18 и проверяет, что данные переживают апгрейд. Общий контейнер
+ * уже обновлён до последней версии, воспроизвести на нём этот сценарий нельзя.
+ *
+ * <p>Поэтому контейнер здесь намеренно не переиспользуется. Testcontainers выбирает
+ * контейнер для переиспользования по хешу конфигурации, а она у этого класса совпадает
+ * с конфигурацией общего контейнера из {@link com.warehouse.AbstractIntegrationTest}
+ * до последнего символа. С {@code withReuse(true)} оба класса цепляются к одной и той же
+ * базе: этот тест откатывает на ней схему до V18, а {@code @Container} по завершении
+ * класса контейнер останавливает — и всё, что встало в очередь следом, падает с
+ * {@code ConnectException}. Ловится только случайным порядком классов.
+ *
+ * <p>{@code withLabel} — вторая страховка на случай, если переиспользование сюда вернут:
+ * метка входит в хеш, так что совпадения с общим контейнером всё равно не будет.
  */
 @Testcontainers
 class WarehouseMigrationIntegrationTest {
@@ -37,7 +52,8 @@ class WarehouseMigrationIntegrationTest {
                     .withDatabaseName("warehouse")
                     .withUsername("postgres")
                     .withPassword("postgres")
-                    .withReuse(true)
+                    .withReuse(false)
+                    .withLabel("warehouse.test.purpose", "migration-baseline")
                     .withInitScript("init.sql")
                     .withCommand(
                             "postgres",

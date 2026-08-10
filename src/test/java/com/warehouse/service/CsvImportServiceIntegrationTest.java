@@ -1,19 +1,11 @@
 package com.warehouse.service;
 
 import com.warehouse.AbstractIntegrationTest;
-import com.warehouse.dto.response.error.ItemImportErrorDto;
 import com.warehouse.dto.response.item.ItemImportResultDto;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
-import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.PurchaseOrderItemRepository;
-import com.warehouse.repository.PurchaseOrderRepository;
-import com.warehouse.repository.StockAlertRepository;
-import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockRepository;
-import com.warehouse.repository.StockReserveRepository;
 import com.warehouse.service.import_export.CsvImportService;
 import com.warehouse.service.import_export.CsvItemParserService;
 import org.junit.jupiter.api.AfterEach;
@@ -34,7 +26,7 @@ import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
+class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private CategoryRepository categoryRepository;
 
@@ -42,13 +34,7 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     private CsvImportService csvImportService;
 
     @Autowired
-    private ItemRepository          itemRepository;
-    @Autowired
-    private StockMovementRepository movementRepository;
-    @Autowired
-    private StockReserveRepository  reserveRepository;
-    @Autowired
-    private StockRepository         stockRepository;
+    private ItemRepository itemRepository;
 
     @Autowired
     private CsvItemParserService csvItemParserService;
@@ -56,30 +42,10 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private StockAlertRepository stockAlertRepository;
-
-    @Autowired
-    private PurchaseOrderRepository purchaseOrderRepository;
-
-    @Autowired
-    private PurchaseOrderItemRepository purchaseOrderItemRepository;
-
-    @Autowired
-    private BatchRepository batchRepository;
-
     @BeforeEach
     @AfterEach
     void clearDatabase() {
-        reserveRepository.deleteAll();
-        purchaseOrderItemRepository.deleteAll();
-        purchaseOrderRepository.deleteAll();
-        stockAlertRepository.deleteAll();
-        movementRepository.deleteAll();
-        batchRepository.deleteAll();
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
-        categoryRepository.deleteAll();
+        cleanDomainData();
     }
 
     @Test
@@ -92,11 +58,6 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
                 csvContent.getBytes());
 
         ItemImportResultDto result = csvImportService.importItems(file);
-        System.out.println(result.imported());
-        System.out.println(result.failed());
-        for (ItemImportErrorDto i : result.errors()) {
-            System.out.println(i.sku() + ": " + i.errorMessage());
-        }
 
         assertThat(result.imported()).isEqualTo(1);
 
@@ -157,11 +118,6 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(result).isNotNull();
 
-        System.out.println(result.imported());
-        System.out.println(result.failed());
-        for (ItemImportErrorDto i : result.errors()) {
-            System.out.println(i.sku() + ": " + i.errorMessage());
-        }
         // Проверяем, что битая строка зафиксирована в ошибках
         assertThat(result.failed()).isEqualTo(1);
         assertThat(result.errors()).hasSize(1);
@@ -205,12 +161,6 @@ public class CsvImportServiceIntegrationTest extends AbstractIntegrationTest {
         ItemImportResultDto result = csvImportService.importItems(multipartFile);
 
         assertThat(result).isNotNull();
-
-        System.out.println(result.imported());
-        System.out.println(result.failed());
-        for (ItemImportErrorDto i : result.errors()) {
-            System.out.println(i.sku() + ": " + i.errorMessage());
-        }
 
         // Ровно 1 ошибка на 10-й строке
         assertThat(result.failed()).isEqualTo(1);

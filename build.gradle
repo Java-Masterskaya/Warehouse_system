@@ -111,6 +111,14 @@ test {
     // Явно передаём корень проекта — запись снапшота не должна зависеть от рабочей
     // директории форкнутой тестовой JVM (по умолчанию она и так == projectDir, но лучше не гадать).
     systemProperty 'projectRootDir', project.projectDir.absolutePath
+    // Прокидываем настройки JUnit из командной строки в форкнутую тестовую JVM.
+    // Без этого не работает воспроизведение упавшего прогона по сиду:
+    //   ./gradlew test -Djunit.jupiter.execution.order.random.seed=<сид>
+    System.properties.each { key, value ->
+        if (key.toString().startsWith('junit.')) {
+            systemProperty key.toString(), value
+        }
+    }
 }
 
 pitest {

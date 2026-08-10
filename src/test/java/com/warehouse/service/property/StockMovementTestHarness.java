@@ -103,7 +103,7 @@ final class StockMovementTestHarness {
     StockMovementTestHarness() {
         this.item = Item.builder()
                 .id(ITEM_ID)
-                .sku("PBT-ITEM")
+                .sku("PBT-ITEM-" + java.util.UUID.randomUUID().toString().substring(0, 8))
                 .name("Property test item")
                 .minStock(0)
                 .active(true)

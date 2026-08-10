@@ -39,6 +39,15 @@ class UserControllerTest extends AbstractIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    /**
+     * Собственные учётки класса: {@link #adminCanDeactivateAnotherAdmin()} деактивирует
+     * админа и не восстанавливает. С общим {@code admin} из миграции V5 без доступа
+     * остались бы все классы, которые пойдут следом.
+     */
+    private static final String ADMIN_USERNAME = "usercontroller-admin";
+    private static final String SECOND_ADMIN_USERNAME = "usercontroller-admin2";
+    private static final String PASSWORD = "secret";
+
     private User admin;
     private User secondAdmin;
 
@@ -47,11 +56,11 @@ class UserControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        admin = createUser("admin", "secret", Role.ROLE_ADMIN);
-        secondAdmin = createUser("admin2", "secret", Role.ROLE_ADMIN);
+        admin = createUser(ADMIN_USERNAME, PASSWORD, Role.ROLE_ADMIN);
+        secondAdmin = createUser(SECOND_ADMIN_USERNAME, PASSWORD, Role.ROLE_ADMIN);
 
-        adminToken = obtainToken("admin", "secret");
-        secondAdminToken = obtainToken("admin2", "secret");
+        adminToken = obtainToken(ADMIN_USERNAME, PASSWORD);
+        secondAdminToken = obtainToken(SECOND_ADMIN_USERNAME, PASSWORD);
     }
 
     @Test

@@ -9,7 +9,6 @@ import com.warehouse.entity.Stock;
 import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.StockMovementRepository;
 import com.warehouse.repository.StockRepository;
 import com.warehouse.service.item.ItemService;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,9 +37,6 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     private StockRepository stockRepository;
 
     @Autowired
-    private StockMovementRepository stockMovementRepository;
-
-    @Autowired
     private ItemService itemService;
 
     @Autowired
@@ -58,11 +54,7 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
     void setUp() {
         cacheManager.getCache("item").clear();
 
-        stockMovementRepository.deleteAllInBatch();
-        batchRepository.deleteAll();
-        stockRepository.deleteAllInBatch();
-        itemRepository.deleteAllInBatch();
-        categoryRepository.deleteAllInBatch();
+        cleanDomainData();
 
         Category electronics = categoryRepository.save(
                 Category.builder()
@@ -71,14 +63,16 @@ class ItemCardCacheTest extends AbstractIntegrationTest {
         );
 
         Item item = new Item();
-        item.setSku("SKU-001");
+        // SKU уникален на прогон: колонка под уникальным индексом. Суффикс в barcode — на будущее.
+        String itemSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        item.setSku("SKU-ITEMCARD-" + itemSuffix);
         item.setName("Ноутбук");
         item.setCategory(electronics);
         item.setMinStock(5);
         item.setActive(true);
         item.setPrice(BigDecimal.valueOf(1500.00));
         item.setCost(BigDecimal.valueOf(1000.00));
-        item.setBarcode("ITEM-TEST-CARDCACHE-001");
+        item.setBarcode("ITEM-TEST-CARDCACHE-" + itemSuffix);
         itemRepository.save(item);
 
         Stock stock = new Stock();

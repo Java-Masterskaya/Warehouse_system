@@ -3,14 +3,8 @@ package com.warehouse.controller.integration;
 import com.warehouse.AbstractIntegrationTest;
 import com.warehouse.entity.Category;
 import com.warehouse.entity.Item;
-import com.warehouse.repository.BatchRepository;
 import com.warehouse.repository.CategoryRepository;
 import com.warehouse.repository.ItemRepository;
-import com.warehouse.repository.PurchaseOrderItemRepository;
-import com.warehouse.repository.PurchaseOrderRepository;
-import com.warehouse.repository.StockAlertRepository;
-import com.warehouse.repository.StockMovementRepository;
-import com.warehouse.repository.StockRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,35 +43,10 @@ class ItemControllerExportTest extends AbstractIntegrationTest {
     @Autowired
     private ItemRepository itemRepository;
 
-    @Autowired
-    private StockMovementRepository movementRepository;
-
-    @Autowired
-    private StockRepository stockRepository;
-
-    @Autowired
-    private StockAlertRepository stockAlertRepository;
-
-    @Autowired
-    private PurchaseOrderRepository purchaseOrderRepository;
-
-    @Autowired
-    private PurchaseOrderItemRepository purchaseOrderItemRepository;
-
-    @Autowired
-    private BatchRepository batchRepository;
-
     @BeforeEach
     @AfterEach
     void clearDatabase() {
-        purchaseOrderItemRepository.deleteAll();
-        purchaseOrderRepository.deleteAll();
-        stockAlertRepository.deleteAll();
-        movementRepository.deleteAll();
-        batchRepository.deleteAll();
-        stockRepository.deleteAll();
-        itemRepository.deleteAll();
-        categoryRepository.deleteAll();
+        cleanDomainData();
     }
 
     @Test

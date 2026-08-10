@@ -27,6 +27,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Duration;
@@ -76,6 +77,11 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
     @Autowired
     JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
+    private static final String USERNAME = "stockreserve-user";
+
     private String adminToken;
     private String userToken;
 
@@ -85,6 +91,10 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // Класс проверяет резервы через reservationRepository.findAll(): без очистки
+        // в выборку попадают чужие резервы, и проверки расходятся («ожидали 5, получили 7»,
+        // «Expecting empty»).
+        cleanDomainData();
 
         category = categoryRepository.findByNameIgnoreCase("test")
                 .orElseGet(() -> categoryRepository.save(
@@ -119,8 +129,17 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         User admin = userRepository.findByUsername("admin").orElseThrow();
 
-        User user = userRepository.findByUsername("testuser")
-                .orElse(new User(1L, "testuser", "pass@12Word", Role.ROLE_USER, true, LocalDateTime.now()));
+        // Пользователя сохраняем, а не собираем в памяти: cleanDomainData() удаляет учётки,
+        // созданные тестами, и объект с выдуманным id дал бы токен несуществующей учётке.
+        User user = userRepository.findByUsername(USERNAME)
+                .orElseGet(() -> userRepository.save(
+                        User.builder()
+                            .username(USERNAME)
+                            .password(passwordEncoder.encode("pass@12Word"))
+                            .role(Role.ROLE_USER)
+                            .active(true)
+                            .createdAt(LocalDateTime.now())
+                            .build()));
 
         adminToken = jwtUtil.generateToken(admin.getUsername(), admin.getId(), List.of("ROLE_ADMIN"));
 

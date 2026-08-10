@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
-public class CsvItemParserServiceTest extends AbstractIntegrationTest {
+class CsvItemParserServiceTest extends AbstractIntegrationTest {
 
     @Autowired
     private CsvItemParserService csvItemParserService;
