@@ -20,9 +20,6 @@ import org.testcontainers.utility.DockerImageName;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.time.Duration;
-
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 /**
  * Абстрактный базовый класс для интеграционных тестов.
@@ -92,6 +89,7 @@ public abstract class AbstractIntegrationTest {
                                 "-c", "shared_preload_libraries=pg_partman_bgw,pg_cron",
                                 "-c", "cron.database_name=warehouse"
                         );
+
         static {
             INSTANCE.start();
         }
@@ -113,7 +111,6 @@ public abstract class AbstractIntegrationTest {
                 new GenericContainer<>("redis:7-alpine")
                         .withExposedPorts(6379)
                         .withReuse(true);
-
 
         static {
             INSTANCE.start();
@@ -228,15 +225,4 @@ public abstract class AbstractIntegrationTest {
                 .serverCommands()
                 .flushDb();
     }
-
-    @BeforeEach
-    void waitForKafka() {
-        await().pollDelay(Duration.ofSeconds(1))
-                .pollInterval(Duration.ofSeconds(1))
-                .atMost(Duration.ofSeconds(10))
-                .until(() -> {
-                    return true;
-                });
-    }
-
 }
