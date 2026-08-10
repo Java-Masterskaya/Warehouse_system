@@ -24,6 +24,9 @@ public class StockMovementKeysetRepository {
      *
      * @param itemId item identifier
      * @param type optional movement type
+     * @param fromDate lower bound of the time window (partitioning key stock_movements.created_at);
+     *                  {@code null} means no lower bound — pass only for an explicit
+     *                  "full history" request, since without it the query scans all partitions
      * @param lastCreatedAt nullable cursor timestamp
      * @param lastId nullable cursor id
      * @param limit maximum result count
@@ -32,6 +35,7 @@ public class StockMovementKeysetRepository {
     public List<StockMovement> findNextPage(
             Long itemId,
             MovementType type,
+            LocalDateTime fromDate,
             LocalDateTime lastCreatedAt,
             Long lastId,
             int limit
@@ -50,6 +54,9 @@ public class StockMovementKeysetRepository {
         if (type != null) {
             hql.append(" and movement.type = :type");
         }
+        if (fromDate != null) {
+            hql.append(" and movement.createdAt >= :fromDate");
+        }
         if (lastCreatedAt != null && lastId != null) {
             hql.append(" and (movement.createdAt, movement.id) < (:lastCreatedAt, :lastId)");
         }
@@ -59,6 +66,9 @@ public class StockMovementKeysetRepository {
                 .setParameter("itemId", itemId);
         if (type != null) {
             query.setParameter("type", type);
+        }
+        if (fromDate != null) {
+            query.setParameter("fromDate", fromDate);
         }
         if (lastCreatedAt != null) {
             query.setParameter("lastCreatedAt", lastCreatedAt);

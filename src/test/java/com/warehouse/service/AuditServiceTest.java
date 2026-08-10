@@ -5,6 +5,7 @@ import com.warehouse.audit.AuditService;
 import com.warehouse.audit.entity.AuditAction;
 import com.warehouse.audit.entity.AuditLogEntity;
 import com.warehouse.audit.entity.EntityType;
+import com.warehouse.config.TestcontainersConfig;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +18,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-@Import(AuditService.class)
+@Import({AuditService.class, TestcontainersConfig.class})
 class AuditServiceTest {
 
     @Autowired

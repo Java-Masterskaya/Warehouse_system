@@ -23,6 +23,7 @@ spring:
         order_updates: true
   flyway:
     enabled: true
+    mixed: true
     postgresql:
       transactional-lock: false
 

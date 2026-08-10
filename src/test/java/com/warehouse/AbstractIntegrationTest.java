@@ -1,6 +1,7 @@
 package com.warehouse;
 
 import com.warehouse.entity.Warehouse;
+import com.warehouse.postgres.PostgresTestImage;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,10 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
+
+import java.time.Duration;
+
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 /**
  * Абстрактный базовый класс для интеграционных тестов.
@@ -33,7 +38,17 @@ public abstract class AbstractIntegrationTest {
     protected WarehouseRepository warehouseRepository;
 
     static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:16-alpine");
+            new PostgreSQLContainer<>(PostgresTestImage.IMAGE)
+                    .withDatabaseName("warehouse")
+                    .withUsername("postgres")
+                    .withPassword("postgres")
+                    .withReuse(true)
+                    .withInitScript("init.sql")
+                    .withCommand(
+                            "postgres",
+                            "-c", "shared_preload_libraries=pg_partman_bgw,pg_cron",
+                            "-c", "cron.database_name=warehouse"
+                    );
 
     static final RedpandaContainer redpanda =
             new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.2.11"));
@@ -94,4 +109,15 @@ public abstract class AbstractIntegrationTest {
             redisTemplate.delete(keys);
         }
     }
+
+    @BeforeEach
+    void waitForKafka() {
+        await().pollDelay(Duration.ofSeconds(1))
+                .pollInterval(Duration.ofSeconds(1))
+                .atMost(Duration.ofSeconds(10))
+                .until(() -> {
+                    return true;
+                });
+    }
+
 }
