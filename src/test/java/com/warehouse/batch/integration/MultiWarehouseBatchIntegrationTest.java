@@ -254,7 +254,8 @@ class MultiWarehouseBatchIntegrationTest extends AbstractIntegrationTest {
                 item.getId(),
                 MovementType.EXPIRED,
                 0,
-                10
+                10,
+                false
         );
         assertThat(history.content())
                 .extracting(

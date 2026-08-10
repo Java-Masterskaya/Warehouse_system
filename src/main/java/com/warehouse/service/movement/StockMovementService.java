@@ -48,16 +48,18 @@ public interface StockMovementService {
      * @param type   необязательный фильтр по типу движения
      * @param page   номер страницы
      * @param size   количество записей на странице
+     * @param fullHistory флаг "полная история"
      * @return страница с историей движений товара
      */
     PageResponse<StockMovementHistoryResponse> getItemMovementHistory(Long itemId, MovementType type, int page,
-            int size);
+            int size, boolean fullHistory);
 
     CursorPageResponse<StockMovementHistoryResponse> getItemMovementHistoryByCursor(
             Long itemId,
             MovementType type,
             String cursor,
-            int size
+            int size,
+            boolean fullHistory
     );
 
     /**

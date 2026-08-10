@@ -1,6 +1,7 @@
 package com.warehouse;
 
 import com.warehouse.entity.Warehouse;
+import com.warehouse.postgres.PostgresTestImage;
 import com.warehouse.repository.WarehouseRepository;
 import com.warehouse.web.ApiPaths;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,9 @@ import org.testcontainers.utility.DockerImageName;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.time.Duration;
+
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 /**
  * Абстрактный базовый класс для интеграционных тестов.
@@ -77,9 +81,17 @@ public abstract class AbstractIntegrationTest {
      */
     private static final class PostgresHolder {
         static final PostgreSQLContainer<?> INSTANCE =
-                new PostgreSQLContainer<>("postgres:16-alpine")
-                        .withReuse(true);
-
+                new PostgreSQLContainer<>(PostgresTestImage.IMAGE)
+                        .withDatabaseName("warehouse")
+                        .withUsername("postgres")
+                        .withPassword("postgres")
+                        .withReuse(true)
+                        .withInitScript("init.sql")
+                        .withCommand(
+                                "postgres",
+                                "-c", "shared_preload_libraries=pg_partman_bgw,pg_cron",
+                                "-c", "cron.database_name=warehouse"
+                        );
         static {
             INSTANCE.start();
         }
@@ -101,6 +113,7 @@ public abstract class AbstractIntegrationTest {
                 new GenericContainer<>("redis:7-alpine")
                         .withExposedPorts(6379)
                         .withReuse(true);
+
 
         static {
             INSTANCE.start();
@@ -215,4 +228,15 @@ public abstract class AbstractIntegrationTest {
                 .serverCommands()
                 .flushDb();
     }
+
+    @BeforeEach
+    void waitForKafka() {
+        await().pollDelay(Duration.ofSeconds(1))
+                .pollInterval(Duration.ofSeconds(1))
+                .atMost(Duration.ofSeconds(10))
+                .until(() -> {
+                    return true;
+                });
+    }
+
 }
