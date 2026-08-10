@@ -27,6 +27,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Duration;
@@ -76,6 +77,11 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
     @Autowired
     JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    PasswordEncoder passwordEncoder;
+
+    private static final String USERNAME = "stockreserve-user";
+
     private String adminToken;
     private String userToken;
 
@@ -123,13 +129,13 @@ class StockReserveControllerTest extends AbstractIntegrationTest {
 
         User admin = userRepository.findByUsername("admin").orElseThrow();
 
-        // Пользователя сохраняем, а не собираем в памяти: cleanDomainData() удаляет testuser,
-        // и объект с выдуманным id дал бы токен несуществующей учётке.
-        User user = userRepository.findByUsername("testuser")
+        // Пользователя сохраняем, а не собираем в памяти: cleanDomainData() удаляет учётки,
+        // созданные тестами, и объект с выдуманным id дал бы токен несуществующей учётке.
+        User user = userRepository.findByUsername(USERNAME)
                 .orElseGet(() -> userRepository.save(
                         User.builder()
-                            .username("testuser")
-                            .password("pass@12Word")
+                            .username(USERNAME)
+                            .password(passwordEncoder.encode("pass@12Word"))
                             .role(Role.ROLE_USER)
                             .active(true)
                             .createdAt(LocalDateTime.now())
